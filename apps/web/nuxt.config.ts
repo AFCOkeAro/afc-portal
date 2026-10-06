@@ -72,6 +72,14 @@ export default defineNuxtConfig({
     '/register': { ssr: true },
     '/api/**': { cors: false },
   },
+
+  // The app manifest is Nuxt's build-polling feature for a statically served
+  // error page. It is experimental in Nuxt 3, the portal is SSR behind a Nitro
+  // server and never serves a static error page, and leaving it on makes
+  // `pnpm dev:web` print five blocks of `Failed to resolve import
+  // "#app-manifest"` before it will serve anything. The next developer to run
+  // the dev server reads that as a broken scaffold.
+  experimental: { appManifest: false },
   compatibilityDate: '2025-07-01',
 
   nitro: {
