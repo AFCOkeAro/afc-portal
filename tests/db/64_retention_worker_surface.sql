@@ -202,6 +202,6 @@ BEGIN
 
   PERFORM test_support.assert_equals(
     (SELECT count(*)::text FROM retention_runs
-      WHERE actor = 'test:worker:surface' AND status = 'succeeded'), '1',
+      WHERE actor_label = 'test:worker:surface' AND status = 'succeeded'), '1',
     'worker', 'run as retention_worker actually ran: the entrypoint is live, not merely granted');
 END $$;

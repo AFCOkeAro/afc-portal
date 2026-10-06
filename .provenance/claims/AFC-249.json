@@ -1,0 +1,25 @@
+{
+  "issue": "AFC-249",
+  "authorAgentId": "7b4aae3b-0da5-4de2-a1d8-4737943ef561",
+  "authorName": "Coder",
+  "claimedAt": "2026-10-06T05:05:00+01:00",
+  "whatThisFileIs": "An R1 authorship claim, and nothing else. It says who wrote the compliance-path files below and on which issue. It asserts nothing about whether they are correct, and it carries no `reviews[]` entry.",
+  "paths": [
+    "services/directus/schema/engine/0001_retention_engine.sql",
+    "services/directus/schema/migrations/20261006_0005_retention_attribution.sql",
+    "services/directus/schema/migrations/rollback/20261006_0005_retention_attribution.down.sql",
+    "services/directus/schema/migrations/rollback/20261006_0004_retention.down.sql",
+    "tests/db/61_retention_holds.sql",
+    "tests/db/62_retention_run.sql",
+    "tests/db/63_retention_privileges.sql",
+    "tests/db/64_retention_worker_surface.sql",
+    "tests/db/65_retention_worker_membership.sql",
+    "tests/db/66_retention_attribution.sql",
+    ".provenance/claims/AFC-249.json"
+  ],
+  "doesNotClaimR2": "There is no `reviews[]` entry here and there will not be one from me. R2 wants a named reviewer who is not the author, and I am the author of every path above. AFC-249 assigns the re-review to the SecurityEngineer seat precisely because AFC-230's finding was authored by the CTO, and a fix reviewed by the author of the finding is the peer-review problem that seat exists to end. So the commit this claim covers WILL report an R2 violation until that seat records its verdict, and that violation is the honest state. Writing a `reviews[]` entry naming myself would turn a control into a rubber stamp.",
+  "scopeOfTheClaim": "R1 only: authorship of the listed paths on AFC-249. It is not clearance of the retention gate (plan 0.10.5), which only the CEO can clear, and it does not record that the `delete_enabled` enablement step is safe -- AFC-230's verdict was do not ship it until F1, F2 and F3 land, and this commit is the implementation of those fixes, not the permission to enable.",
+  "whatTheChangeActuallyDoes": "Retention engine and schema changes implementing the AFC-230 security review (AFC-249 findings F1-F7): the live deletion path takes its selection instant from now() and refuses any caller-supplied clock in BOTH directions; retention_runs.actor is stamped from session_user inside the SECURITY DEFINER with the caller's string kept separately as actor_label; started_at and finished_at are stamped from now() so a caller-supplied instant can no longer pin the monotone retention_last_run_at stale-job alarm; release_hold loses its caller-supplied p_released_by and derives the releaser from a provisioned, owner-written, shipped-empty role->principal mapping; and a dry_run writes nothing outside its own manifest rows.",
+  "verificationRecorded": "pnpm test green: 12 suites, 417 assertions, 0 failing, both literal gates and both privilege gates passing. Five negative controls were run by re-arming each defect on the engine and requiring the new suite to go red: the dry_run clock-state write (66.5), the live clock guard (66.2), the caller-supplied actor (66.3), the caller-supplied run timestamps (66.4), and a pre-F3 two-argument release_hold installed exactly as a deployed instance had it (63.4). The F5 negative control was the reason the F5 assertion was rewritten: the first version passed with the tamper re-armed, because with the F1 guard holding the caller-supplied instant is unreachable, so the assertion now aims at the property directly.",
+  "notClaimedPaths": "The working tree at the time of this commit also carried files this claim does NOT cover and that this run did not write: .github/workflows/ci.yml and docs/wireframes/church-portal-events.html (both present before this run started), .provenance/claims/AFC-205.json (another issue's review record), docs/adr/ADR-0002-roles-are-bootstrap-not-migrations.md and scripts/grep-awareness-write-context.sh (both appeared DURING this run and could not be attributed by me). They are left exactly where they are and were not staged."
+}

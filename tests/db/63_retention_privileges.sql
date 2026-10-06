@@ -141,7 +141,7 @@ BEGIN
 
   PERFORM test_support.assert_not_raises('retention_worker',
     $q$SELECT count(*) FROM retention_run_items WHERE run_id =
-          (SELECT run_id FROM retention_runs WHERE actor = 'test:priv:worker')$q$,
+          (SELECT run_id FROM retention_runs WHERE actor_label = 'test:priv:worker')$q$,
     'priv', 'retention_worker can read the manifest it produced');
 
   -- And it cannot reach the engine internals that would let it shortcut a
@@ -225,9 +225,55 @@ END $$;
 
 -- ---------------------------------------------------------------------------
 -- 63.4  PLACING AND RELEASING A HOLD.
+--
+-- AFC-249 F3/F4 changed what the release half of this block claims. It used to
+-- read "the actor on that release is one the database chose" above an assertion
+-- that checked released_by IS NOT NULL, on a uuid the CALLER generated one
+-- statement earlier -- a comment contradicted by the line under it, and an
+-- assertion that could not fail.
+--
+-- WHAT IS ASSERTED, in this order, because the order is the control:
+--   * directus_app can place a hold, and it is there;
+--   * it cannot release by updating the row;
+--   * the two-argument call -- the one that carried a caller-chosen releaser --
+--     is refused, because that function no longer exists (42883);
+--   * directus_app ships with NO provisioned principal, so a real release
+--     attempt under it is REFUSED rather than stored with a releaser nobody
+--     chose, and the hold is still holding;
+--   * only once the owner role provisions one does the release work, and the
+--     releaser it stores is the PROVISIONED principal -- compared against the
+--     uuid the caller had in hand, so a function that went back to honouring an
+--     argument goes red rather than quietly agreeing;
+--   * and nobody but the owner may decide that mapping.
+--
+-- WHY THE RELEASE ATTEMPTS USE SET SESSION AUTHORIZATION AND NOT probe().
+--   retention.release_hold derives the releaser from session_user, and SET LOCAL
+--   ROLE -- which is what test_support.probe() and as_role() do -- does not
+--   change session_user. A probe "as directus_app" is a session that
+--   authenticated as somebody else and assumed directus_app partway through, and
+--   release_hold correctly refuses to attribute the release to that somebody
+--   else. Reading that refusal as "directus_app cannot release" would be a
+--   measurement of the harness, and reading it as "the release succeeded" would
+--   be worse: that is exactly what happened on the first run of this block, and
+--   it passed.
+--
+--   Directus does not SET ROLE. It connects as directus_app, so session_user is
+--   directus_app, and the only faithful impersonation is SET SESSION
+--   AUTHORIZATION. See 65.4 for the full argument; this block restores the
+--   harness session identity afterwards and ASSERTS that it is back, so a
+--   silently unrestored session cannot make a later block pass for the wrong
+--   reason.
 -- ---------------------------------------------------------------------------
 DO $$
+DECLARE
+  v_hold      uuid;
+  v_forged    uuid := '00000000-0000-0000-0000-00000000f0f9';
+  v_principal uuid := '00000000-0000-0000-0000-00000000d0d0';
+  v_holder    text;
+  v_got       text := '(never attempted)';
 BEGIN
+  SELECT c.v INTO v_holder FROM test_support.config c WHERE c.k = 'session_role';
+
   -- Placing is an ordinary app action: the DPO can hold from the UI.
   --
   -- Written with as_role, NOT assert_not_raises: the probe harness discards its
@@ -239,32 +285,111 @@ BEGIN
        VALUES ('retention_class', 'fixture_orphan', 'placed by the runtime identity',
                gen_random_uuid())$q$);
 
+  SELECT id INTO v_hold FROM legal_holds
+   WHERE scope_type = 'retention_class' AND scope_id = 'fixture_orphan'
+     AND released_at IS NULL LIMIT 1;
+
   PERFORM test_support.assert_equals(
     (SELECT count(*)::text FROM legal_holds
       WHERE scope_type = 'retention_class' AND scope_id = 'fixture_orphan'
         AND released_at IS NULL), '1',
     'priv', 'positive control: directus_app can place a legal hold, and the hold is there to release');
 
-  -- Releasing goes through the function so the actor is stamped by the
-  -- database. A direct UPDATE would be a release with no recorded actor, which
-  -- is the one release nobody can defend afterwards.
+  -- Releasing goes through the function so the releaser is stamped by the
+  -- database. A direct UPDATE would be a release with no recorded releaser at
+  -- all, which is the one release nobody can defend afterwards.
   PERFORM test_support.assert_raises('directus_app',
     $q$UPDATE legal_holds SET released_by = gen_random_uuid(), released_at = now()
         WHERE released_at IS NULL$q$,
     '42501', 'priv', 'directus_app cannot release a hold by updating the row');
 
-  PERFORM test_support.as_role('directus_app',
-    $q$SELECT retention.release_hold(
-         (SELECT id FROM legal_holds
-           WHERE scope_type = 'retention_class' AND scope_id = 'fixture_orphan' LIMIT 1),
-         gen_random_uuid())$q$);
+  -- THE PARAMETER IS GONE. This is the assertion with teeth against a
+  -- regression: put p_released_by back and this stops being the truth, and the
+  -- suite says so rather than the function quietly accepting a forged releaser
+  -- again. 42883 undefined_function, not 42501 -- the call never reaches a
+  -- privilege check, because there is no such function to hold a privilege on.
+  PERFORM test_support.assert_raises('directus_app',
+    format($q$SELECT retention.release_hold(%L::uuid, %L::uuid)$q$, v_hold, v_forged),
+    '42883', 'priv', 'release_hold takes no releaser argument: the caller cannot name who released, because the database stamps it');
 
-  -- And the actor on that release is one the database chose.
+  -- Precondition on the attempt below, so the refusal cannot be passing because
+  -- some earlier run left a principal behind.
   PERFORM test_support.assert_equals(
-    (SELECT count(*)::text FROM legal_holds
-      WHERE scope_type = 'retention_class' AND scope_id = 'fixture_orphan'
-        AND released_by IS NOT NULL AND released_at IS NOT NULL), '1',
-    'priv', 'directus_app can release a hold through the function, and the release is stamped');
+    (SELECT count(*)::text FROM retention_principals WHERE role_name = 'directus_app'), '0',
+    'priv', 'precondition: directus_app ships with no provisioned principal');
+
+  -- THE ATTEMPT, as the role that actually holds EXECUTE, authenticated as.
+  -- 23001 rather than 22023: this is a control refusing an operation, and the
+  -- distinction from "you passed something invalid" is what an operator reads a
+  -- log to make.
+  SET SESSION AUTHORIZATION directus_app;
+  v_got := 'NOT REFUSED -- the release went through with nobody attributed';
+  BEGIN
+    PERFORM retention.release_hold(v_hold);
+  EXCEPTION WHEN OTHERS THEN
+    v_got := SQLSTATE;
+  END;
+  EXECUTE 'SET SESSION AUTHORIZATION ' || quote_ident(v_holder);
+
+  PERFORM test_support.assert_equals(v_got, '23001',
+    'priv', 'a release under a role with no provisioned principal is refused, not stored with a releaser the caller chose');
+
+  PERFORM test_support.assert_equals(current_user, v_holder,
+    'priv', 'the harness session identity is restored after impersonation, so the blocks below are not running as somebody unexpected');
+
+  -- And the hold it refused to release is still holding. Asserted on the row,
+  -- not on the absence of an error: a refusal that arrived after the UPDATE
+  -- would produce the same log line and a hold that is no longer holding.
+  PERFORM test_support.assert_equals(
+    (SELECT count(*)::text FROM legal_holds WHERE id = v_hold AND released_at IS NULL), '1',
+    'priv', 'and the hold it refused to release is still holding');
+
+  -- Nobody but the owner may decide this mapping. directus_app holds no write
+  -- grant, and the trigger is the second layer for the case where a grant list
+  -- is widened by accident -- the same shape as the clock-state guard.
+  PERFORM test_support.assert_raises('directus_app',
+    $q$INSERT INTO retention_principals (role_name, principal_id) VALUES ('directus_app', gen_random_uuid())$q$,
+    '42501', 'priv', 'directus_app cannot provision its own release attribution: refused by the grant list');
+
+  PERFORM test_support.as_role(NULL,
+    $c$GRANT ALL PRIVILEGES ON retention_principals TO test_table_super$c$);
+
+  PERFORM test_support.assert_raises('test_table_super',
+    $q$UPDATE retention_principals SET principal_id = gen_random_uuid()$q$,
+    '23001', 'priv', 'a role with ALL on the mapping still cannot re-point a release attribution: refused by the trigger');
+
+  -- Provision, under the owner role. This is the shape a deployment uses, and
+  -- it is the only thing standing between the refusal above and a release.
+  PERFORM test_support.as_role('directus_migrator',
+    format($c$INSERT INTO retention_principals (role_name, principal_id, note)
+           VALUES ('directus_app', %L::uuid, 'DPO service principal')$c$, v_principal));
+
+  -- And now the release works, still authenticated as directus_app, and the
+  -- releaser it stores is the PROVISIONED principal. Compared as a value
+  -- against a value: this is the assertion the old "IS NOT NULL" should have
+  -- been, and the only way it can fail is if the stored releaser is not the one
+  -- the database chose.
+  SET SESSION AUTHORIZATION directus_app;
+  v_got := 'not attempted';
+  BEGIN
+    PERFORM retention.release_hold(v_hold);
+    v_got := 'released';
+  EXCEPTION WHEN OTHERS THEN
+    v_got := 'raised ' || SQLSTATE;
+  END;
+  EXECUTE 'SET SESSION AUTHORIZATION ' || quote_ident(v_holder);
+
+  PERFORM test_support.assert_equals(v_got, 'released',
+    'priv', 'directus_app can release a hold through the function, once the owner role has provisioned the attribution');
+
+  PERFORM test_support.assert_equals(
+    (SELECT released_by::text FROM legal_holds WHERE id = v_hold), v_principal::text,
+    'priv', 'and the releaser recorded is the principal the database maps the session role to');
+
+  -- And it is not the uuid the caller had in hand when the abuse was attempted.
+  PERFORM test_support.assert_true(
+    (SELECT released_by::text FROM legal_holds WHERE id = v_hold) <> v_forged::text,
+    'priv', 'specifically not a uuid the caller supplied');
 
   -- A hold cannot be forged as already released.
   PERFORM test_support.assert_raises('directus_app',

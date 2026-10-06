@@ -452,21 +452,26 @@ BEGIN
   -- not a third party editing history. Written with as_role, NOT through a
   -- probe: probe() discards its writes, so the next assertion would run against
   -- a row that is still open and would pass for the wrong reason.
-  INSERT INTO retention_runs (run_id, mode, status, actor)
-  VALUES (gen_random_uuid(), 'dry_run', 'running', 'test:in-flight');
+  --
+  -- actor is the session, and this INSERT is standing in for the engine rather
+  -- than being one -- so it names the session it is running under, exactly as
+  -- retention.run does. The label is what identifies this row to the assertions
+  -- below, which is the whole reason the two are separate columns.
+  INSERT INTO retention_runs (run_id, mode, status, actor, actor_label)
+  VALUES (gen_random_uuid(), 'dry_run', 'running', current_user, 'test:in-flight');
 
   PERFORM test_support.as_role(NULL,
     $q$UPDATE retention_runs SET status = 'failed', finished_at = now(),
             error = 'reconciled: job killed mid-run, manifest reviewed'
-        WHERE actor = 'test:in-flight'$q$);
+        WHERE actor_label = 'test:in-flight'$q$);
 
   PERFORM test_support.assert_equals(
-    (SELECT status::text FROM retention_runs WHERE actor = 'test:in-flight'), 'failed',
+    (SELECT status::text FROM retention_runs WHERE actor_label = 'test:in-flight'), 'failed',
     'manifest', 'precondition: the in-flight run has been closed out as failed');
 
   PERFORM test_support.assert_raises(NULL,
     $q$UPDATE retention_runs SET status = 'succeeded', error = NULL
-        WHERE actor = 'test:in-flight'$q$,
+        WHERE actor_label = 'test:in-flight'$q$,
     '23001', 'manifest', 'and once closed it is frozen');
 
   -- Run items are append-only too. Anchored on a run that actually HAS a
@@ -497,12 +502,16 @@ BEGIN
     format($q$DELETE FROM retention_run_items WHERE run_id = %L$q$, v_wd_run),
     '23001', 'manifest', 'a role with ALL on the table still cannot delete a manifest item');
 
-  -- The actor is part of the evidence, and it is NOT NULL at the schema level.
-  -- Asserted over every run rather than against "the latest one", which would
-  -- be an assertion about test ordering and not about the schema.
-  PERFORM test_support.assert_equals(
-    (SELECT count(*)::text FROM retention_runs WHERE actor IS NULL OR actor = ''), '0',
-    'manifest', 'every run records who ran it');
+  -- "Every run records who ran it" used to live here, asserted as a count of
+  -- rows where actor IS NULL OR actor = ''. AFC-249 F4 called it out and the
+  -- call is right: every row in the table was created by this suite with a
+  -- non-empty actor, so the count was a count of the suite's own fixtures and
+  -- could not have failed. It has been REMOVED rather than restated here,
+  -- because a replacement that only checks the shape of the column is the same
+  -- assertion with the confidence removed. The replacement attempts the abuse --
+  -- a run whose caller supplies a label that is not an identity, and a run made
+  -- by a session that cannot log in -- and asserts what was actually stored.
+  -- It is in tests/db/66_retention_attribution.sql.
 
   PERFORM test_support.assert_equals(
     (SELECT count(*)::text FROM retention_runs WHERE started_at IS NULL), '0',
@@ -538,7 +547,7 @@ BEGIN
   PERFORM retention.run('test:no-overlap', 'dry_run');
   PERFORM test_support.assert_equals(
     (SELECT count(*)::text FROM retention_runs
-      WHERE actor = 'test:no-overlap' AND status = 'succeeded'), '1',
+      WHERE actor_label = 'test:no-overlap' AND status = 'succeeded'), '1',
     'writer', 'positive control: with nothing in flight the run proceeds and records itself');
 
   v_first  := pg_try_advisory_lock(4210245981);
@@ -641,12 +650,12 @@ BEGIN
     'failrun', 'and it says why, rather than failing somewhere inside the erasure');
 
   PERFORM test_support.assert_equals(
-    (SELECT count(*)::text FROM retention_runs WHERE actor = 'test:failrun:live'), '0',
+    (SELECT count(*)::text FROM retention_runs WHERE actor_label = 'test:failrun:live'), '0',
     'failrun', 'the failed run leaves no run row: the row is in the transaction that just rolled back');
 
   PERFORM test_support.assert_equals(
     (SELECT count(*)::text FROM retention_run_items
-      WHERE run_id = (SELECT run_id FROM retention_runs WHERE actor = 'test:failrun:dry')
+      WHERE run_id = (SELECT run_id FROM retention_runs WHERE actor_label = 'test:failrun:dry')
         AND action = 'deleted'), '0',
     'failrun', 'no manifest item claims a deletion that did not happen');
 
@@ -673,7 +682,7 @@ BEGIN
 
   PERFORM test_support.assert_equals(
     (SELECT count(*)::text FROM retention_runs
-      WHERE status = 'failed' AND actor = 'test:failrun:live'), '0',
+      WHERE status = 'failed' AND actor_label = 'test:failrun:live'), '0',
     'failrun', 'a live failure is never counted here, because its row rolled back: job failure is alerted from the log');
 
   -- Once the class is configured properly, the job runs. A control that stops

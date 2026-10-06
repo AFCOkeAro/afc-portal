@@ -68,6 +68,12 @@ $$;
 -- deployment recreates it from bootstrap/0001_roles.sql; the REVOKE PUBLIC in
 -- that file is what makes recreation safe.
 -- ---------------------------------------------------------------------------
+-- Both arities. 0005 removed p_released_by, because a caller-supplied releaser
+-- is not an attribution (AFC-249 F3), so the shape that 0004 shipped is gone and
+-- the shape 0005 shipped is the one that may be installed. Both are listed so a
+-- teardown works against either tree rather than only against the history this
+-- file was written next to.
+DROP FUNCTION IF EXISTS retention.release_hold(uuid);
 DROP FUNCTION IF EXISTS retention.release_hold(uuid, uuid);
 DROP FUNCTION IF EXISTS retention.run(text, text, timestamptz);
 DROP FUNCTION IF EXISTS retention.sync_clocks(timestamptz);
@@ -129,6 +135,10 @@ DROP TABLE IF EXISTS retention_clocks;
 DROP TABLE IF EXISTS retention_policies;
 DROP TABLE IF EXISTS retention_class_sources;
 DROP TABLE IF EXISTS retention_anchor_sources;
+-- Added by 0005 and dependent on nothing, so it can go anywhere. Listed here so a
+-- full teardown of the retention feature leaves no orphaned identity mapping
+-- behind even if 0005's own rollback was not run.
+DROP TABLE IF EXISTS retention_principals;
 
 -- ---------------------------------------------------------------------------
 -- 4. people.

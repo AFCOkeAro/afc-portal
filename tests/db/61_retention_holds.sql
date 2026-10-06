@@ -21,7 +21,8 @@
 --         nothing, and produces exactly the false assurance this control
 --         exists to prevent.
 --   61.5  a released hold is history: the row survives, cannot be deleted,
---         cannot be re-armed, and a release with no actor is refused
+--         cannot be re-armed, and a release the database cannot attribute is
+--         refused rather than stored
 
 -- Reuse the fixture people from 60_retention_due_date.sql. Suites run in
 -- filename order in one transaction, so the fixtures are already present.
@@ -249,41 +250,94 @@ BEGIN
 END $$;
 
 -- ---------------------------------------------------------------------------
--- 61.5  RELEASE IS HISTORY.
+-- 61.5  A RELEASE IS ATTRIBUTED, AND IT IS THE DATABASE THAT ATTRIBUTES IT.
+--
+-- AFC-249 F3. Before this, release_hold(p_hold_id, p_released_by) stored the
+-- uuid the CALLER supplied, while its own COMMENT claimed the database stamped
+-- it. Only released_at was the database's. The parameter is gone; the releaser
+-- comes from retention_principals, keyed on session_user.
+--
+-- So the order of these assertions is the point, and it is why they cannot be
+-- collapsed into "the release is stamped":
+--
+--   1. the harness session role is NOT provisioned, and a release is REFUSED
+--      -- not stored with a NULL or a fabricated releaser. A release nobody can
+--      attribute is a release that cannot be defended, and it unblocks the
+--      deletion of records somebody placed a hold on;
+--   2. only then is the role provisioned, by the owner role, which is the shape
+--      a real deployment uses;
+--   3. and the stored releaser is the PROVISIONED principal -- asserted against
+--      a fabricated uuid the caller had in hand, so a function that went back to
+--      honouring an argument would go red here rather than quietly agree.
 -- ---------------------------------------------------------------------------
 DO $$
 DECLARE
   v_hold    uuid;
-  v_hold_2  uuid;
+  v_holder  text;
+  v_forged  uuid := '00000000-0000-0000-0000-00000000c0de';
+  v_real    uuid := '00000000-0000-0000-0000-00000000a11e';
   v_released timestamptz;
 BEGIN
+  SELECT c.v INTO v_holder FROM test_support.config c WHERE c.k = 'session_role';
+
   SELECT id INTO v_hold FROM legal_holds
    WHERE scope_type = 'person' AND released_at IS NULL LIMIT 1;
 
   PERFORM test_support.assert_true(v_hold IS NOT NULL, 'hold',
     'precondition: an active hold exists to release');
 
-  -- A release with no actor is refused: the actor on a release is the evidence
-  -- that erasure became permissible again.
-  PERFORM test_support.assert_raises(NULL,
-    $q$SELECT retention.release_hold(NULL, NULL)$q$,
-    '22023', 'hold', 'releasing a hold without naming who released it is refused');
+  PERFORM test_support.assert_true(v_holder IS NOT NULL AND v_holder <> '', 'hold',
+    'precondition: the harness session role is named, so a release can be attributed to a role at all');
 
-  PERFORM test_support.assert_raises(NULL,
-    format($q$SELECT retention.release_hold(%L::uuid, NULL)$q$, v_hold),
-    '22023', 'hold', 'releasing a specific hold with no actor is refused');
+  -- Precondition on the abuse itself: the role this suite releases under is not
+  -- provisioned. Without this, the refusal below could be passing because some
+  -- earlier suite happened to add the row.
+  PERFORM test_support.assert_equals(
+    (SELECT count(*)::text FROM retention_principals WHERE role_name = v_holder), '0',
+    'hold', 'precondition: the harness session role has no provisioned principal');
 
+  -- A NULL hold is an argument error, not an attribution decision, and it is
+  -- refused before the attribution is even consulted.
   PERFORM test_support.assert_raises(NULL,
-    format($q$SELECT retention.release_hold(%L::uuid, gen_random_uuid())$q$,
-            '00000000-0000-0000-0000-00000000beef'),
-    '22023', 'hold', 'releasing a hold that does not exist is refused, not a silent no-op');
+    $q$SELECT retention.release_hold(NULL)$q$,
+    '22023', 'hold', 'releasing a hold without naming which hold is refused');
 
-  PERFORM retention.release_hold(v_hold, gen_random_uuid());
+  -- THE ATTEMPT. No principal for this session: refused, and the hold is still
+  -- holding. Asserted as "still active" rather than as "an error was raised",
+  -- because an error that arrived after the UPDATE would leave the same log line.
+  PERFORM test_support.assert_raises(NULL,
+    format($q$SELECT retention.release_hold(%L::uuid)$q$, v_hold),
+    '23001', 'hold', 'a release under a role with no provisioned principal is refused rather than stored unattributed');
+
+  PERFORM test_support.assert_equals(
+    (SELECT count(*)::text FROM legal_holds WHERE id = v_hold AND released_at IS NULL), '1',
+    'hold', 'and the hold it refused to release is still holding');
+
+  -- Provision it, the way a deployment does: under the owner role, which is the
+  -- only role the table's trigger admits. v_real is deliberately NOT the forged
+  -- uuid the caller was holding.
+  PERFORM test_support.as_role('directus_migrator',
+    format($c$INSERT INTO retention_principals (role_name, principal_id, note)
+           VALUES (%L, %L::uuid, 'test harness session identity')$c$,
+            v_holder, v_real));
+
+  PERFORM test_support.as_role(NULL,
+    format($q$SELECT retention.release_hold(%L::uuid)$q$, v_hold));
 
   SELECT released_at INTO v_released FROM legal_holds WHERE id = v_hold;
 
   PERFORM test_support.assert_true(v_released IS NOT NULL, 'hold',
     'the release is recorded with a timestamp');
+
+  -- THE MEASUREMENT. The stored releaser is the provisioned principal, and is
+  -- not the uuid the caller had in hand.
+  PERFORM test_support.assert_equals(
+    (SELECT released_by::text FROM legal_holds WHERE id = v_hold), v_real::text,
+    'hold', 'the releaser recorded is the principal provisioned for the session, not a value the caller supplied');
+
+  PERFORM test_support.assert_true(
+    (SELECT released_by::text FROM legal_holds WHERE id = v_hold) <> v_forged::text,
+    'hold', 'and specifically not the fabricated uuid the caller was holding');
 
   -- The row survives. A release is a historical fact about a legal decision.
   PERFORM test_support.assert_equals(
@@ -325,8 +379,15 @@ BEGIN
 
   -- A second release is refused rather than silently re-stamping.
   PERFORM test_support.assert_raises(NULL,
-    format($q$SELECT retention.release_hold(%L::uuid, gen_random_uuid())$q$, v_hold),
+    format($q$SELECT retention.release_hold(%L::uuid)$q$, v_hold),
     '22023', 'hold', 'releasing an already-released hold is refused');
+
+  -- A hold that does not exist is refused, not a silent no-op. Asserted with a
+  -- role that IS provisioned, so the refusal is about the hold and not about the
+  -- attribution -- otherwise it would pass for the wrong reason.
+  PERFORM test_support.assert_raises(NULL,
+    format($q$SELECT retention.release_hold('00000000-0000-0000-0000-00000000beef'::uuid)$q$),
+    '22023', 'hold', 'releasing a hold that does not exist is refused, not a silent no-op');
 END $$;
 
 -- ---------------------------------------------------------------------------

@@ -338,6 +338,31 @@ $$;
 --   A hold wins over everything, including an already-due clock and an enabled
 --   policy. That ordering is asserted in tests/db/61_retention_holds.sql.
 --
+--   THE CALLER SUPPLIES NO CLOCK ON A LIVE RUN, AND NO ACTOR AT ALL. Both were
+--   measured as forgeable on a pristine HEAD by the independent security review
+--   (AFC-230, findings F1, F2, F5, F6, F7; implemented in AFC-249):
+--
+--     * p_now made the selection instant a caller argument, so one call with a
+--       future instant selected clocks whose due dates had not arrived, and one
+--       call with a past instant selected nothing while records were due and
+--       reported status='succeeded' with zero candidates. Both directions are
+--       an NDPA failure and neither needs a forged clock.
+--     * p_actor was written straight into retention_runs.actor, which is the
+--       attribution evidence for an erasure.
+--     * p_now also stamped started_at and finished_at, and
+--       retention_metrics.retention_last_run_at is max(started_at) feeding the
+--       stale-job alarm. max() is monotone over an append-only table, so one
+--       forged run pinned that alarm at infinity permanently.
+--     * p_actor was accepted as an empty string.
+--     * the hold branch wrote retention_clocks.state='held' above the mode
+--       branch, so a PREVIEW mutated state.
+--
+--   p_now and p_actor are still in the signature. p_now is kept because a
+--   preview is legitimately asked about a future instant (F7: forward only) and
+--   because AFC-167 froze the signature; p_actor is kept because the operator's
+--   own words about a run are worth recording -- in actor_label, which is a
+--   label and is not read as an attribution. Neither is trusted on a live run.
+--
 -- SECURITY DEFINER: the worker role holds no DELETE grant on any collection, so
 -- erasure happens through this function's rights. That is deliberate -- it is
 -- what makes "the job is the only deletion path" true rather than aspirational.
@@ -372,10 +397,95 @@ DECLARE
   v_targets     integer;
   v_src         record;
   v_erased      record;
+  -- The database's clock, and the instant selection is made at. Deliberately two
+  -- names for what is one value on a live run: v_db_now is what the manifest and
+  -- every timestamp are stamped from, and v_select_now is the predicate's right
+  -- operand. On a dry run they differ by design and only v_select_now moves.
+  v_db_now      timestamptz := now();
+  v_select_now  timestamptz;
+  v_can_login   boolean;
+  v_session     text := session_user::text;
 BEGIN
   IF p_mode NOT IN ('dry_run', 'live') THEN
     RAISE EXCEPTION 'retention.run mode must be dry_run or live, got %', p_mode
       USING ERRCODE = 'invalid_parameter_value';
+  END IF;
+
+  -- ---------------------------------------------------------------------
+  -- WHO RAN THIS, BEFORE ANY WORK IS DONE.
+  --
+  -- session_user survives into this SECURITY DEFINER body and reads the role the
+  -- connection authenticated as, which is what makes it the right source: it is
+  -- not an argument, so no caller can write it, and it is not current_user,
+  -- which is the engine owner and would name every run after the same role.
+  --
+  -- A session that authenticated as a role with no LOGIN is refused rather than
+  -- recorded as something. That role is one the engine assumed through SET ROLE
+  -- -- a credential nobody holds -- and an erasure attributed to it names nobody.
+  -- 23001 rather than 22023, because this is a control refusing an operation and
+  -- not a malformed argument; an operator reading the log needs to see which of
+  -- those it was.
+  -- ---------------------------------------------------------------------
+  SELECT r.rolcanlogin INTO v_can_login
+    FROM pg_roles r WHERE r.rolname = session_user;
+
+  IF NOT COALESCE(v_can_login, false) THEN
+    RAISE EXCEPTION
+      'retention.run session % is not a role that can log in, so this run could not be attributed to an accountable identity. An erasure is attributed to the session that performed it; a session that authenticated as nothing would be attributed to nobody.'
+      , v_session
+      USING ERRCODE = 'restrict_violation';
+  END IF;
+
+  -- The label is still checked, because a run whose only human-readable field is
+  -- empty is a run nobody can find in the log. 22023: this is argument
+  -- validation, and an operator reading a log should be able to tell the
+  -- difference between "you passed something invalid" and "a control stopped you".
+  IF p_actor IS NULL OR btrim(p_actor) = '' THEN
+    RAISE EXCEPTION
+      'retention.run requires a non-empty actor label naming the source of the run (a scheduler, an operator, a review sweep). It is stored as actor_label; the attribution itself is the session.'
+      USING ERRCODE = 'invalid_parameter_value';
+  END IF;
+
+  -- ---------------------------------------------------------------------
+  -- THE CLOCK. Two-sided on live, forward-only on preview.
+  --
+  -- Not "reject p_now > now() + one day". That option is one-sided: it closes
+  -- the widening direction and leaves the suppressing direction open, and
+  -- suppressing erasure is the NDPA failure that needs no forged future clock at
+  -- all -- retention.run('x','live','1970-01-01') erased nothing while records
+  -- were due and reported success with zero candidates, which is
+  -- indistinguishable from "nothing to do".
+  --
+  -- So on live the parameter is not interpreted, it is CHECKED, and any value
+  -- other than the database's own clock is refused rather than ignored. Ignored
+  -- would be worse than refused in the other direction: the caller would see a
+  -- successful run over the wrong window and have no reason to know.
+  --
+  -- The DEFAULT is now(), which is the transaction timestamp, so the ordinary
+  -- two-argument call passes this check exactly. That is why the equality is a
+  -- check rather than a heuristic: p_now is now() by construction when the
+  -- caller supplied nothing.
+  -- ---------------------------------------------------------------------
+  IF p_mode = 'live' THEN
+    IF p_now IS DISTINCT FROM v_db_now THEN
+      RAISE EXCEPTION
+        'retention.run(''live'') takes its selection instant from the database and refuses a caller-supplied clock. Supplied % against the database''s %: a future instant erases records before their due date and a past instant erases nothing while records are due, and both are NDPA failures. Run it dry with a forward instant to see the future, then live without one.'
+        , p_now, v_db_now
+        USING ERRCODE = 'restrict_violation';
+    END IF;
+    v_select_now := v_db_now;
+  ELSE
+    -- A preview may look FORWARD -- that is what a preview is for -- but never
+    -- backward past now(). A 1970 preview reports zero candidates for a schedule
+    -- that has thirty, and a preview that under-reports is a control lying to
+    -- the person deciding whether to enable the live run.
+    IF p_now < v_db_now THEN
+      RAISE EXCEPTION
+        'retention.run(''dry_run'') may look forward from now(), not backward. Supplied % against the database''s %: a preview anchored in the past hides records that are already due, which is the same over-retention failure as a live run with a forged past clock.'
+        , p_now, v_db_now
+        USING ERRCODE = 'restrict_violation';
+    END IF;
+    v_select_now := p_now;
   END IF;
 
   v_lock := pg_try_advisory_lock(v_lock_key);
@@ -402,8 +512,25 @@ BEGIN
   -- control, because it reads as covered. Crash detection is the scheduler's
   -- job-failure alert and the WARNING emitted below -- see the failure handler.
 
-  INSERT INTO retention_runs (run_id, mode, status, actor, lock_token, started_at)
-  VALUES (v_run_id, p_mode, 'running', p_actor, v_lock_key::text, p_now);
+  -- The manifest header. Three of these four values are the database's:
+  --
+  --   actor          session_user, because the attribution evidence for an
+  --                  erasure is the session that performed it and a session is
+  --                  not something the caller gets to write.
+  --   actor_label    the caller's string, kept as a label.
+  --   started_at     now(), because retention_metrics.retention_last_run_at is
+  --                  max(started_at) over an append-only table feeding the
+  --                  stale-job alarm, so one forged value would pin that alarm
+  --                  at infinity for ever.
+  --   preview_instant  only ever a forward-looking preview instant, and only on
+  --                  a dry run. On live it is NULL, because a live run has no
+  --                  caller-supplied clock at all.
+  INSERT INTO retention_runs
+    (run_id, mode, status, actor, actor_label, preview_instant, lock_token, started_at)
+  VALUES
+    (v_run_id, p_mode, 'running', v_session, p_actor,
+     CASE WHEN p_mode = 'dry_run' THEN v_select_now END,
+     v_lock_key::text, v_db_now);
 
   BEGIN
     FOR c IN
@@ -414,9 +541,16 @@ BEGIN
         JOIN retention_policies rp ON rp.id = rc.policy_id
        -- A clock is a candidate at all only when its due date is reached.
        -- Selection is by due_at, not by state, so an 'indeterminate' clock
-       -- (due_at NULL) can never be selected: NULL <= now() is NULL, not true.
+       -- (due_at NULL) can never be selected: NULL <= v_select_now is NULL, not
+       -- true.
+       --
+       -- v_select_now, not p_now, and on a live run those are equal only
+       -- because the check above refused every other value. The predicate reads
+       -- the variable rather than the argument so that "the live path selects
+       -- on the database clock" is visible in the SQL rather than an invariant
+       -- a later edit could quietly break.
        WHERE rc.due_at IS NOT NULL
-         AND rc.due_at <= p_now
+         AND rc.due_at <= v_select_now
          -- Live erasure is only ever against a policy that is currently
          -- active. A clock left behind by a superseded rule is evaluated,
          -- reported, and not erased by a rule that is no longer in force.
@@ -427,7 +561,19 @@ BEGIN
       --    moment of erasure rather than at selection time.
       v_held := retention.has_active_hold(c.person_id, c.retention_class);
       IF v_held THEN
-        UPDATE retention_clocks SET state = 'held' WHERE id = c.id;
+        -- Marking the clock held is a WRITE, so it belongs to the mode that is
+        -- allowed to write. It used to sit above this branch and run in both
+        -- modes, so a PREVIEW changed retention_clocks.state from 'live' to
+        -- 'held' -- and the next sync_clocks() will not move it back, because a
+        -- hold outranks a resync by design. A preview that cannot be undone by
+        -- the next real run is not a preview.
+        --
+        -- The manifest still records the hold, which is the whole point of the
+        -- branch: a dry run reports what it would skip and why, and changes
+        -- nothing.
+        IF p_mode = 'live' THEN
+          UPDATE retention_clocks SET state = 'held' WHERE id = c.id;
+        END IF;
         v_action := 'skipped'; v_skip := 'held';
         v_held_n := v_held_n + 1; v_skipped := v_skipped + 1;
       -- 1b. Already erased. Ahead of the enablement check so a second run
@@ -506,7 +652,7 @@ BEGIN
     v_failed := 0;
 
     UPDATE retention_runs
-       SET finished_at = p_now,
+       SET finished_at = v_db_now,
            status      = 'succeeded',
            counts      = jsonb_build_object(
              'deleted',     v_deleted,
@@ -537,15 +683,27 @@ BEGIN
     -- Consequence to record against AFC-167 section 8.6: job failure is alerted
     -- from the log and the scheduler, NOT from retention_metrics. A metrics row
     -- that can never be non-zero is an alarm that always reads healthy.
+    --
+    -- The session is named, not the caller's string. The log is read by whoever
+    -- has to answer "who did this", and the answer to that is the credential that
+    -- connected -- the caller's string is in the WARNING as the label, because a
+    -- label is useful for finding the run and is not an identity.
     RAISE WARNING
-      'retention.run FAILED actor=% mode=% error=%', p_actor, p_mode, left(SQLERRM, 1500);
+      'retention.run FAILED session=% label=% mode=% error=%',
+      v_session, p_actor, p_mode, left(SQLERRM, 1500);
     PERFORM pg_advisory_unlock(v_lock_key);
     RAISE;
   END;
 END $$;
 
 COMMENT ON FUNCTION retention.run(text, text, timestamptz) IS
-  'The only deletion path. Dry-run default, single-writer advisory lock, hold checked at erasure time. Order: hold -> ladder -> due -> delete_enabled.';
+  'The only deletion path. Dry-run default, single-writer advisory lock, hold checked at erasure time. Order: hold -> ladder -> due -> delete_enabled.
+
+  ATTRIBUTION AND CLOCK, neither of them the caller''s to choose. actor is session_user, read inside this SECURITY DEFINER body; actor_label holds the caller''s string and is a label only. started_at and finished_at are now(), because retention_last_run_at is max(started_at) over an append-only table and one forged value pins the stale-job alarm at infinity.
+
+  On live, p_now is CHECKED against now() and refused with restrict_violation if it differs -- two-sided, because a future instant erases before the due date and a past instant suppresses erasure while records are due. On dry_run a forward p_now is honoured and recorded in preview_instant; a p_now before now() is refused, because a preview that under-reports is the same over-retention failure.
+
+  A dry run writes nothing outside its own manifest rows. Marking a held clock is a live-mode write.';
 
 -- ===========================================================================
 -- 6. Observability. Five metrics, one view. Source of the alert rules.
@@ -575,23 +733,85 @@ SELECT
 COMMENT ON VIEW retention_metrics IS
   'AFC-167 section 8.6 metrics. Alert on: a non-zero indeterminate count (a data-quality alarm, not a delete signal), and job not run in N hours via retention_last_run_at.
 
-  DEVIATION, recorded deliberately: retention_runs_failed counts runs RECONCILED as failed, not live failures. A run that fails rolls its own row back with the transaction, so it cannot appear here -- see retention.run section 5. Live job failure is alerted from the server log WARNING and the scheduler failure alert. A metric that is structurally always zero is an alarm that always reads healthy, which is worse than no alarm.';
+  DEVIATION, recorded deliberately: retention_runs_failed counts runs RECONCILED as failed, not live failures. A run that fails rolls its own row back with the transaction, so it cannot appear here -- see retention.run section 5. Live job failure is alerted from the server log WARNING and the scheduler failure alert. A metric that is structurally always zero is an alarm that always reads healthy, which is worse than no alarm.
+
+  retention_last_run_at is now only as trustworthy as retention_runs.started_at, which is why that column is stamped inside retention.run from now() and not from a parameter (AFC-249 F5). It used to be a caller argument feeding a monotone max() over an append-only table, which meant a single forged run disabled this alarm permanently and silently.';
+
+-- The attribution map the release path reads is a migration object, and a deploy
+-- that skipped migration 0005 should say so here rather than failing on the first
+-- release with "relation does not exist" -- which is the same fail-loudly
+-- discipline the schema check at the top of this file follows.
+DO $$
+BEGIN
+  IF to_regclass('public.retention_principals') IS NULL THEN
+    RAISE EXCEPTION
+      'public.retention_principals is missing. It is created by migrations/20261006_0005_retention_attribution.sql, and without it a legal-hold release cannot be attributed to a principal the database chose.'
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+END $$;
 
 -- Release of a hold, stamped by the database rather than by the caller. A
 -- release is the moment erasure becomes permissible again, so the actor on it
 -- is evidence, not bookkeeping.
+--
+-- p_released_by is GONE, and that is the fix rather than a detail of it.
+-- AFC-230 measured, on a pristine HEAD, that the stored releaser was the uuid
+-- the CALLER supplied: a session with EXECUTE on this function could name any
+-- principal it liked as the person who lifted a legal hold, and the hold's own
+-- COMMENT claimed the database stamped it. Only released_at was stamped by the
+-- database. A comment that says the opposite of what the code does is not a
+-- documentation defect on a surface that decides whether a child's record may be
+-- erased.
+--
+-- So there is nowhere to pass a releaser. It is derived here from session_user
+-- through retention_principals, which is an owner-written table shipped empty, so
+-- a deployment with no provisioned principal REFUSES every release rather than
+-- storing a fabricated one. Fail closed, because a release nobody can attribute
+-- is a release that cannot be defended to the NDPC, and it unblocks the deletion
+-- of records somebody placed a hold on.
+--
+-- WHAT THIS DOES AND DOES NOT ATTRIBUTE, stated rather than implied. It names the
+-- principal the database role speaks for, read from a row somebody provisioned
+-- under the owner role. It does not, and cannot, identify which individual
+-- operator inside that role pressed the button -- every Directus user shares the
+-- one directus_app connection, and the database cannot see past it. Naming a
+-- role-bound principal is therefore strictly more than was recorded before and is
+-- still not a person. The individual is attributable in Directus, which is where
+-- the session lives.
 CREATE OR REPLACE FUNCTION retention.release_hold(
-  p_hold_id uuid, p_released_by uuid
+  p_hold_id uuid
 ) RETURNS void
 LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = public, retention, pg_temp AS $$
+DECLARE
+  v_released_by uuid;
+  v_session     text := session_user::text;
 BEGIN
-  IF p_released_by IS NULL THEN
-    RAISE EXCEPTION 'a legal hold release must name who released it'
+  -- Argument validation first, so an operator who passed nothing gets told what
+  -- they passed wrong rather than what their role is missing. 22023, matching
+  -- the convention this file already states below: 23001 is reserved for a
+  -- control refusing an operation.
+  IF p_hold_id IS NULL THEN
+    RAISE EXCEPTION 'a legal hold release must name the hold it releases'
       USING ERRCODE = 'invalid_parameter_value';
   END IF;
+
+  -- Attribute or refuse. There is no third branch, and in particular there is no
+  -- branch that stores NULL, because legal_holds.released_by being NULL with
+  -- released_at set is the one release row nobody can defend afterwards.
+  SELECT rp.principal_id INTO v_released_by
+    FROM public.retention_principals rp
+   WHERE rp.role_name = v_session;
+
+  IF v_released_by IS NULL THEN
+    RAISE EXCEPTION
+      'legal hold release refused: database role % has no principal in retention_principals, so a release under it could not be attributed to anyone. Releasing a hold is what makes erasure permissible again, and that decision is attributed to a principal, not to the connection. Provision the role under the owner role, or release under a role that is provisioned.'
+      , v_session
+      USING ERRCODE = 'restrict_violation';
+  END IF;
+
   UPDATE legal_holds
-     SET released_by = p_released_by, released_at = now()
+     SET released_by = v_released_by, released_at = now()
    WHERE id = p_hold_id AND released_at IS NULL;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'no active legal hold % to release', p_hold_id
@@ -603,9 +823,10 @@ END $$;
 -- not restrict_violation. Across this codebase 23001 means "a control rejected
 -- an operation", which is what an immutable trigger or a live hold does; using
 -- it for a NULL argument would blur exactly the distinction an operator reads
--- a log to make.
-COMMENT ON FUNCTION retention.release_hold(uuid, uuid) IS
-  'Releases a legal hold, stamping actor and time from the database. The row survives: a release is history.';
+-- a log to make. The one place this function uses 23001 is the attribution check
+-- above, and it is a control refusing an operation -- not an argument check.
+COMMENT ON FUNCTION retention.release_hold(uuid) IS
+  'Releases a legal hold. BOTH actor and time are stamped by the database: released_at is now() and released_by is the principal retention_principals maps this session role to. The row survives: a release is history. There is no parameter for a caller to name a releaser, and a role with no provisioned principal is refused rather than recorded as unattributed.';
 
 -- ===========================================================================
 -- 7. Grants. Default deny, then the minimum.
@@ -615,9 +836,16 @@ COMMENT ON FUNCTION retention.release_hold(uuid, uuid) IS
 --                     so that "the job is the only deletion path" is enforced
 --                     by the grant list rather than by discipline.
 --   directus_app      SELECT on the config and clocks, INSERT on legal_holds,
---                     EXECUTE on release_hold. No UPDATE on legal_holds: a
---                     release goes through the function so the actor is
---                     stamped by the database. No DELETE anywhere.
+--                     EXECUTE on release_hold(uuid). No UPDATE on legal_holds: a
+--                     release goes through the function because the function is
+--                     what stamps the releaser from the session, and there is no
+--                     parameter left to stamp it with. No DELETE anywhere.
+--
+--   The two-argument release_hold(uuid, uuid) is dropped above rather than
+--   revoked, because a CREATE OR REPLACE cannot change a function's identity
+--   and an instance that applied the previous engine would otherwise keep
+--   serving it -- still executable, still storing whatever releaser its caller
+--   supplied.
 -- ===========================================================================
 -- Default deny, blanket first. PostgreSQL grants EXECUTE on every new function
 -- to PUBLIC, and an explicit REVOKE per function is a list someone has to keep
@@ -626,9 +854,31 @@ COMMENT ON FUNCTION retention.release_hold(uuid, uuid) IS
 -- grants that follow are the exceptions, deliberately enumerated.
 REVOKE ALL ON ALL FUNCTIONS IN SCHEMA retention FROM PUBLIC;
 
+-- The two-argument release_hold(p_hold_id uuid, p_released_by uuid) is REMOVED
+-- here, if this instance still carries it.
+--
+-- CREATE OR REPLACE cannot change a function's identity, so writing the new
+-- one-argument body alongside the old two-argument function would leave the old
+-- one in the catalog -- still executable by directus_app, still storing whatever
+-- releaser its caller supplied. That is the exact forgery AFC-230 measured, and a
+-- REVOKE is not enough against it: the ACL would be correct and the parameter
+-- would still be there. So it is dropped.
+--
+-- Conditional, because on a fresh deployment the function was never created and
+-- a plain DROP would fail with 42883 on the schema this whole system exists to
+-- install. Same conditional-drop shape as the trigger drops above.
+DO $$
+BEGIN
+  IF to_regprocedure('retention.release_hold(uuid, uuid)') IS NOT NULL THEN
+    DROP FUNCTION retention.release_hold(uuid, uuid);
+    RAISE NOTICE 'engine: dropped the caller-releaser release_hold(uuid, uuid); the releaser is now derived from the session (AFC-249 F3)';
+  END IF;
+END
+$$;
+
 REVOKE ALL ON FUNCTION retention.run(text, text, timestamptz) FROM PUBLIC;
 REVOKE ALL ON FUNCTION retention.sync_clocks(timestamptz) FROM PUBLIC;
-REVOKE ALL ON FUNCTION retention.release_hold(uuid, uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION retention.release_hold(uuid) FROM PUBLIC;
 REVOKE ALL ON FUNCTION retention.compute_due_date(timestamptz, timestamptz, integer, integer, text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION retention.resolve_anchor(text, uuid) FROM PUBLIC;
 REVOKE ALL ON FUNCTION retention.has_active_hold(uuid, text) FROM PUBLIC;
@@ -639,7 +889,7 @@ REVOKE ALL ON FUNCTION retention.terminal_ladder_stage(jsonb) FROM PUBLIC;
 
 GRANT EXECUTE ON FUNCTION retention.run(text, text, timestamptz) TO retention_worker;
 GRANT EXECUTE ON FUNCTION retention.sync_clocks(timestamptz) TO retention_worker;
-GRANT EXECUTE ON FUNCTION retention.release_hold(uuid, uuid) TO directus_app;
+GRANT EXECUTE ON FUNCTION retention.release_hold(uuid) TO directus_app;
 
 -- USAGE on the schema is the minimum to resolve these names at all. Only the
 -- two roles above get it.

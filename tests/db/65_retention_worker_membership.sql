@@ -375,7 +375,7 @@ BEGIN
       -- be exercised is a broken control, and this is what F2 looked like before
       -- it was fixed.
       SELECT count(*) INTO v_recorded FROM retention_runs
-       WHERE actor = 'test:membership:worker' AND status = 'succeeded';
+       WHERE actor_label = 'test:membership:worker' AND status = 'succeeded';
     EXCEPTION WHEN OTHERS THEN
       v_run := 'raised ' || SQLSTATE || ' ' || SQLERRM;
     END;
