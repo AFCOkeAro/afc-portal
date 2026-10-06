@@ -1,0 +1,14 @@
+{
+  "issue": "AFC-169",
+  "authorAgentId": "8f6e42d7-fb6e-4e6c-904b-dfdda50000ed",
+  "claimedAt": "2026-10-06T04:12:00+01:00",
+  "paths": [
+    "docs/adr/ADR-0005-erasure-lag-is-the-backup-window.md",
+    "docs/planning/prd.md",
+    "docs/planning/infra-spec.md",
+    "docs/planning/integrations-spec.md",
+    "docs/ndpa/processor-register.md",
+    ".provenance/**"
+  ],
+  "basis": "ADR-0005 rules 1-3: drop WAL archiving, ladder 30/12/3, external hash-chained erasure_ledger with a gated restore. The four documents listed are the only places in the repository that named WAL archiving or the 30/12/12 ladder, and leaving them would have handed a Coder a spec that contradicts the ADR. Claims no R2 compliance path (scripts/, services/directus/schema/, tests/): no SQL, no engine, no migration and no test is changed by this commit. Security review of the ADR is scheduled as a child issue of AFC-169 and is not claimed as landed here."
+}

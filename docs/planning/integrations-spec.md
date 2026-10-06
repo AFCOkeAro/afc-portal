@@ -113,11 +113,12 @@ This spec covers the integrations the board listed: **Gravatar, Email, Telegram,
 
 | Item | Detail |
 | --- | --- |
-| Database | Nightly `pg_dump -Fc` + WAL archiving where available |
+| Database | Nightly `pg_dump -Fc`. **No WAL archiving** — [ADR-0005](/AFC/issues/AFC-169#document-adr-0005-erasure-lag-is-the-backup-window) rule 1 |
 | Media | Nightly sync of the uploads volume to S3-compatible object storage |
 | Off-site | Backups pushed to object storage with versioning/immutability |
-| Retention | 30 daily, 12 weekly, 12 monthly; quarterly restore drill |
+| Retention | 30 daily, 12 weekly, **3 monthly**; quarterly restore drill through the gated restore pipeline ([ADR-0005](/AFC/issues/AFC-169#document-adr-0005-erasure-lag-is-the-backup-window) rule 2) |
 | Secrets | Separate backup credentials (never the app token); `secret_ref` only |
+| Erasure | External append-only hash-chained `erasure_ledger` under object-lock, excluded from every dump; restore promotion gated on ledger replay (same ADR, rule 3). **This is a processor of its own and needs its own register row** |
 | Alerting | Backup job exit status → alert (Telegram/email) on failure |
 | Targets | RPO ≤ 24h, RTO ≤ 4h |
 | Board-facing | A **Backup** status page in the portal (last success, size, drill date) for admins |

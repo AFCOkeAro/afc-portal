@@ -326,8 +326,14 @@ Permission rules are enforced **server-side by Directus policies**; the frontend
 - Attendance submit retry-safe (idempotent).
 
 ### 7.5 Backup and retention
-- Nightly `pg_dump` + continuous WAL archiving; media synced to object storage.
-- Retention: 30 daily, 12 weekly, 12 monthly backups; quarterly restore test.
+- Nightly `pg_dump`; media synced to object storage. **Continuous WAL archiving is
+  withdrawn** — it sets a hard floor under the backup-erasure lag that no dump-side
+  decision can lower, and the stated RPO is 24h. Decision and arithmetic:
+  [ADR-0005](/AFC/issues/AFC-169#document-adr-0005-erasure-lag-is-the-backup-window).
+- Retention: 30 daily, 12 weekly, **3 monthly** backups; quarterly restore test through
+  the gated restore pipeline. The monthly count was reduced from 12 by the CTO as an
+  availability trade (deep recovery shortens to 3 months); erasure lag in media becomes
+  ~90 days instead of 12. Same ADR.
 - Targets: **RPO ≤ 24h**, **RTO ≤ 4h**.
 - Person/attendance data retention policy defined with the board (default: retain while active + 7 years for financial welfare records; soft-archive people).
 

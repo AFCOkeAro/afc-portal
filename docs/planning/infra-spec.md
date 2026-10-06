@@ -210,13 +210,14 @@ api.example.org {
 
 | Item | Plan |
 | --- | --- |
-| Database | Nightly `pg_dump -Fc` (cron container) + Postgres WAL archiving if available |
+| Database | Nightly `pg_dump -Fc` (cron container). **No WAL archiving, no PITR** — [ADR-0005](/AFC/issues/AFC-169#document-adr-0005-erasure-lag-is-the-backup-window) rule 1 |
 | Media | Nightly sync of the `uploads` volume to S3-compatible object storage (`rclone`/`aws s3 sync`) |
 | Off-site | Backups pushed to object storage (Hetzner Storage Box/OBJ or Backblaze B2) |
-| Retention | 30 daily, 12 weekly, 12 monthly |
-| Restore test | Quarterly drill into a scratch container; documented runbook |
+| Retention | 30 daily, 12 weekly, **3 monthly** — [ADR-0005](/AFC/issues/AFC-169#document-adr-0005-erasure-lag-is-the-backup-window) rule 2. The 3 is a CTO decision with an availability cost; see its "Consequences" |
+| Restore test | Quarterly drill **through the gated restore pipeline only**; documented runbook |
 | Targets | **RPO ≤ 24h**, **RTO ≤ 4h** |
 | Protection | Versioning/immutability on the backup bucket; separate credentials from app tokens |
+| Erasure | Append-only hash-chained `erasure_ledger` in object storage under object-lock, **never included in a `pg_dump`**. Promotion of a restored database is refused until the ledger is replayed and every erased identifier is absent. Rationale and arithmetic: [ADR-0005](/AFC/issues/AFC-169#document-adr-0005-erasure-lag-is-the-backup-window) |
 
 ---
 
