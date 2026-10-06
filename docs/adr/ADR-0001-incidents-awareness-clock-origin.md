@@ -115,12 +115,55 @@ visibly inferred. Closing this completely would mean an external append-only log
 or a separate trust boundary, which is disproportionate at this scale and is a
 board conversation, not a code change.
 
+### Second residual: the origin is the transaction start, not the statement start
+
+Found by execution while closing [AFC-170](/AFC/issues/AFC-170), not by reading.
+`awareness_at` defaults to `now()`, which is `transaction_timestamp()`. A session
+that opens a transaction, waits, and *then* inserts gets a clock origin earlier
+than the moment the breach was filed. Measured: `BEGIN; SELECT pg_sleep(3);
+INSERT ...` produced an `awareness_at` **3.00 seconds before** the insert's own
+`detected_at`, with provenance `insert_default`. The `BEFORE INSERT` guard does
+not catch it, correctly — the value *was* produced by the default, so it passes
+the `IS DISTINCT FROM now()` test by construction.
+
+Not escalated to a new issue, deliberately. It is **not** an escalation of the
+residual above: it requires table ownership, which is the same capability that
+already permits unconditional bypass via `ALTER TABLE ... DISABLE TRIGGER`. It is
+a strictly smaller consequence of an authority we have already accepted and
+documented. Fixing it alone would close one door of a room whose main door is
+open, and would churn a control that is currently verified green — on a change
+whose only reviewer is the author, which is precisely the failure mode the board
+priced when it declined the SecurityEngineer seat.
+
+The cheap fix is known and recorded so it is not rediscovered: default the column
+to `statement_timestamp()` and compare against `statement_timestamp()` in the
+guard, which stays exact for the same reason `now()` is exact today. It ships
+with the next pass over this file, not as a hotfix.
+
 ## Verification
 
 `pnpm test:db` — 5 suites, 108 assertions, PostgreSQL 16.4. The immutability suite
 covers all seven roles in the v4 matrix plus a role granted `ALL` on the table, and
 asserts `23001` for each. Mutation-checked: removing the trigger takes the run from
 108 assertions passing to 3 suites failing.
+
+### Why an earlier "the UPDATE guard does not fire" report was wrong
+
+`BEFORE UPDATE ... FOR EACH ROW` only fires for rows the statement **matched**. A
+`WHERE` clause matching zero rows raises nothing at all, so a harness probe with a
+misspelled or unseeded `ref` returns "no error" and is indistinguishable from a
+bypass — which is what [AFC-170](/AFC/issues/AFC-170) recorded as an open question
+about [AFC-166](/AFC/issues/AFC-166)'s `20_immutability.sql`.
+
+Confirmed by execution, not inference, on 2026-10-06:
+
+| Statement (as a role granted `ALL` on `incidents`) | Result |
+| --- | --- |
+| `UPDATE ... SET awareness_at='2000-01-01' WHERE ref='IMMUT-FIXTURE'` (row exists) | `23001 restrict_violation` |
+| same, with a `ref` that matches nothing | **no error** — trigger never ran |
+| `UPDATE ... SET awareness_at = awareness_at WHERE ref=...` (row exists) | no error, by design — `IS DISTINCT FROM` |
+
+The guard is correct. The probe was measuring an empty result set.
 
 ## Review status
 
