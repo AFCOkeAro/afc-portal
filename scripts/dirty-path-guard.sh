@@ -165,6 +165,26 @@ CLAIMS_DIR=".provenance/claims"
 # The R2 grandfather list. Lives under scripts/ on purpose -- see the header.
 GRANDFATHERED_FILE="scripts/r2-grandfathered.json"
 
+# ---------------------------------------------------------------------------
+# Caller arity contract.
+# ---------------------------------------------------------------------------
+# The dispatcher at the foot of this file accepts ONE optional argument after
+# --check-commit: the REV. ROOT is this script's own location, and it is never
+# a parameter, because f64cc7d established that a caller who wants to pass ROOT
+# is a caller who is about to put a revision in the wrong slot.
+#
+# This number is not documentation, it is enforced: audit_callers() walks every
+# tracked file in the repository and fails if any shell command invokes this
+# guard with more than this many arguments. See assertion 11e for the whole
+# story, and for why a caller can pass more arguments and still be broken.
+#
+# Declared here, at the top, rather than beside the dispatcher that honours it:
+# --self-test runs before the dispatcher is ever reached and assertion 11e reads
+# this value. A constant living on the far side of the code that needs it is the
+# same shape of bug as the argument order this whole commit exists to fix.
+CHECK_COMMIT_MAX_ARGS=1
+
+
 # fnmatch-ish: '*' matches within a path segment, '**' matches across them.
 glob_match() {
   local pat="$1" str="$2"
@@ -944,8 +964,13 @@ Reviewed-by: Someone
   #      the gate certifies the whole thing. This is the same failure as 11a --
   #      report nothing, exit 0 -- reached through a different door, so it needs
   #      its own assertion. Live on this repository: the root commit 1f43c9e
-  #      adds ten R2 paths (four migrations, one rollback, five control-suite
+  #      adds ten R2 paths (three migrations, one rollback, six control-suite
   #      files) and not one of them was ever reported by --check-commit.
+  #      Counted, not estimated: `git diff-tree --root --no-commit-id --name-only
+  #      -r 1f43c9e | grep -cE 'engine/|migrations/|tests/db/|retention-literal'`
+  #      returns 10, split 3/1/6. The CTO review of f64cc7d caught the split
+  #      being wrong while the total was right, and no decision turns on it, so
+  #      it is corrected here rather than left to be found again.
   #
   #      So: a repository whose ONLY commit is the one under test, and that
   #      commit adds a compliance-path file with no reviewer. Must exit 1.
@@ -988,7 +1013,107 @@ Issue: AFC-996
     fi
   fi
 
-  return $rc
+  # 11e. THE CALLER ARITY CONTRACT. 11a-11d drove the CLI and found that the
+  #      dispatcher and the function disagreed about argument order. They could
+  #      NOT find that .github/workflows/ci.yml passed two arguments, because
+  #      nothing in this file ever looked at ci.yml:
+  #
+  #        self-test on f64cc7d  : 27 assertions ok, exit 0
+  #        ci.yml as written     : bash ... --check-commit "$PWD" "$range"
+  #                               -> exit 2, gate read no commit at all
+  #
+  #      So the defect class survived its own fix one layer up, and 27/27 green
+  #      sat next to a broken only production caller. This assertion reads the
+  #      repository instead of a fixture, so a caller is a first-class subject
+  #      of the guard rather than an unexamined assumption about it.
+  #
+  #      It runs against ROOT_DEFAULT, never against $tmp: auditing a fixture
+  #      would audit the fixture and always pass, which is the same mistake in
+  #      a new place.
+  local bad_callers audited
+  bad_callers=$(audit_callers "$ROOT_DEFAULT")
+  audited=$(count_callers "$ROOT_DEFAULT")
+  if [ -n "$bad_callers" ]; then
+    echo "SELF-TEST FAIL: a caller passes more than $CHECK_COMMIT_MAX_ARGS argument(s) to --check-commit"
+    echo "    the dispatcher takes ONE optional argument, the REV. Anything further"
+    echo "    lands in a slot the dispatcher never reads."
+    printf '%s\n' "$bad_callers" | sed 's/^/    /'
+    rc=1
+  else
+    echo "  self-test ok: all $audited committed --check-commit caller(s) pass $CHECK_COMMIT_MAX_ARGS argument"
+  fi
+
+  # 11f. THE AUDIT MUST ACTUALLY AUDIT. An assertion that passes because it
+  #      matched nothing is indistinguishable from a correct one, and that is
+  #      the exact failure this section exists to end -- 11e would be one more
+  #      green light over a blind check if its matcher were quietly broken.
+  #
+  #      So plant a caller with too many arguments in a throwaway repository
+  #      and prove audit_callers() names it. If the matcher stops recognising
+  #      command-position invocations, this goes red.
+  local probe_repo="$tmp/arity-probe"
+  mkdir -p "$probe_repo/scripts"
+  git -C "$probe_repo" init -q
+  git -C "$probe_repo" config user.email guard@afc.test
+  git -C "$probe_repo" config user.name  "AFC guard self-test"
+  mkdir -p "$probe_repo/.github/workflows"
+  printf 'name: t\non: push\njobs:\n  t:\n    steps:\n      - run: |\n' > "$probe_repo/.github/workflows/ci.yml"
+  # The exact shape that was live on main: ROOT as $2, REV as $3.
+  printf '          bash scripts/dirty-path-guard.sh --check-commit "$PWD" "$range"\n' >> "$probe_repo/.github/workflows/ci.yml"
+  git -C "$probe_repo" add -A
+  git -C "$probe_repo" commit -q -m "probe: a caller with the wrong arity"
+  local probe_out
+  probe_out=$(audit_callers "$probe_repo")
+  if [ -z "$probe_out" ]; then
+    echo "SELF-TEST FAIL: audit_callers did not name a planted caller passing 2 arguments"
+    echo "    an audit that matches nothing is a green light over a blind check"
+    rc=1
+  elif ! printf '%s' "$probe_out" | grep -q 'ci.yml'; then
+    echo "SELF-TEST FAIL: audit_callers named a caller without naming its file"
+    printf '%s\n' "$probe_out" | sed 's/^/    /'
+    rc=1
+  else
+    echo "  self-test ok: the arity audit names a caller passing 2 arguments"
+  fi
+
+  # 11g. ...and it must NOT cry wolf. The repository is full of prose that
+  #      mentions --check-commit -- claim files quoting the old command as
+  #      evidence, comments explaining the bug, this file's own dispatcher and
+  #      usage line. A matcher that flagged those would be muted within a week,
+  #      which is how a control stops existing while still appearing in the
+  #      pipeline.
+  #
+  #      A SEPARATE repository, because 11f's still contains the planted
+  #      offender and auditing it again would report that offender for the wrong
+  #      reason -- which is precisely the failure mode being tested for.
+  local prose_repo="$tmp/arity-prose"
+  mkdir -p "$prose_repo/scripts" "$prose_repo/.provenance/claims"
+  git -C "$prose_repo" init -q
+  git -C "$prose_repo" config user.email guard@afc.test
+  git -C "$prose_repo" config user.name  "AFC guard self-test"
+  # Four shapes, one of each way the real repository talks about the flag
+  # without calling it. If any of these trips the matcher, the audit is noise.
+  printf '{ "note": "scripts/dirty-path-guard.sh --check-commit still reports an R2 violation" }\n' > "$prose_repo/.provenance/claims/AFC-999.json"
+  printf '# AFC-210 added --check-commit below\n' > "$prose_repo/prose.md"
+  printf 'See `--check-commit [REV]` in the header.\n' > "$prose_repo/scripts/README.md"
+  printf 'bash scripts/dirty-path-guard.sh --check-commit\n' > "$prose_repo/one-arg.md"
+  git -C "$prose_repo" add -A
+  git -C "$prose_repo" commit -q -m "probe: prose and a correct caller, no offender"
+  probe_out=$(audit_callers "$prose_repo")
+  if [ -n "$probe_out" ]; then
+    echo "SELF-TEST FAIL: audit_callers flagged prose or a correct one-argument caller"
+    echo "    a matcher that cries wolf on documentation gets switched off"
+    printf '%s\n' "$probe_out" | sed 's/^/    /'
+    rc=1
+  elif [ "$(count_callers "$prose_repo")" != "1" ]; then
+    echo "SELF-TEST FAIL: audit_callers missed the one genuine caller in the probe repo"
+    echo "    got $(count_callers "$prose_repo"), expected 1 -- the matcher is not just"
+    echo "    strict, it is wrong, and 11f would still have passed"
+    rc=1
+  else
+    echo "  self-test ok: prose mentioning --check-commit is not treated as a caller,"
+    echo "                and the one real one-argument caller is still counted"
+  fi
 
   return $rc
 }
@@ -1129,6 +1254,106 @@ grandfathered_lookup() {
     if (typeof hit.reason !== "string" || !hit.reason.trim()) process.exit(2);
     process.stdout.write([hit.short || hit.commit.slice(0, 7), hit.reason.trim()].join("|"));
   ' "$f" "$sha"
+}
+
+# ---------------------------------------------------------------------------
+# Caller audit. How many arguments does every committed caller pass?
+# ---------------------------------------------------------------------------
+# Prints one `path:line: text` record per tracked line that invokes this guard
+# as a shell COMMAND with more than $CHECK_COMMIT_MAX_ARGS arguments after
+# --check-commit. Prints nothing when every caller is inside the contract.
+#
+# WHY THIS EXISTS
+#   11a-11d drive the CLI. They found that the dispatcher and the function
+#   disagreed about argument order. They could not find that .github/workflows/
+#   ci.yml passed TWO arguments, because nothing in this file ever looked at
+#   ci.yml. So f64cc7d shipped with 27/27 green and its only production caller
+#   broken: `--check-commit "$PWD" "$range"` put $PWD in the REV slot, git could
+#   not resolve it, and the R2 step exited 2 before reading a single commit.
+#   One commit earlier the same step passed because the wiring was reversed.
+#   The defect class was not closed, it was moved up one layer, and this
+#   function is the layer.
+#
+# WHAT COUNTS AS A CALLER
+#   A tracked line whose first word is this script (optionally preceded by
+#   bash/sh), followed by --check-commit. That is deliberately narrow:
+#
+#     bash scripts/dirty-path-guard.sh --check-commit "$range"     audited
+#     "scripts/dirty-path-guard.sh --check-commit still reports"    NOT audited
+#     #  AFC-210 added --check-commit below                          NOT audited
+#     "--check-commit")   check_commit ...                          NOT audited
+#
+#   Prose that names the flag is not a caller, and the repository is full of it
+#   -- claim files that quote the old command as evidence, comments that
+#   explain the bug, this file's own dispatcher. Auditing prose would make the
+#   assertion a nuisance and it would be muted within a week, which is the
+#   documented way a control stops existing while still appearing in the
+#   pipeline. The limit is stated here rather than hidden: a caller that hides
+#   the script behind a variable, a wrapper, or `eval` is not covered.
+#
+# ARGUMENTS ARE COUNTED, NOT GUESSED
+#   Quote-aware, and it stops at the first unquoted shell metacharacter or at a
+#   `#` comment. `--check-commit "$range" | tee out` is one argument; the `tee`
+#   is not the guard's problem. Getting this wrong in either direction is worse
+#   than not having the assertion: too strict and it cries wolf on legitimate
+#   pipelines, too loose and it misses the bug it exists to catch.
+# How many tracked lines invoke the guard as a command at all? Informational
+# only. Zero is not a failure -- a fresh clone or a throwaway fixture has no
+# callers -- but it is printed, because R4 claims CI calls this gate and a
+# silent 0 is exactly how that claim would rot unnoticed.
+#
+# Same "is this a command, or prose" matcher as audit_callers(), factored into
+# one awk so the two cannot drift apart and disagree about what a caller is.
+count_callers() {
+  local root="${1:-$ROOT_DEFAULT}"
+  _audit_callers "$root" count
+}
+
+# The shared matcher. Mode 'report' prints offending lines; mode 'count' prints
+# the number of command-position invocations found. Everything the two agree on
+# lives here, once.
+_audit_callers() {
+  local root="${1:-$ROOT_DEFAULT}" mode="${2:-report}"
+  local self_abs
+  self_abs="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)/$(basename "${BASH_SOURCE[0]}")"
+  git -C "$root" grep -n -e '--check-commit' -- . 2>/dev/null \
+  | awk -v self="$self_abs" -v root="$root" -v max="${CHECK_COMMIT_MAX_ARGS:-1}" -v mode="$mode" '
+      {
+        line = $0
+        path = ""
+        if (match(line, /^[^:]*:[0-9]+:/)) {
+          path = substr(line, 1, index(line, ":"))
+          sub(/:$/, "", path)
+          line = substr(line, RLENGTH + 1)
+        }
+        if (root "/" path == self) next
+        if (line !~ /^[[:space:]]*(bash|sh|\/bin\/(bash|sh))?[[:space:]]*[^[:space:]]*dirty-path-guard\.sh[[:space:]]/) next
+        i = index(line, "--check-commit")
+        if (i == 0) next
+        found++
+        rest = substr(line, i + 15)
+        n = 0; intok = 0; q = ""; k = 1; L = length(rest)
+        while (k <= L) {
+          c = substr(rest, k, 1)
+          if (q != "") { if (c == q) q = ""; intok = 1; k++; continue }
+          if (c == "\"" || c == "'"'"'") { q = c; intok = 1; k++; continue }
+          if (c ~ /[|><;()]/) break
+          if (c == "#" && !intok) break
+          if (c ~ /[[:space:]]/) { if (intok) { n++; intok = 0 } k++; continue }
+          intok = 1; k++
+        }
+        if (intok) n++
+        if (n > max) bad++
+        if (mode == "report" && n > max) print $0
+      }
+      END {
+        if (mode == "count") print found + 0
+      }' || true
+}
+
+# The public name: callers that pass too many arguments, one record per line.
+audit_callers() {
+  _audit_callers "${1:-$ROOT_DEFAULT}" report
 }
 
 # ---------------------------------------------------------------------------
@@ -1353,6 +1578,8 @@ if [ "${1:-}" = "--self-test" ]; then
   self_test
   exit $?
 fi
+
+# ---------------------------------------------------------------------------
 
 case "${1:-}" in
   "")                 guard "${2:-$ROOT_DEFAULT}"; exit $? ;;
