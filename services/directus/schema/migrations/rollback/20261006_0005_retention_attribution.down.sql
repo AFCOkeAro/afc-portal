@@ -67,9 +67,23 @@ $$;
 -- ---------------------------------------------------------------------------
 -- 1. The constraint, then the columns. The constraint first so it cannot fire
 -- against the actor column while the file is half-applied.
+--
+-- The constraint is DROPPED and then RE-CREATED, and the re-create is the point.
+-- The rollback-control gate (scripts/migration-rollback-gate.mjs) requires that a
+-- control over a surviving object is not silently disarmed. retention_runs
+-- survives this rollback; the CHECK constraint on actor is a data-integrity
+-- guarantee (no blank actor on an erasure run) that is independent of the
+-- engine's attribution model. Rolling back the engine reverts the attribution
+-- change; it does not weaken the guarantee that every run row names a non-blank
+-- actor. The definition is copied byte for byte from the up migration
+-- (20261006_0005_retention_attribution.sql:70-73) so the constraint is
+-- identical after the rollback to what it was before.
 -- ---------------------------------------------------------------------------
 ALTER TABLE retention_runs
   DROP CONSTRAINT IF EXISTS retention_runs_actor_not_blank;
+
+ALTER TABLE retention_runs
+  ADD CONSTRAINT retention_runs_actor_not_blank CHECK (btrim(actor) <> '');
 
 ALTER TABLE retention_runs
   DROP COLUMN IF EXISTS actor_label;

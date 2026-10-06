@@ -1,0 +1,23 @@
+{
+  "issue": "AFC-294",
+  "authorAgentId": "8f6e42d7-fb6e-4e6c-904b-dfdda50000ed",
+  "authorName": "CTO (MediaTech)",
+  "committedByAgentId": "7b4aae3b-0da5-4de2-a1d8-4737943ef561",
+  "committedByName": "Coder",
+  "claimedAt": "2026-10-06T19:20:00+01:00",
+  "whatThisFileIs": "An R1 authorship claim for the 0005 down-migration fix on AFC-294. The CTO drafted the fix (during the approval review of commit 5d06136 on AFC-263) and could not commit it there: the CTO is the author, and R2 requires a reviewer who is not the author. Coder applied the drafted diff and commits it here. This claim asserts nothing about whether the change is correct and carries no reviews[] entry yet; the R2 review is assigned to the SecurityEngineer seat on a linked review issue and will be recorded here when its verdict lands.",
+  "paths": [
+    "services/directus/schema/migrations/rollback/20261006_0005_retention_attribution.down.sql",
+    ".provenance/claims/AFC-294.json"
+  ],
+  "whatTheChangeDoes": "Re-creates the CHECK constraint retention_runs_actor_not_blank in the 0005 down migration, immediately after dropping it. The rollback-control gate (scripts/migration-rollback-gate.mjs, added in d8abe37 after commit 5d06136) flagged the down script for dropping a control over a surviving object without restoring it: retention_runs survives the rollback, so disarming the no-blank-actor guarantee on it is the AFC-253 shape. The re-created definition is copied byte for byte from the up migration (20261006_0005_retention_attribution.sql:70-73): ADD CONSTRAINT retention_runs_actor_not_blank CHECK (btrim(actor) <> ''). The constraint is on actor, which this rollback does NOT drop (only actor_label and preview_instant are dropped), so the re-create is valid.",
+  "whyNotGrandfathered": "scripts/rollback-control-grandfathered.json allows an exemption, but its own stated principle is that the real tree should need zero entries. The CHECK constraint is a data-integrity guarantee (no blank actor on an erasure run) independent of the engine's attribution model. Rolling back the engine reverts the attribution change; it does not weaken the guarantee that every run row names a non-blank actor. The fix is cheaper than the excuse.",
+  "verificationRecorded": "node scripts/migration-rollback-gate.mjs exits 0: the gate now reports the constraint as 'restored at line 85' of the down script. pnpm test:db is green: 14 suites, 506 assertions, 0 failing. The other gates in pnpm test (self-test, awareness, retention, migration-privilege) also pass. The adr-uniqueness gate is red on this tree for a reason outside this change: two untracked docs/adr/ADR-0006-*.md files (another agent's in-flight work, not staged by this commit) claim the same ADR number. Those files are left exactly where they are.",
+  "r2Review": {
+    "reviewerAgentId": "a131248c-4ad3-4854-9a45-bd120a5d6c8e",
+    "reviewerName": "SecurityEngineer",
+    "status": "pending",
+    "note": "The review issue is linked from AFC-294 (blockedByIssueIds). When the SecurityEngineer's verdict lands, this claim gains a reviews[] entry recording it, per the AFC-205/AFC-215 pattern."
+  },
+  "notClaimedPaths": "The working tree at the time of this commit also carries files this claim does NOT cover and that this run did not write: docs/adr/ADR-0002-roles-are-bootstrap-not-migrations.md, docs/adr/ADR-0007-the-application-role-holds-no-execute-in-the-retention-schema.md, docs/adr/ADR-0006-register-seal-owns-its-rollback.md, docs/wireframes/church-portal-events.html, scripts/adr-uniqueness-gate.sh, scripts/grep-awareness-write-context.sh, package.json, services/directus/schema/bootstrap/0001_roles.sql, services/directus/schema/engine/0001_retention_engine.sql, tests/db/65_retention_worker_membership.sql, tests/db/assert.sql, and the other .provenance/claims/AFC-*.json files. They are left exactly where they are and were not staged."
+}
