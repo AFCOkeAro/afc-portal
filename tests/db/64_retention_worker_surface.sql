@@ -18,6 +18,8 @@
 -- WHAT IS ASSERTED
 --   64.1  the worker's EXECUTE surface on the engine schema is EXACTLY
 --         {run, sync_clocks} -- no more, and no fewer
+--         and directus_app's surface on the same schema is EXACTLY {} -- the
+--         application reaches the engine through nothing at all (AFC-208)
 --   64.2  PUBLIC holds EXECUTE on nothing in the engine schema
 --   64.3  the helpers the SECURITY DEFINER route deliberately kept away from
 --         the worker stay away, each named, so the grant that would undo F2's
@@ -78,6 +80,140 @@ BEGIN
         AND has_function_privilege('retention_worker', p.oid, 'EXECUTE')),
     '0',
     'worker', 'and nothing else is: the worker surface has not quietly widened');
+END $$;
+
+-- ---------------------------------------------------------------------------
+-- 64.1b  THE APPLICATION ROLE'S SURFACE ON THE SAME SCHEMA IS EXACTLY {}.
+--
+-- AFC-208. Why this is the second half of 64.1 and not a curiosity:
+--
+--   64.1 pins what the WORKER can reach. It says nothing about anybody else, so a
+--   grant of any engine function to directus_app keeps every other assertion in
+--   this file green. That is not hypothetical. main carried
+--   GRANT EXECUTE ON retention.release_hold(...) TO directus_app through 63, 64
+--   and 65 all green, and through AFC-249's own new attribution suite as well.
+--   65.2 pins directus_app away from retention.run BY NAME; nothing anywhere
+--   pinned it away from the schema, which is the only place a grant on a renamed
+--   or added function would show up.
+--
+--   Least privilege is not a floor. Empty is the claim for this role, and empty
+--   is only enforceable by set equality against a named list. An "is it absent"
+--   check also passes on a query that matched nothing.
+--
+-- FOUR INDEPENDENT INSTRUMENTS, because the failure mode is a check that reports
+-- nothing and reads as clean:
+--
+--   1. the same aggregate 64.1 uses, over directus_app, compared to empty
+--   2. has_function_privilege, asked about specific functions BY NAME, so a red
+--      run says which one arrived instead of printing "(none)"
+--   3. aclexplode over proacl -- a direct read of the grant list with no
+--      privilege function in the query, so it cannot share a bug with 1 or 2
+--   4. an actual call, refused by the grant list at runtime
+--
+-- The positive control is on instrument 1 and it is the strongest form
+-- available: the identical query, run against retention_worker, must return
+-- run+sync_clocks. A query that can report a grant, and does, cannot be the
+-- reason the other role reports none.
+-- ---------------------------------------------------------------------------
+DO $$
+DECLARE
+  v_app_surface text[];
+  v_expect      text[];
+  v_release_oid oid;
+  v_run_oid     oid;
+  v_acl_leak    text;
+BEGIN
+  -- Preconditions, so every denial below is a decision and not a typo. If either
+  -- function were renamed or dropped this would fail with "does not exist" rather
+  -- than quietly passing on an absence that means nothing.
+  SELECT p.oid INTO v_release_oid
+    FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+   WHERE n.nspname = 'retention' AND p.proname = 'release_hold';
+  SELECT p.oid INTO v_run_oid
+    FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+   WHERE n.nspname = 'retention' AND p.proname = 'run';
+
+  PERFORM test_support.assert_true(v_release_oid IS NOT NULL, 'worker',
+    'release_hold exists, so denying it to the application role is a decision and not a typo');
+
+  PERFORM test_support.assert_true(v_run_oid IS NOT NULL, 'worker',
+    'run exists, so the erasure entrypoint below is named rather than absent');
+
+  -- Instrument 1. Set equality against the EMPTY set.
+  --
+  -- nullif before coalesce, and the reason is not cosmetic:
+  -- array_to_string(ARRAY[]::text[], ',') returns the EMPTY STRING, not NULL, so a
+  -- plain coalesce leaves the expected side as '' and the assertion compares
+  -- '(none)' with '' on a tree where the control is working -- a red suite on
+  -- correct behaviour.
+  v_expect := ARRAY[]::text[];
+
+  SELECT array_agg(p.proname ORDER BY p.proname) INTO v_app_surface
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+   WHERE n.nspname = 'retention'
+     AND has_function_privilege('directus_app', p.oid, 'EXECUTE');
+
+  PERFORM test_support.assert_equals(
+    coalesce(nullif(array_to_string(v_app_surface, ','), ''), '(none)'),
+    coalesce(nullif(array_to_string(v_expect, ','), ''), '(none)'),
+    'worker', 'directus_app EXECUTE surface on the engine is empty: the application reaches the engine through nothing');
+
+  -- The positive control. The SAME query against a role that IS granted: it must
+  -- report the two grants that exist. Without it, a typo in the role name or in
+  -- nspname produces an empty result on both sides and the assertion above
+  -- passes on a tree where directus_app holds everything.
+  PERFORM test_support.assert_equals(
+    (SELECT coalesce(array_to_string(array_agg(p.proname ORDER BY p.proname), ','), '(none)')
+       FROM pg_proc p
+       JOIN pg_namespace n ON n.oid = p.pronamespace
+      WHERE n.nspname = 'retention'
+        AND has_function_privilege('retention_worker', p.oid, 'EXECUTE')),
+    'run,sync_clocks',
+    'worker', 'probe control: the same query reports the worker surface in full, so the empty result above is a fact and not a lookup that matched nothing');
+
+  -- Instrument 2, by name, so a failure says which function arrived.
+  PERFORM test_support.assert_true(
+    has_function_privilege('directus_app', v_release_oid, 'EXECUTE') IS NOT TRUE,
+    'worker', 'directus_app cannot execute release_hold: a forged hold release is the one thing that must stay out of reach');
+
+  PERFORM test_support.assert_true(
+    has_function_privilege('directus_app', v_run_oid, 'EXECUTE') IS NOT TRUE,
+    'worker', 'and cannot execute run: erasure is not handed to the application role');
+
+  -- Instrument 3. The grant list itself, with no privilege function in the
+  -- query. A grant that arrived through a group role would not appear here --
+  -- which is why instrument 1 has to be the primary claim and this one is the
+  -- cross-check, not the reverse.
+  SELECT coalesce(string_agg(DISTINCT p.proname, ', ' ORDER BY p.proname), '(none)') INTO v_acl_leak
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    CROSS JOIN LATERAL aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
+    JOIN pg_roles g ON g.oid = a.grantee
+   WHERE n.nspname = 'retention'
+     AND g.rolname = 'directus_app'
+     AND a.privilege_type = 'EXECUTE';
+
+  PERFORM test_support.assert_equals(v_acl_leak, '(none)',
+    'worker', 'and the ACL on every engine function names no directus_app EXECUTE entry either');
+
+  -- Instrument 4. The grant list refusing an actual call. A catalog check says
+  -- what the ACL says; this says what the database does. 42501 and not 23001,
+  -- because the refusal must be the grant list and not a check inside the
+  -- function -- the two are told apart by an operator reading a log.
+  --
+  -- Run from the runner's session with p_role named, NOT from inside an
+  -- impersonated session: a session that has already dropped superuser cannot SET
+  -- LOCAL ROLE, and this helper captures a refused switch as the statement's
+  -- sqlstate. That trap is AFC-257, and it is why 66 reaches for
+  -- SET SESSION AUTHORIZATION where this uses the harness.
+  PERFORM test_support.assert_raises('directus_app',
+    $q$SELECT retention.release_hold(gen_random_uuid())$q$,
+    '42501', 'worker', 'a directus_app session is refused release_hold by the grant list: forging a release is not a thing the application role can do');
+
+  PERFORM test_support.assert_raises('directus_app',
+    $q$SELECT retention.run('test:surface:app', 'dry_run')$q$,
+    '42501', 'worker', 'and is refused run, so an application-side compromise has no erasure path to reach');
 END $$;
 
 -- ---------------------------------------------------------------------------

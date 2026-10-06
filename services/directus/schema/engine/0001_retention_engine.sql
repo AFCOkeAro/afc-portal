@@ -889,7 +889,64 @@ REVOKE ALL ON FUNCTION retention.terminal_ladder_stage(jsonb) FROM PUBLIC;
 
 GRANT EXECUTE ON FUNCTION retention.run(text, text, timestamptz) TO retention_worker;
 GRANT EXECUTE ON FUNCTION retention.sync_clocks(timestamptz) TO retention_worker;
-GRANT EXECUTE ON FUNCTION retention.release_hold(uuid) TO directus_app;
+-- ---------------------------------------------------------------------------
+-- THE APPLICATION ROLE CANNOT RELEASE A HOLD. AFC-208, ADR-0006.
+--
+-- AFC-249 (F3) built the right mechanism here and then attached it to the wrong
+-- caller, so the two halves of this decision are deliberately split:
+--
+--   KEEP    deriving the releaser from the session rather than taking it as a
+--           parameter. A caller who cannot choose the actor is the whole point,
+--           and a caller-chosen uuid is a false record in an NDPA s.40(2)
+--           evidence trail.
+--
+--   REVOKE  the grant that lets the application role call it at all.
+--
+-- WHY THE TWO ARE NOT THE SAME CLAIM. retention.run derives its attribution
+-- from session_user too, and that one is correct: the job connects as
+-- retention_job, a per-credential LOGIN, so session_user there names an
+-- accountable identity. directus_app is not that. Directus authenticates in the
+-- application layer and pools every request under ONE database identity, so
+-- session_user inside this function is always directus_app -- whatever
+-- authenticated user is on the other end of the HTTP request.
+--
+-- So with the grant in place, resolving session_user through retention_principals
+-- does not attribute a release to the person who made it. It attributes every
+-- release by the application to ONE constant, pre-named principal, and the row
+-- it stores says that person made the decision.
+--
+-- MEASURED, not inferred. The chain completes as soon as that one row exists:
+--
+--   INSERT INTO retention_principals (role_name, principal_id, note)
+--     VALUES ('directus_app', <uuid>, '...');        -- one row, no code change
+--   directus_app  SELECT release_hold(<any hold it can read>)   ALLOWED
+--   released_by   = <the principal mapped to directus_app>      -- a person
+--   retention_job SELECT retention.run(..., 'live')            ALLOWED
+--   clock state   -> 'deleted'                    the record was erased
+--
+-- The attacker never executed an erasure. They removed the hold and the job
+-- did the erasing, which is the shape of the whole attack: retention.run
+-- re-reads the hold at the moment of erasure, so removing it is sufficient.
+--
+-- WITHOUT that row the release is refused 23001 -- and that is what the tree
+-- looks like today, because no migration provisions a principal. That is not a
+-- control. It is an empty table, and the row that makes the feature work at all
+-- is the same row that reopens the chain. A deploy that provisions it, for any
+-- reason, without reading this comment, hands a pooled connection the capability
+-- to release every legal hold in the system.
+--
+-- There is also nothing to protect with it. release_hold has no caller anywhere
+-- in this repository: services/directus/extensions/ is empty, there is no flow,
+-- and apps/web/server/api/ has no legal-hold route. A capability nobody invokes,
+-- guarded by nothing, costs the entire entitlement property and buys no function.
+--
+-- GRANT IT BACK IN THE SAME COMMIT THAT ADDS THE CALLER, and the caller has to be
+-- a path where the connected database role IS the person: the authenticated user
+-- resolved at the Directus layer and carried in, behind a Directus permission --
+-- not a pooled connection. That is AFC-243. tests/db/64_retention_worker_surface.sql
+-- 64.1b pins this role's EXECUTE surface on this schema to the empty set, so any
+-- grant added here fails the suite the day it lands.
+REVOKE EXECUTE ON FUNCTION retention.release_hold(uuid) FROM directus_app;
 
 -- USAGE on the schema is the minimum to resolve these names at all. Only the
 -- two roles above get it.
