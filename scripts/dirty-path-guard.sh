@@ -1387,6 +1387,73 @@ Issue: AFC-996
     rc=1
   fi
 
+  # 11j. THE WRAPPED-PROSE CLASS. AFC-282. 11g pinned prose that starts with
+  #      `{`, `#` and `See ` -- shapes whose first token is not the script.
+  #      It did not cover a prose sentence that begins in COMMAND POSITION
+  #      with the script path and the flag, which is exactly what a wrapped
+  #      documentation block produces. merge-in-gate.sh:125 read
+  #
+  #          scripts/dirty-path-guard.sh --check-commit that the CI file
+  #
+  #      and the old "any indentation" rule counted "that the CI file" as
+  #      four arguments, so the guard went RED on its own repository. The fix
+  #      is to the definition of COMMAND POSITION, not to the arity rule: a
+  #      bare token introduced by spaces is a wrapped continuation unless its
+  #      arguments carry shell evidence (a quote or a variable). A bash/sh
+  #      prefix, column 0 and a tab-indented recipe are always callers.
+  #
+  #      A SEPARATE repository from 11f and 11h, for the reason 11g gives:
+  #      each probe must hold only the shape it tests, or it reports an
+  #      offender it did not plant.
+  local wrapped_repo="$tmp/arity-wrapped"
+  mkdir -p "$wrapped_repo/scripts"
+  git -C "$wrapped_repo" init -q
+  git -C "$wrapped_repo" config user.email guard@afc.test
+  git -C "$wrapped_repo" config user.name  "AFC guard self-test"
+  # The class under test, plus two genuine callers it must not silence: a
+  # bash-prefixed one, and a space-indented bare one that carries shell
+  # evidence -- the evidence rule keeps the latter audited.
+  printf '                    scripts/dirty-path-guard.sh --check-commit that the CI file\n' > "$wrapped_repo/wrapped.md"
+  printf 'bash scripts/dirty-path-guard.sh --check-commit "$range"\n' > "$wrapped_repo/real-bash.sh"
+  printf '    scripts/dirty-path-guard.sh --check-commit "$range"\n' > "$wrapped_repo/real-bare.sh"
+  git -C "$wrapped_repo" add -A
+  git -C "$wrapped_repo" commit -q -m "probe: wrapped prose and two genuine one-argument callers"
+  probe_out=$(audit_callers "$wrapped_repo")
+  local wrapped_count
+  wrapped_count=$(count_callers "$wrapped_repo")
+  if [ -n "$probe_out" ]; then
+    echo "SELF-TEST FAIL: audit_callers flagged a wrapped prose sentence as a caller"
+    echo "    a space-indented prose line is a continuation, not a command; a gate"
+    echo "    that goes red on documentation gets muted."
+    printf '%s\n' "$probe_out" | sed 's/^/    /'
+    rc=1
+  elif [ "$wrapped_count" != "2" ]; then
+    echo "SELF-TEST FAIL: the wrapped-prose probe counted $wrapped_count caller(s), expected 2"
+    echo "    the prose must be ignored AND both genuine callers must still count"
+    rc=1
+  else
+    echo "  self-test ok: wrapped prose in command position is not a caller,"
+    echo "                and both genuine callers beside it still count"
+  fi
+  # The other direction: a space-indented bare caller WITH shell evidence and
+  # TWO arguments is a real defect and must still be caught. If the precision
+  # fix had simply dropped every space-indented line, it would pass the
+  # assertion above and fail here.
+  printf '    scripts/dirty-path-guard.sh --check-commit "$PWD" "$range"\n' >> "$wrapped_repo/real-bare.sh"
+  git -C "$wrapped_repo" add -A
+  git -C "$wrapped_repo" commit -q -m "probe: a space-indented bare caller with two arguments"
+  probe_out=$(audit_callers "$wrapped_repo")
+  if [ "$(printf '%s' "$probe_out" | grep -c .)" != "1" ]; then
+    echo "SELF-TEST FAIL: audit_callers did not catch the space-indented bare two-argument caller"
+    echo "    the evidence rule must keep such a caller audited, or the fix is a"
+    echo "    loosening rather than a precision fix."
+    printf '%s\n' "$probe_out" | sed 's/^/    /'
+    rc=1
+  else
+    echo "  self-test ok: a space-indented bare caller with shell evidence and two"
+    echo "                arguments is still caught (the fix is precision, not silence)"
+  fi
+
   # 11i. THE BOUNDARY REFUSES, NOT JUST THE AUDIT. AFC-241 found the dispatcher
   #      SILENTLY ignored a surplus argument: `--check-commit <rev> surplus`
   #      returned exactly what `--check-commit <rev>` returned, so the contract
@@ -1713,13 +1780,35 @@ grandfathered_lookup() {
 #   function is the layer.
 #
 # WHAT COUNTS AS A CALLER
-#   A tracked line whose first word is this script (optionally preceded by
-#   bash/sh), followed by --check-commit. That is deliberately narrow:
+#   A tracked line that invokes this script in COMMAND POSITION, followed by
+#   --check-commit. Command position is deliberately narrow:
 #
 #     bash scripts/dirty-path-guard.sh --check-commit "$range"     audited
+#     scripts/dirty-path-guard.sh --check-commit "$range"          audited (column 0)
+#     <tab>scripts/dirty-path-guard.sh --check-commit "$range"     audited (recipe)
 #     "scripts/dirty-path-guard.sh --check-commit still reports"    NOT audited
 #     #  AFC-210 added --check-commit below                          NOT audited
 #     "--check-commit")   check_commit ...                          NOT audited
+#
+#   A token that names this script but is introduced by SPACES ALONE is a
+#   wrapped prose continuation, not a command, UNLESS its argument list
+#   carries shell evidence (a quote or a variable). AFC-282 measured why that
+#   distinction has to exist. The documentation block of merge-in-gate.sh
+#   wrapped a sentence so that a line began, after indentation, with the
+#   script path and the flag:
+#
+#         scripts/dirty-path-guard.sh --check-commit that the CI file
+#
+#   The earlier "any indentation" rule called that a caller and counted "that
+#   the CI file" as four arguments, so the guard went RED on its own
+#   repository. The ARITY rule was never wrong -- the definition of command
+#   position was too loose. A bash/sh prefix, column 0 and a tab-indented
+#   recipe are unambiguously commands; a space-indented bare token is
+#   ambiguous, and is audited only when it carries shell evidence. This is a
+#   PRECISION fix, not a loosening: bash/sh-prefixed, column-0 and
+#   tab-indented callers are audited with any argument list, bare words
+#   included, and the dispatcher still refuses a surplus argument at the
+#   boundary (assertion 11i).
 #
 #   Prose that names the flag is not a caller, and the repository is full of it
 #   -- claim files that quote the old command as evidence, comments that
@@ -1754,6 +1843,17 @@ grandfathered_lookup() {
 #     run_guard() { … }                        a shell-function wrapper
 #     eval "…"                                 eval
 #     a package.json "scripts" entry          a JSON string, not a shell line
+#     a space-indented BARE invocation whose  the command-position rule above:
+#       arguments carry no shell evidence       spaces alone mark a wrapped
+#                                               prose continuation. A bash/sh
+#                                               prefix, column 0 and a tab
+#                                               recipe are still audited with
+#                                               ANY argument list. A real
+#                                               caller of this shape is still
+#                                               caught at the boundary when it
+#                                               runs (the dispatcher refuses a
+#                                               surplus argument, 11i), just
+#                                               not pre-flight. AFC-282.
 #     --check-commit $(git rev-parse HEAD) …  UNQUOTED command substitution as
 #                                            the first argument: `(` is a
 #                                            metacharacter, so the scan stops
@@ -1822,11 +1922,43 @@ _audit_callers() {
           line = substr(line, RLENGTH + 1)
         }
         if (root "/" path == self) next
-        if (line !~ /^[[:space:]]*(bash|sh|\/bin\/(bash|sh))?[[:space:]]*[^[:space:]]*dirty-path-guard\.sh[[:space:]]/) next
+
+        # COMMAND POSITION. AFC-282. The token that names this script must be
+        # somewhere a shell would actually run it from. Three positions are
+        # unambiguous and always audited:
+        #
+        #   bash/sh[/bin/…]-prefixed, any indentation   a pipeline line
+        #   column 0 (no leading whitespace)            a statement
+        #   tab-indented                                a Makefile recipe
+        #
+        # A token introduced by SPACES ALONE is a wrapped prose continuation,
+        # not a command -- UNLESS its argument list carries shell evidence (a
+        # quote or a variable reference), which every real revision argument
+        # has and a sentence does not. The old rule allowed ANY indentation, so
+        # the documentation block of merge-in-gate.sh wrapped a sentence to
+        # begin, after indentation, with the script path and the flag:
+        #
+        #   scripts/dirty-path-guard.sh --check-commit that the CI file
+        #
+        # and "that the CI file" counted as four arguments. The guard went RED
+        # on its own repository. The ARITY rule was never wrong; the definition
+        # of command position was too loose. This is a precision fix, not a
+        # loosening of the arity check: a bash/sh-prefixed, column-0 or
+        # tab-indented caller is audited with any argument list, bare words
+        # included, and the dispatcher still refuses a surplus argument at the
+        # boundary. The only shape this stops auditing is a space-indented bare
+        # token with no shell evidence -- see the NOT-audited list in the
+        # header above this function.
+        lw = line
+        sub(/[^[:space:]].*$/, "", lw)          # the leading whitespace run
+        rest0 = substr(line, length(lw) + 1)    # from the first non-space char
+        if (rest0 !~ /^((bash|sh|\/bin\/(bash|sh))[[:space:]]+)?[^[:space:]]*dirty-path-guard\.sh([[:space:]]|$)/) next
+        haspref = (rest0 ~ /^(bash|sh|\/bin\/(bash|sh))[[:space:]]+/)
         i = index(line, "--check-commit")
         if (i == 0) next
-        found++
         rest = substr(line, i + 15)
+        if (!haspref && length(lw) > 0 && index(lw, "\t") == 0 && rest !~ /["'"'"'$]/) next
+        found++
         # qtok: does the token being accumulated END IN A CLOSING QUOTE? The
         # discard at the metacharacter test below is conditional on it.
         n = 0; intok = 0; q = ""; qtok = 0; k = 1; L = length(rest)

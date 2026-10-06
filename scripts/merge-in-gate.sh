@@ -121,9 +121,9 @@ Why there, not a merge hook
                     stronger: it refuses a non-compliant commit before the commit
                     has an identity.
 How it checks    : materialises the staged tree into a temporary dangling commit
-                    object (git write-tree + git commit-tree) and asks the SAME
-                    scripts/dirty-path-guard.sh --check-commit that the CI file
-                    asks. One rule, one implementation.
+                    object (git write-tree + git commit-tree) and asks, via
+                    scripts/dirty-path-guard.sh, the SAME --check-commit the
+                    CI file asks. One rule, one implementation.
 Fail-closed      : if the guard cannot run, the commit is refused. A gate that
                     cannot answer never answers "pass".
 
