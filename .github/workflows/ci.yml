@@ -96,13 +96,20 @@ jobs:
       # the push added. Checking all of main every run would be slower each time
       # and would re-report settled history as if it were new.
       #
-      # EXPECTED RED UNTIL R1 IS CLOSED, and deliberately not `continue-on-error`.
-      # This step is red on main today and that is honest: four compliance-path
-      # commits in history carry no `Issue:` trailer and four paths were never
-      # registered in a claim file. R2 is closed -- two commits carry a
-      # review record, three are grandfathered with the reason printed on every
-      # run. R1 is not, and the R1 debt belongs to the AFC-195 fence owner
-      # rather than to the decision that exposed it.
+      # EXPECTED RED WHILE R1 IS OPEN, and deliberately not `continue-on-error`.
+      # Measured against full history with the corrected guard (f64cc7d):
+      # eight compliance-path commits, 22 violations -- 19 R1 across seven
+      # commits, and 3 R2. The R2 3 are 1f43c9e, 3cb6b0a and 876d1f6; the other
+      # five are closed (three grandfathered with the reason printed on every
+      # run, two by AFC-197 review records). R1 is untouched by that ruling and
+      # the R1 debt belongs to the AFC-195 fence owner rather than to the
+      # decision that exposed it.
+      #
+      # The counts above were wrong until f64cc7d and are corrected here. Until
+      # that commit this step passed two arguments, the dispatcher put the
+      # second in the REV slot, git could not resolve it, and the step exited 2
+      # before reading one commit -- so this comment described a run that had
+      # never actually happened.
       #
       # It is left failing rather than made advisory on purpose. A gate
       # configured so its failure is ignorable trains the team to scroll past it,
@@ -118,7 +125,14 @@ jobs:
             range=HEAD
           fi
           echo "provenance check over $range"
-          bash scripts/dirty-path-guard.sh --check-commit "$PWD" "$range"
+          # ONE argument, as usage: documents. f64cc7d corrected the dispatcher
+          # to pass (ROOT, REV) in the order check_commit() declares, so $2 is
+          # the REV and the old second argument here landed in the REV slot,
+          # where git could not resolve it and the step failed closed with
+          # exit 2 before reading a single commit. ROOT_DEFAULT is derived from
+          # BASH_SOURCE (scripts/dirty-path-guard.sh:214), so it is already the
+          # workspace root and needs no argument.
+          bash scripts/dirty-path-guard.sh --check-commit "$range"
 
   retention-gate:
     name: Retention literal gate
