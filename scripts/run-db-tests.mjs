@@ -35,6 +35,10 @@ const MIGRATIONS = join(REPO, 'services/directus/schema/migrations');
 // meaningful, because the migrations are allowed to state a period and the
 // engine is not.
 const ENGINE = join(REPO, 'services/directus/schema/engine');
+// Bootstrap. Applied as the cluster owner, before anything else, and applied
+// as the FILE rather than as a transcription of it -- see the comment at the
+// call site for why a second copy of the privilege boundary is a defect.
+const BOOTSTRAP = join(REPO, 'services/directus/schema/bootstrap');
 const TESTS = join(REPO, 'tests/db');
 
 const log = (...a) => console.log(...a);
@@ -265,43 +269,37 @@ async function main() {
     await db.exec(`SET TIME ZONE '${SESSION_TZ}'`);
     log(`Session TimeZone pinned to ${SESSION_TZ}`);
     // ---------------------------------------------------------------
-    // Roles, as the bootstrap superuser. After this the migrations run as
-    // directus_migrator and own everything they create.
+    // Bootstrap, as the cluster owner. This is the REAL bootstrap file, not a
+    // copy of it, and that is load-bearing rather than tidiness.
+    //
+    // This block used to inline its own version of the bootstrap role creation.
+    // It had already drifted from services/directus/schema/bootstrap/0001_roles.sql
+    // -- it was missing the worker's USAGE on schema public, the REVOKE of the
+    // engine schema from PUBLIC, and the boundary assertion entirely -- so the
+    // fixture was a configuration nobody deploys. A suite that verifies a copy
+    // of the artifact is verifying the copy, and a privilege boundary that
+    // exists in two files is a boundary that will be edited in one of them.
+    //
+    // AFC-205 is the concrete cost. The retention capability is provisioned by
+    // membership in the bootstrap file; with the grant living only there, the
+    // fixture never sees it and the new suite would have to invent the grant
+    // itself -- which is testing fiction again, one layer up.
+    //
+    // ADR-0002 is why this is a step and not a migration: role creation needs
+    // cluster authority, which no migration in the sequence has.
     // ---------------------------------------------------------------
-    log('\nBootstrapping roles');
-    await db.exec(`
-      DO $bootstrap$
-      BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'directus_migrator') THEN
-          CREATE ROLE directus_migrator NOLOGIN;
-        END IF;
-        IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'directus_app') THEN
-          CREATE ROLE directus_app LOGIN;
-        END IF;
-        -- Retention worker. Bootstrap role, created here for the same reason as
-        -- the two above: a migration runs as directus_migrator, which does not
-        -- hold CREATEROLE, so a migration cannot create its own executor role.
-        -- Getting this wrong in production is a migration that fails loudly with
-        -- "retention_worker is missing" rather than an engine nobody can run.
-        IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'retention_worker') THEN
-          CREATE ROLE retention_worker NOLOGIN;
-        END IF;
-      END
-      $bootstrap$;
-
-      -- PostgreSQL 15+ gives PUBLIC no CREATE on the public schema, so the
-      -- migration role is granted it explicitly. The runtime role gets USAGE
-      -- only: it reads and writes, it does not create objects.
-      GRANT USAGE, CREATE ON SCHEMA public TO directus_migrator;
-      GRANT USAGE ON SCHEMA public TO directus_app;
-
-      -- The engine schema, owned by the migration role. Bootstrap creates it
-      -- for the same reason it creates roles: a migration runs as
-      -- directus_migrator, which has no CREATE on the database, so the engine
-      -- install could not create its own schema. Owned (not just USAGE'd) so
-      -- the engine can install into it.
-      CREATE SCHEMA IF NOT EXISTS retention AUTHORIZATION directus_migrator;
-    `);
+    log('\nBootstrapping roles (services/directus/schema/bootstrap/0001_roles.sql)');
+    try {
+      await db.exec(loadSql(join(BOOTSTRAP, '0001_roles.sql')));
+      log('  ok   bootstrap/0001_roles.sql');
+    } catch (e) {
+      // The boundary assertions in that file raise on purpose. Naming the file
+      // and the message, rather than "a bootstrap statement failed", is the
+      // difference between a deploy that stops here and one that limps on.
+      console.error(`\n  FAIL bootstrap/0001_roles.sql did not apply\n       ${e.message}\n`);
+      process.exitCode = 1;
+      throw e;
+    }
 
     // ---------------------------------------------------------------
     // Migrations, as the table owner.

@@ -31,7 +31,8 @@ BEGIN
     SELECT * FROM (VALUES
       ('directus_migrator', 'NOLOGIN'),  -- owns every table; SET ROLE only
       ('directus_app',      'LOGIN'),    -- the one identity Directus uses
-      ('retention_worker',  'NOLOGIN')   -- sole erasure executor; holds no DELETE
+      ('retention_worker',  'NOLOGIN'),  -- sole erasure executor; holds no DELETE
+      ('retention_job',     'LOGIN')     -- the one login that may reach the worker
     ) AS t(name, login)
   LOOP
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = v_rec.name) THEN
@@ -53,6 +54,29 @@ GRANT USAGE, CREATE ON SCHEMA public TO directus_migrator;
 GRANT USAGE ON SCHEMA public TO directus_app;
 GRANT USAGE ON SCHEMA public TO retention_worker;
 
+-- ---------------------------------------------------------------------
+-- WHO IS ALLOWED TO REACH THE ERASURE PATH. ADR-0004.
+--
+-- retention_worker is NOLOGIN, so it can never connect by itself, and a role
+-- that nothing holds can never be reached either. That was the state of this
+-- tree: the sole executor of live erasure had no holder, so
+-- retention.run(p_actor,'live',now()) could not be called by anyone who logs
+-- in -- only by a cluster superuser, and only by accident.
+--
+-- So the capability and the identity are separated. retention_worker keeps
+-- the grant surface and stays NOLOGIN. retention_job is the LOGIN identity
+-- the scheduler connects as, and this GRANT is the only thing it holds: no
+-- table privilege, no DELETE, no EXECUTE of its own. Everything it can do, it
+-- can do because it is a member of the role that owns the surface.
+--
+-- NOT directus_app. That is the broad application identity, and granting it
+-- this membership would make any application-side compromise into a
+-- data-erasure capability, which is the boundary AFC-193 exists to hold. The
+-- job and the application do not share a trust level.
+--
+-- GRANT membership is additive, so this line is already a no-op on re-run.
+GRANT retention_worker TO retention_job;
+
 -- The engine schema. Also bootstrap, for the same reason the roles are: the
 -- engine installs as directus_migrator, which has CREATE on schema public but
 -- not on the database, so the engine cannot create its own schema. Migration
@@ -68,7 +92,7 @@ CREATE SCHEMA IF NOT EXISTS retention AUTHORIZATION directus_migrator;
 REVOKE ALL ON SCHEMA retention FROM PUBLIC;
 
 -- Belt and braces: assert the boundary this directory exists to protect. If any
--- of these three has picked up cluster-level authority, this file fails rather
+-- of these four has picked up cluster-level authority, this file fails rather
 -- than proceeding, because every migration runs under one of them.
 DO $$
 DECLARE
@@ -76,7 +100,7 @@ DECLARE
 BEGIN
   SELECT string_agg(rolname, ', ') INTO v_bad
     FROM pg_roles
-   WHERE rolname IN ('directus_migrator', 'directus_app', 'retention_worker')
+   WHERE rolname IN ('directus_migrator', 'directus_app', 'retention_worker', 'retention_job')
      AND (rolsuper OR rolcreaterole OR rolcreatedb OR rolreplication OR rolbypassrls);
 
   IF v_bad IS NOT NULL THEN
@@ -85,6 +109,52 @@ BEGIN
       '(SUPERUSER/CREATEROLE/CREATEDB/REPLICATION/BYPASSRLS). Remove it before '
       'migrating -- a migration runs under one of these identities.',
       v_bad
+      USING ERRCODE = 'restrict_violation';
+  END IF;
+END
+$$;
+
+-- ---------------------------------------------------------------------
+-- EXACTLY ONE REACHABLE IDENTITY. ADR-0004.
+--
+-- The grant above is necessary and not sufficient. A capability nobody holds
+-- is an inoperable control, and a capability several identities hold is a
+-- wider one -- and this is the single most destructive function in the
+-- system, so "how many credentials can delete a record?" has to have an
+-- answer that is a name, produced by the step that provisions it.
+--
+-- So the deploy fails on both wrong counts rather than on neither:
+--
+--   0  the retention job can never run, and the only evidence is a stale
+--      retention_last_run_at in retention_metrics. That is the silent
+--      unbounded-liability case the metrics view exists to catch.
+--   >1 the erasure surface is wider than the single identity it is designed
+--      around, which is a privilege drift this file is the right place to
+--      refuse.
+--
+-- Counted over roles that can LOGIN, because a NOLOGIN holder is not
+-- reachable and is not a credential anybody can steal.
+DO $$
+DECLARE
+  v_holders text;
+  v_n       integer;
+BEGIN
+  SELECT count(*), coalesce(string_agg(member.rolname, ', ' ORDER BY member.rolname), '(none)')
+    INTO v_n, v_holders
+    FROM pg_auth_members m
+    JOIN pg_roles granted ON granted.oid = m.roleid
+    JOIN pg_roles member  ON member.oid  = m.member
+   WHERE granted.rolname = 'retention_worker'
+     AND member.rolcanlogin;
+
+  IF v_n <> 1 THEN
+    RAISE EXCEPTION
+      'retention_worker has % LOGIN members (%), and it must have exactly one. '
+      'Zero means the retention job cannot run at all and nothing will report it; '
+      'more than one means the credential that can execute live erasure is not a '
+      'single accountable name. Grant it to exactly one LOGIN role -- retention_job '
+      'by default -- and remove every other membership.',
+      v_n, v_holders
       USING ERRCODE = 'restrict_violation';
   END IF;
 END
