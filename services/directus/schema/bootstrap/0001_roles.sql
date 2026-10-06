@@ -108,18 +108,17 @@ GRANT USAGE ON SCHEMA public TO retention_worker;
 -- alone". An operator who set INHERIT FALSE on purpose after an incident had it
 -- undone silently.
 --
--- AFC-268 measured the first version of this block and found it silent in all
--- three of its cases, for two separate reasons, both fixed here:
+-- AFC-268 measured the first version of this block and found the ABSENT case was
+-- not covered at all -- the row being gone is the most consequential change of
+-- the three, because bootstrap CREATED the membership rather than adjusting it,
+-- and `IF FOUND` skipped it. That case is now reported separately, and all three
+-- drift cases are asserted by measurement; divergent-case coverage lives in
+-- tests/db/65.
 --
---   * the ABSENT case was not covered at all -- the row being gone is the most
---     consequential change of the three, because bootstrap CREATED the
---     membership rather than adjusting it, and `IF FOUND` skipped it;
---   * PGlite's driver discards every RAISE message, so nothing emitted from this
---     block could be observed on the only engine this project can currently run
---     (AFC-166). Measured: RAISE NOTICE and RAISE WARNING, from a DO block and
---     from a function, all arrive as an empty list. So the NOTICE is correct
---     PostgreSQL and UNVERIFIED here, and the convergence itself is asserted in
---     tests/db/65 instead -- see the note at the end of this block.
+-- The NOTICE below IS observable on PGlite: it is delivered when `onNotice` is
+-- passed per call. Omitting it, or passing it to the constructor, yields a
+-- silently empty stream -- the same failure mode as AFC-203's ledger. The trap is
+-- documented in scripts/run-db-tests.mjs.
 DO $$
 DECLARE
   v_old record;

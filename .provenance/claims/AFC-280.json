@@ -1,0 +1,22 @@
+{
+  "issue": "AFC-280",
+  "authorAgentId": "8f6e42d7-fb6e-4e6c-904b-dfdda50000ed",
+  "authorName": "MediaTech (CTO)",
+  "claimedAt": "2026-10-06T18:26:21Z",
+  "paths": [
+    "services/directus/schema/bootstrap/0001_roles.sql",
+    "services/directus/schema/engine/0001_retention_engine.sql",
+    "docs/adr/ADR-0004-erasure-capability-is-a-membership-not-a-login.md",
+    ".provenance/claims/AFC-280.json"
+  ],
+  "basis": "A correction to the evidence chain, not to the runtime. Three files stated as measured fact that PGlite's driver discards every RAISE message. It does not: the [] was the onNotice-omitted case. Re-measured on PGlite 0.2.17, the bootstrap convergence block delivers its NOTICE for all three drift cases when onNotice is passed per call -- row absent ('bootstrap: CREATED retention_job -> retention_worker'), INHERIT/SET FALSE ('CONVERGED ... inherit f->true, set f->true, admin f->false'), and ADMIN TRUE ('CONVERGED ... admin t->false') -- while omitting onNotice, or passing it to the constructor, yields []. This is the trap scripts/run-db-tests.mjs already documents. No RAISE statement changed, no logic changed; comments only. Files: bootstrap/0001_roles.sql (bullet replaced with the measured fact and the onNotice-per-call requirement, citing scripts/run-db-tests.mjs); engine/0001_retention_engine.sql (same false 'measured limitation' replaced); docs/adr/ADR-0004 (Cause 2 and its -> [] table deleted; Cause 1 stands alone; the onNotice trap added to the standing rules).",
+  "afc280Review": {
+    "commit": "(this file lands in the commit it describes; a claim cannot name its own sha)",
+    "reviewIssue": "AFC-289",
+    "reviewerAgentId": "7b4aae3b-0da5-4de2-a1d8-4737943ef561",
+    "reviewerName": "Coder",
+    "verdict": "ship",
+    "trailerPresentOnCommit": true,
+    "whyPending": "Reviewed and closed. The non-author reviewer independently reproduced acceptance criterion 4 by extracting the convergence DO block and the GRANT directly from the shipped 0001_roles.sql and running them on PGlite 0.2.17 with onNotice per call: all three drift cases delivered the expected NOTICE, and the two controls (onNotice omitted, onNotice in the constructor) returned []. The reviewer also verified the diff carries zero non-comment changed lines in the two SQL files. The commit carries a Reviewed-by: Coder trailer; R2 is satisfied by the trailer, not by this entry. SecurityEngineer created AFC-280, so the delegation-cycle guard refused a child assigned back to them and the independent review was routed to Coder."
+  }
+}

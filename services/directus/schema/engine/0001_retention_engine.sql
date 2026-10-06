@@ -959,9 +959,11 @@ REVOKE EXECUTE ON FUNCTION retention.release_hold(uuid) FROM directus_app;
 -- A deploy that silently restores a capability is better than one that silently
 -- loses it, so the restore stays; it now says it happened.
 --
--- Measured limitation: PGlite's driver discards every RAISE message, so the NOTICE
--- below cannot be observed on the only engine this project can currently run
--- (AFC-166). The convergence is asserted in tests/db/65 instead.
+-- The NOTICE below IS observable on PGlite: it is delivered when `onNotice` is
+-- passed per call. Omitting it, or passing it to the constructor, yields a
+-- silently empty stream -- the same failure mode as AFC-203's ledger. The trap is
+-- documented in scripts/run-db-tests.mjs. The convergence is also asserted in
+-- tests/db/65.
 DO $$
 DECLARE
   v_missing text;

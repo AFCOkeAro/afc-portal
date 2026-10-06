@@ -379,32 +379,15 @@ down because the default instinct is the opposite:
 > control.
 
 So the repair stays. What is not acceptable is that it is silent — and this pass found
-the silence had **two causes**, only one of which was mine.
+the silence had one cause, and it was mine.
 
 ## Cause 1 — a real gap, found by reading
 
 The first version of the reporting block only fired when the membership row **existed**
 with divergent options (`IF FOUND AND …`). The absent case was not covered at all — and
 absent is the most consequential of the three cases, because bootstrap then *created*
-the membership rather than adjusting it. That case is now reported separately.
-
-## Cause 2 — the reporting is unverifiable on the only engine we can run
-
-The reviewer measured all three mutations and found no log line naming any of them. That
-was not a defect in the NOTICE; it is a property of the engine:
-
-```
-RAISE NOTICE from a DO block            -> []
-RAISE WARNING from a DO block           -> []
-RAISE NOTICE from a plpgsql function    -> []
-```
-
-**PGlite's driver discards every `RAISE` message.** So the NOTICE is correct PostgreSQL
-and **unverified in execution** here, and the reviewer's "log line: none" is exactly what
-a driver that drops them produces. Neither of us can currently observe it.
-
-The honest consequence is written into the code rather than glossed: the reporting is
-asserted by reading, and the thing that actually converges is asserted by measurement.
+the membership rather than adjusting it. That case is now reported separately, and all
+three drift cases are asserted by measurement.
 
 ## What was measured, and what was not
 
@@ -439,9 +422,17 @@ Part 4 is narrower and, I think, the most operational of the three:
 > output. The control may be correct and the evidence for it absent — which is worse,
 > because the absence reads as "nothing happened" and therefore "nothing was wrong".
 
+The trap is documented in `scripts/run-db-tests.mjs`: PGlite delivers `RAISE` messages
+only when `onNotice` is passed per call; omitting it, or passing it to the constructor,
+yields a silently empty stream — the same failure mode as
+[AFC-203](/AFC/issues/AFC-203)'s ledger. An instrument reporting nothing is
+indistinguishable from an instrument with nothing to report, and the response is to
+connect the instrument, not to conclude the world went quiet.
+
 This is the same root cause as [AFC-166](/AFC/issues/AFC-166): there is no run of this
 suite, in CI or anywhere, on a server build. Every measurement in all three review passes
 is PostgreSQL 16 compiled to WebAssembly, in a single connection. That is not a reason to
 distrust the results — the reviewer's semantics are ordinary server behaviour — but
 "no reason to doubt" is not "measured", and for an NDPA s.40(2) evidence surface the
 distinction is the whole question.
+
