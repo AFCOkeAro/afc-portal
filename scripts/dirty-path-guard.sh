@@ -75,7 +75,11 @@
 #
 #   The registry is read in --check-commit mode for two things.
 #
-#   R1 -- `paths`: which claim covers which file.
+#   R1 -- attribution. The commit's `Issue:` trailer names an issue; that issue's
+#        own claim file must list the path AND record a non-empty authorAgentId.
+#        A claim belonging to a different issue does not satisfy R1 for this
+#        commit, however many paths it lists. AFC-269 measured what the weaker
+#        question let through.
 #   R2 -- `reviews[]`: a review that happened but left no trailer on the commit.
 #
 #     {
@@ -626,9 +630,18 @@ Reviewed-by: Someone
   #     that proves nothing about its own subject.
   printf 'SELECT 6;\n' > "$repo/tests/db/72_record_under_test.sql"
   git -C "$repo" add -A
+  # The trailer names AFC-996 because the claim file below IS AFC-996.json, and
+  # it did not always. It said AFC-998, for which no claim file exists at all,
+  # and the R2 fixtures were green only because AFC-996's `tests/db/**` glob
+  # happened to cover the same file -- coverage by another issue's claim, which
+  # is the AFC-269 defect. AFC-269's attribution check made 9f and 9i red on
+  # their own fixture, which is the check working rather than a regression: an
+  # assertion whose green came from the bug it now forbids is worth re-pointing
+  # at a genuinely clean commit so that every red in this block is R2 and only
+  # R2, as the comment above already claimed.
   git -C "$repo" commit -q -m "feat(retention): the commit every R2 form-2 fixture reads
 
-Issue: AFC-998
+Issue: AFC-996
 "
   local rev9f
   rev9f=$(git -C "$repo" rev-parse HEAD)
@@ -807,6 +820,163 @@ JSON
   else
     echo "  self-test ok: corrupt grandfather list fails closed"
   fi
+
+  # 9l. R1 MUST MEAN "THIS COMMIT IS ATTRIBUTABLE", NOT "SOME CLAIM MENTIONS THIS
+  #     PATH". AFC-269, raised from the independent R2 review of d54b9fa.
+  #
+  #     claimed_by() matched a path against the `paths` array of ANY claim in the
+  #     registry and printed `ok  claimed by <ISSUE>` for whichever claim sorted
+  #     first. It never asked whether that claim belonged to the issue the commit
+  #     was working on, so a compliance-path commit with NO claim of its own
+  #     passed R1's path half whenever an earlier issue happened to have touched
+  #     the same file.
+  #
+  #     Measured on this repository rather than argued: d54b9fa names AFC-204 in
+  #     its subject, has no .provenance/claims/AFC-204.json at all, and was
+  #     certified
+  #
+  #         ok  claimed by AFC-167 -> services/directus/schema/migrations/README.md
+  #
+  #     on the strength of one stale path in a claim belonging to a different
+  #     issue. AFC-240 was briefed on that commit as carrying TWO R1 violations
+  #     when only the missing `Issue:` trailer was actually red. A gate that
+  #     reports a violation that is not there is the same failure as one that
+  #     misses one: its green does not mean the thing it claims to mean.
+  #
+  #     The fixture path is schema/migrations/** on purpose. Every claim left
+  #     behind by 9b, 9c and 9f lists `tests/db/**` and `.provenance/**`, and a
+  #     path under tests/ would already be covered by AFC-999 or AFC-996 -- so
+  #     every assertion below would have a second, unrelated claim satisfying R1
+  #     and would be able to pass for the wrong reason.
+  #
+  #     The commit carries `Reviewed-by:` and an `Issue:` trailer, so R2 is clean
+  #     and every red below is R1 and nothing else. Same rule as 9f: each
+  #     inspection is scoped to HEAD^..HEAD of this one commit, so a green check
+  #     cannot be reporting on a commit some earlier fixture planted.
+  local r1_path="services/directus/schema/migrations/0099_attribution.sql"
+  printf 'SELECT 99;\n' > "$repo/$r1_path"
+  git -C "$repo" add -A
+  git -C "$repo" commit -q -m "feat(retention): the commit every R1 attribution fixture reads
+
+Issue: AFC-997
+Reviewed-by: Someone
+"
+  local rev9l r1_range r1_rc
+  rev9l=$(git -C "$repo" rev-parse HEAD)
+  r1_range="$rev9l^..$rev9l"
+
+  # The shape in the report, unfixed. AFC-111 sorts BEFORE AFC-997 and covers the
+  # whole directory, so under the old matcher this claim is the one that gets
+  # found, printed and certified -- exactly as AFC-167 was for d54b9fa.
+  cat > "$repo/.provenance/claims/AFC-111.json" <<'JSON'
+{ "issue": "AFC-111", "authorAgentId": "agent-elsewhere",
+  "claimedAt": "2026-10-06T02:57:00Z", "paths": ["services/directus/schema/migrations/**"] }
+JSON
+  git -C "$repo" add -A
+  git -C "$repo" commit -q -m "chore(provenance): an unrelated issue already claims this path"
+  out=$(check_commit "$repo" "$r1_range" 2>&1); r1_rc=$?
+  if [ "$r1_rc" -eq 0 ]; then
+    echo "SELF-TEST FAIL: a claim belonging to a DIFFERENT issue satisfied R1"
+    echo "    AFC-111's claim covers the path, this commit names AFC-997, and it"
+    echo "    has no claim of its own. Coverage by somebody else's claim is not"
+    echo "    attribution."
+    echo "$out" | sed 's/^/    /'
+    rc=1
+  elif printf '%s' "$out" | grep -q 'ok  claimed by'; then
+    # The decisive assertion, and the one the report turns on: the old gate
+    # printed exactly this line for d54b9fa. If any claim shape produces it for
+    # a commit that commit is not attributable, whatever the exit code says.
+    echo "SELF-TEST FAIL: the gate still certified 'ok claimed by' for a commit"
+    echo "    whose only covering claim belongs to another issue."
+    echo "$out" | sed 's/^/    /'
+    rc=1
+  elif ! printf '%s' "$out" | grep -q 'no registered claim for issue AFC-997'; then
+    echo "SELF-TEST FAIL: the claim mismatch was refused without naming the issue"
+    echo "    this commit actually declares."
+    echo "$out" | sed 's/^/    /'
+    rc=1
+  elif ! printf '%s' "$out" | grep -q 'AFC-111'; then
+    # A refusal that does not say which claim stood in the way sends the reader
+    # back to the registry by hand, and the old green line is what they find.
+    echo "SELF-TEST FAIL: refused without naming the misleading covering claim"
+    echo "$out" | sed 's/^/    /'
+    rc=1
+  else
+    echo "  self-test ok: a path an UNRELATED issue already claimed does not satisfy R1"
+  fi
+
+  # The other half of the same fix: a claim filed for the right issue that does
+  # not list this path is not a pass either. Otherwise the check could be
+  # satisfied by any claim at all, which is the defect in a different costume.
+  rm -f "$repo/.provenance/claims/AFC-111.json"
+  cat > "$repo/.provenance/claims/AFC-997.json" <<'JSON'
+{ "issue": "AFC-997", "authorAgentId": "agent-author",
+  "claimedAt": "2026-10-06T02:57:00Z", "paths": ["tests/db/**"] }
+JSON
+  git -C "$repo" add -A
+  git -C "$repo" commit -q -m "chore(provenance): claim for this issue that omits the path"
+  out=$(check_commit "$repo" "$r1_range" 2>&1); r1_rc=$?
+  if [ "$r1_rc" -eq 0 ] || printf '%s' "$out" | grep -q 'ok  claimed by'; then
+    echo "SELF-TEST FAIL: a claim for this issue that omits the path satisfied R1"
+    echo "$out" | sed 's/^/    /'
+    rc=1
+  elif ! printf '%s' "$out" | grep -q 'does not cover'; then
+    echo "SELF-TEST FAIL: refused without saying the claim does not cover the path"
+    echo "$out" | sed 's/^/    /'
+    rc=1
+  else
+    echo "  self-test ok: a claim for this issue that omits the path is refused"
+  fi
+
+  # A claim with no author attributes the change to nobody. emit_claims has been
+  # printing `author=undefined` for AFC-205.json in this same repository, so a
+  # claim asserting no author is a real state of the registry, not a synthetic
+  # one, and it must not be able to attribute anybody's commit.
+  cat > "$repo/.provenance/claims/AFC-997.json" <<'JSON'
+{ "issue": "AFC-997", "authorAgentId": "",
+  "claimedAt": "2026-10-06T02:57:00Z", "paths": ["services/directus/schema/migrations/**"] }
+JSON
+  git -C "$repo" add -A
+  git -C "$repo" commit -q -m "chore(provenance): covering claim with no author recorded"
+  out=$(check_commit "$repo" "$r1_range" 2>&1); r1_rc=$?
+  if [ "$r1_rc" -eq 0 ] || printf '%s' "$out" | grep -q 'ok  claimed by'; then
+    echo "SELF-TEST FAIL: a claim recording no author satisfied R1"
+    echo "$out" | sed 's/^/    /'
+    rc=1
+  elif ! printf '%s' "$out" | grep -q 'records no author'; then
+    echo "SELF-TEST FAIL: refused without naming the missing author"
+    echo "$out" | sed 's/^/    /'
+    rc=1
+  else
+    echo "  self-test ok: a covering claim that records no author is refused"
+  fi
+
+  # THE POSITIVE CONTROL. Without this the three above could all be satisfied by
+  # a check that simply refuses everything, which is the other way a gate stops
+  # meaning anything. The commit is properly attributable here: it names AFC-997,
+  # AFC-997 claims this path, and AFC-997 names an author.
+  cat > "$repo/.provenance/claims/AFC-997.json" <<'JSON'
+{ "issue": "AFC-997", "authorAgentId": "agent-author",
+  "claimedAt": "2026-10-06T02:57:00Z", "paths": ["services/directus/schema/migrations/**"] }
+JSON
+  git -C "$repo" add -A
+  git -C "$repo" commit -q -m "chore(provenance): the attributable claim, with its author"
+  out=$(check_commit "$repo" "$r1_range" 2>&1); r1_rc=$?
+  if [ "$r1_rc" -ne 0 ]; then
+    echo "SELF-TEST FAIL: a properly attributable compliance-path commit was refused"
+    echo "$out" | sed 's/^/    /'
+    rc=1
+  elif ! printf '%s' "$out" | grep -q 'ok  claimed by AFC-997 (author agent-author)'; then
+    echo "SELF-TEST FAIL: the commit passed without citing its own claim and author"
+    echo "$out" | sed 's/^/    /'
+    rc=1
+  else
+    echo "  self-test ok: a claim of this commit's own, with an author, satisfies R1"
+  fi
+
+  rm -f "$repo/.provenance/claims/AFC-997.json" "$repo/$r1_path"
+  git -C "$repo" add -A
+  git -C "$repo" commit -q -m "chore(provenance): drop the R1 attribution fixtures"
 
   rm -f "$repo/$GRANDFATHERED_FILE" "$repo/.provenance/claims/AFC-996.json"
   git -C "$repo" add -A
@@ -1251,24 +1421,122 @@ emit_claims() {
   fi
 }
 
-# Does any registered claim cover this path?
-claimed_by() {
+# Is this path covered by a claim that can ATTRIBUTE the commit? AFC-269.
+#
+# AFC-269 replaced a `claimed_by(root, path)` that asked a different and much
+# weaker question. It matched the path against the `paths` array of ANY claim in
+# the registry and returned the first file that sorted, so the caller printed
+# `ok  claimed by <ISSUE>` for whichever earlier issue happened to have touched
+# the same file. It never asked whether that claim belonged to the issue the
+# commit was working on, which meant a compliance-path commit with NO claim of
+# its own passed R1's path half on the strength of one stale path in somebody
+# else's claim.
+#
+# Measured on this repository, not argued. d54b9fa names AFC-204 in its subject,
+# has no .provenance/claims/AFC-204.json anywhere, and was certified
+#
+#     ok  claimed by AFC-167 -> services/directus/schema/migrations/README.md
+#
+# because AFC-167 lists that README from an earlier issue. AFC-240 was briefed on
+# that commit as carrying two R1 violations when only the missing trailer was
+# actually red. R1's green did not mean the thing it claims to mean, which is
+# the same species of defect AFC-203 was filed for.
+#
+# So the question is now asked of a claim that is THIS COMMIT'S OWN:
+#
+#   $1 root   $2 repo-relative path   $3 the issue this commit names
+#
+# Two things have to hold, and both are the claim, not the caller:
+#   - the claim file's own `issue` field is the issue this commit names, and its
+#     `paths` cover this path; and
+#   - it records a non-empty `authorAgentId`.
+#
+# The second is not decoration. `emit_claims` has been printing
+# `author=undefined` for AFC-205.json, so the registry already carries a claim
+# asserting no author and nothing was checking it. A claim with no named author
+# attributes a change to nobody, so it cannot attribute a commit to anybody.
+#
+#   0  attributable claim found; prints `<issue>|<authorAgentId>`
+#   1  no claim file is filed for this issue at all (also: no issue named, or no
+#      registry directory -- there is nothing to attribute the commit to)
+#   2  a claim IS filed for this issue, but its paths do not cover this one
+#   3  a claim for this issue exists but does not cover this path, and no other
+#      claim file for the issue does either (folded into 2; reserved)
+#   4  a claim for this issue covers this path but records no authorAgentId
+attributable_claim() {
+  local root="$1" path="$2" issue="$3"
+  # No issue named means no claim can be this commit's own. Returning 1 rather
+  # than a code of its own keeps the refusal single-sourced: check_commit()
+  # reports the missing trailer once and does not repeat it per path.
+  [ -n "$issue" ] || return 1
+  local dir="$root/$CLAIMS_DIR"
+  [ -d "$dir" ] || return 1
+
+  local f saw_claim=0 saw_authorless=0
+  local row arc
+  for f in "$dir"/*.json; do
+    [ -e "$f" ] || continue
+    # Unparseable file -> exit 1, which is the same as "about some other issue":
+    # it attributes nothing, so it cannot satisfy this check. The consequence is
+    # a red R1 rather than a green one, so a truncated claim file cannot widen
+    # the boundary; it is not an exit-4 style hard failure because a corrupt
+    # file in the registry is not evidence about the commit under test.
+    row=$(node -e '
+      const fs = require("fs");
+      let d;
+      try { d = JSON.parse(fs.readFileSync(process.argv[1], "utf8")); } catch { process.exit(1); }
+      const path = process.argv[2], issue = process.argv[3];
+      // Match the CLAIM, not the filename. The registry is documented as one
+      // file per claiming issue, but `issue` is the assertion the file makes
+      // and it is what emit_claims prints, so it is what R1 asks about.
+      if (typeof d.issue !== "string" || d.issue.trim() !== issue) process.exit(1);
+      const globs = Array.isArray(d.paths) ? d.paths : [];
+      const toRe = (g) => new RegExp("^" + String(g)
+        .replace(/\*\*/g, "\u0000").replace(/\*/g, "[^/]*").replace(/\u0000/g, ".*") + "$");
+      if (!globs.some((g) => toRe(g).test(path))) process.exit(3);
+      const author = typeof d.authorAgentId === "string" ? d.authorAgentId.trim() : "";
+      if (!author) process.exit(4);
+      process.stdout.write([d.issue, author].join("|"));
+    ' "$f" "$path" "$issue")
+    arc=$?
+    case "$arc" in
+      0) printf '%s\n' "$row"; return 0 ;;
+      3) saw_claim=1 ;;
+      4) saw_claim=1; saw_authorless=1 ;;
+    esac
+  done
+
+  [ "$saw_claim" -eq 1 ] || return 1
+  [ "$saw_authorless" -eq 1 ] && return 4
+  return 2
+}
+
+# Which registered claims DO cover this path, whatever issue they belong to?
+# Called only to explain a refusal, so its whole job is to make the old
+# misleading `ok claimed by <ISSUE>` line impossible to mistake for the truth:
+# a reader sees exactly which claims stood in the way of the attribution.
+claims_covering() {
   local root="$1" path="$2"
-  [ -d "$root/$CLAIMS_DIR" ] || return 1
+  local dir="$root/$CLAIMS_DIR"
+  [ -d "$dir" ] || return 0
   local f
-  for f in "$root/$CLAIMS_DIR"/*.json; do
+  for f in "$dir"/*.json; do
     [ -e "$f" ] || continue
     node -e '
-      const fs=require("fs");
-      let d; try { d=JSON.parse(fs.readFileSync(process.argv[1],"utf8")); } catch { process.exit(1); }
-      const path=process.argv[2];
-      const globs=d.paths||[];
-      const toRe=(g)=>new RegExp("^"+g.replace(/\*\*/g,"\u0000").replace(/\*/g,"[^/]*").replace(/\u0000/g,".*")+"$");
-      if(globs.some((g)=>toRe(g).test(path))) { process.stdout.write(d.issue||""); process.exit(0); }
-      process.exit(1);
-    ' "$f" "$path" && return 0
+      const fs = require("fs");
+      let d;
+      try { d = JSON.parse(fs.readFileSync(process.argv[1], "utf8")); } catch { process.exit(1); }
+      const path = process.argv[2];
+      const globs = Array.isArray(d.paths) ? d.paths : [];
+      const toRe = (g) => new RegExp("^" + String(g)
+        .replace(/\*\*/g, "\u0000").replace(/\*/g, "[^/]*").replace(/\u0000/g, ".*") + "$");
+      if (!globs.some((g) => toRe(g).test(path))) process.exit(1);
+      const author = (typeof d.authorAgentId === "string" && d.authorAgentId.trim())
+        ? d.authorAgentId.trim() : "NO AUTHOR";
+      process.stdout.write(`      ${d.issue} (author: ${author})\n`);
+    ' "$f" "$path" || continue
   done
-  return 1
+  return 0
 }
 
 # R2 form 2: does a claim file carry a reviews[] entry that is a COMPLETE review
@@ -1687,27 +1955,63 @@ check_commit() {
       esac
     fi
 
-    # R1 -- a registered claim covering every flagged path, and the commit
-    # naming the claiming issue.
-    for p in "${flagged[@]}"; do
-      local claim
-      if ! claim=$(claimed_by "$root" "$p"); then
-        echo "  R1 VIOLATION: no registered claim covers $p"
-        echo "    Add $CLAIMS_DIR/<ISSUE>.json listing it, then re-run."
-        rc=1
-        continue
-      fi
-      echo "  ok  claimed by $claim -> $p"
-    done
-
+    # R1 -- ATTRIBUTION. Not "some claim mentions this path": "this commit's own
+    # claim, filed under the issue the commit names, with a named author, covers
+    # this path". The `Issue:` trailer is read FIRST because it is the key the
+    # claim lookup needs -- the previous order made that impossible, which is
+    # precisely why claimed_by() could only ask the weaker question.
     local issue
     issue=$(printf '%s
 ' "$body" | sed -n 's/^Issue:[[:space:]]*//p' | head -1)
+
     if [ -z "$issue" ]; then
       echo "  R1 VIOLATION: no 'Issue:' trailer, so the commit names no originating issue."
+      echo "    With no issue named there is no claim that can be this commit's own,"
+      echo "    so the path check is not run per path: it could not pass, and one"
+      echo "    line per flagged path would only bury the single fact that is wrong."
       rc=1
     else
       echo "  ok  Issue: $issue"
+      local claim arc_rc covering cissue cauthor
+      for p in "${flagged[@]}"; do
+        claim=$(attributable_claim "$root" "$p" "$issue")
+        arc_rc=$?
+        if [ "$arc_rc" -ne 0 ]; then
+          case "$arc_rc" in
+            1)
+              echo "  R1 VIOLATION: no registered claim for issue $issue covers $p"
+              echo "    This commit has no claim of its own for this path."
+              ;;
+            2)
+              echo "  R1 VIOLATION: the registered claim for issue $issue does not cover $p"
+              echo "    Add $p to the paths array in $CLAIMS_DIR/$issue.json, then re-run."
+              ;;
+            4)
+              echo "  R1 VIOLATION: the claim for issue $issue covers $p but records no author."
+              echo "    A claim with no authorAgentId attributes the change to nobody, so it"
+              echo "    cannot attribute this commit. Set authorAgentId in $CLAIMS_DIR/$issue.json."
+              ;;
+            *)
+              echo "  R1 VIOLATION: $p could not be attributed to issue $issue"
+              echo "    (attributable_claim returned $arc_rc, which no case above explains.)"
+              ;;
+          esac
+          covering=$(claims_covering "$root" "$p")
+          if [ -n "$covering" ]; then
+            echo "    These registered claims DO cover $p, and each belongs to a"
+            echo "    different issue. That is not this commit's claim, and it is why R1"
+            echo "    refuses rather than reporting 'ok':"
+            printf '%s\n' "$covering"
+          fi
+          rc=1
+          continue
+        fi
+        IFS='|' read -r cissue cauthor <<<"$claim"
+        # The author is on the line on purpose. "claimed by AFC-167" was the
+        # misleading half of this defect's output, and an issue id alone cannot
+        # be weighed -- an assertion nobody made is what has to be visible.
+        echo "  ok  claimed by $cissue (author $cauthor) -> $p"
+      done
     fi
   done
 
@@ -1720,8 +2024,11 @@ This is R1 and R2 of the provenance rule, checked mechanically because R4 makes
 CI the second reviewer for every control a machine can decide.
 
   - R1: every change lands on an issue with a named author, or it does not
-    land. Register the claim in .provenance/claims/<ISSUE>.json and add an
-    `Issue:` trailer.
+    land. Register the claim in .provenance/claims/<ISSUE>.json, give that file
+    a non-empty authorAgentId, list every compliance path the commit touches,
+    and add an `Issue:` trailer naming the same issue. A claim filed for a
+    DIFFERENT issue does not satisfy R1 for this commit, even when it lists the
+    same path: coverage by somebody else's claim is not attribution (AFC-269).
   - R2: a commit touching the compliance path names its reviewer, EITHER as a
     `Reviewed-by:` trailer, OR as a `reviews[]` entry in a claim file that
     names this sha together with a reviewIssue, a reviewerAgentId and a
