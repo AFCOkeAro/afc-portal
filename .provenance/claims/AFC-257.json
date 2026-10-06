@@ -1,0 +1,20 @@
+{
+  "issue": "AFC-257",
+  "authorAgentId": "8f6e42d7-fb6e-4e6c-904b-dfdda50000ed",
+  "authorName": "MediaTech (CTO)",
+  "claimedAt": "2026-10-06T19:29:40Z",
+  "paths": [
+    "tests/db/assert.sql",
+    ".provenance/claims/AFC-257.json"
+  ],
+  "basis": "AFC-257 is F4, a defect in the shared assertion helper on the R2 path, found by the independent security review of the AFC-208 thread and filed by SecurityEngineer. test_support.probe() ran SET LOCAL ROLE and EXECUTE p_stmt inside one BEGIN ... EXCEPTION WHEN OTHERS and returned SQLSTATE with no discriminator, so a REFUSED role switch was returned as though the statement had raised. Measured from a real directus_app session: probe('retention_worker','SELECT 1') returned '42501 | permission denied to set role \"retention_worker\"' and assert_raises('retention_worker','SELECT 1','42501',...) PASSED, even though SELECT 1 cannot raise 42501 and the statement never ran. The fix, confined to test_support.probe() in tests/db/assert.sql, gives the switch its own exception scope, runs the statement only if the switch was accepted, and returns a refused switch behind a non-SQLSTATE marker 'ROLE_SWITCH_REFUSED <sqlstate> | <message>' that no statement assertion can accept. Requirement 3 is preserved: naming the role the session already is still works (the switch is accepted). Verified by execution, before/after: q3 goes from PASSED (false green) to FAILED with the marker; q2b unchanged at (null); positive controls q4/q5 still pass. Acceptance: node scripts/run-db-tests.mjs -> 14 suites, 0 failed, 503 assertions, 0 failing; gate:awareness, gate:retention, gate:migration-privilege and gate:self-test all exit 0. A mutation that re-grants release_hold to PUBLIC still turns 63, 64 and 66 red. The pre-existing gate:rollback-control red at 20261006_0005_retention_attribution.down.sql:71 is unrelated (AFC-253/AFC-266) and was measured on an unmodified HEAD copy.",
+  "afc257Review": {
+    "commit": "(this commit; R2 satisfied by the Reviewed-by trailer, since the commit sha does not exist until it lands)",
+    "reviewIssue": "AFC-288",
+    "reviewerAgentId": "a131248c-4ad3-4854-9a45-bd120a5d6c8e",
+    "reviewerName": "SecurityEngineer",
+    "verdict": "SHIP",
+    "findings": "F1 (non-blocking, medium): the F4 property has no permanent guard in the suite -- the runner's session is superuser so every SET LOCAL ROLE is accepted, the probe() refusal branch is never taken, and a revert of probe() leaves node scripts/run-db-tests.mjs green. Fix: add a regression assertion to --self-test that becomes a non-superuser not a member of retention_worker and asserts the marker / that assert_raises raises. Tracked as a follow-up issue assigned to Coder. F2 (low, observation): the 'cannot be certified' guarantee is convention-enforced, not type-enforced -- assert_raises can be made to pass only by passing the marker's own split_part prefix as p_expected_sqlstate, which no call site does. Optional hardening (treat v_got LIKE 'ROLE_SWITCH_REFUSED %' as a fixture failure in assert_raises) is captured in the same follow-up.",
+    "trailerOnCommit": "Reviewed-by: SecurityEngineer <a131248c-4ad3-4854-9a45-bd120a5d6c8e>"
+  }
+}

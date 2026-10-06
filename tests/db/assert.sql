@@ -131,27 +131,75 @@ END $$;
 
 -- Runs p_stmt as p_role inside a discarded subtransaction.
 -- Returns the SQLSTATE, or NULL when the statement succeeded.
+--
+-- AFC-257 / F4. The role switch and the statement must NOT share an exception
+-- scope. They used to: `SET LOCAL ROLE` and `EXECUTE p_stmt` sat inside one
+-- `BEGIN ... EXCEPTION WHEN OTHERS`, and the handler could not tell which of
+-- the two raised, so a REFUSED SWITCH was returned as though the statement had
+-- raised. Measured from a real directus_app session:
+--
+--   probe('retention_worker', 'SELECT 1')  ->  42501 | permission denied to set role "retention_worker"
+--   assert_raises('retention_worker', 'SELECT 1', '42501', ...)  ->  PASSED
+--
+-- `SELECT 1` cannot raise 42501. The statement never ran; the switch was
+-- refused, and the assertion certified the refusal as the statement's outcome.
+-- Any assertion whose named role the impersonated session does not hold could
+-- be satisfied this way, either direction.
+--
+-- So the switch is captured in its OWN scope, and a refused switch is returned
+-- behind a marker (`ROLE_SWITCH_REFUSED`) that is not a five-character SQLSTATE
+-- and therefore can never equal an expected code. `assert_raises` cannot pass on
+-- it, `assert_not_raises` cannot pass on it, and no statement assertion can
+-- satisfy it. A refused switch is a broken fixture and is reported as one.
+--
+-- Requirement kept intact: naming the role the session already is still works.
+-- That switch is ACCEPTED, so the statement runs and the probe returns its real
+-- outcome (q2b). Only the refusal is now distinguished.
 CREATE OR REPLACE FUNCTION test_support.probe(p_role text, p_stmt text)
 RETURNS text LANGUAGE plpgsql AS $$
 DECLARE
-  v_got text;
-  v_msg text;
+  v_switch     text;  -- sqlstate of SET LOCAL ROLE, NULL when the switch was accepted
+  v_switch_msg text;
+  v_got        text;  -- sqlstate of p_stmt, NULL when the statement succeeded
+  v_msg        text;
 BEGIN
   BEGIN
+    -- The switch gets its own exception scope, so a refusal cannot be mistaken
+    -- for the statement's outcome (AFC-257).
     BEGIN
       EXECUTE 'SET LOCAL ROLE ' || quote_ident(
         COALESCE(p_role, (SELECT v FROM test_support.config WHERE k = 'session_role'))
       );
-      EXECUTE p_stmt;
-      v_got := NULL;
     EXCEPTION WHEN OTHERS THEN
-      v_got := SQLSTATE;
-      v_msg := SQLERRM;
+      v_switch := SQLSTATE;
+      v_switch_msg := SQLERRM;
     END;
+
+    -- Run the statement only if the switch was accepted. Otherwise the probe
+    -- would execute p_stmt under the WRONG identity and report that as the
+    -- statement's own behaviour.
+    IF v_switch IS NULL THEN
+      BEGIN
+        EXECUTE p_stmt;
+        v_got := NULL;
+      EXCEPTION WHEN OTHERS THEN
+        v_got := SQLSTATE;
+        v_msg := SQLERRM;
+      END;
+    END IF;
+
     PERFORM test_support._rollback();
   EXCEPTION WHEN SQLSTATE 'P0001' THEN
     -- inner subtransaction discarded: role switch undone, probe's writes undone
   END;
+
+  IF v_switch IS NOT NULL THEN
+    -- A marker, not a SQLSTATE: split_part(..., ' | ', 1) can never equal the
+    -- five-character code a statement assertion expects, so the refusal cannot
+    -- be certified by assert_raises or assert_not_raises.
+    RETURN 'ROLE_SWITCH_REFUSED ' || v_switch
+      || CASE WHEN v_switch_msg IS NULL THEN '' ELSE ' | ' || v_switch_msg END;
+  END IF;
   -- the message rides along in the sqlstate slot only in debug builds, so it is
   -- appended where the assertion can print it
   RETURN v_got || CASE WHEN v_msg IS NULL THEN '' ELSE ' | ' || v_msg END;
