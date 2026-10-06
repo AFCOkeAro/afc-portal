@@ -20,6 +20,13 @@
 
 name: ci
 
+# Least privilege. This workflow only ever reads the repository: it checks out
+# code and installs dependencies. It publishes nothing and opens no PR. The
+# default GITHUB_TOKEN can be broader than read on older repos, so it is
+# narrowed here rather than inherited.
+permissions:
+  contents: read
+
 on:
   pull_request:
   push:
@@ -53,15 +60,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Order matters and is not cosmetic. setup-node's `cache: pnpm` resolves
+      # pnpm from PATH, and the action's own contract is "Package manager
+      # should be pre-installed" -- so pnpm/action-setup has to run FIRST.
+      # The other way round the cache step cannot find a package manager.
+      - uses: pnpm/action-setup@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
 
-      - uses: pnpm/action-setup@v4
-
+      # pnpm-lock.yaml is committed. setup-node keys the cache on that file's
+      # hash, and a suite that is legal evidence for a compliance control has to
+      # resolve the same transitive dependency tree every run. An unpinned
+      # resolve makes a green run non-reproducible.
       - name: Install
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       # PGlite gives a real Postgres 16 engine with no service container, so the
       # control tests exercise the same trigger and privilege semantics they
