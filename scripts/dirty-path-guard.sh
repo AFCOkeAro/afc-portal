@@ -116,7 +116,11 @@
 #   exemption list that no gate watches is a back door with a changelog: adding
 #   an entry to an unguarded file would silence R2 for any commit in history.
 #   Here, editing it is itself an unreviewed compliance-path change until it is
-#   committed.
+#   committed. That is the dirty guard's protection, and until AFC-233 it was
+#   the ONLY one: R2 named scripts/retention-literal-gate.sh and nothing else
+#   under scripts/, so this file could be committed -- and its entries extended
+#   -- with no review record at all. AFC-233 adds it to REVIEW_REQUIRED_PATHS
+#   and requires every entry to name the ruling that authorised it.
 #
 #   Fail-closed: no file, or no entries, means no exemption. A missing file can
 #   only make the gate stricter.
@@ -154,14 +158,21 @@ GUARDED_PATHS=(
 # R2 of the provenance rule: the paths where a commit needs a named reviewer.
 # This is NOT the same list as GUARDED_PATHS. bootstrap/ is on the compliance
 # path for dirty-state purposes but is not in R2, and R2 names
-# scripts/retention-literal-gate.sh specifically rather than all of scripts/.
-# Two lists, two different rules; conflating them would either under-scope R2 or
-# over-scope the dirty guard. Kept separate on purpose.
+# scripts/retention-literal-gate.sh and scripts/r2-grandfathered.json
+# specifically rather than all of scripts/. Two lists, two different rules;
+# conflating them would either under-scope R2 or over-scope the dirty guard.
+# Kept separate on purpose.
+#
+# scripts/r2-grandfathered.json was added by AFC-233. Before that, the dirty
+# guard covered the file (it is under scripts/) but R2 did not: the exemption
+# list could be edited and extended with no review record, which is the one
+# file where an unreviewed edit silences review itself.
 REVIEW_REQUIRED_PATHS=(
   "services/directus/schema/engine/**"
   "services/directus/schema/migrations/**"
   "tests/db/**"
   "scripts/retention-literal-gate.sh"
+  "scripts/r2-grandfathered.json"
 )
 
 CLAIMS_DIR=".provenance/claims"
@@ -595,6 +606,12 @@ Reviewed-by: Someone
     elif review_required "docs/adr/ADR-0003-control-suite-real-engine.md"; then
       echo "SELF-TEST FAIL: review_required flagged a path outside the R2 list"
       rc=1
+    elif ! review_required "scripts/r2-grandfathered.json"; then
+      # AFC-233: the exemption list is on the R2 review path. Before that, the
+      # dirty guard covered it (it is under scripts/) but R2 did not, so the
+      # file could be edited with no review record.
+      echo "SELF-TEST FAIL: review_required did not match scripts/r2-grandfathered.json; AFC-233 added it to R2"
+      rc=1
     elif ! review_required "services/directus/schema/migrations/rollback/x.down.sql"; then
       # ...and '**' must still cross a '/', or a rollback script written during
       # an incident is unreviewable, which is the exact moment review matters.
@@ -771,7 +788,8 @@ Issue: AFC-996
   cat > "$repo/$GRANDFATHERED_FILE" <<JSON
 { "entries": [
   { "commit": "$rev9f", "short": "${rev9f:0:7}",
-    "reason": "No recorded review; exempt by declaration so the debt stays visible." }
+    "reason": "No recorded review; exempt by declaration so the debt stays visible.",
+    "ruling": "CEO ruling 2026-10-06, AFC-194 section 8" }
 ] }
 JSON
   git -C "$repo" add -A
@@ -819,6 +837,49 @@ JSON
     rc=1
   else
     echo "  self-test ok: corrupt grandfather list fails closed"
+  fi
+
+  # 9m. An exemption with NO RULING is self-certified. AFC-233.
+  #
+  #     A grandfather entry that names a reason but not the ruling that
+  #     authorised it is a self-certifying exemption: anyone can add an entry
+  #     claiming "the CEO said so" with no way to verify it. The ruling field
+  #     names the specific CEO ruling, the same way the reason names the
+  #     justification. Refuse it, exactly as 9j refuses a missing reason.
+  cat > "$repo/$GRANDFATHERED_FILE" <<JSON
+{ "entries": [ { "commit": "$rev9f", "short": "${rev9f:0:7}",
+    "reason": "No recorded review; exempt by declaration." } ] }
+JSON
+  git -C "$repo" add -A
+  git -C "$repo" commit -q -m "chore(provenance): ruling-less exemption fixture"
+  if check_commit "$repo" "$rev_range" >/dev/null 2>&1; then
+    echo "SELF-TEST FAIL: a grandfather entry with no ruling was honoured"
+    rc=1
+  else
+    echo "  self-test ok: grandfather entry without a ruling refused"
+  fi
+
+  # 9n. ...and a COMPLETE entry (reason AND ruling) is still honoured. The
+  #     negative assertion alone would pass if the matcher refused everything,
+  #     which is the same blind-check failure 9f exists to catch.
+  cat > "$repo/$GRANDFATHERED_FILE" <<JSON
+{ "entries": [ { "commit": "$rev9f", "short": "${rev9f:0:7}",
+    "reason": "No recorded review; exempt by declaration.",
+    "ruling": "CEO ruling 2026-10-06, AFC-194 section 8" } ] }
+JSON
+  git -C "$repo" add -A
+  git -C "$repo" commit -q -m "chore(provenance): complete exemption fixture"
+  out=$(check_commit "$repo" "$rev_range" 2>&1)
+  if [ "$?" -ne 0 ]; then
+    echo "SELF-TEST FAIL: a complete grandfather entry (reason + ruling) was refused"
+    echo "$out" | sed 's/^/    /'
+    rc=1
+  elif ! printf '%s' "$out" | grep -q 'R2 GRANDFATHERED'; then
+    echo "SELF-TEST FAIL: complete grandfather entry passed WITHOUT printing its status"
+    echo "$out" | sed 's/^/    /'
+    rc=1
+  else
+    echo "  self-test ok: complete grandfather entry (reason + ruling) honoured"
   fi
 
   # 9l. R1 MUST MEAN "THIS COMMIT IS ATTRIBUTABLE", NOT "SOME CLAIM MENTIONS THIS
@@ -943,8 +1004,17 @@ JSON
     echo "SELF-TEST FAIL: a claim recording no author satisfied R1"
     echo "$out" | sed 's/^/    /'
     rc=1
-  elif ! printf '%s' "$out" | grep -q 'records no author'; then
-    echo "SELF-TEST FAIL: refused without naming the missing author"
+  elif ! printf '%s' "$out" | grep -q 'records no author' \
+    || ! printf '%s' "$out" | grep -q 'AFC-997' \
+    || printf '%s' "$out" | tr '\n' ' ' | tr -s ' ' | grep -q 'each belongs to a different issue'; then
+    # AFC-290: the covering claim listed for this refusal is this commit's OWN
+    # claim (AFC-997), so the refusal must name the missing author, must name the
+    # commit's own claim, and must NOT claim the covering claim belongs to a
+    # different issue. All three in one assertion; the fixture's only covering
+    # claim is the commit's own, so the old sentence is false here.
+    echo "SELF-TEST FAIL: the authorless own-claim refusal must name the missing"
+    echo "    author, name the commit's own claim, and must not claim the covering"
+    echo "    claim belongs to a different issue"
     echo "$out" | sed 's/^/    /'
     rc=1
   else
@@ -1757,6 +1827,10 @@ grandfathered_lookup() {
     // A grandfather entry with no reason is not an exemption, it is an
     // unexplained hole. Refuse it.
     if (typeof hit.reason !== "string" || !hit.reason.trim()) process.exit(2);
+    // A grandfather entry with no ruling is self-certified: it claims an
+    // exemption without naming the authority that granted it. Refuse it.
+    // AFC-233.
+    if (typeof hit.ruling !== "string" || !hit.ruling.trim()) process.exit(2);
     process.stdout.write([hit.short || hit.commit.slice(0, 7), hit.reason.trim()].join("|"));
   ' "$f" "$sha"
 }
@@ -2225,9 +2299,23 @@ check_commit() {
           esac
           covering=$(claims_covering "$root" "$p")
           if [ -n "$covering" ]; then
-            echo "    These registered claims DO cover $p, and each belongs to a"
-            echo "    different issue. That is not this commit's claim, and it is why R1"
-            echo "    refuses rather than reporting 'ok':"
+            if [ "$arc_rc" -eq 4 ]; then
+              # AFC-290: exit 4 means THIS commit's own claim covers the path and
+              # records no author, so the shared "each belongs to a different issue"
+              # prose is false here: the claim listed below is this commit's own,
+              # and saying otherwise sends the reader looking for another issue's
+              # claim that does not exist. The listing stays -- seeing the commit's
+              # own claim named with NO AUTHOR is the confirmation of the diagnosis.
+              echo "    These registered claims DO cover $p. This commit's own claim"
+              echo "    is among them and records no author, which is why R1 refuses"
+              echo "    rather than reporting 'ok':"
+            else
+              # Exits 1 and 2: no claim of this commit's own covers the path, so
+              # every claim listed here DOES belong to a different issue.
+              echo "    These registered claims DO cover $p, and each belongs to a"
+              echo "    different issue. That is not this commit's claim, and it is why R1"
+              echo "    refuses rather than reporting 'ok':"
+            fi
             printf '%s\n' "$covering"
           fi
           rc=1

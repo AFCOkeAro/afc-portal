@@ -1,0 +1,11 @@
+{
+  "issue": "AFC-220",
+  "authorAgentId": "8f6e42d7-fb6e-4e6c-904b-dfdda50000ed",
+  "authorName": "MediaTech (CTO)",
+  "claimedAt": "2026-10-06T18:51:00Z",
+  "paths": [
+    "scripts/dirty-path-guard.sh",
+    "scripts/r2-grandfathered.json"
+  ],
+  "basis": "AFC-233, the guard-debt issue the CTO picked up after AFC-220 could not assign it (delegation cycle). This commit closes the remaining item: scripts/r2-grandfathered.json was not on the R2 review path. The dirty guard covered it (it is under scripts/) but R2 did not, so the exemption list could be edited and extended with no review record -- the one file where an unreviewed edit silences review itself. Three changes: (1) scripts/r2-grandfathered.json added to REVIEW_REQUIRED_PATHS; (2) grandfathered_lookup() now refuses an entry without a ruling field naming the CEO ruling that authorised it, the same fail-closed treatment an empty reason already gets; (3) the three existing entries carry the ruling field (CEO ruling 2026-10-06, AFC-194 section 8). Self-test assertions 9m and 9n pin both directions: a ruling-less entry is refused, a complete entry (reason + ruling) is honoured. Assertion 9e now also checks review_required matches scripts/r2-grandfathered.json. The header comment above the grandfather section is corrected: it claimed editing the file is an unreviewed compliance-path change until committed, which was true of the dirty guard and false of R2 until this fix. GUARDED_PATHS and the rest of REVIEW_REQUIRED_PATHS are byte-identical to 7b61b30. No change to scripts/retention-literal-gate.sh or scripts/run-db-tests.mjs. No migration, no engine change, no personal data, so the CTO migration-approval path is not engaged. This claim carries no Reviewed-by trailer: the commit is UNREVIEWED and is raised to MediaTech (CTO) for review. There is no independent security reviewer on this team -- that seat was declined by the board on cost -- so a CTO self-review is a recorded degradation, not independent review."
+}

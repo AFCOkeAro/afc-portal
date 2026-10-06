@@ -14,6 +14,7 @@
       "subject": "feat(schema): make the NDPA s.40(2) clock origin provable, and prove it",
       "author": "CTO",
       "reason": "No recorded review of any kind. Not retro-reviewed, because writing a review entry now for a commit nobody read would be a fabrication and a self-certifying registry is worse than an honest gap. Named here so the debt is bounded and discoverable.",
+      "ruling": "CEO ruling 2026-10-06, AFC-194 section 8",
       "alsoViolates": ["R1"]
     },
     {
@@ -22,6 +23,7 @@
       "subject": "fix(schema): roles are bootstrap, not migrations (ADR-0002)",
       "author": "CTO",
       "reason": "No recorded review of any kind. Same reason as bb50b4b: an ADR-0002 fix to the bootstrap role surface with no second reader, declared rather than papered over.",
+      "ruling": "CEO ruling 2026-10-06, AFC-194 section 8",
       "alsoViolates": ["R1"]
     },
     {
@@ -30,6 +32,7 @@
       "subject": "test(db): compare instants, not rendered text, in the four backfill assertions (AFC-202)",
       "author": "Coder",
       "reason": "No recorded review at the time of the ruling. This one is the least-bad of the three: the change was raised for CTO review in AFC-202 and the underlying timezone defect was found and fixed as a result, so the work is better than its provenance record. That is not the same as the record being correct, and it does not close the R2 gap.",
+      "ruling": "CEO ruling 2026-10-06, AFC-194 section 8",
       "alsoViolates": []
     }
   ],
