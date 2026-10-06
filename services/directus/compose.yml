@@ -1,0 +1,169 @@
+# AFC Church Portal — production stack.
+#
+# SPECIFICATION: docs/planning/infra-spec.md §4. This file is a transcription of
+# the outline in that section, not a design of mine. If the two disagree, §4 is
+# wrong and the spec is what changes. AFC-211 added exactly one thing to it: the
+# `deploy-region` guard below.
+#
+# NAMES ONLY. Every environment value is a `${VAR}` reference resolved from
+# services/directus/.env on the host (mode 600, git-ignored). No secret value,
+# no region value, and no default appears in this file or in any other committed
+# file. A real value here would be a secret committed to a repository that will
+# hold children's records.
+#
+# ---------------------------------------------------------------------------
+# THE deploy-region GUARD — AFC-211
+#
+# ADR "Pin the production hosting region" (AFC-171) made DEPLOY_REGION the one
+# source of truth for where this deployment runs: required, no default, no
+# placeholder, chosen by a human at the moment the server is bought. Declaring
+# it closed the prose leak. It did not close the enforcement leak, because a
+# declared-but-unread variable is a comment, and there was no provisioning path
+# for it to enforce anything in. This file is that path.
+#
+# `deploy-region` runs the assertion and exits. Every other service declares
+# `depends_on: deploy-region: condition: service_completed_successfully`, so on
+# `docker compose up` the assertion runs FIRST and the rest of the stack does
+# not start unless it passes. That is the whole mechanism: not a check someone
+# remembers to run, a precondition the stack cannot boot without.
+#
+# Why not in apps/web, which is where a reader might expect a check to live:
+# DEPLOY_REGION is legitimately unset in dev and in CI. A boot check in the Nuxt
+# app would fail every developer machine and every pipeline for the absence of a
+# production-only fact. Here, unset means "no production deployment is
+# configured" — correct, and not an error. It is an error in exactly one place:
+# the place that IS a production deployment.
+#
+# The guard exits 78 (EX_CONFIG) on a missing or malformed value and prints a
+# message naming DEPLOY_REGION and where to set it. There is no bypass flag and
+# no warn mode. A guard with an escape hatch gets escaped.
+#
+# `postgres:16-alpine` is the guard's image deliberately: the stack already
+# pulls it, so the guard costs no additional image and cannot fail for a reason
+# unrelated to the region.
+# ---------------------------------------------------------------------------
+
+services:
+  # -------------------------------------------------------------------------
+  # The gate. Exits 0 or 78; nothing else. Not a long-running service, so
+  # restart: "no" — a restarting assertion would bury the message it printed
+  # once under a retry loop.
+  # -------------------------------------------------------------------------
+  deploy-region:
+    image: postgres:16-alpine
+    restart: "no"
+    entrypoint: ["/bin/sh", "/bootstrap/assert-deploy-region.sh"]
+    environment:
+      DEPLOY_REGION: ${DEPLOY_REGION}
+    volumes:
+      - ./bin/assert-deploy-region.sh:/bootstrap/assert-deploy-region.sh:ro
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    depends_on:
+      deploy-region:
+        condition: service_completed_successfully
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  directus:
+    image: directus/directus:11
+    restart: unless-stopped
+    depends_on:
+      deploy-region:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+    environment:
+      KEY: ${DIRECTUS_KEY}
+      SECRET: ${DIRECTUS_SECRET}
+      DB_CLIENT: pg
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: ${POSTGRES_DB}
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      ADMIN_EMAIL: ${DIRECTUS_ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${DIRECTUS_ADMIN_PASSWORD}
+      PUBLIC_URL: ${DIRECTUS_PUBLIC_URL}
+      STORAGE_LOCATIONS: local
+      STORAGE_LOCAL_DRIVER: local
+      STORAGE_LOCAL_ROOT: /directus/uploads
+      EMAIL_TRANSPORT: smtp
+      EMAIL_FROM: ${EMAIL_FROM}
+      EMAIL_SMTP_HOST: ${EMAIL_SMTP_HOST}
+      EMAIL_SMTP_PORT: ${EMAIL_SMTP_PORT}
+      EMAIL_SMTP_USER: ${EMAIL_SMTP_USER}
+      EMAIL_SMTP_PASSWORD: ${EMAIL_SMTP_PASSWORD}
+      EMAIL_SMTP_SECURE: "true"
+      RATE_LIMITER_ENABLED: "true"
+    volumes:
+      - uploads:/directus/uploads
+      - ./extensions:/directus/extensions
+
+  web:
+    build: ../../apps/web
+    restart: unless-stopped
+    depends_on:
+      deploy-region:
+        condition: service_completed_successfully
+      directus:
+        condition: service_started
+    environment:
+      NUXT_PUBLIC_DIRECTUS_URL: ${DIRECTUS_PUBLIC_URL}
+      NUXT_DIRECTUS_SERVER_TOKEN: ${NUXT_DIRECTUS_SERVER_TOKEN}
+      NUXT_PUBLIC_SITE_URL: ${SITE_URL}
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      deploy-region:
+        condition: service_completed_successfully
+      web:
+        condition: service_started
+      directus:
+        condition: service_started
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+  db-backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    depends_on:
+      deploy-region:
+        condition: service_completed_successfully
+    entrypoint: ["/bin/sh", "/backup/backup.sh"]
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      S3_ENDPOINT: ${S3_ENDPOINT}
+      S3_BUCKET: ${S3_BUCKET}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+    volumes:
+      - ./backup:/backup:ro
+      - backupdata:/backups
+
+volumes:
+  pgdata:
+  uploads:
+  caddy_data:
+  caddy_config:
+  backupdata:
