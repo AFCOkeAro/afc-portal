@@ -50,18 +50,42 @@ CREATE INDEX IF NOT EXISTS incidents_reported_at_idx ON incidents (reported_at)
 --                        control must be enforced by trigger, not by role
 --                        permissions. These column grants are defence in depth.
 -- ---------------------------------------------------------------------------
+--
+-- Both identities are BOOTSTRAP roles, provisioned by the cluster-owner
+-- bootstrap step that runs BEFORE the migration sequence. This file asserts they
+-- exist and then only ever GRANTs and REVOKEs against them.
+--
+-- ADR-0002. This block used to CREATE both roles. That is the defect
+-- 20261006_0004_retention.sql exposed: because the sequence was privileged for
+-- 0001 and unprivileged from 0002 onward, 0001 could mint a role and no later
+-- migration could. The first migration that needed a NEW role failed with
+-- 42501, and the obvious fix -- granting CREATEROLE to the migrator -- would
+-- have let the migration identity promote itself to directus_app.
+--
+-- Roles are infrastructure. Migrations are history. See
+-- services/directus/schema/bootstrap/README.md and scripts/migration-privilege-gate.sh,
+-- which fails the build if any migration creates or escalates a role.
+--
+-- The assertion is fail-closed and names the missing role: a deploy that skips
+-- bootstrap gets a sentence it can act on, not a silent partial install.
+-- ---------------------------------------------------------------------------
 
 DO $$
+DECLARE
+  v_missing text;
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'directus_migrator') THEN
-    -- No login: this role is assumed via SET ROLE by the migration runner, or
-    -- granted to a deploy account. It never authenticates as itself.
-    CREATE ROLE directus_migrator NOLOGIN;
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'directus_app') THEN
-    -- The Directus runtime identity. LOGIN because Directus authenticates with
-    -- it; it owns nothing.
-    CREATE ROLE directus_app LOGIN;
+  SELECT string_agg(r, ', ') INTO v_missing
+    FROM unnest(ARRAY['directus_migrator', 'directus_app']) AS r
+   WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = r);
+
+  IF v_missing IS NOT NULL THEN
+    RAISE EXCEPTION
+      'bootstrap role(s) % are missing. They are provisioned by the cluster-owner '
+      'bootstrap step BEFORE the migration sequence (ADR-0002), not by a migration: '
+      'migrations run as directus_migrator, which holds no CREATEROLE. Run the '
+      'bootstrap before migrating -- see services/directus/schema/bootstrap/README.md.',
+      v_missing
+      USING ERRCODE = 'restrict_violation';
   END IF;
 END
 $$;

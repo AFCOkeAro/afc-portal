@@ -47,12 +47,21 @@ jobs:
         run: |
           bash scripts/awareness-write-context-gate.sh --self-test
           bash scripts/retention-literal-gate.sh --self-test
+          bash scripts/migration-privilege-gate.sh --self-test
 
       - name: Awareness write-context gate
         run: bash scripts/awareness-write-context-gate.sh
 
       - name: Retention literal gate
         run: bash scripts/retention-literal-gate.sh
+
+      # ADR-0002. A migration may GRANT and REVOKE; it may never CREATE ROLE.
+      # Roles are provisioned by the cluster-owner bootstrap step before the
+      # sequence. The reason this is not fixed by granting CREATEROLE to the
+      # migrator is that CREATEROLE lets the migration identity promote itself
+      # to directus_app and escalate to full read/write on the app database.
+      - name: Migration privilege boundary gate
+        run: bash scripts/migration-privilege-gate.sh
 
   db-tests:
     name: Database control tests (awareness_at)
