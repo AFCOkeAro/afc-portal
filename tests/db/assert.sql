@@ -32,6 +32,37 @@ CREATE TABLE IF NOT EXISTS test_support.results (
 -- simplicity rather than exposure.
 GRANT USAGE ON SCHEMA test_support TO PUBLIC;
 GRANT INSERT, SELECT ON test_support.results TO PUBLIC;
+GRANT USAGE, SELECT ON SEQUENCE test_support.results_seq_seq TO PUBLIC;
+
+-- The role that owns this harness. Captured once, because SET LOCAL ROLE leaks
+-- out of every helper and no test may rely on the ambient role: NULL means "the
+-- session role" everywhere in this harness.
+CREATE TABLE IF NOT EXISTS test_support.config (k text PRIMARY KEY, v text);
+INSERT INTO test_support.config (k, v) VALUES ('session_role', current_user)
+  ON CONFLICT (k) DO UPDATE SET v = EXCLUDED.v;
+GRANT SELECT ON test_support.config TO PUBLIC;
+
+-- Every role in the v4 permission matrix (data-model-v4.md 5), plus one role with
+-- strictly more privilege than any Directus role can hold. Created here rather
+-- than inside a suite: a suite that fails rolls back, and the suites after it
+-- must not lose their cast.
+DO $$
+DECLARE
+  v_role text;
+  v_roles text[] := ARRAY[
+    'super_admin', 'area_admin', 'branch_admin',
+    'welfare_officer', 'staff_volunteer', 'member', 'public'
+  ];
+BEGIN
+  FOREACH v_role IN ARRAY v_roles LOOP
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'directus_' || v_role) THEN
+      EXECUTE format('CREATE ROLE directus_%I LOGIN', v_role);
+    END IF;
+  END LOOP;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'test_table_super') THEN
+    CREATE ROLE test_table_super LOGIN;
+  END IF;
+END $$;
 
 -- Sentinel raised purely to force a rollback. Never a real test failure.
 CREATE OR REPLACE FUNCTION test_support._rollback()
@@ -46,26 +77,30 @@ CREATE OR REPLACE FUNCTION test_support.probe(p_role text, p_stmt text)
 RETURNS text LANGUAGE plpgsql AS $$
 DECLARE
   v_got text;
+  v_msg text;
 BEGIN
   BEGIN
     BEGIN
-      IF p_role IS NOT NULL THEN
-        EXECUTE 'SET LOCAL ROLE ' || quote_ident(p_role);
-      END IF;
+      EXECUTE 'SET LOCAL ROLE ' || quote_ident(
+        COALESCE(p_role, (SELECT v FROM test_support.config WHERE k = 'session_role'))
+      );
       EXECUTE p_stmt;
       v_got := NULL;
     EXCEPTION WHEN OTHERS THEN
       v_got := SQLSTATE;
+      v_msg := SQLERRM;
     END;
     PERFORM test_support._rollback();
   EXCEPTION WHEN SQLSTATE 'P0001' THEN
     -- inner subtransaction discarded: role switch undone, probe's writes undone
   END;
-  RETURN v_got;
+  -- the message rides along in the sqlstate slot only in debug builds, so it is
+  -- appended where the assertion can print it
+  RETURN v_got || CASE WHEN v_msg IS NULL THEN '' ELSE ' | ' || v_msg END;
 END $$;
 
 -- Runs a statement as p_role and lets it persist. Unlike probe(), this does NOT
--- roll back -- use it for fixture setup.
+-- roll back -- use it for fixture setup. p_role NULL means the session role.
 --
 -- Note: `SET LOCAL ROLE` inside a function leaks until the end of the enclosing
 -- transaction, so every privileged statement names its role explicitly and no
@@ -74,7 +109,9 @@ END $$;
 CREATE OR REPLACE FUNCTION test_support.as_role(p_role text, p_stmt text)
 RETURNS void LANGUAGE plpgsql AS $$
 BEGIN
-  EXECUTE 'SET LOCAL ROLE ' || quote_ident(p_role);
+  EXECUTE 'SET LOCAL ROLE ' || quote_ident(
+    COALESCE(p_role, (SELECT v FROM test_support.config WHERE k = 'session_role'))
+  );
   EXECUTE p_stmt;
 END $$;
 
@@ -109,7 +146,7 @@ BEGIN
             'no error raised, expected ' || p_expected_sqlstate || ' from: ' || p_stmt);
     RAISE EXCEPTION 'ASSERTION FAILED: [%] % -- statement succeeded but % was expected: %',
       p_suite, p_name, p_expected_sqlstate, p_stmt;
-  ELSIF v_got <> p_expected_sqlstate THEN
+  ELSIF split_part(v_got, ' | ', 1) <> p_expected_sqlstate THEN
     INSERT INTO test_support.results (suite, name, ok, detail)
     VALUES (p_suite, p_name, false,
             'expected ' || p_expected_sqlstate || ' got ' || v_got || ' from: ' || p_stmt);

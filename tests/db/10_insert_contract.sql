@@ -31,7 +31,6 @@ BEGIN
   PERFORM test_support.as_role('directus_app',
     $q$INSERT INTO incidents (ref, summary, severity, status, detected_at)
       VALUES ('INSERT-RUNTIME', 'Inserted as the Directus runtime identity', 'major', 'open', now())$q$);
-  PERFORM test_support.as_role(NULL, 'SELECT 1');
 
   SELECT id, awareness_at, awareness_at_source INTO v_id, v_awareness, v_source
     FROM incidents WHERE ref = 'INSERT-RUNTIME';
@@ -112,10 +111,15 @@ DECLARE
   ];
 BEGIN
   FOREACH v_role IN ARRAY v_roles LOOP
-    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'directus_' || v_role) THEN
-      EXECUTE format('CREATE ROLE directus_%I LOGIN', v_role);
-    END IF;
-    EXECUTE format('GRANT INSERT (ref, summary, severity, status, detected_at) ON incidents TO directus_%I', v_role);
+    -- as_role(NULL, ...) is the session role: the grants below need to be made
+    -- by someone who has grant option, and the ambient role at this point is
+    -- whatever the previous helper left behind.
+    PERFORM test_support.as_role(NULL,
+      format('GRANT SELECT ON incidents TO directus_%I', v_role));
+    PERFORM test_support.as_role(NULL,
+      format('GRANT SELECT ON incidents_breach_clock TO directus_%I', v_role));
+    PERFORM test_support.as_role(NULL,
+      format('GRANT INSERT (ref, summary, severity, status, detected_at) ON incidents TO directus_%I', v_role));
 
     PERFORM test_support.assert_raises(format('directus_%s', v_role),
       format($q$INSERT INTO incidents (ref, summary, awareness_at)

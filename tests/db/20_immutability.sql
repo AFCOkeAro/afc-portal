@@ -16,6 +16,10 @@
 -- Permissions are a control we can widen by accident; a trigger that rejects
 -- even a fully-granted session is not something a role change removes.
 
+-- The roles themselves come from tests/db/assert.sql. Here they get the most
+-- generous table-level DML a Directus policy could ever map to -- including
+-- TRUNCATE, which no Directus role would ever be granted and which therefore
+-- proves the trigger is what stops a full register wipe.
 DO $$
 DECLARE
   v_role text;
@@ -25,20 +29,16 @@ DECLARE
   ];
 BEGIN
   FOREACH v_role IN ARRAY v_roles LOOP
-    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'directus_' || v_role) THEN
-      EXECUTE format('CREATE ROLE directus_%I LOGIN', v_role);
-    END IF;
-    -- The most generous table-level DML a Directus policy could ever map to, so
-    -- a rejection below can never be blamed on an under-granted fixture.
-    EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON incidents TO directus_%I', v_role);
-    EXECUTE format('GRANT SELECT ON incidents_breach_clock TO directus_%I', v_role);
+    PERFORM test_support.as_role(NULL,
+      format('GRANT SELECT, INSERT, UPDATE, DELETE, TRUNCATE ON incidents TO directus_%I', v_role));
+    PERFORM test_support.as_role(NULL,
+      format('GRANT SELECT ON incidents_breach_clock TO directus_%I', v_role));
   END LOOP;
 
-  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'test_table_super') THEN
-    CREATE ROLE test_table_super LOGIN;
-  END IF;
-  GRANT ALL PRIVILEGES ON incidents TO test_table_super;
-  GRANT ALL PRIVILEGES ON incidents_breach_clock TO test_table_super;
+  PERFORM test_support.as_role(NULL,
+    'GRANT ALL PRIVILEGES ON incidents TO test_table_super');
+  PERFORM test_support.as_role(NULL,
+    'GRANT ALL PRIVILEGES ON incidents_breach_clock TO test_table_super');
 END
 $$;
 

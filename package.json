@@ -2,11 +2,15 @@
   "name": "afc-church-portal",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
+    "gate:awareness": "bash scripts/awareness-write-context-gate.sh",
+    "gate:retention": "bash scripts/retention-literal-gate.sh",
+    "gate:self-test": "bash scripts/awareness-write-context-gate.sh --self-test && bash scripts/retention-literal-gate.sh --self-test",
     "test:db": "node scripts/run-db-tests.mjs",
-    "gate:awareness": "bash scripts/grep-awareness-write-context.sh",
-    "test": "pnpm gate:awareness && pnpm test:db"
+    "test": "pnpm gate:self-test && pnpm gate:awareness && pnpm gate:retention && pnpm test:db"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.2.17",

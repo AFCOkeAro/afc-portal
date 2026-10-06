@@ -35,20 +35,25 @@ CREATE TABLE backfill_probe.incidents (
 -- The probe grants the runtime identity the same access it has on the real
 -- register, so the fixtures below are inserted through a role that Directus
 -- actually uses.
-GRANT USAGE ON SCHEMA backfill_probe TO directus_app;
-GRANT SELECT, INSERT, UPDATE ON backfill_probe.incidents TO directus_app;
+GRANT USAGE ON SCHEMA backfill_probe TO directus_app, test_table_super;
+GRANT SELECT, INSERT, UPDATE ON backfill_probe.incidents TO directus_app, test_table_super;
 
-SET ROLE directus_app;
-INSERT INTO backfill_probe.incidents (ref, summary, detected_at, created_at) VALUES
-  ('BF-DETECTED-ONLY', 'Engineering found it, nobody told anyone else',
-    timestamptz '2026-10-01 09:00+00', timestamptz '2026-10-01 09:05+00'),
-  ('BF-CREATED-EARLY', 'Reported before engineering logged a detection',
-    timestamptz '2026-10-03 12:00+00', timestamptz '2026-10-03 11:00+00'),
-  ('BF-NO-TIMESTAMPS', 'A row with nothing but created_at',
-    NULL, timestamptz '2026-10-04 08:00+00'),
-  ('BF-REPORTED-ONLY', 'Already reported to the Commission',
-    NULL, timestamptz '2026-10-05 08:00+00');
-RESET ROLE;
+DO $$
+BEGIN
+  PERFORM test_support.as_role('directus_app',
+    $q$INSERT INTO backfill_probe.incidents (ref, summary, detected_at, created_at) VALUES
+      ('BF-DETECTED-ONLY', 'Engineering found it, nobody told anyone else',
+        timestamptz '2026-10-01 09:00+00', timestamptz '2026-10-01 09:05+00'),
+      ('BF-CREATED-EARLY', 'Reported before engineering logged a detection',
+        timestamptz '2026-10-03 12:00+00', timestamptz '2026-10-03 11:00+00'),
+      ('BF-NO-TIMESTAMPS', 'A row with nothing but created_at',
+        NULL, timestamptz '2026-10-04 08:00+00'),
+      ('BF-REPORTED-ONLY', 'Already reported to the Commission',
+        NULL, timestamptz '2026-10-05 08:00+00')$q$);
+  -- Back to the session role: the migration below has to create objects in the
+  -- probe schema, and as_role leaves the impersonated role in place.
+  PERFORM test_support.as_role(NULL, 'SELECT 1');
+END $$;
 
 UPDATE backfill_probe.incidents
    SET reported_at = timestamptz '2026-10-05 20:00+00'
@@ -56,7 +61,8 @@ UPDATE backfill_probe.incidents
 
 SET search_path = backfill_probe, public;
 \i services/directus/schema/migrations/20261006_0002_incidents_awareness_at.sql
-RESET search_path;
+SET search_path = public;   -- explicit, not RESET: RESET leaves the local engine's
+-- search_path in a state where unqualified names stop resolving
 
 DO $$
 DECLARE
@@ -117,7 +123,8 @@ $$;
 -- enforcing.
 SET search_path = backfill_probe, public;
 \i services/directus/schema/migrations/20261006_0002_incidents_awareness_at.sql
-RESET search_path;
+SET search_path = public;   -- explicit, not RESET: RESET leaves the local engine's
+-- search_path in a state where unqualified names stop resolving
 
 DO $$
 DECLARE
@@ -129,7 +136,7 @@ BEGIN
   );
 
   PERFORM test_support.assert_equals(v_after::text, (
-    SELECT jsonb_agg(to_jsonb(t) - 'id' ORDER BY ref)
+    SELECT jsonb_agg(to_jsonb(t) - 'id' ORDER BY ref)::text
       FROM (SELECT ref, awareness_at, awareness_at_source FROM backfill_probe.incidents) t
   ), 'backfill', 'sanity: the second run changed nothing');
 
@@ -148,10 +155,10 @@ BEGIN
         WHERE ref = 'BF-DETECTED-ONLY'$q$,
     '23001', 'backfill', 'the re-run migration left the guard enabled and enforcing');
 
-  PERFORM test_support.assert_not_raises('directus_app',
+  -- as_role, not probe: this row has to survive for the assertions below.
+  PERFORM test_support.as_role('directus_app',
     $q$INSERT INTO backfill_probe.incidents (ref, summary)
-      VALUES ('BF-AFTER-RERUN', 'inserted after the second migration run')$q$,
-    'backfill', 'a fresh insert on the re-run schema is still accepted');
+      VALUES ('BF-AFTER-RERUN', 'inserted after the second migration run')$q$);
 
   PERFORM test_support.assert_equals(
     (SELECT awareness_at_source FROM backfill_probe.incidents WHERE ref = 'BF-AFTER-RERUN'),
@@ -165,4 +172,10 @@ BEGIN
 END
 $$;
 
-DROP SCHEMA backfill_probe CASCADE;
+-- Dropping the probe needs its owner back, and as_role leaves the impersonated
+-- role in place until the transaction ends.
+DO $$
+BEGIN
+  PERFORM test_support.as_role(NULL, 'SELECT 1');
+  EXECUTE 'DROP SCHEMA backfill_probe CASCADE';
+END $$;

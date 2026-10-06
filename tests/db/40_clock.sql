@@ -29,10 +29,24 @@ CREATE TABLE clock_probe.incidents (
 
 SET search_path = clock_probe, public;
 \i services/directus/schema/migrations/20261006_0002_incidents_awareness_at.sql
-RESET search_path;
+SET search_path = public;   -- explicit, not RESET: RESET leaves the local engine's
+-- search_path in a state where unqualified names stop resolving
+
+-- test_table_super needs to reach the probe to prove the guard is still there.
+GRANT USAGE ON SCHEMA clock_probe TO test_table_super;
+GRANT SELECT, UPDATE ON clock_probe.incidents TO test_table_super;
 
 -- Re-point the default to age the clock. This is the same lever the migration
 -- uses to stamp rows; only the offset differs.
+--
+-- The BEFORE INSERT guard from 0002 is disabled for the fixtures, because its
+-- whole job is to reject exactly this: a clock origin that did not come from
+-- now(). Ageing a fixture is the one legitimate reason to do that, it happens in
+-- a throwaway schema, and the trigger is switched back on immediately after --
+-- which is also a live demonstration that bypassing the guard requires table
+-- ownership, and nothing else reaches it.
+ALTER TABLE clock_probe.incidents DISABLE TRIGGER incidents_no_caller_clock;
+
 ALTER TABLE clock_probe.incidents
   ALTER COLUMN awareness_at DROP DEFAULT,
   ALTER COLUMN awareness_at SET DEFAULT (now() - interval '65 hours');
@@ -57,6 +71,8 @@ INSERT INTO clock_probe.incidents (ref, summary, severity, status, detected_at)
 VALUES ('CLOCK-1H', 'Aware an hour ago, healthy', 'minor', 'open',
         now() - interval '1 hour');
 
+ALTER TABLE clock_probe.incidents ENABLE TRIGGER incidents_no_caller_clock;
+
 DO $$
 DECLARE
   v65            numeric;
@@ -78,6 +94,13 @@ BEGIN
   SELECT round((72 - EXTRACT(EPOCH FROM (now() - detected_at)) / 3600)::numeric, 2)
     INTO v65_detected
     FROM clock_probe.incidents WHERE ref = 'CLOCK-65H';
+
+  -- The guard is back on for the probe, so the fixture ages but stays sealed.
+  PERFORM test_support.assert_raises('test_table_super',
+    $q$UPDATE clock_probe.incidents
+          SET awareness_at = now() - interval '5 hours'
+        WHERE ref = 'CLOCK-65H'$q$,
+    '23001', 'clock', 'the clock probe is sealed again after the fixtures were seeded');
 
   PERFORM test_support.assert_true(v65 > 6.9 AND v65 < 7.1, 'clock',
     'remaining hours for a 65-hour-old clock is ~7, read from awareness_at',
@@ -119,10 +142,10 @@ BEGIN
   -- Closing a breach takes it off the clock; the row stays.
   UPDATE clock_probe.incidents SET status = 'closed' WHERE ref = 'CLOCK-1H';
   PERFORM test_support.assert_equals(
-    (SELECT count(*) FROM clock_probe.incidents_breach_clock WHERE ref = 'CLOCK-1H'),
+    (SELECT count(*)::text FROM clock_probe.incidents_breach_clock WHERE ref = 'CLOCK-1H'),
     '0', 'clock', 'a closed breach is off the clock but still in the register');
   PERFORM test_support.assert_equals(
-    (SELECT count(*) FROM clock_probe.incidents WHERE ref = 'CLOCK-1H'),
+    (SELECT count(*)::text FROM clock_probe.incidents WHERE ref = 'CLOCK-1H'),
     '1', 'clock', 'a closed breach is not deleted');
 END
 $$;
@@ -137,11 +160,11 @@ DECLARE
   v_remaining numeric;
   v_due       timestamptz;
 BEGIN
-  SET LOCAL ROLE directus_app;
-  INSERT INTO incidents (ref, summary, severity, status, detected_at)
-  VALUES ('CLOCK-LIVE', 'Live fixture for the clock assertions', 'critical', 'open',
-          now() - interval '5 hours');
-  RESET ROLE;
+  PERFORM test_support.as_role('directus_app',
+    $q$INSERT INTO incidents (ref, summary, severity, status, detected_at)
+      VALUES ('CLOCK-LIVE', 'Live fixture for the clock assertions', 'critical', 'open',
+              now() - interval '5 hours')$q$);
+  PERFORM test_support.as_role(NULL, 'SELECT 1');
 
   SELECT remaining_hours, notification_due_at INTO v_remaining, v_due
     FROM incidents_breach_clock WHERE ref = 'CLOCK-LIVE';
@@ -168,12 +191,12 @@ BEGIN
     (SELECT count(*) FROM incidents_breach_clock WHERE clock_origin_missing) = 0,
     'clock', 'the view reports zero clock-origin gaps');
 
-  SET LOCAL ROLE directus_app;
-  UPDATE incidents SET status = 'reported' WHERE ref = 'CLOCK-LIVE';
-  RESET ROLE;
+  PERFORM test_support.as_role('directus_app',
+    $q$UPDATE incidents SET status = 'reported' WHERE ref = 'CLOCK-LIVE'$q$);
+  PERFORM test_support.as_role(NULL, 'SELECT 1');
 
   PERFORM test_support.assert_equals(
-    (SELECT count(*) FROM incidents_breach_clock WHERE ref = 'CLOCK-LIVE'),
+    (SELECT count(*)::text FROM incidents_breach_clock WHERE ref = 'CLOCK-LIVE'),
     '0', 'clock', 'a reported breach is off the clock');
 END
 $$;

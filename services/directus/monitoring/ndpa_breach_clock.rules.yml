@@ -1,0 +1,103 @@
+# NDPA s.40(2) breach clock — alert rules
+#
+# The timestamp exists so that a clock gets watched. A clock that lives only in
+# the breach register document is a spreadsheet, not a control (AFC-166 §6).
+#
+# Source of truth for the numbers: the `incidents_breach_clock` view created by
+# services/directus/schema/migrations/20261006_0002_incidents_awareness_at.sql
+# and the exporter queries beside this file.
+#
+# Thresholds, and why:
+#   60h remaining — leaves a working day plus overnight inside the 72h window,
+#                   so the alert lands while there is still time to act.
+#    0h remaining — the breach was not notified in time. This is not a warning,
+#                   it is a reportable incident in its own right.
+#   origin missing — should be impossible after the migration. A non-zero count
+#                   is a broken migration, not a data condition, so it pages the
+#                   same on-call path rather than waiting for a breach to hide
+#                   behind it.
+#
+# Routing: both the 60h and the 0h alerts must reach the on-call path in the
+# 72-hour runbook owned by AFC-163. This file does not own the runbook; it names
+# the contract. If AFC-163's runbook does not exist yet, these alerts are
+# unroutable and that is a known open gap, not a silent one.
+
+groups:
+  - name: ndpa-breach-clock
+    interval: 5m
+    rules:
+      - alert: NdpaBreachClockOriginMissing
+        expr: ndpa_breach_clock_origin_missing > 0
+        for: 1m
+        labels:
+          severity: page
+          control: ndpa-s40-2
+        annotations:
+          summary: >-
+            An incident has no clock origin — the NDPA s.40(2) clock cannot be
+            evidenced for {{ $labels.ref }}.
+          description: >-
+            incidents.awareness_at is NOT NULL by constraint, so this means the
+            migration is not applied on this database, or the row came from
+            somewhere outside it. Until it is fixed, no 72-hour deadline can be
+            computed for this incident. Treat as a broken migration, not as a
+            data question.
+          runbook: AFC-163 72-hour notification runbook
+          runbook_url: /AFC/issues/AFC-163
+
+      - alert: NdpaBreachProvenanceMissing
+        expr: ndpa_breach_provenance_missing > 0
+        for: 1m
+        labels:
+          severity: page
+          control: ndpa-s40-2
+        annotations:
+          summary: >-
+            An incident has a clock origin with no provenance — NDPC will ask
+            whether it is real or inferred, and we cannot answer.
+          description: >-
+            awareness_at_source records how the clock origin was established:
+            insert_default (server-set at insert) or
+            backfill:earliest_of_detected_reported_created (inferred by the
+            migration on pre-existing rows). A NULL means that record is gone.
+
+      - alert: NdpaBreachClockWarning
+        # 60 hours remaining = 12 hours consumed of the 72.
+        expr: ndpa_breach_clock_remaining_hours <= 60
+          and ndpa_breach_clock_remaining_hours > 0
+        for: 5m
+        labels:
+          severity: page
+          control: ndpa-s40-2
+        annotations:
+          summary: >-
+            {{ $labels.ref }}: {{ $value | printf "%.1f" }}h left on the NDPA
+            s.40(2) clock (aware {{ $labels.awareness_at }}).
+          description: >-
+            Two thirds of the window remain. If notification has not been
+            prepared, start it now. awareness_at is when the church became
+            aware — detected_at ({{ $labels.detected_at }}) is deliberately not
+            used for this deadline and may be later.
+          runbook: AFC-163 72-hour notification runbook
+          runbook_url: /AFC/issues/AFC-163
+
+      - alert: NdpaBreachClockBreached
+        expr: ndpa_breach_clock_remaining_hours <= 0
+        for: 1m
+        labels:
+          severity: page
+          control: ndpa-s40-2
+        annotations:
+          summary: >-
+            {{ $labels.ref }}: the 72-hour window has closed with
+            {{ $value | printf "%.1f" }}h still owed (aware
+            {{ $labels.awareness_at }}).
+          description: >-
+            Notification was not made inside the window. This is a
+            reportable failure in its own right: record what happened and when
+            in the incident row. Do not edit awareness_at — the remediation for a
+            wrong clock origin is a new incident row referencing this one, which
+            keeps both records. editing it destroys the only evidence of when the
+            church became aware.
+          runbook: AFC-163 72-hour notification runbook
+          runbook_url: /AFC/issues/AFC-163

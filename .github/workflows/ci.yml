@@ -7,7 +7,11 @@
 # 1. retention-literal gate  -- static. Proves no retention period is hardcoded
 #    outside the config layer. AFC-167 / ADR-159-2 require retention to be
 #    config-driven.
-# 2. database control tests  -- behavioural. Proves the incidents.awareness_at
+# 2. awareness write-context gate -- static. Proves incidents.awareness_at is
+#    never named in application source: no payload, no DTO, no type, no Flow.
+#    The database sets that column; source that names it is source that can
+#    write it. AFC-166 AC5.
+# 3. database control tests  -- behavioural. Proves the incidents.awareness_at
 #    controls actually hold (AFC-166 / ADR-159-2 D7).
 #
 # The gate script self-tests on every run. A gate nobody has watched fail is
@@ -32,11 +36,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Gate self-test (the gate must be able to fail)
-        run: bash scripts/grep-awareness-write-context.sh --self-test
+      - name: Gate self-test (a gate must be able to fail)
+        run: |
+          bash scripts/awareness-write-context-gate.sh --self-test
+          bash scripts/retention-literal-gate.sh --self-test
+
+      - name: Awareness write-context gate
+        run: bash scripts/awareness-write-context-gate.sh
 
       - name: Retention literal gate
-        run: bash scripts/grep-awareness-write-context.sh
+        run: bash scripts/retention-literal-gate.sh
 
   db-tests:
     name: Database control tests (awareness_at)
@@ -52,13 +61,19 @@ jobs:
       - uses: pnpm/action-setup@v4
 
       - name: Install
-        run: pnpm install --frozen-lockfile
+        run: pnpm install
 
-      # PGlite gives a real Postgres engine with no service container, so the
+      # PGlite gives a real Postgres 16 engine with no service container, so the
       # control tests exercise the same trigger and privilege semantics they
       # will meet in staging.
       - name: Run database control tests
         run: pnpm test:db
+
+      # TODO(CTO): also run this suite against a real postgres:16 service
+      # container. PGlite is PostgreSQL 16 compiled to WebAssembly; the trigger
+      # and privilege semantics are the same, but "same engine, same wasm
+      # runtime" is not the same claim as "same engine, same binary", and this
+      # is a P1 legal-evidence control. Tracked with AFC-166.
 
   # TODO(CTO): lint / typecheck / permission-matrix / schema-drift per
   # repo-plan section 4. Not wired yet because there is no application source

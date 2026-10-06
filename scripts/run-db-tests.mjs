@@ -143,7 +143,9 @@ async function main() {
         log(`  ok   ${file}`);
         passed++;
       } catch (e) {
-        console.error(`  FAIL ${file}\n       ${e.message}`);
+        // position/where are what make a SQL failure locatable in a 200-line file
+        const at = e.position ? ` (position ${e.position}${e.where ? `, ${e.where.trim()}` : ''})` : '';
+        console.error(`  FAIL ${file}\n       ${e.message}${at}`);
         failed++;
       }
     }
