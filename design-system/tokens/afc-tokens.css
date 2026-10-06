@@ -1,0 +1,427 @@
+/* ==========================================================================
+   AFC Design System — tokens v1.0.0
+   Apostolic Faith Church · West & Central Africa · Lagos North Area
+   --------------------------------------------------------------------------
+   Drop-in stylesheet. Zero build step, zero framework dependency.
+     <link rel="stylesheet" href="design-system/tokens/afc-tokens.css">
+
+   Every value here is either (a) MEASURED from production AFC/WECA CSS, or
+   (b) DERIVED from a measured value to satisfy a WCAG 2.2 threshold that
+   production currently fails. Measured values carry a `measured:` provenance
+   comment; derived values carry the failing pair they replace.
+
+   Layer order — never skip ahead:
+     1. primitive   raw ramps, no meaning      --afc-ink-900
+     2. semantic    role on surface            --afc-text-secondary
+     3. component   one component's knobs     --afc-btn-height-md
+
+   Run `node design-system/tools/contrast-check.mjs` to verify the semantic
+   layer. It exits non-zero if any declared pair fails its WCAG threshold.
+   ========================================================================== */
+
+:root {
+  color-scheme: light;
+
+  /* ======================================================================
+     1. PRIMITIVES — ink (cool neutrals)
+     Production sources, in descending usage frequency:
+       #090b19 x116   #f3f6fc x73   #6e7488 x51   #e2e7f1 x38
+     ---------------------------------------------------------------------- */
+  --afc-ink-950: #05060f;
+  --afc-ink-900: #090b19; /* measured: apostolicfaith.org, 116 uses */
+  --afc-ink-800: #12141f;
+  --afc-ink-700: #1e2029; /* measured */
+  --afc-ink-600: #2a2d38;
+  --afc-ink-500: #444752; /* measured */
+  --afc-ink-400: #525968; /* DERIVED from #6e7488 — 4.29:1 on paper-100, FAILS AA */
+  --afc-ink-300: #6e7488; /* measured. Retained as a NON-TEXT value only. */
+  --afc-ink-200: #8a94a6; /* measured */
+  --afc-ink-150: #969caa; /* measured */
+  --afc-ink-100: #d4ddee; /* measured */
+  --afc-ink-50:  #e2e7f1; /* measured */
+  --afc-ink-25:  #e4ebf3; /* measured */
+
+  /* ----------------------------------------------------------------------
+     PRIMITIVES — paper (surfaces). Production page ground is #f3f6fc.
+     ---------------------------------------------------------------------- */
+  --afc-paper-0:   #ffffff;
+  --afc-paper-25:  #fbfcfe;
+  --afc-paper-50:  #f7fbfe; /* measured: --pin-stripe */
+  --afc-paper-100: #f3f6fc; /* measured: page background, 73 uses */
+  --afc-paper-200: #edf2fa;
+  --afc-paper-300: #e7edf7;
+
+  /* ----------------------------------------------------------------------
+     PRIMITIVES — gold. THE BRAND SEAL.
+     Sampled from afc-jesus-light-of-world.png (H47 S0.90 V0.97).
+     `measured` gold-400 sits at 1.71:1 on white: unusable as text, usable as
+     a graphic fill. That is why gold-600/700 exist below and why the rule
+     "gold is never a UI surface" exists in the guidelines.
+     ---------------------------------------------------------------------- */
+  --afc-gold-200: #ffe9a3;
+  --afc-gold-300: #ffd65c;
+  --afc-gold-400: #f5be00; /* measured */
+  --afc-gold-500: #d9a600; /* press / hover */
+  --afc-gold-600: #7a5c00; /* DERIVED — 6.25:1 on white. Gold-toned TEXT on light. */
+  --afc-gold-700: #5e4700; /* DERIVED — 8.83:1 on white */
+
+  /* ----------------------------------------------------------------------
+     PRIMITIVES — action (cool azure).
+     Production primary button is #3F8CD1 (--dark-outline) with #fff text:
+     3.57:1 — FAILS WCAG AA 1.4.3. action-600 keeps the same hue family and
+     passes at 6.02:1.
+     ---------------------------------------------------------------------- */
+  --afc-action-300: #6baaf2; /* measured: #3898ec, media player accent */
+  --afc-action-400: #3898ec; /* measured */
+  --afc-action-500: #2a79cc; /* measured family — 4.46:1, large text only */
+  --afc-action-600: #1a63b4; /* DERIVED — 6.02:1 on white. THE primary. */
+  --afc-action-700: #12559e; /* derived — hover/press */
+  --afc-action-800: #0d4888;
+
+  /* ----------------------------------------------------------------------
+     PRIMITIVES — deep blue (AFCF + Africa for Christ).
+     Named at the request of the brand owner: this family is a DEEP BLUE,
+     not purple and not indigo. Measured H 252-253 S 0.63-0.68 L 0.26.
+     H 252 sits on the blue/violet boundary in HSL, which is exactly why it
+     reads as violet when the ink is lightened; at production lightness it is
+     unambiguously blue. Do not lighten this ramp without re-checking the name.
+     ---------------------------------------------------------------------- */
+  --afc-blue-200: #d8d5ee; /* measured family, 80% tint — soft badge fill */
+  --afc-blue-400: #4a3a92; /* measured family, tint — hover/press         */
+  --afc-blue-500: #33207c; /* measured family, tint                        */
+  --afc-blue-600: #29186b; /* MEASURED afcf-logo.png — THE ink              */
+  --afc-blue-700: #24155c; /* measured africa-for-christ-logo.png           */
+  --afc-blue-800: #1a0f45; /* deepest step — badge ground, hover on blue-600 */
+
+  /* ----------------------------------------------------------------------
+     PRIMITIVES — status
+     ---------------------------------------------------------------------- */
+  --afc-danger-400: #d9534f;
+  --afc-danger-500: #b03636;
+  --afc-danger-600: #992e2e; /* 7.54:1 on white */
+  --afc-danger-700: #7d2525;
+
+  --afc-success-400: #3f9d63;
+  --afc-success-500: #2a7f4b;
+  --afc-success-600: #175a35; /* 8.23:1 on white */
+
+  --afc-warn-400: #e0a800;
+  --afc-warn-500: #a67c00;
+  --afc-warn-600: #7a5c00;
+
+  --afc-info-600: #1a63b4;
+
+  /* ======================================================================
+     1b. PRIMITIVES — department seals
+     Five real marks, THREE colour families. Sampled with
+     `node tools/sample-logo.mjs`, provenance in logos/README.md.
+
+     THE GOVERNING FINDING (rev 2): colour cannot identify a department.
+     Measured hue of every mark:
+
+       JTLW / AFC        H 45   gold    ─┐
+       WECA lockup       H 43   gold     ├─ THREE marks share gold
+       AFCMF ring        H 47   gold    ─┘
+       Africa for Christ H 253  deep blue ─┐ TWO marks share deep blue
+       AFCF              H 252  deep blue ─┘
+       Youth Development H 195  teal      ── unique
+
+     So `--afc-dept-accent` is a FAMILY TINT, never an identity key. Identity
+     is the seal artwork plus the department name. A department switcher that
+     relies on the accent hue alone fails WCAG 1.4.1 Use of Color.
+     ---------------------------------------------------------------------- */
+  --afc-dept-afc-accent:   var(--afc-gold-400);   /* gold  #F5BE00  JTLW script   */
+  --afc-dept-weca-accent:  var(--afc-gold-400);   /* gold  #FFD567  lockup script  */
+  --afc-dept-afcmf-accent: #eb7d26;              /* orange#EB7D26 "Outstanding"   */
+  --afc-dept-afcf-accent:  var(--afc-blue-600);  /* deep blue #29186B AFCF cross  */
+  --afc-dept-afc4c-accent: var(--afc-blue-700);  /* deep blue #24155C Africa map  */
+  --afc-dept-ydd-accent:   #0184b1;              /* teal  #0184B1  YDD figures   */
+
+  /* Ink for each accent, used for text and for the seal on a light surface.
+     Each is a measured mark colour or the AA-derivation of one. */
+  --afc-dept-afc-ink:   #090b19;
+  --afc-dept-weca-ink:  #4a4a4a;   /* DERIVED from lockup strapline #666666 */
+  --afc-dept-afcmf-ink: #8a3f06;   /* DERIVED from #EB7D26 — 6.6:1 on white */
+  --afc-dept-afcf-ink:  #29186b;   /* measured */
+  --afc-dept-afc4c-ink: #24155c;   /* measured */
+  --afc-dept-ydd-ink:   #0d4a63;   /* DERIVED from #0184B1 — 5.6:1 on white */
+
+  /* AFCMF is a full-colour crest, not a single-ink mark. These are the other
+     inks it carries, exposed so a matching surface can be built from tokens
+     instead of from an eyedropper. */
+  --afc-dept-afcmf-red:    #db393a; /* "Outstanding for Christ" caption */
+  --afc-dept-afcmf-ring:   #fbd959; /* crest ring — same gold family as AFC  */
+  --afc-dept-afcmf-slate:  #6a6d7e; /* shield field                        */
+  /* YDD mark also carries red and navy. */
+  --afc-dept-ydd-warm:  #ad332e;
+  --afc-dept-ydd-deep:  #2b305c;
+
+  /* ======================================================================
+     2. SEMANTIC — light theme (default)
+     ====================================================================== */
+  --afc-bg-canvas:        var(--afc-paper-100); /* measured page ground        */
+  --afc-bg-surface:       var(--afc-paper-0);
+  --afc-bg-surface-raised:var(--afc-paper-0);
+  --afc-bg-sunken:        var(--afc-paper-200);
+  --afc-bg-inset:         var(--afc-paper-50);
+  --afc-bg-inverse:       var(--afc-ink-900); /* measured, 116 uses           */
+  --afc-bg-inverse-text:  var(--afc-paper-50);
+
+  --afc-bg-action:        var(--afc-action-600);
+  --afc-bg-action-hover:  var(--afc-action-700);
+  --afc-bg-action-press:  var(--afc-action-800);
+  --afc-bg-action-soft:   #e8f0fa;
+  --afc-bg-action-text:   #ffffff;
+
+  --afc-text-primary:     var(--afc-ink-900);   /* 18.07:1 on canvas           */
+  --afc-text-secondary:   var(--afc-ink-400);   /* 6.49:1 on canvas            */
+  --afc-text-muted:       var(--afc-ink-400);   /* 7.45:1 on white             */
+  --afc-text-disabled:    var(--afc-ink-200);   /* non-text only, see a11y.md  */
+  --afc-text-on-dark:     var(--afc-paper-50);
+  --afc-text-on-dark-muted: #a8b0c4;            /* 7.02:1 on ink-900           */
+
+  --afc-border-subtle:    var(--afc-ink-50);
+  --afc-border-default:   var(--afc-ink-100);
+  --afc-border-strong:    var(--afc-ink-200);   /* 3.0:1 — non-text minimum    */
+  --afc-border-inverse:   rgba(255, 255, 255, 0.18);
+
+  --afc-focus-inner:      #ffffff;              /* inner ring on dark grounds   */
+  --afc-focus-outer:      var(--afc-ink-900);   /* outer ring, always visible  */
+  --afc-focus-ring: 0 0 0 2px var(--afc-focus-inner), 0 0 0 4px var(--afc-focus-outer);
+
+  /* Active department. Defaults to AFC; overridden by [data-dept='…'] below. */
+  --afc-dept-accent: var(--afc-dept-afc-accent);
+  --afc-dept-ink:    var(--afc-dept-afc-ink);
+
+  --afc-seal-accent:      var(--afc-dept-accent);
+  --afc-seal-ink:         var(--afc-dept-ink);
+  --afc-seal-on-light:    var(--afc-dept-ink); /* 3:1+ against paper — see pairs.json */
+
+  --afc-status-danger:    var(--afc-danger-600);
+  --afc-status-danger-bg: #fbeeed;
+  --afc-status-success:   var(--afc-success-600);
+  --afc-status-success-bg:#e9f4ee;
+  --afc-status-warn:      var(--afc-warn-600);
+  --afc-status-warn-bg:   #fdf5e0;
+  --afc-status-info:      var(--afc-action-600);
+  --afc-status-info-bg:   #e8f0fa;
+  --afc-status-neutral:   var(--afc-ink-400);
+  --afc-status-neutral-bg:var(--afc-paper-200);
+
+  /* ======================================================================
+     3. SCALE TOKENS
+     ====================================================================== */
+
+  /* Spacing — 4px base, 8 steps. Tailwind-compatible. */
+  --afc-space-0:  0;
+  --afc-space-1:  0.25rem;  /*  4px */
+  --afc-space-2:  0.5rem;   /*  8px */
+  --afc-space-3:  0.75rem;  /* 12px */
+  --afc-space-4:  1rem;     /* 16px */
+  --afc-space-5:  1.5rem;   /* 24px */
+  --afc-space-6:  2rem;     /* 32px */
+  --afc-space-7:  3rem;     /* 48px */
+  --afc-space-8:  5rem;     /* 80px — measured: padding-section-medium */
+  --afc-space-9:  8rem;     /* 128px — measured: padding-section-large */
+
+  /* Type scale — 1.250 (major third). Two weights + five sizes do 80% of AFC. */
+  --afc-font-sans:  Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+                    'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
+  --afc-font-serif: 'Playfair Display', 'The Bohemian', Georgia,
+                    'Source Serif 4', 'Times New Roman', serif;
+  --afc-font-read:  'Source Serif 4', Georgia, Cambria, 'Times New Roman', serif;
+  --afc-font-mono:  ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --afc-text-2xs: 0.6875rem; /* 11px — measured: c_button_text */
+  --afc-text-xs:  0.75rem;   /* 12px — measured: .subtitle           */
+  --afc-text-sm:  0.875rem;  /* 14px */
+  --afc-text-base:1rem;      /* 16px — density-adjustable            */
+  --afc-text-md:  1.125rem;
+  --afc-text-lg:  1.375rem;
+  --afc-text-xl:  1.75rem;
+  --afc-text-2xl: 2.25rem;
+  --afc-text-3xl: 3rem;
+  --afc-text-4xl: 4.875rem; /* measured: .text-size-xxl. 78px        */
+
+  --afc-leading-tight:  1.1;   /* measured: display                    */
+  --afc-leading-snug:   1.25;
+  --afc-leading-normal: 1.5;   /* measured: .c_button_text line-height */
+  --afc-leading-relaxed:1.7;
+
+  --afc-weight-regular: 400; /* measured: .subtitle, Inter default   */
+  --afc-weight-medium:  500;
+  --afc-weight-semibold:600;
+  --afc-weight-bold:    700;
+
+  /* Tracking. Two signature values, both measured. */
+  --afc-track-label:  0.25em;  /* measured: letter-spacing 4px @12px  */
+  --afc-track-button: 0.19em;  /* measured: letter-spacing 3px @11px  */
+  --afc-track-tight: -0.03em; /* measured: display -0.03em .. -0.05em */
+  --afc-track-normal:  0em;
+
+  /* Radii. Production is pill-dominant: 35 uses of border-radius:100px. */
+  --afc-radius-xs:  2px;   /* measured */
+  --afc-radius-sm:  4px;
+  --afc-radius-md:  8px;   /* measured */
+  --afc-radius-lg:  12px;
+  --afc-radius-xl:  20px;  /* measured */
+  --afc-radius-pill: 999px;/* measured: 35 uses. THE AFC button shape. */
+  --afc-radius-full: 50%;  /* measured */
+
+  /* Elevation. Cool-tinted, never pure black — matches the ink ramp. */
+  --afc-shadow-xs: 0 1px 2px rgba(9, 11, 25, 0.06);
+  --afc-shadow-sm: 0 1px 3px rgba(9, 11, 25, 0.08), 0 1px 2px rgba(9, 11, 25, 0.04);
+  --afc-shadow-md: 0 4px 12px rgba(9, 11, 25, 0.10), 0 2px 4px rgba(9, 11, 25, 0.06);
+  --afc-shadow-lg: 0 12px 32px rgba(9, 11, 25, 0.14), 0 4px 8px rgba(9, 11, 25, 0.06);
+  --afc-shadow-focus: var(--afc-focus-ring);
+
+  /* Motion. The AFC signature curve, measured 58× in production CSS. */
+  --afc-ease-afc:   cubic-bezier(0.25, 0.46, 0.45, 0.94); /* THE curve */
+  --afc-ease-out:   cubic-bezier(0.16, 1, 0.3, 1);
+  --afc-ease-in:    cubic-bezier(0.55, 0.085, 0.68, 0.53);
+  --afc-ease-spring:cubic-bezier(0.34, 1.4, 0.64, 1);
+
+  /* Durations. 100ms is the Doherty feedback ceiling for direct manipulation. */
+  --afc-dur-instant:  60ms;  /* press feedback only            */
+  --afc-dur-fast:    120ms;  /* hover, colour                   */
+  --afc-dur-feedback:100ms;  /* Doherty ceiling — see a11y.md    */
+  --afc-dur-base:    240ms;
+  --afc-dur-slow:    400ms;  /* measured: production .4s         */
+  --afc-dur-deliberate: 600ms; /* page/section transitions only   */
+
+  /* Layout */
+  --afc-content-max:    80rem;   /* measured: .max-width-xxlarge (1280px) */
+  --afc-content-measure: 68ch;   /* long-form reading measure */
+  --afc-sidebar-w:      16rem;
+  --afc-topbar-h:       4rem;
+
+  /* Density. Church Portal is field-used on phones: `cozy` is the default.
+     Switch on <html data-density="compact"> for desktop data tables. */
+  --afc-density-y: 0.625rem;
+  --afc-row-y: 0.875rem;
+  --afc-control-min: 44px;  /* WCAG 2.2 AA 2.5.8 + practical touch floor */
+
+  [data-density='compact'] {
+    --afc-density-y: 0.3125rem;
+    --afc-row-y: 0.5rem;
+  }
+  [data-density='compact'] { --afc-control-min: 32px; }
+
+  /* Per-component z-index ladder. Never write a bare z-index. */
+  --afc-z-base: 0;
+  --afc-z-sticky: 100;
+  --afc-z-topbar: 200;
+  --afc-z-drawer: 300;
+  --afc-z-modal: 400;
+  --afc-z-toast: 500;
+}
+
+/* ==========================================================================
+   SEMANTIC — dark theme. Not a filter: every surface is re-picked so that
+   text/surface ratios hold. Dark mode is the primary AFC photographic
+   context (candlelit sanctuary, evening services).
+   ========================================================================== */
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  --afc-bg-canvas:        #0b0d18;
+  --afc-bg-surface:       var(--afc-ink-900);
+  --afc-bg-surface-raised:#12141f;
+  --afc-bg-sunken:        var(--afc-ink-950);
+  --afc-bg-inset:         #101224;
+  --afc-bg-inverse:       var(--afc-paper-50);
+  --afc-bg-inverse-text:  var(--afc-ink-900);
+
+  --afc-bg-action:        var(--afc-action-400);
+  --afc-bg-action-hover:  var(--afc-action-300);
+  --afc-bg-action-press:  #8cc2f7;
+  --afc-bg-action-soft:   #14243c;
+  --afc-bg-action-text:   #06121f;   /* ink on light azure — 9.7:1 */
+
+  --afc-text-primary:     var(--afc-paper-50);   /* 17.9:1 on ink-900 */
+  --afc-text-secondary:   #b4bccd;              /* 9.4:1  on ink-900 */
+  --afc-text-muted:       #97a0b4;              /* 6.6:1  on ink-900 */
+  --afc-text-disabled:    #626b80;
+  --afc-text-on-dark:     var(--afc-paper-50);
+  --afc-text-on-dark-muted:#a8b0c4;
+
+  --afc-border-subtle:    rgba(255, 255, 255, 0.08);
+  --afc-border-default:   rgba(255, 255, 255, 0.14);
+  --afc-border-strong:    rgba(255, 255, 255, 0.42); /* composited on ink-900 = 3.14:1 */
+  --afc-border-inverse:   rgba(9, 11, 25, 0.18);
+
+  --afc-focus-inner:      var(--afc-ink-900);
+  --afc-focus-outer:      #ffffff;
+
+  --afc-status-danger:    #f0928e;
+  --afc-status-danger-bg: #3a1a19;
+  --afc-status-success:   #7fcea1;
+  --afc-status-success-bg:#12281c;
+  --afc-status-warn:      #ffd06b;
+  --afc-status-warn-bg:   #2e2411;
+  --afc-status-info:      #8cc2f7;
+  --afc-status-info-bg:   #14243c;
+  --afc-status-neutral:   #97a0b4;
+  --afc-status-neutral-bg:#1c2032;
+
+  --afc-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --afc-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.3);
+  --afc-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.55), 0 2px 4px rgba(0, 0, 0, 0.4);
+  --afc-shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.65), 0 4px 8px rgba(0, 0, 0, 0.45);
+}
+
+/* ==========================================================================
+   DEPARTMENT SCOPES
+   Applied as `data-dept="ydd"` on <html> or any subtree. Overrides the seal
+   and the soft action tint only. Never the neutrals — that is what keeps six
+   marks looking like one organisation.
+
+   Note the shared families: `afc`, `weca` and `afcmf` all resolve to the gold
+   ramp, and `afcf` and `afc4c` both resolve to the deep blue ramp. That is the
+   measured truth of the marks, not an oversight. If two departments must be
+   told apart in the same view, pair the seal artwork with the name — do not
+   reach for the accent hue.
+   ========================================================================== */
+[data-dept='afc']  { --afc-dept-accent: var(--afc-dept-afc-accent);
+                     --afc-dept-ink: var(--afc-dept-afc-ink); }
+[data-dept='weca'] { --afc-dept-accent: var(--afc-dept-weca-accent);
+                     --afc-dept-ink: var(--afc-dept-weca-ink); }
+[data-dept='afcmf']{ --afc-dept-accent: var(--afc-dept-afcmf-accent);
+                     --afc-dept-ink: var(--afc-dept-afcmf-ink); }
+[data-dept='afcf'] { --afc-dept-accent: var(--afc-dept-afcf-accent);
+                     --afc-dept-ink: var(--afc-dept-afcf-ink); }
+[data-dept='afc4c'] { --afc-dept-accent: var(--afc-dept-afc4c-accent);
+                     --afc-dept-ink: var(--afc-dept-afc4c-ink); }
+[data-dept='ydd']  { --afc-dept-accent: var(--afc-dept-ydd-accent);
+                     --afc-dept-ink: var(--afc-dept-ydd-ink); }
+
+/* ==========================================================================
+   REDUCED MOTION
+   WCAG 2.3.3 / 2.2.2. Collapse duration, never remove affordance — an
+   instant state change is still a state change.
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --afc-dur-instant: 0.01ms;
+    --afc-dur-fast: 0.01ms;
+    --afc-dur-feedback: 0.01ms;
+    --afc-dur-base: 0.01ms;
+    --afc-dur-slow: 0.01ms;
+    --afc-dur-deliberate: 0.01ms;
+  }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ==========================================================================
+   HIGH CONTRAST / FORCED COLORS
+   The seal and the focus ring are decorative system colours: in forced-colors
+   mode the browser owns them and they must not be fought.
+   ========================================================================== */
+@media (forced-colors: active) {
+  :root { --afc-border-strong: CanvasText; --afc-border-default: CanvasText; }
+}

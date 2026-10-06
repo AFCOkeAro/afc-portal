@@ -1,0 +1,77 @@
+{
+  "name": "@afc/design-system",
+  "version": "1.0.1",
+  "description": "Shared design system for Apostolic Faith Church: measured tokens, an accessible component layer, and the four AFC seals. CSS-first, build-free, zero runtime dependencies.",
+  "license": "UNLICENSED",
+  "private": true,
+  "type": "module",
+  "main": "./tokens/afc-tokens.css",
+  "exports": {
+    ".": "./tokens/afc-tokens.css",
+    "./tokens": "./tokens/afc-tokens.css",
+    "./components": "./components/afc-components.css",
+    "./tailwind": "./adapters/tailwind-preset.js",
+    "./styleguide": "./styleguide/index.html",
+    "./logos/*": "./logos/*",
+    "./docs/*": "./docs/*"
+  },
+  "files": [
+    "tokens",
+    "components",
+    "adapters",
+    "logos",
+    "docs",
+    "styleguide",
+    "tools",
+    "README.md"
+  ],
+  "scripts": {
+    "verify": "node tools/contrast-check.mjs && node tools/seal-weight-check.mjs && node tools/reflow-check.mjs && node tools/tab-role-check.mjs",
+    "verify:contrast": "node tools/contrast-check.mjs",
+    "verify:seals": "node tools/seal-weight-check.mjs",
+    "verify:reflow": "node tools/reflow-check.mjs",
+    "verify:tabs": "node tools/tab-role-check.mjs"
+  },
+  "keywords": [
+    "apostolic-faith-church",
+    "afc",
+    "weca",
+    "afcf",
+    "afcmf",
+    "afc4c",
+    "design-system",
+    "design-tokens",
+    "wcag",
+    "css"
+  ],
+  "peerDependencies": {},
+  "dependencies": {},
+  "engines": {
+    "node": ">=18"
+  },
+  "afc": {
+    "status": "approved",
+    "approvedAt": "2026-10-06",
+    "approvedRevision": "404f7ca7-b4fb-41e3-b109-55ca39df1b9f",
+    "issue": "AFC-152",
+    "revision": 3,
+    "measuredFrom": [
+      "apostolicfaith.org production CSS",
+      "apostolicfaithweca.org production CSS",
+      "afcf-portal.afmweca.org",
+      "Internet Archive: youth.afmweca.com, apostolicfaithweca.org 2013 masthead"
+    ],
+    "scope": "interface tokens only \u2014 rendered-media art direction is owned by AFC-154",
+    "accessibility": {
+      "standard": "WCAG 2.2 AA",
+      "gate": "tools/contrast-check.mjs",
+      "pairs": 50,
+      "passing": 50
+    },
+    "openDecisions": [
+      "brand owner to supply a transparent AFCMF master (currently JPEG on opaque white)",
+      "font licensing: The Bohemian / Chronicle vs the shipped open substitutes",
+      "confirmation that a department may change its seal but never the neutrals"
+    ]
+  }
+}

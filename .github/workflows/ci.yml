@@ -249,6 +249,36 @@ jobs:
   # is a P1 legal-evidence control. Tracked with AFC-166.
 
   # --------------------------------------------------------------------------
+  # Design-system static gates. AFC-199.
+  #
+  # WHY THIS IS ITS OWN JOB. It needs no dependency install, no database and no
+  # browser -- it is one source scan and one CSS invariant, so it runs in
+  # seconds and cannot be hidden behind an install failure. It is also the only
+  # mechanical control over a component contract that the stylesheet cannot
+  # enforce by itself: the design system ships no JavaScript, so nothing in the
+  # CSS can refuse a consuming app that writes `aria-selected` on an anchor-nav
+  # link. The tab-role gate is that refusal.
+  #
+  # The self-test runs first, for the same reason every other gate here
+  # self-tests: a gate nobody has watched fail is untested, not enforced.
+  # --------------------------------------------------------------------------
+  design-system-gates:
+    name: Design-system tab-role gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Tab-role gate self-test (the gate must be able to fail)
+        run: node design-system/tools/tab-role-check.mjs --self-test
+
+      # Fails when a `.afc-tab` carries `aria-selected` without `role="tab"`,
+      # i.e. the selected-state hook was put on a link, and when the CSS no
+      # longer pairs the aria-selected and aria-current active-state rules in
+      # one declaration block.
+      - name: Tab-role gate (no aria-selected on an .afc-tab link)
+        run: node design-system/tools/tab-role-check.mjs
+
+  # --------------------------------------------------------------------------
   # repo-plan section 4, steps 1-3. Added by AFC-174, the first commit with
   # application source to lint.
   #

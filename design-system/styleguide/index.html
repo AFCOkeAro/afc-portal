@@ -1,0 +1,716 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AFC Design System — live reference</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../tokens/afc-tokens.css" />
+<link rel="stylesheet" href="../components/afc-components.css" />
+<style>
+  /* Styleguide chrome only. Everything inside .sg-* is documentation scaffolding;
+     the components themselves carry no page-level CSS. */
+  body { margin: 0; background: var(--afc-bg-canvas); color: var(--afc-text-primary); font-family: var(--afc-font-sans); }
+
+  .sg-masthead {
+    background: var(--afc-bg-inverse); color: var(--afc-text-on-dark);
+    padding: var(--afc-space-8) 0 var(--afc-space-7);
+  }
+  .sg-masthead__inner { max-width: var(--afc-content-max); margin-inline: auto; padding-inline: var(--afc-space-5); }
+  .sg-masthead h1 {
+    font-family: var(--afc-font-serif); font-weight: 400;
+    font-size: clamp(2.25rem, 1.6rem + 2.8vw, 3.5rem);
+    letter-spacing: -0.03em; line-height: 1.1; margin: var(--afc-space-3) 0 var(--afc-space-3);
+  }
+  .sg-masthead p { margin: 0; max-width: 62ch; color: var(--afc-text-on-dark-muted); line-height: 1.7; }
+  .sg-masthead .afc-label { color: var(--afc-gold-300); }
+
+  .sg-fit { margin-block-start: var(--afc-space-4); }
+  .sg-grid { max-width: var(--afc-content-max); margin-inline: auto; padding: var(--afc-space-7) var(--afc-space-5) var(--afc-space-9); }
+  .sg-section + .sg-section { margin-top: var(--afc-space-9); }
+  .sg-section > header { margin-bottom: var(--afc-space-5); padding-bottom: var(--afc-space-3); border-bottom: 1px solid var(--afc-border-default); }
+  .sg-section h2 { font-family: var(--afc-font-serif); font-size: var(--afc-text-2xl); letter-spacing: -0.03em; margin: var(--afc-space-2) 0 var(--afc-space-2); }
+  .sg-section header p { margin: 0; color: var(--afc-text-secondary); font-size: var(--afc-text-sm); max-width: 72ch; line-height: 1.7; }
+  .sg-note { font-size: var(--afc-text-xs); color: var(--afc-text-muted); }
+  .sg-code { font-family: var(--afc-font-mono); font-size: var(--afc-text-2xs); background: var(--afc-bg-sunken); padding: 2px 6px; border-radius: var(--afc-radius-xs); color: var(--afc-text-secondary); }
+
+  .sg-demo { background: var(--afc-bg-surface); border: 1px solid var(--afc-border-subtle); border-radius: var(--afc-radius-md); padding: var(--afc-space-5); }
+  .sg-demo--inset { background: var(--afc-bg-sunken); border: 0; }
+  .sg-demo + .sg-demo { margin-top: var(--afc-space-4); }
+  .sg-swatch-grid { display: grid; gap: var(--afc-space-3); grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr)); }
+  .sg-swatch-grid--wide { grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr)); }
+  .sg-swatch { border: 1px solid var(--afc-border-subtle); border-radius: var(--afc-radius-sm); overflow: hidden; background: var(--afc-bg-surface); }
+  .sg-swatch__chip { height: 4rem; }
+  .sg-swatch__meta { padding: var(--afc-space-2) var(--afc-space-3); }
+  .sg-swatch__name { font-size: var(--afc-text-2xs); font-weight: var(--afc-weight-medium); }
+  .sg-swatch__val { font-family: var(--afc-font-mono); font-size: var(--afc-text-2xs); color: var(--afc-text-muted); }
+  .sg-ramp { display: flex; border-radius: var(--afc-radius-sm); overflow: hidden; border: 1px solid var(--afc-border-subtle); }
+  /* flex-basis 0 lets the ramps have a different step count than the ink ramp
+     without the last swatch stretching. The trailing paper chip is a scale
+     reference, not a ramp step. */
+  .sg-ramp > div { flex: 1 1 0; min-width: 0; height: 3.25rem; }
+  .sg-ramp > div:last-child { flex: 0 1 3rem; }
+  .sg-scale-row { display: flex; align-items: center; gap: var(--afc-space-4); padding: var(--afc-space-2) 0; border-bottom: 1px dashed var(--afc-border-subtle); }
+  .sg-scale-bar { height: 1rem; background: var(--afc-dept-accent); border-radius: 2px; }
+  .sg-seal-grid { display: grid; gap: var(--afc-space-3); grid-template-columns: repeat(auto-fit, minmax(12.5rem, 1fr)); }
+  .sg-seal-card { display: flex; flex-direction: column; align-items: flex-start; gap: var(--afc-space-3); padding: var(--afc-space-4); background: var(--afc-bg-surface); border: 1px solid var(--afc-border-subtle); border-radius: var(--afc-radius-md); }
+  .sg-seal-card img { height: calc(3.5rem * var(--afc-seal-optical, 1)); width: auto; max-width: 100%; object-fit: contain; object-position: left center; flex: 0 0 auto; }
+  .sg-seal-card > div { min-width: 0; }
+  .sg-spec { display: grid; grid-template-columns: minmax(8rem, auto) 1fr; gap: var(--afc-space-2) var(--afc-space-5); font-size: var(--afc-text-sm); margin: 0; }
+  .sg-spec dt { font-family: var(--afc-text-xs); letter-spacing: var(--afc-track-label); text-transform: uppercase; color: var(--afc-text-muted); padding-top: 2px; }
+  .sg-spec dd { margin: 0; color: var(--afc-text-primary); }
+  .sg-navdemo { display: grid; grid-template-columns: auto 1fr; gap: var(--afc-space-4); align-items: start; }
+  @media (max-width: 47.99rem) { .sg-navdemo { grid-template-columns: 1fr; } .sg-navdemo .afc-card { width: auto !important; } }
+
+  .sg-theme-bar { display: flex; align-items: center; gap: var(--afc-space-3); padding: var(--afc-space-3) var(--afc-space-5); background: var(--afc-bg-surface); border-bottom: 1px solid var(--afc-border-default); flex-wrap: wrap; row-gap: var(--afc-space-2); }
+  @media (max-width: 34rem) { .sg-theme-bar__note { display: none; } }
+</style>
+</head>
+<body class="afc">
+<a class="afc-skip-link" href="#main">Skip to content</a>
+
+<header class="sg-masthead">
+  <div class="sg-masthead__inner">
+    <p class="afc-label">Draft v1.0.0 · for board review</p>
+    <h1>AFC Design System</h1>
+    <p>
+      One token layer and one component layer for every Apostolic Faith Church surface —
+      the global site, the West &amp; Central Africa council, the campus and youth departments,
+      and the Church Portal. Every value below is either measured from production AFC and WECA
+      stylesheets or derived from a measured value to pass a WCAG&nbsp;2.2 threshold.
+    </p>
+  </div>
+</header>
+
+<div class="sg-theme-bar">
+  <span class="afc-label afc-label--muted">Preview</span>
+  <div class="afc-segmented" role="group" aria-label="Theme preview">
+    <button class="afc-segmented__btn" type="button" data-theme-set="light" aria-pressed="true">Light</button>
+    <button class="afc-segmented__btn" type="button" data-theme-set="dark" aria-pressed="false">Dark</button>
+  </div>
+  <span class="afc-grow"></span>
+  <span class="afc-meta sg-theme-bar__note">Density: <code class="sg-code">cozy</code> (default, 44px targets)</span>
+</div>
+
+<main id="main" class="sg-grid">
+
+  <!-- ============================================================ SEALS -->
+  <section class="sg-section">
+    <header>
+      <p class="afc-label">01 · Brand</p>
+      <h2>The seals</h2>
+      <p>
+        All five marks are authentic artwork supplied by the brand owner on 2026-10-06, except
+        Youth Development which is an archived recovery. Each sits in the same container contract so
+        switching department never changes layout.
+      </p>
+    </header>
+
+    <div class="sg-demo">
+      <div class="sg-seal-grid">
+        <div class="sg-seal-card" data-seal="jtlw">
+          <img src="../logos/afc-jesus-light-of-world.png" alt="Jesus — the Light of the World, in gold script" />
+          <div><div class="afc-seal__name">Apostolic Faith</div><div class="afc-seal__sub">Global · Portland</div></div>
+        </div>
+        <div class="sg-seal-card" data-dept="weca" data-seal="weca">
+          <img src="../logos/weca-lockup-print.png" alt="Jesus — The Light of the World, West and Central Africa lockup" />
+          <div><div class="afc-seal__name">WECA</div><div class="afc-seal__sub">West &amp; Central Africa</div></div>
+        </div>
+        <div class="sg-seal-card" data-dept="afcmf" data-seal="afcmf">
+          <img src="../logos/afcmf-logo.jpg" alt="AFCMF crest — Outstanding for Christ" />
+          <div><div class="afc-seal__name">AFCMF</div><div class="afc-seal__sub">Outstanding for Christ</div></div>
+        </div>
+        <div class="sg-seal-card" data-dept="ydd" data-seal="ydd">
+          <img src="../logos/youth-development-logo.png" alt="Youth Development Department — three figures in teal, navy and red" />
+          <div><div class="afc-seal__name">Youth Development</div><div class="afc-seal__sub">Youth · Lagos North</div></div>
+        </div>
+        <div class="sg-seal-card" data-dept="afcf" data-seal="afcf">
+          <img src="../logos/afcf-logo.png" alt="Apostolic Faith Campus Fellowship — cross over an open Bible" />
+          <div><div class="afc-seal__name">AFCF</div><div class="afc-seal__sub">Campus fellowship</div></div>
+        </div>
+        <div class="sg-seal-card" data-dept="afc4c" data-seal="afc4c">
+          <img src="../logos/africa-for-christ-logo.png" alt="Africa for Christ — the outline of the continent" />
+          <div><div class="afc-seal__name">Africa for Christ</div><div class="afc-seal__sub">The World for Christ</div></div>
+        </div>
+      </div>
+      <p class="sg-note" style="margin:var(--afc-space-4) 0 0">
+        <strong>Colour cannot identify a department.</strong> Sampled hue of every mark: gold H45 (Apostolic
+        Faith), gold H43 (WECA), gold H47 (AFCMF ring), deep blue H252 (AFCF), deep blue H253 (Africa for
+        Christ), teal H195 (Youth Development). Three marks share gold, two share deep blue. The accent
+        tint is a family marker — identity is the artwork plus the name, never the hue alone.
+      </p>
+    </div>
+
+    <div class="sg-demo sg-demo--inset">
+      <p class="afc-label afc-label--muted">Department scoping — the accent changes, the chrome does not</p>
+      <div class="sg-seal-grid" style="margin-top:var(--afc-space-4)">
+        <div class="afc-card" data-dept="afc"><span class="afc-badge" style="background:var(--afc-gold-200);color:var(--afc-gold-700)">afc</span><p class="afc-meta" style="margin:var(--afc-space-3) 0 0">Gold H45. Neutral surfaces unchanged.</p></div>
+        <div class="afc-card" data-dept="weca"><span class="afc-badge" style="background:var(--afc-gold-200);color:var(--afc-gold-700)">weca</span><p class="afc-meta" style="margin:var(--afc-space-3) 0 0">Gold H43 — the same family as afc.</p></div>
+        <div class="afc-card" data-dept="afcmf"><span class="afc-badge" style="background:#fbe6d2;color:#8a3f06">afcmf</span><p class="afc-meta" style="margin:var(--afc-space-3) 0 0">Orange, taken from the "Outstanding" script.</p></div>
+        <div class="afc-card" data-dept="afcf"><span class="afc-badge" style="background:var(--afc-blue-200);color:var(--afc-blue-700)">afcf</span><p class="afc-meta" style="margin:var(--afc-space-3) 0 0">Deep blue H252 — a blue, not a purple.</p></div>
+        <div class="afc-card" data-dept="afc4c"><span class="afc-badge" style="background:var(--afc-blue-200);color:var(--afc-blue-700)">afc4c</span><p class="afc-meta" style="margin:var(--afc-space-3) 0 0">Deep blue H253 — the same family as afcf.</p></div>
+        <div class="afc-card" data-dept="ydd"><span class="afc-badge" style="background:#dff2f8;color:#0d4a63">ydd</span><p class="afc-meta" style="margin:var(--afc-space-3) 0 0">Teal H195 — the only unique hue in the set.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ COLOR -->
+  <section class="sg-section">
+    <header>
+      <p class="afc-label">02 · Colour</p>
+      <h2>Cool ink, reserved gold</h2>
+      <p>
+        The AFC interface is near-black indigo on cool paper — <span class="sg-code">#090b19</span> on
+        <span class="sg-code">#f3f6fc</span> in production, 116 and 73 uses respectively. Gold appears
+        <strong>zero</strong> times in the production stylesheet: it lives only in the logo. That is why
+        gold is a brand-seal token here and never a UI surface.
+      </p>
+    </header>
+
+    <div class="sg-demo">
+      <p class="afc-label afc-label--muted">Ink ramp — measured</p>
+      <div class="sg-ramp" style="margin:var(--afc-space-3) 0 var(--afc-space-5)">
+        <div style="background:#090b19"></div><div style="background:#1e2029"></div><div style="background:#444752"></div>
+        <div style="background:#525968"></div><div style="background:#6e7488"></div><div style="background:#8a94a6"></div>
+        <div style="background:#d4ddee"></div><div style="background:#e2e7f1"></div><div style="background:#f3f6fc"></div>
+        <div style="background:#ffffff"></div>
+      </div>
+      <dl class="sg-spec">
+        <dt>Measured</dt><dd>#090b19 (116 uses) · #f3f6fc (73) · #6e7488 (51) · #e2e7f1 (38) · #d4ddee · #e4ebf3 · #444752 · #8a94a6</dd>
+        <dt>Derived</dt><dd><span class="sg-code">--afc-ink-400 #525968</span> replaces <span class="sg-code">#6e7488</span> as a text colour — production measured 4.29:1 on page, which fails AA. <span class="sg-code">#6e7488</span> is retained for non-text use only.</dd>
+      </dl>
+    </div>
+
+    <div class="sg-demo">
+      <p class="afc-label afc-label--muted">Brand seal ramp — gold</p>
+      <div class="sg-ramp" style="margin:var(--afc-space-3) 0 var(--afc-space-4)">
+        <div style="background:#ffe9a3"></div><div style="background:#ffd65c"></div><div style="background:#f5be00"></div>
+        <div style="background:#d9a600"></div><div style="background:#7a5c00"></div><div style="background:#5e4700"></div>
+        <div style="background:#f3f6fc"></div>
+      </div>
+      <div class="afc-alert afc-alert--warn">
+        <span aria-hidden="true">⚠</span>
+        <div class="afc-alert__body">
+          <p class="afc-alert__title">Gold is not a text colour on a light surface.</p>
+          Measured <span class="sg-code">#f5be00</span> against white is <strong>1.71:1</strong>. Use
+          <span class="sg-code">--afc-gold-600 #7a5c00</span> (6.25:1) when you need gold-toned text, and
+          never set gold as a button or badge background with white type.
+        </div>
+      </div>
+    </div>
+
+    <div class="sg-demo">
+      <p class="afc-label afc-label--muted">Brand seal ramp — deep blue (AFCF · Africa for Christ)</p>
+      <div class="sg-ramp" style="margin:var(--afc-space-3) 0 var(--afc-space-4)">
+        <div style="background:#d8d5ee"></div><div style="background:#4a3a92"></div><div style="background:#33207c"></div>
+        <div style="background:#29186b"></div><div style="background:#24155c"></div><div style="background:#1a0f45"></div>
+        <div style="background:#f3f6fc"></div>
+      </div>
+      <dl class="sg-spec">
+        <dt>Measured</dt><dd><span class="sg-code">#29186b</span> from the supplied AFCF mark · <span class="sg-code">#24155c</span> from the supplied Africa for Christ mark. Both sit at <strong>H 252–253</strong>.</dd>
+        <dt>The name</dt><dd>This is a <strong>deep blue</strong>. Not purple, not indigo — as the brand owner confirmed on review of revision 1. H 252 falls on the blue/violet boundary in HSL, which is why a lightened version of it reads violet. Lighten this ramp only after re-checking the name.</dd>
+        <dt>Derived</dt><dd><span class="sg-code">--afc-blue-800 #1a0f45</span> is the badge ground; white type on it measures 16.4:1.</dd>
+      </dl>
+    </div>
+
+    <div class="sg-demo">
+      <p class="afc-label afc-label--muted">Semantic layer — the only values components may use</p>
+      <p class="afc-label afc-label--muted" style="margin-top:var(--afc-space-4)">Solid fills · text sits on these</p>
+      <div class="sg-swatch-grid" style="margin-top:var(--afc-space-3)">
+        <div class="sg-swatch"><div class="sg-swatch__chip" style="background:var(--afc-bg-action)"></div><div class="sg-swatch__meta"><div class="sg-swatch__name">bg-action</div><div class="sg-swatch__val">#1A63B4 · 6.02:1</div></div></div>
+        <div class="sg-swatch"><div class="sg-swatch__chip" style="background:var(--afc-danger-600)"></div><div class="sg-swatch__meta"><div class="sg-swatch__name">danger-600</div><div class="sg-swatch__val">#992E2E · 7.54:1</div></div></div>
+        <div class="sg-swatch"><div class="sg-swatch__chip" style="background:var(--afc-success-600)"></div><div class="sg-swatch__meta"><div class="sg-swatch__name">success-600</div><div class="sg-swatch__val">#175A35 · 8.23:1</div></div></div>
+        <div class="sg-swatch"><div class="sg-swatch__chip" style="background:var(--afc-warn-600)"></div><div class="sg-swatch__meta"><div class="sg-swatch__name">warn-600</div><div class="sg-swatch__val">#7A5C00 · 6.25:1</div></div></div>
+      </div>
+      <p class="afc-label afc-label--muted" style="margin-top:var(--afc-space-5)">Tinted surfaces · ink sits on these</p>
+      <div class="sg-swatch-grid" style="margin-top:var(--afc-space-3)">
+        <div class="sg-swatch"><div class="sg-swatch__chip" style="background:var(--afc-status-danger-bg)"></div><div class="sg-swatch__meta"><div class="sg-swatch__name">danger bg</div><div class="sg-swatch__val">#FBEEED · 6.66:1</div></div></div>
+        <div class="sg-swatch"><div class="sg-swatch__chip" style="background:var(--afc-status-success-bg)"></div><div class="sg-swatch__meta"><div class="sg-swatch__name">success bg</div><div class="sg-swatch__val">#E9F4EE · 7.31:1</div></div></div>
+        <div class="sg-swatch"><div class="sg-swatch__chip" style="background:var(--afc-border-strong)"></div><div class="sg-swatch__meta"><div class="sg-swatch__name">border-strong</div><div class="sg-swatch__val">#8A94A6 · 3.06:1</div></div></div>
+        <div class="sg-swatch"><div class="sg-swatch__chip" style="background:var(--afc-status-info-bg)"></div><div class="sg-swatch__meta"><div class="sg-swatch__name">info bg</div><div class="sg-swatch__val">#E8F0FA · 5.24:1</div></div></div>
+        <div class="sg-swatch"><div class="sg-swatch__chip" style="background:var(--afc-status-neutral-bg)"></div><div class="sg-swatch__meta"><div class="sg-swatch__name">neutral bg</div><div class="sg-swatch__val">#EDF2FA · 6.25:1</div></div></div>
+      </div>
+      <p class="sg-note" style="margin:var(--afc-space-4) 0 0">
+        Every ratio on this page is asserted by <span class="sg-code">node design-system/tools/contrast-check.mjs</span>,
+        which reads the token source and exits non-zero on a failing pair. 34 pairs, 34 passing.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============================================================ TYPE -->
+  <section class="sg-section">
+    <header>
+      <p class="afc-label">03 · Type</p>
+      <h2>Editorial at two weights</h2>
+      <p>
+        Production loads The Bohemian, Chronicle, Varche Caps and Eudoxus Sans — all commercial licences.
+        The system ships open substitutes: <strong>Playfair Display</strong> for display (already used in
+        the Aporeneur flyer in this workspace), <strong>Inter</strong> for interface, <strong>Source Serif 4</strong>
+        for long-form. Swapping to the licensed originals is a one-token change per family.
+      </p>
+    </header>
+
+    <div class="sg-demo">
+      <div style="display:grid;gap:var(--afc-space-5)">
+        <div>
+          <p class="afc-label afc-label--muted">Display · Playfair Display · tracking −0.03em</p>
+          <p class="afc-h1" style="margin-top:var(--afc-space-2)">Welcome.</p>
+          <p class="afc-h2">Thank you for visiting.</p>
+          <p class="afc-h3">Sunday worship · 10:00</p>
+        </div>
+        <hr class="afc-rule" style="margin:0" />
+        <div>
+          <p class="afc-label afc-label--muted">Interface · Inter · 400 and 500</p>
+          <p class="afc-body" style="margin-top:var(--afc-space-2)">
+            We are a traditional, Bible-believing church, committed to upholding the Gospel of Jesus Christ.
+            Services are a time to worship, to be encouraged, and to hear practical, Bible-based teaching.
+          </p>
+          <p class="afc-lede" style="margin-top:var(--afc-space-3)">A lede opens a section at 18px in secondary ink.</p>
+          <p class="afc-meta">Meta line · 12px muted · timestamps and provenance</p>
+        </div>
+        <div>
+          <p class="afc-label afc-label--muted">The label — measured from production <code class="sg-code">.subtitle</code></p>
+          <p class="afc-label" style="margin-top:var(--afc-space-2)">WORLD HEADQUARTERS</p>
+          <p class="afc-label afc-label--muted">UPCOMING EVENTS</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ SPACE / SHAPE / MOTION -->
+  <section class="sg-section">
+    <header>
+      <p class="afc-label">04 · Space, shape, motion</p>
+      <h2>Measured behaviour, not taste</h2>
+      <p>
+        Production is pill-dominant: 35 uses of <span class="sg-code">border-radius:100px</span> against 18 of
+        <span class="sg-code">1px</span>. Pills mark what is interactive; containers stay near-square.
+        Every transition uses one curve — <span class="sg-code">cubic-bezier(.25,.46,.45,.94)</span> at 400ms,
+        58 times in production.
+      </p>
+    </header>
+
+    <div class="afc-grid afc-grid--2 sg-fit">
+      <div class="sg-demo">
+        <p class="afc-label afc-label--muted">Spacing · 4px base</p>
+        <div style="margin-top:var(--afc-space-3)">
+          <div class="sg-scale-row"><span class="sg-code" style="width:4rem">space-1</span><div class="sg-scale-bar" style="width:var(--afc-space-1)"></div><span class="afc-meta">4px</span></div>
+          <div class="sg-scale-row"><span class="sg-code" style="width:4rem">space-2</span><div class="sg-scale-bar" style="width:var(--afc-space-2)"></div><span class="afc-meta">8px</span></div>
+          <div class="sg-scale-row"><span class="sg-code" style="width:4rem">space-3</span><div class="sg-scale-bar" style="width:var(--afc-space-3)"></div><span class="afc-meta">12px</span></div>
+          <div class="sg-scale-row"><span class="sg-code" style="width:4rem">space-4</span><div class="sg-scale-bar" style="width:var(--afc-space-4)"></div><span class="afc-meta">16px</span></div>
+          <div class="sg-scale-row"><span class="sg-code" style="width:4rem">space-5</span><div class="sg-scale-bar" style="width:var(--afc-space-5)"></div><span class="afc-meta">24px</span></div>
+          <div class="sg-scale-row"><span class="sg-code" style="width:4rem">space-6</span><div class="sg-scale-bar" style="width:var(--afc-space-6)"></div><span class="afc-meta">32px</span></div>
+          <div class="sg-scale-row"><span class="sg-code" style="width:4rem">space-8</span><div class="sg-scale-bar" style="width:var(--afc-space-8)"></div><span class="afc-meta">80px · section</span></div>
+        </div>
+      </div>
+
+      <div class="sg-demo">
+        <p class="afc-label afc-label--muted">Radii · interactive vs container</p>
+        <div class="afc-row" style="margin-top:var(--afc-space-4)">
+          <div style="width:4.5rem;height:3.5rem;background:var(--afc-bg-action-soft);border:1px solid var(--afc-bg-action);border-radius:var(--afc-radius-xs);display:grid;place-items:center" class="afc-meta">xs</div>
+          <div style="width:4.5rem;height:3.5rem;background:var(--afc-bg-action-soft);border:1px solid var(--afc-bg-action);border-radius:var(--afc-radius-md);display:grid;place-items:center" class="afc-meta">md</div>
+          <div style="width:4.5rem;height:3.5rem;background:var(--afc-bg-action-soft);border:1px solid var(--afc-bg-action);border-radius:var(--afc-radius-xl);display:grid;place-items:center" class="afc-meta">xl</div>
+          <div style="width:4.5rem;height:3.5rem;background:var(--afc-bg-action-soft);border:1px solid var(--afc-bg-action);border-radius:var(--afc-radius-pill);display:grid;place-items:center" class="afc-meta">pill</div>
+        </div>
+        <p class="sg-note" style="margin:var(--afc-space-4) 0 0">
+          Buttons and chips take <span class="sg-code">--afc-radius-pill</span>. Cards, panels and fields take
+          <span class="sg-code">md</span> or <span class="sg-code">xs</span>. Never mix within one component.
+        </p>
+        <p class="afc-label afc-label--muted" style="margin-top:var(--afc-space-5)">Motion</p>
+        <div class="afc-row" style="margin-top:var(--afc-space-3)">
+          <span class="afc-badge">feedback 100ms</span>
+          <span class="afc-badge">fast 120ms</span>
+          <span class="afc-badge">base 240ms</span>
+          <span class="afc-badge">slow 400ms</span>
+        </div>
+        <p class="sg-note" style="margin:var(--afc-space-3) 0 0">
+          Direct manipulation responds inside 100ms (Doherty). Everything above that is deliberate motion.
+          <span class="sg-code">prefers-reduced-motion: reduce</span> collapses all durations to 0.01ms and
+          keeps every state change instantaneous rather than removing it.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ BUTTONS -->
+  <section class="sg-section">
+    <header>
+      <p class="afc-label">05 · Buttons</p>
+      <h2>Pill, uppercase, tracked</h2>
+      <p>
+        Built from the measured production rule: pill radius, <span class="sg-code">letter-spacing:3px</span>,
+        uppercase, 11px Inter, 16×28px padding. Minimum hit target is
+        <span class="sg-code">--afc-control-min</span> — 44px in the default density.
+      </p>
+    </header>
+
+    <div class="sg-demo">
+      <div class="afc-row">
+        <button class="afc-btn afc-btn--primary" type="button">Record attendance</button>
+        <button class="afc-btn afc-btn--secondary" type="button">Export</button>
+        <button class="afc-btn afc-btn--ghost" type="button">Cancel</button>
+        <button class="afc-btn afc-btn--danger" type="button">Delete record</button>
+        <button class="afc-btn afc-btn--primary" type="button" disabled>Unavailable</button>
+      </div>
+      <div class="afc-row" style="margin-top:var(--afc-space-4)">
+        <button class="afc-btn afc-btn--primary afc-btn--sm" type="button">Small</button>
+        <button class="afc-btn afc-btn--secondary" type="button">Default</button>
+        <button class="afc-btn afc-btn--secondary afc-btn--lg" type="button">Large</button>
+        <button class="afc-btn afc-btn--primary afc-btn--icon" type="button" aria-label="Add member">+</button>
+        <button class="afc-btn afc-btn--primary" type="button" data-loading="true">Saving</button>
+      </div>
+      <p class="sg-note" style="margin:var(--afc-space-4) 0 0">
+        The loading state swaps the label for a spinner inside the same box, so nothing reflows. Focus every
+        button to see the two-ring focus stack — it is visible on light and dark without depending on a
+        single colour's contrast.
+      </p>
+    </div>
+
+    <div class="sg-demo" style="background:#090b19;border-color:rgba(255,255,255,.18)">
+      <p class="afc-label" style="color:var(--afc-paper-50)">On an explicit dark island</p>
+      <div class="afc-row" style="margin-top:var(--afc-space-3)">
+        <button class="afc-btn afc-btn--on-dark" type="button">View profile</button>
+        <button class="afc-btn afc-btn--primary" type="button">Send message</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ FORMS -->
+  <section class="sg-section">
+    <header>
+      <p class="afc-label">06 · Forms</p>
+      <h2>One column, validate inline</h2>
+      <p>
+        Single-column layout, label above, help and error below the control. Errors name the problem in words
+        and add a glyph and a heavier left rule, so the state survives colour-blindness and greyscale printing.
+        Nothing blocks submission to report a problem.
+      </p>
+    </header>
+
+    <div class="afc-grid afc-grid--2 sg-fit" style="align-items:start">
+      <div class="sg-demo">
+        <div class="afc-field">
+          <label class="afc-field__label" for="sg-name">Full name <span class="afc-field__req" aria-hidden="true">*</span></label>
+          <input class="afc-input" id="sg-name" type="text" placeholder="e.g. Adaeze Okonkwo" required />
+          <p class="afc-field__help">As it appears on the membership record.</p>
+        </div>
+
+        <div class="afc-field" data-invalid="true">
+          <label class="afc-field__label" for="sg-phone">Phone <span class="afc-field__req" aria-hidden="true">*</span></label>
+          <input class="afc-input" id="sg-phone" type="tel" value="0803 12" aria-invalid="true" aria-describedby="sg-phone-err" />
+          <p class="afc-field__error" id="sg-phone-err">Enter a full 11-digit number, for example 0803 123 4567.</p>
+        </div>
+
+        <div class="afc-field">
+          <label class="afc-field__label" for="sg-branch">Branch <span class="afc-field__optional">optional</span></label>
+          <select class="afc-select" id="sg-branch">
+            <option>All branches</option><option>Lagos North Area HQ</option><option>Ikeja</option><option>Surulere</option>
+          </select>
+        </div>
+
+        <div class="afc-field">
+          <label class="afc-field__label" for="sg-note">Notes</label>
+          <textarea class="afc-textarea" id="sg-note" placeholder="Only what the welfare team needs."></textarea>
+        </div>
+
+        <div class="afc-row" style="margin-top:var(--afc-space-5)">
+          <button class="afc-btn afc-btn--primary" type="button">Save member</button>
+          <button class="afc-btn afc-btn--ghost" type="button">Discard</button>
+        </div>
+      </div>
+
+      <div class="sg-demo">
+        <p class="afc-label afc-label--muted">Choice controls</p>
+        <div class="afc-stack afc-stack--sm" style="margin-top:var(--afc-space-3)">
+          <label class="afc-choice">
+            <input type="checkbox" checked />
+            <span class="afc-choice__text">Send welcome message
+              <span class="afc-choice__hint">Uses the template already approved for new members.</span>
+            </span>
+          </label>
+          <label class="afc-choice">
+            <input type="checkbox" />
+            <span class="afc-choice__text">Add to the youth register</span>
+          </label>
+          <label class="afc-choice">
+            <input type="radio" name="sg-role" checked />
+            <span class="afc-choice__text">Member</span>
+          </label>
+          <label class="afc-choice">
+            <input type="radio" name="sg-role" />
+            <span class="afc-choice__text">Worker</span>
+          </label>
+          <label class="afc-switch">
+            <input type="checkbox" checked />
+            <span class="afc-switch__track"></span>
+            <span class="afc-choice__text">Active on the contact list</span>
+          </label>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ DATA -->
+  <section class="sg-section">
+    <header>
+      <p class="afc-label">07 · Data</p>
+      <h2>Tables, stats, timelines</h2>
+      <p>
+        The table collapses to one card per row below 48rem — the width at which columns stop fitting, not a
+        device name. Row headers stay sticky on desktop with tabular numerals so figures align vertically.
+      </p>
+    </header>
+
+    <div class="afc-grid afc-grid--4 sg-fit" style="margin-bottom:var(--afc-space-4)">
+      <div class="afc-stat"><span class="afc-label afc-label--muted">Attendance · last Sunday</span><span class="afc-stat__value">1,284</span><span class="afc-stat__delta afc-stat__delta--up">▲ 6.1% vs prior Sunday</span></div>
+      <div class="afc-stat"><span class="afc-label afc-label--muted">Newcomers this month</span><span class="afc-stat__value">37</span><span class="afc-stat__delta afc-stat__delta--up">▲ 12 from April</span></div>
+      <div class="afc-stat"><span class="afc-label afc-label--muted">Open welfare cases</span><span class="afc-stat__value">18</span><span class="afc-stat__delta afc-stat__delta--down">▼ 4 awaiting follow-up</span></div>
+      <div class="afc-stat"><span class="afc-label afc-label--muted">Camp meeting RSVPs</span><span class="afc-stat__value">642</span><span class="afc-stat__delta afc-stat__delta--flat">— steady</span></div>
+    </div>
+
+    <div class="sg-demo sg-demo--inset">
+      <div class="afc-card afc-card--flush afc-card--raised">
+        <div class="afc-card__head">
+          <div><p class="afc-label">Households</p><p class="afc-meta">Lagos North Area · last 5 records</p></div>
+          <span class="afc-grow"></span>
+          <button class="afc-btn afc-btn--secondary afc-btn--sm" type="button">Filter</button>
+        </div>
+        <div class="afc-table-wrap">
+          <table class="afc-table afc-table--responsive">
+            <caption class="afc-visually-hidden">Recent household records with head, branch, and members</caption>
+            <thead>
+              <tr><th scope="col">Head of household</th><th scope="col">Branch</th><th scope="col" data-numeric>Members</th><th scope="col">Status</th><th scope="col"><span class="afc-visually-hidden">Actions</span></th></tr>
+            </thead>
+            <tbody>
+              <tr><td data-label="Head of household">A. Okonkwo</td><td data-label="Branch">Ikeja</td><td data-label="Members" data-numeric>5</td><td data-label="Status"><span class="afc-badge afc-badge--success">Visited</span></td><td data-label="Actions"><div class="afc-table__row-action"><button class="afc-btn afc-btn--ghost afc-btn--sm" type="button">Open</button></div></td></tr>
+              <tr><td data-label="Head of household">M. Balogun</td><td data-label="Branch">Surulere</td><td data-label="Members" data-numeric>3</td><td data-label="Status"><span class="afc-badge afc-badge--warn">Follow up</span></td><td data-label="Actions"><div class="afc-table__row-action"><button class="afc-btn afc-btn--ghost afc-btn--sm" type="button">Open</button></div></td></tr>
+              <tr><td data-label="Head of household">S. Adeyemi</td><td data-label="Branch">HQ</td><td data-label="Members" data-numeric>7</td><td data-label="Status"><span class="afc-badge">New</span></td><td data-label="Actions"><div class="afc-table__row-action"><button class="afc-btn afc-btn--ghost afc-btn--sm" type="button">Open</button></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="afc-card__foot">
+          <span class="afc-meta">Showing 3 of 412</span>
+          <span class="afc-grow"></span>
+          <nav class="afc-pagination" aria-label="Pagination">
+            <a class="afc-pagination__page" href="#" aria-disabled="true">‹</a>
+            <a class="afc-pagination__page" href="#" aria-current="page">1</a>
+            <a class="afc-pagination__page" href="#">2</a>
+            <a class="afc-pagination__page" href="#">3</a>
+            <a class="afc-pagination__page" href="#">›</a>
+          </nav>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ NAV -->
+  <section class="sg-section">
+    <header>
+      <p class="afc-label">08 · Navigation</p>
+      <h2>Rails, tabs, steps</h2>
+      <p>
+        The Church Portal spans church office, youth, branches and campus. The left rail carries the modules;
+        the active item is the only filled element in it (Von Restorff), so position is legible at a glance.
+      </p>
+    </header>
+
+    <div class="afc-grid afc-grid--2 sg-fit">
+      <div class="sg-demo sg-demo--inset">
+        <div class="sg-navdemo">
+          <nav class="afc-card" style="width:14rem;padding:var(--afc-space-3)" aria-label="Portal modules">
+            <p class="afc-label afc-label--muted" style="padding:0 var(--afc-space-3) var(--afc-space-3)">Modules</p>
+            <div class="afc-nav">
+              <div class="afc-nav__group">
+                <a class="afc-nav__item" href="#" aria-current="page">Church office</a>
+                <a class="afc-nav__item" href="#">People &amp; households</a>
+                <a class="afc-nav__item" href="#">Attendance <span class="afc-nav__badge">9</span></a>
+                <a class="afc-nav__item" href="#">Events</a>
+              </div>
+              <div class="afc-nav__group">
+                <a class="afc-nav__item" href="#">Welfare <span class="afc-nav__badge">18</span></a>
+                <a class="afc-nav__item" href="#">Newcomer care</a>
+              </div>
+              <div class="afc-nav__group">
+                <a class="afc-nav__item" href="#">Youth &amp; campus</a>
+                <a class="afc-nav__item" href="#">Finance</a>
+              </div>
+            </div>
+          </nav>
+          <div class="afc-stack">
+            <ol class="afc-crumbs"><li><a href="#">Church office</a></li><li><a href="#">Attendance</a></li><li aria-current="page">Last Sunday</li></ol>
+            <div>
+              <div class="afc-tabs" role="tablist">
+                <button class="afc-tab" role="tab" aria-selected="true">By service</button>
+                <button class="afc-tab" role="tab" aria-selected="false">By branch</button>
+                <button class="afc-tab" role="tab" aria-selected="false">By age band</button>
+              </div>
+            </div>
+            <div class="afc-card">
+              <ol class="afc-steps">
+                <li class="afc-steps__item" data-state="done"><span class="afc-steps__num">✓</span>Service</li>
+                <li class="afc-steps__item" data-state="current"><span class="afc-steps__num">2</span>Head count</li>
+                <li class="afc-steps__item"><span class="afc-steps__num">3</span>Visitors</li>
+                <li class="afc-steps__item"><span class="afc-steps__num">4</span>Submit</li>
+              </ol>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="afc-stack">
+        <div class="sg-demo">
+          <p class="afc-label afc-label--muted">Badges — colour plus word</p>
+          <div class="afc-row" style="margin-top:var(--afc-space-3)">
+            <span class="afc-badge">Draft</span>
+            <span class="afc-badge afc-badge--success">Confirmed</span>
+            <span class="afc-badge afc-badge--warn">Needs follow-up</span>
+            <span class="afc-badge afc-badge--danger">Overdue</span>
+            <span class="afc-badge afc-badge--info">Scheduled</span>
+          </div>
+          <p class="sg-note" style="margin:var(--afc-space-4) 0 0">The word carries the meaning; the colour only speeds recognition up (WCAG 1.4.1).</p>
+        </div>
+        <div class="sg-demo">
+          <p class="afc-label afc-label--muted">Progress</p>
+          <div class="afc-stack afc-stack--sm" style="margin-top:var(--afc-space-3)">
+            <div class="afc-progress" role="progressbar" aria-valuenow="68" aria-valuemin="0" aria-valuemax="100" aria-label="Welfare cases resolved"><div class="afc-progress__bar" style="width:68%"></div></div>
+            <div class="afc-progress" role="progressbar" aria-valuenow="42" aria-valuemin="0" aria-valuemax="100" aria-label="Newcomer follow-up"><div class="afc-progress__bar afc-progress__bar--gold" style="width:42%"></div></div>
+          </div>
+          <div class="afc-row" style="margin-top:var(--afc-space-5)">
+            <span class="afc-ring">
+              <svg width="64" height="64" viewBox="0 0 64 64"><circle class="afc-ring__track" cx="32" cy="32" r="26"/><circle class="afc-ring__value" cx="32" cy="32" r="26" stroke-dasharray="163.4" stroke-dashoffset="52.3"/></svg>
+              <span class="afc-ring__label">68%</span>
+            </span>
+            <span class="afc-meta">Ring charts carry an <code class="sg-code">aria-label</code> and the numeric value in text.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ STATES -->
+  <section class="sg-section">
+    <header>
+      <p class="afc-label">09 · States</p>
+      <h2>The states nobody demos</h2>
+      <p>
+        Empty, loading and error get the same care as the happy path. The empty state names the situation and
+        offers the one next action; it never says "no data".
+      </p>
+    </header>
+
+    <div class="afc-grid afc-grid--2 sg-fit">
+      <div class="sg-demo">
+        <div class="afc-empty">
+          <span class="afc-empty__mark" aria-hidden="true"></span>
+          <p class="afc-empty__title">No attendance recorded yet</p>
+          <p class="afc-empty__body">Once a service is recorded it appears here, newest first.</p>
+          <button class="afc-btn afc-btn--primary afc-btn--sm" type="button">Record a service</button>
+        </div>
+      </div>
+
+      <div class="sg-stack" style="display:flex;flex-direction:column;gap:var(--afc-space-4)">
+        <div class="sg-demo">
+          <p class="afc-label afc-label--muted">Loading</p>
+          <div style="margin-top:var(--afc-space-3)">
+            <div class="afc-skel afc-skel--title"></div>
+            <div class="afc-skel afc-skel--line" style="width:92%"></div>
+            <div class="afc-skel afc-skel--line" style="width:78%"></div>
+            <div class="afc-skel afc-skel--line" style="width:54%"></div>
+          </div>
+        </div>
+        <div class="afc-alert afc-alert--danger">
+          <span aria-hidden="true">⚠</span>
+          <div class="afc-alert__body">
+            <p class="afc-alert__title">Could not reach the server</p>
+            Your last change is not saved. Check the connection and try again.
+          </div>
+        </div>
+        <div class="afc-alert afc-alert--success">
+          <span aria-hidden="true">✓</span>
+          <div class="afc-alert__body"><p class="afc-alert__title">Attendance saved</p>412 households updated for 5 October.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ OVERLAY -->
+  <section class="sg-section">
+    <header>
+      <p class="afc-label">10 · Overlay</p>
+      <h2>Confirm before destroying</h2>
+      <p>
+        Destructive actions always confirm, and the confirm dialog puts the safe choice first and makes it
+        visually dominant. The dialog is a real focus trap with <code class="sg-code">role="dialog"</code> and
+        <code class="sg-code">aria-modal</code>; on phones it becomes a bottom sheet within thumb reach.
+      </p>
+    </header>
+
+    <div class="sg-demo sg-demo--inset">
+      <div class="afc-scrim" role="dialog" aria-modal="true" aria-labelledby="sg-dlg-t" style="position:relative;inset:auto;min-height:22rem;border-radius:var(--afc-radius-md)">
+        <div class="afc-modal">
+          <div class="afc-modal__head">
+            <p class="afc-label afc-label--muted">Destructive action</p>
+            <h2 class="afc-h3" id="sg-dlg-t" style="margin-top:var(--afc-space-2)">Delete 412 household records?</h2>
+          </div>
+          <div class="afc-modal__body">
+            <p class="afc-body">This removes every household record in Lagos North Area from this device. It cannot be undone.</p>
+            <p class="afc-meta" style="margin-top:var(--afc-space-3)">Export first if you need a copy.</p>
+          </div>
+          <div class="afc-modal__foot">
+            <button class="afc-btn afc-btn--secondary" type="button">Keep records</button>
+            <button class="afc-btn afc-btn--danger" type="button">Delete records</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ A11Y -->
+  <section class="sg-section">
+    <header>
+      <p class="afc-label">11 · Accessibility</p>
+      <h2>Built in, not bolted on</h2>
+    </header>
+    <div class="sg-demo">
+      <div class="afc-grid sg-grid--2">
+        <dl class="sg-spec">
+          <dt>Text contrast</dt><dd>Every semantic pair ≥ 4.5:1, asserted in CI by <code class="sg-code">tools/contrast-check.mjs</code>.</dd>
+          <dt>Non-text</dt><dd>Borders, icons and focus rings ≥ 3:1 (WCAG 1.4.11).</dd>
+          <dt>Target size</dt><dd>44px default density, 32px compact. WCAG 2.5.8 floor is 24px.</dd>
+          <dt>Focus</dt><dd>Two-ring stack, light inner + ink outer, on every interactive atom.</dd>
+        </dl>
+        <dl class="sg-spec">
+          <dt>Colour independence</dt><dd>Status always pairs colour with a word and a glyph.</dd>
+          <dt>Motion</dt><dd><code class="sg-code">prefers-reduced-motion</code> honoured globally; motion is never the only signal.</dd>
+          <dt>Zoom &amp; reflow</dt><dd>Layout reflows to 320px; tables collapse to cards below 48rem.</dd>
+          <dt>Forced colours</dt><dd>System colours are not fought; borders map to <code class="sg-code">CanvasText</code>.</dd>
+        </dl>
+      </div>
+      <p class="sg-note" style="margin:var(--afc-space-4) 0 0">
+        Contrast is computed, not asserted. Run <code class="sg-code">node design-system/tools/contrast-check.mjs</code> —
+        it exits non-zero on any failing pair, so an inaccessible token cannot merge.
+      </p>
+    </div>
+  </section>
+
+  <footer class="afc-row afc-row--between" style="padding-top:var(--afc-space-7);border-top:1px solid var(--afc-border-default);margin-top:var(--afc-space-8)">
+    <p class="afc-meta">AFC Design System · draft v1.0.0 · awaiting board approval</p>
+    <p class="afc-meta">Tokens <code class="sg-code">tokens/afc-tokens.css</code> · Components <code class="sg-code">components/afc-components.css</code></p>
+  </footer>
+</main>
+
+<script>
+  // Preview-only control. The design system ships zero JavaScript.
+  const bar = document.querySelector('.sg-theme-bar');
+  bar.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-theme-set]');
+    if (!btn) return;
+    document.documentElement.dataset.theme = btn.dataset.themeSet;
+    bar.querySelectorAll('[data-theme-set]').forEach((b) =>
+      b.setAttribute('aria-pressed', String(b === btn)));
+  });
+</script>
+</body>
+</html>

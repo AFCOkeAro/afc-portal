@@ -1,0 +1,782 @@
+/* ==========================================================================
+   AFC Design System — component layer v1.0.0 (draft, pending board approval)
+   --------------------------------------------------------------------------
+   Framework-agnostic. No build step. Pair with tokens/afc-tokens.css.
+
+     <link rel="stylesheet" href="design-system/tokens/afc-tokens.css">
+     <link rel="stylesheet" href="design-system/components/afc-components.css">
+
+   Conventions
+     - Every colour, space, radius, duration and easing is a token. No literals.
+     - Every interactive control meets --afc-control-min (44px) in `cozy`
+       density and 32px in `compact`. WCAG 2.2 AA 2.5.8 floor is 24px; the
+       Church Portal is field-used on phones, so we hold 44px in the default.
+     - Focus is a two-ring stack (light inner + ink outer) so it survives any
+       surface without relying on a single colour's contrast.
+     - Colour never carries meaning alone: every status pairs colour + label
+       (WCAG 1.4.1 Use of Colour).
+     - Shape grammar, from production: pills for INTERACTIVE, near-square
+       (--afc-radius-xs/md) for CONTAINERS. 35 production uses of
+       border-radius:100px vs 18 of 1px — the asymmetry is the brand.
+   ========================================================================== */
+
+/* ==========================================================================
+   1. BASE
+   ========================================================================== */
+*, *::before, *::after { box-sizing: border-box; }
+
+body.afc {
+  margin: 0;
+  background: var(--afc-bg-canvas);
+  color: var(--afc-text-primary);
+  font-family: var(--afc-font-sans);
+  font-size: var(--afc-text-base);
+  line-height: var(--afc-leading-normal);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+.afc-h1, .afc-h2, .afc-h3, .afc-h4 {
+  font-family: var(--afc-font-serif);
+  font-weight: var(--afc-weight-regular);
+  letter-spacing: var(--afc-track-tight);
+  line-height: var(--afc-leading-tight);
+  color: var(--afc-text-primary);
+  margin: 0;
+  text-wrap: balance;
+}
+.afc-h1 { font-size: clamp(2rem, 1.4rem + 2.6vw, 3rem); }
+.afc-h2 { font-size: clamp(1.5rem, 1.2rem + 1.4vw, 2.25rem); }
+.afc-h3 { font-size: var(--afc-text-xl); }
+.afc-h4 { font-size: var(--afc-text-lg); }
+
+.afc-body  { margin: 0; max-width: var(--afc-content-measure); line-height: var(--afc-leading-relaxed); }
+.afc-lede  { font-size: var(--afc-text-md); color: var(--afc-text-secondary); max-width: var(--afc-content-measure); }
+.afc-meta  { font-size: var(--afc-text-xs); color: var(--afc-text-muted); }
+.afc-num   { font-family: var(--afc-font-mono); font-variant-numeric: tabular-nums; }
+
+/* THE AFC label. Measured: apostolicfaith.org `.subtitle` —
+   12px / Inter / 400 / uppercase / letter-spacing 4px / #090b19.            */
+.afc-label {
+  font-family: var(--afc-font-sans);
+  font-size: var(--afc-text-xs);
+  font-weight: var(--afc-weight-regular);
+  letter-spacing: var(--afc-track-label);
+  text-transform: uppercase;
+  color: var(--afc-text-primary);
+  margin: 0;
+}
+.afc-label--muted { color: var(--afc-text-muted); }
+.afc-label--on-dark { color: var(--afc-text-on-dark-muted); }
+
+.afc-link {
+  color: var(--afc-bg-action);
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+  text-decoration-thickness: 1px;
+  border-radius: var(--afc-radius-xs);
+  transition: color var(--afc-dur-fast) var(--afc-ease-afc);
+}
+.afc-link:hover { color: var(--afc-bg-action-hover); }
+.afc-link:focus-visible { outline: none; box-shadow: var(--afc-shadow-focus); }
+
+.afc-rule { border: 0; border-top: 1px solid var(--afc-border-subtle); margin: var(--afc-space-6) 0; }
+
+/* ==========================================================================
+   2. LAYOUT SHELL — topbar + sidebar (Church Portal module navigation)
+   ========================================================================== */
+/* Sticky chrome must reserve its own height, otherwise any in-page anchor or
+   restored scroll position lands underneath the topbar. */
+html:has(.afc-topbar) { scroll-padding-top: calc(var(--afc-topbar-h) + var(--afc-space-3)); }
+
+.afc-shell { display: grid; min-height: 100vh; grid-template-areas: 'top' 'main'; }
+.afc-shell__main { grid-area: main; }
+
+@media (min-width: 64rem) {
+  .afc-shell--sidebar {
+    grid-template-columns: var(--afc-sidebar-w) 1fr;
+    grid-template-areas: 'top top' 'side main';
+  }
+  .afc-shell--sidebar .afc-shell__side { grid-area: side; display: block; }
+}
+.afc-shell__side { display: none; }
+
+.afc-topbar {
+  grid-area: top;
+  position: sticky; top: 0; z-index: var(--afc-z-topbar);
+  display: flex; align-items: center; gap: var(--afc-space-4);
+  min-height: var(--afc-topbar-h);
+  padding: 0 var(--afc-space-5);
+  background: var(--afc-bg-surface);
+  border-bottom: 1px solid var(--afc-border-subtle);
+}
+.afc-topbar__title { font-family: var(--afc-font-serif); font-size: var(--afc-text-md); letter-spacing: var(--afc-track-tight); }
+.afc-topbar__spacer { flex: 1 1 auto; min-width: 0; }
+.afc-topbar { flex-wrap: wrap; row-gap: var(--afc-space-2); }
+
+.afc-nav { padding: var(--afc-space-4) var(--afc-space-3); }
+.afc-nav__group + .afc-nav__group { margin-top: var(--afc-space-5); }
+.afc-nav__item {
+  display: flex; align-items: center; gap: var(--afc-space-3);
+  min-width: 0;
+  min-height: var(--afc-control-min);
+  padding: 0 var(--afc-space-3);
+  border-radius: var(--afc-radius-md);
+  color: var(--afc-text-secondary);
+  text-decoration: none;
+  font-size: var(--afc-text-sm);
+  transition: background-color var(--afc-dur-fast) var(--afc-ease-afc),
+              color var(--afc-dur-fast) var(--afc-ease-afc);
+}
+.afc-nav__item:hover { background: var(--afc-bg-sunken); color: var(--afc-text-primary); }
+.afc-nav__item[aria-current='page'] {
+  background: var(--afc-bg-action-soft);
+  color: var(--afc-bg-action);
+  font-weight: var(--afc-weight-medium);
+}
+/* Von Restorff: the active item is the only filled pill in the rail. */
+.afc-nav__badge {
+  margin-left: auto;
+  min-width: 1.5rem; padding: 0 0.4rem;
+  border-radius: var(--afc-radius-pill);
+  background: var(--afc-bg-sunken);
+  color: var(--afc-text-secondary);
+  font-size: var(--afc-text-2xs);
+  line-height: 1.5rem; text-align: center;
+}
+
+.afc-container {
+  width: 100%;
+  max-width: var(--afc-content-max);
+  margin-inline: auto;
+  padding: var(--afc-space-5);
+}
+@media (min-width: 48rem) { .afc-container { padding: var(--afc-space-7) var(--afc-space-6); } }
+
+/* ==========================================================================
+   3. BUTTON — measured from production .c_button_link
+   pill · uppercase · letter-spacing 3px · 11px Inter · white on azure
+   ========================================================================== */
+.afc-btn {
+  --afc-btn-bg: transparent;
+  --afc-btn-fg: var(--afc-text-primary);
+  --afc-btn-border: var(--afc-border-strong);
+  position: relative;
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--afc-space-2);
+  min-height: var(--afc-control-min);
+  padding: var(--afc-space-3) var(--afc-space-5);
+  border: 1px solid var(--afc-btn-border);
+  border-radius: var(--afc-radius-pill);
+  background: var(--afc-btn-bg);
+  color: var(--afc-btn-fg);
+  font-family: var(--afc-font-sans);
+  font-size: var(--afc-text-2xs);
+  font-weight: var(--afc-weight-medium);
+  letter-spacing: var(--afc-track-button);
+  text-transform: uppercase;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color var(--afc-dur-fast) var(--afc-ease-afc),
+              border-color var(--afc-dur-fast) var(--afc-ease-afc),
+              color var(--afc-dur-fast) var(--afc-ease-afc),
+              transform var(--afc-dur-instant) var(--afc-ease-afc);
+}
+.afc-btn:hover  { transform: translateY(-1px); }
+.afc-btn:active { transform: translateY(0); }
+.afc-btn:focus-visible { outline: none; box-shadow: var(--afc-shadow-focus); }
+
+.afc-btn--primary { --afc-btn-bg: var(--afc-bg-action); --afc-btn-fg: var(--afc-bg-action-text); --afc-btn-border: var(--afc-bg-action); }
+.afc-btn--primary:hover  { --afc-btn-bg: var(--afc-bg-action-hover); --afc-btn-border: var(--afc-bg-action-hover); }
+.afc-btn--primary:active { --afc-btn-bg: var(--afc-bg-action-press); --afc-btn-border: var(--afc-bg-action-press); }
+
+.afc-btn--secondary { --afc-btn-bg: var(--afc-bg-surface); --afc-btn-fg: var(--afc-text-primary); --afc-btn-border: var(--afc-border-strong); }
+.afc-btn--secondary:hover { --afc-btn-bg: var(--afc-bg-sunken); }
+
+.afc-btn--ghost { --afc-btn-bg: transparent; --afc-btn-fg: var(--afc-text-secondary); --afc-btn-border: transparent; }
+.afc-btn--ghost:hover { --afc-btn-bg: var(--afc-bg-sunken); --afc-btn-fg: var(--afc-text-primary); }
+
+/* Destructive. Always paired with a confirm step — see docs/DESIGN_SYSTEM.md
+   on Forgiveness. A red button is never the only path out of an action.       */
+.afc-btn--danger { --afc-btn-bg: var(--afc-danger-600); --afc-btn-fg: var(--afc-paper-0); --afc-btn-border: var(--afc-danger-600); }
+.afc-btn--danger:hover { --afc-btn-bg: var(--afc-danger-700); --afc-btn-border: var(--afc-danger-700); }
+
+.afc-btn--on-dark { --afc-btn-bg: transparent; --afc-btn-fg: var(--afc-text-on-dark); --afc-btn-border: var(--afc-border-inverse); }
+.afc-btn--on-dark:hover { --afc-btn-bg: rgba(255, 255, 255, 0.1); }
+
+.afc-btn--sm { min-height: calc(var(--afc-control-min) * 0.72); padding: var(--afc-space-1) var(--afc-space-4); }
+.afc-btn--lg { min-height: calc(var(--afc-control-min) * 1.18); padding: var(--afc-space-4) var(--afc-space-6); }
+.afc-btn--block { width: 100%; }
+
+/* Fitts's Law: square hit area stays >= 44px even when the glyph is small. */
+.afc-btn--icon { padding: 0; width: var(--afc-control-min); min-width: var(--afc-control-min); font-size: var(--afc-text-md); }
+
+.afc-btn[disabled], .afc-btn[aria-disabled='true'] {
+  --afc-btn-bg: var(--afc-bg-sunken);
+  --afc-btn-fg: var(--afc-text-disabled);
+  --afc-btn-border: var(--afc-border-subtle);
+  cursor: not-allowed; transform: none;
+}
+
+/* ~100ms feedback loop. The label is swapped for a spinner in the SAME box so
+   nothing reflows (Doherty Threshold).                                       */
+.afc-btn[data-loading='true'] { color: transparent; pointer-events: none; }
+.afc-btn[data-loading='true']::after {
+  content: '';
+  position: absolute; inset: 50% auto auto 50%;
+  width: 1.05em; height: 1.05em; margin: -0.55em 0 0 -0.55em;
+  border: 2px solid currentColor; border-top-color: transparent;
+  border-radius: var(--afc-radius-full);
+  color: var(--afc-btn-fg);
+  animation: afc-spin var(--afc-dur-deliberate) linear infinite;
+}
+@keyframes afc-spin { to { transform: rotate(360deg); } }
+
+/* ==========================================================================
+   4. FIELDS — single-column, label above, help/error below.
+   Norman's constraints: the control only accepts the expected shape, and
+   inline validation states the problem next to the thing that is wrong.
+   ========================================================================== */
+.afc-field { display: flex; flex-direction: column; gap: var(--afc-space-2); }
+.afc-field + .afc-field { margin-top: var(--afc-space-5); }
+
+.afc-field__label {
+  display: flex; align-items: baseline; gap: var(--afc-space-2);
+  font-size: var(--afc-text-sm);
+  font-weight: var(--afc-weight-medium);
+  color: var(--afc-text-primary);
+}
+.afc-field__req { color: var(--afc-danger-600); font-weight: var(--afc-weight-bold); }
+.afc-field__optional { font-weight: var(--afc-weight-regular); color: var(--afc-text-muted); font-size: var(--afc-text-xs); }
+
+.afc-input, .afc-select, .afc-textarea {
+  width: 100%;
+  min-height: var(--afc-control-min);
+  padding: var(--afc-space-3) var(--afc-space-4);
+  border: 1px solid var(--afc-border-strong);
+  border-radius: var(--afc-radius-md);
+  background: var(--afc-bg-surface);
+  color: var(--afc-text-primary);
+  font-family: var(--afc-font-sans);
+  font-size: var(--afc-text-base);
+  line-height: var(--afc-leading-normal);
+  transition: border-color var(--afc-dur-fast) var(--afc-ease-afc),
+              box-shadow var(--afc-dur-fast) var(--afc-ease-afc);
+}
+.afc-textarea { min-height: calc(var(--afc-control-min) * 2.5); resize: vertical; line-height: var(--afc-leading-relaxed); }
+.afc-select {
+  appearance: none;
+  padding-right: var(--afc-space-7);
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5l5-5' fill='none' stroke='%236E7488' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-position: right var(--afc-space-4) center;
+  background-size: 12px 8px;
+  background-repeat: no-repeat;
+  padding-right: var(--afc-space-7);
+}
+.afc-input::placeholder, .afc-textarea::placeholder { color: var(--afc-text-muted); opacity: 1; }
+.afc-input:hover, .afc-select:hover, .afc-textarea:hover { border-color: var(--afc-ink-200); }
+.afc-input:focus, .afc-select:focus, .afc-textarea:focus {
+  outline: none;
+  border-color: var(--afc-bg-action);
+  box-shadow: 0 0 0 3px var(--afc-bg-action-soft);
+}
+.afc-input:focus-visible, .afc-select:focus-visible, .afc-textarea:focus-visible {
+  border-color: var(--afc-bg-action);
+  box-shadow: var(--afc-shadow-focus);
+}
+.afc-input[disabled], .afc-select[disabled], .afc-textarea[disabled] {
+  background: var(--afc-bg-sunken); color: var(--afc-text-disabled);
+  cursor: not-allowed;
+}
+
+.afc-field__help  { font-size: var(--afc-text-xs); color: var(--afc-text-muted); margin: 0; }
+.afc-field__error {
+  display: flex; align-items: flex-start; gap: var(--afc-space-2);
+  font-size: var(--afc-text-xs); color: var(--afc-status-danger); margin: 0;
+  font-weight: var(--afc-weight-medium);
+}
+/* The error marker is a glyph, not just colour (WCAG 1.4.1). */
+.afc-field__error::before { content: '\26A0'; line-height: 1.3; }
+
+.afc-field[data-invalid='true'] .afc-input,
+.afc-field[data-invalid='true'] .afc-select,
+.afc-field[data-invalid='true'] .afc-textarea {
+  border-color: var(--afc-danger-600);
+  /* Error state carries a non-colour channel too — a heavier left rule. */
+  border-left-width: 3px;
+}
+.afc-field[data-invalid='true'] .afc-input:focus,
+.afc-field[data-invalid='true'] .afc-select:focus,
+.afc-field[data-invalid='true'] .afc-textarea:focus {
+  box-shadow: 0 0 0 3px var(--afc-status-danger-bg);
+}
+
+.afc-field-grid { display: grid; gap: var(--afc-space-4); }
+@media (min-width: 40rem) { .afc-field-grid--2 { grid-template-columns: 1fr 1fr; } }
+
+.afc-input-group { display: flex; gap: var(--afc-space-2); }
+.afc-input-group .afc-input { flex: 1 1 auto; }
+
+/* --- choice controls --- */
+.afc-choice { display: flex; align-items: flex-start; gap: var(--afc-space-3); min-height: var(--afc-control-min); padding-block: var(--afc-space-2); cursor: pointer; }
+.afc-choice input { flex: 0 0 auto; width: 1.25rem; height: 1.25rem; margin-top: 0.1rem; accent-color: var(--afc-bg-action); cursor: pointer; }
+.afc-choice input:focus-visible { outline: none; box-shadow: var(--afc-shadow-focus); border-radius: var(--afc-radius-xs); }
+.afc-choice__text { font-size: var(--afc-text-sm); color: var(--afc-text-primary); }
+.afc-choice__hint { display: block; font-size: var(--afc-text-xs); color: var(--afc-text-muted); margin-top: 2px; }
+
+.afc-switch { display: inline-flex; align-items: center; gap: var(--afc-space-3); cursor: pointer; }
+.afc-switch input { position: absolute; opacity: 0; width: 0; height: 0; }
+.afc-switch__track {
+  position: relative; flex: 0 0 auto;
+  width: 2.75rem; height: 1.5rem;
+  border-radius: var(--afc-radius-pill);
+  background: var(--afc-border-strong);
+  transition: background-color var(--afc-dur-fast) var(--afc-ease-afc);
+}
+.afc-switch__track::after {
+  content: ''; position: absolute; top: 3px; left: 3px;
+  width: 1.125rem; height: 1.125rem; border-radius: var(--afc-radius-full);
+  background: var(--afc-paper-0);
+  box-shadow: var(--afc-shadow-xs);
+  transition: transform var(--afc-dur-fast) var(--afc-ease-afc);
+}
+.afc-switch input:checked + .afc-switch__track { background: var(--afc-bg-action); }
+.afc-switch input:checked + .afc-switch__track::after { transform: translateX(1.25rem); }
+.afc-switch input:focus-visible + .afc-switch__track { box-shadow: var(--afc-shadow-focus); }
+
+/* ==========================================================================
+   5. CARDS, PANELS, STATS
+   ========================================================================== */
+.afc-card {
+  background: var(--afc-bg-surface);
+  border: 1px solid var(--afc-border-subtle);
+  border-radius: var(--afc-radius-md);
+  padding: var(--afc-space-5);
+}
+.afc-card--flush { padding: 0; overflow: hidden; }
+.afc-card--raised { box-shadow: var(--afc-shadow-sm); border-color: var(--afc-border-default); }
+.afc-card__head {
+  display: flex; align-items: center; gap: var(--afc-space-3);
+  padding: var(--afc-space-4) var(--afc-space-5);
+  border-bottom: 1px solid var(--afc-border-subtle);
+}
+.afc-card__body { padding: var(--afc-space-5); }
+.afc-card__foot {
+  padding: var(--afc-space-4) var(--afc-space-5);
+  border-top: 1px solid var(--afc-border-subtle);
+  background: var(--afc-bg-inset);
+  display: flex; align-items: center; gap: var(--afc-space-3);
+  flex-wrap: wrap;
+}
+
+.afc-panel { background: var(--afc-bg-sunken); border-radius: var(--afc-radius-md); padding: var(--afc-space-5); }
+
+/* Grid/flex children default to min-width:auto, which lets a long row of tabs,
+   breadcrumbs or a pager push the whole page sideways on a 360px phone.
+   min-width:0 is what lets them actually shrink. */
+.afc-grid { display: grid; gap: var(--afc-space-4); min-width: 0; }
+.afc-grid > *, .afc-stack > *, .afc-row > * { min-width: 0; }
+@media (min-width: 40rem) { .afc-grid--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 56rem) { .afc-grid--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+                             .afc-grid--4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 72rem) { .afc-grid--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+
+/* Stat tile — attendance headcounts, welfare cases, event RSVPs. */
+.afc-stat {
+  display: flex; flex-direction: column; gap: var(--afc-space-2);
+  padding: var(--afc-space-5);
+  background: var(--afc-bg-surface);
+  border: 1px solid var(--afc-border-subtle);
+  border-radius: var(--afc-radius-md);
+}
+.afc-stat__value {
+  /* Push value + delta to the bottom so figures line up across a row even when
+     one label wraps to two lines and another does not. */
+  margin-top: auto;
+  font-family: var(--afc-font-serif);
+  font-size: var(--afc-text-3xl);
+  line-height: 1;
+  letter-spacing: var(--afc-track-tight);
+  font-variant-numeric: tabular-nums;
+}
+.afc-stat__delta { font-size: var(--afc-text-xs); font-weight: var(--afc-weight-medium); }
+.afc-stat__delta--up   { color: var(--afc-status-success); }
+.afc-stat__delta--down { color: var(--afc-status-danger); }
+.afc-stat__delta--flat { color: var(--afc-text-muted); }
+
+/* ==========================================================================
+   6. TABLE — data-dense on desktop, card-per-row on phones.
+   Content-driven breakpoint: the table switches at 48rem because that is
+   where the columns stop fitting, not at a device name.
+   ========================================================================== */
+.afc-table-wrap { width: 100%; overflow-x: auto; }
+.afc-table { width: 100%; border-collapse: collapse; font-size: var(--afc-text-sm); }
+.afc-table caption { text-align: left; padding: var(--afc-space-4) var(--afc-space-5); font-size: var(--afc-text-xs); color: var(--afc-text-muted); }
+.afc-table th, .afc-table td {
+  padding: var(--afc-row-y) var(--afc-space-4);
+  text-align: left;
+  border-bottom: 1px solid var(--afc-border-subtle);
+}
+.afc-table thead th {
+  position: sticky; top: 0; z-index: var(--afc-z-sticky);
+  background: var(--afc-bg-inset);
+  font-family: var(--afc-font-sans);
+  font-size: var(--afc-text-2xs);
+  font-weight: var(--afc-weight-medium);
+  letter-spacing: var(--afc-track-button);
+  text-transform: uppercase;
+  color: var(--afc-text-secondary);
+  white-space: nowrap;
+}
+.afc-table tbody tr { transition: background-color var(--afc-dur-fast) var(--afc-ease-afc); }
+.afc-table tbody tr:hover { background: var(--afc-bg-inset); }
+.afc-table td[data-numeric], .afc-table th[data-numeric] { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--afc-font-mono); }
+.afc-table__row-action { display: flex; gap: var(--afc-space-2); justify-content: flex-end; }
+
+@media (max-width: 47.99rem) {
+  .afc-table--responsive thead { display: none; }
+  .afc-table--responsive tbody tr {
+    display: grid; gap: var(--afc-space-2);
+    padding: var(--afc-space-4);
+    border-bottom: 1px solid var(--afc-border-default);
+  }
+  .afc-table--responsive td {
+    display: flex; justify-content: space-between; gap: var(--afc-space-4);
+    padding: 0; border: 0; text-align: left;
+  }
+  .afc-table--responsive td::before {
+    content: attr(data-label);
+    flex: 0 0 auto;
+    font-size: var(--afc-text-2xs);
+    letter-spacing: var(--afc-track-button);
+    text-transform: uppercase;
+    color: var(--afc-text-muted);
+  }
+  .afc-table--responsive td[data-numeric] { text-align: left; }
+}
+
+/* ==========================================================================
+   7. BADGE / STATUS PILL — colour + text, never colour alone.
+   ========================================================================== */
+.afc-badge {
+  display: inline-flex; align-items: center; gap: var(--afc-space-2);
+  padding: 0.15rem var(--afc-space-3);
+  border-radius: var(--afc-radius-pill);
+  background: var(--afc-status-neutral-bg);
+  color: var(--afc-status-neutral);
+  font-size: var(--afc-text-2xs);
+  font-weight: var(--afc-weight-medium);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+/* The dot is decoration; the word carries the meaning. */
+.afc-badge::before { content: ''; width: 0.4rem; height: 0.4rem; border-radius: var(--afc-radius-full); background: currentColor; }
+.afc-badge--success { background: var(--afc-status-success-bg); color: var(--afc-status-success); }
+.afc-badge--danger  { background: var(--afc-status-danger-bg);  color: var(--afc-status-danger); }
+.afc-badge--warn    { background: var(--afc-status-warn-bg);    color: var(--afc-status-warn); }
+.afc-badge--info    { background: var(--afc-status-info-bg);    color: var(--afc-status-info); }
+.afc-badge--solid-danger { background: var(--afc-danger-600); color: var(--afc-paper-0); }
+
+/* ==========================================================================
+   8. ALERT + TOAST
+   ========================================================================== */
+.afc-alert {
+  display: flex; gap: var(--afc-space-3);
+  padding: var(--afc-space-4) var(--afc-space-4);
+  border-radius: var(--afc-radius-md);
+  border-left: 3px solid currentColor;
+  background: var(--afc-status-info-bg);
+  color: var(--afc-status-info);
+  font-size: var(--afc-text-sm);
+}
+.afc-alert__body { color: var(--afc-text-primary); }
+.afc-alert__title { font-weight: var(--afc-weight-semibold); margin: 0 0 2px; color: var(--afc-text-primary); }
+.afc-alert--success { background: var(--afc-status-success-bg); color: var(--afc-status-success); }
+.afc-alert--danger  { background: var(--afc-status-danger-bg);  color: var(--afc-status-danger); }
+.afc-alert--warn    { background: var(--afc-status-warn-bg);    color: var(--afc-status-warn); }
+
+.afc-toast-stack { position: fixed; inset-block-end: var(--afc-space-5); inset-inline-end: var(--afc-space-5); z-index: var(--afc-z-toast); display: flex; flex-direction: column; gap: var(--afc-space-2); max-width: min(24rem, calc(100vw - 2 * var(--afc-space-5))); }
+.afc-toast {
+  display: flex; align-items: flex-start; gap: var(--afc-space-3);
+  padding: var(--afc-space-3) var(--afc-space-4);
+  border-radius: var(--afc-radius-md);
+  background: var(--afc-bg-inverse);
+  color: var(--afc-text-on-dark);
+  box-shadow: var(--afc-shadow-lg);
+  font-size: var(--afc-text-sm);
+  animation: afc-toast-in var(--afc-dur-base) var(--afc-ease-afc);
+}
+@keyframes afc-toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* ==========================================================================
+   9. STATES — empty, skeleton, progress. The states nobody demos.
+   ========================================================================== */
+.afc-empty {
+  display: flex; flex-direction: column; align-items: center; gap: var(--afc-space-3);
+  padding: var(--afc-space-8) var(--afc-space-5);
+  text-align: center;
+  color: var(--afc-text-muted);
+}
+.afc-empty__mark {
+  width: 2.5rem; height: 2.5rem; border-radius: var(--afc-radius-full);
+  border: 2px dashed var(--afc-border-strong);
+}
+.afc-empty__title { font-family: var(--afc-font-serif); font-size: var(--afc-text-lg); color: var(--afc-text-primary); margin: 0; }
+.afc-empty__body { font-size: var(--afc-text-sm); max-width: 34ch; margin: 0; }
+
+.afc-skel {
+  border-radius: var(--afc-radius-sm);
+  background: linear-gradient(90deg, var(--afc-bg-sunken) 25%, var(--afc-paper-200) 37%, var(--afc-bg-sunken) 63%);
+  background-size: 400% 100%;
+  animation: afc-shimmer 1.4s var(--afc-ease-afc) infinite;
+}
+@keyframes afc-shimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }
+.afc-skel--line { height: 0.75rem; margin-block: var(--afc-space-2); }
+.afc-skel--title { height: 1.5rem; width: 60%; margin-block: var(--afc-space-3); }
+.afc-skel--block { height: 6rem; }
+
+.afc-progress { height: 0.5rem; background: var(--afc-bg-sunken); border-radius: var(--afc-radius-pill); overflow: hidden; }
+.afc-progress__bar { height: 100%; background: var(--afc-bg-action); border-radius: inherit; transition: width var(--afc-dur-slow) var(--afc-ease-afc); }
+.afc-progress__bar--gold { background: var(--afc-gold-500); }
+
+.afc-ring { display: inline-grid; place-items: center; position: relative; }
+.afc-ring svg { transform: rotate(-90deg); }
+.afc-ring circle { fill: none; stroke-width: 8; }
+.afc-ring__track { stroke: var(--afc-bg-sunken); }
+.afc-ring__value { stroke: var(--afc-bg-action); stroke-linecap: round; transition: stroke-dashoffset var(--afc-dur-slow) var(--afc-ease-afc); }
+.afc-ring__label { position: absolute; font-size: var(--afc-text-sm); font-weight: var(--afc-weight-semibold); font-variant-numeric: tabular-nums; }
+
+/* ==========================================================================
+   10. NAVIGATION — tabs, breadcrumb, pagination, segmented
+   ========================================================================== */
+.afc-tabs { display: flex; gap: var(--afc-space-1); border-bottom: 1px solid var(--afc-border-subtle); overflow-x: auto; max-width: 100%; scrollbar-width: thin; }
+.afc-tab {
+  position: relative;
+  min-height: var(--afc-control-min);
+  padding: var(--afc-space-2) var(--afc-space-4);
+  border: 0; background: transparent;
+  color: var(--afc-text-secondary);
+  font-family: var(--afc-font-sans);
+  font-size: var(--afc-text-sm); font-weight: var(--afc-weight-medium);
+  white-space: nowrap; cursor: pointer;
+  transition: color var(--afc-dur-fast) var(--afc-ease-afc);
+}
+.afc-tab:hover { color: var(--afc-text-primary); }
+.afc-tab:focus-visible { outline: none; box-shadow: var(--afc-shadow-focus); border-radius: var(--afc-radius-sm); }
+/* The active state, shared by both semantics, in ONE declaration block each.
+   `aria-selected` is for a real ARIA tab panel (role="tab" inside role="tablist").
+   `aria-current` is for an anchor nav, where the tab links to a section and no
+   panel is selected. `.afc-tabs` is used for both, so both hooks must render the
+   same active state. Do not use `aria-selected` on a link -- see
+   docs/DESIGN_SYSTEM.md section 6.5 and tools/tab-role-check.mjs. */
+.afc-tab[aria-selected='true'],
+.afc-tab[aria-current='true'] { color: var(--afc-bg-action); }
+.afc-tab[aria-selected='true']::after,
+.afc-tab[aria-current='true']::after {
+  content: ''; position: absolute; inset-inline: var(--afc-space-2); bottom: -1px;
+  height: 2px; background: var(--afc-bg-action); border-radius: 2px 2px 0 0;
+}
+
+.afc-crumbs {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--afc-space-2);
+  font-size: var(--afc-text-xs); color: var(--afc-text-muted);
+  max-width: 100%; min-width: 0;
+}
+.afc-crumbs li { min-height: 2rem; }
+.afc-crumbs a {
+  display: inline-flex; align-items: center;
+  min-height: 2rem; padding-inline: var(--afc-space-1);
+  color: var(--afc-text-secondary); text-decoration: none;
+  border-radius: var(--afc-radius-xs);
+}
+.afc-crumbs a:hover { color: var(--afc-text-primary); text-decoration: underline; }
+.afc-crumbs a:focus-visible { outline: none; box-shadow: var(--afc-shadow-focus); }
+.afc-crumbs li { display: flex; align-items: center; gap: var(--afc-space-2); }
+.afc-crumbs ol { display: contents; list-style: none; margin: 0; padding: 0; }
+.afc-crumbs li + li::before { content: '/'; color: var(--afc-border-strong); }
+
+.afc-pagination {
+  display: flex; align-items: center; gap: var(--afc-space-2);
+  max-width: 100%; min-width: 0; overflow-x: auto; scrollbar-width: thin;
+  padding-block-end: 2px; /* keep the focus ring inside the scroll box */
+}
+.afc-pagination__page {
+  min-width: var(--afc-control-min); min-height: var(--afc-control-min);
+  display: inline-grid; place-items: center;
+  border: 1px solid var(--afc-border-default); border-radius: var(--afc-radius-md);
+  background: var(--afc-bg-surface); color: var(--afc-text-secondary);
+  font-size: var(--afc-text-sm); text-decoration: none;
+  font-variant-numeric: tabular-nums;
+}
+.afc-pagination__page:hover { background: var(--afc-bg-sunken); color: var(--afc-text-primary); }
+.afc-pagination__page:focus-visible { outline: none; box-shadow: var(--afc-shadow-focus); }
+.afc-pagination__page[aria-current='page'] { background: var(--afc-bg-action); border-color: var(--afc-bg-action); color: var(--afc-bg-action-text); font-weight: var(--afc-weight-semibold); }
+.afc-pagination__page[aria-disabled='true'] { opacity: 0.4; pointer-events: none; }
+
+.afc-segmented { display: inline-flex; padding: 3px; gap: 2px; background: var(--afc-bg-sunken); border-radius: var(--afc-radius-pill); max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.afc-segmented__btn {
+  min-height: calc(var(--afc-control-min) - 8px);
+  padding: 0 var(--afc-space-4);
+  border: 0; border-radius: var(--afc-radius-pill);
+  background: transparent; color: var(--afc-text-secondary);
+  font-family: var(--afc-font-sans); font-size: var(--afc-text-xs); font-weight: var(--afc-weight-medium);
+  cursor: pointer; white-space: nowrap;
+  transition: background-color var(--afc-dur-fast) var(--afc-ease-afc), color var(--afc-dur-fast) var(--afc-ease-afc);
+}
+.afc-segmented__btn:hover { color: var(--afc-text-primary); }
+.afc-segmented__btn:focus-visible { outline: none; box-shadow: var(--afc-shadow-focus); }
+.afc-segmented__btn[aria-pressed='true'] { background: var(--afc-bg-surface); color: var(--afc-text-primary); box-shadow: var(--afc-shadow-xs); }
+
+/* Steps — multi-stage data entry (household registration, welfare intake). */
+.afc-steps { display: flex; gap: var(--afc-space-2); list-style: none; margin: 0; padding: 0; flex-wrap: wrap; }
+.afc-steps__item { display: flex; align-items: center; gap: var(--afc-space-2); font-size: var(--afc-text-xs); color: var(--afc-text-muted); }
+.afc-steps__num {
+  display: inline-grid; place-items: center;
+  width: 1.5rem; height: 1.5rem; border-radius: var(--afc-radius-full);
+  border: 1px solid var(--afc-border-strong);
+  font-size: var(--afc-text-2xs); font-variant-numeric: tabular-nums;
+}
+.afc-steps__item[data-state='current'] { color: var(--afc-text-primary); font-weight: var(--afc-weight-semibold); }
+.afc-steps__item[data-state='current'] .afc-steps__num { background: var(--afc-bg-action); border-color: var(--afc-bg-action); color: var(--afc-bg-action-text); }
+.afc-steps__item[data-state='done'] { color: var(--afc-text-secondary); }
+.afc-steps__item[data-state='done'] .afc-steps__num { background: var(--afc-status-success-bg); border-color: var(--afc-status-success); color: var(--afc-status-success); }
+
+/* ==========================================================================
+   11. OVERLAY — modal + drawer
+   ========================================================================== */
+.afc-scrim {
+  position: fixed; inset: 0; z-index: var(--afc-z-modal);
+  background: rgba(9, 11, 25, 0.55);
+  display: grid; place-items: center; padding: var(--afc-space-4);
+  animation: afc-fade var(--afc-dur-fast) var(--afc-ease-afc);
+}
+@keyframes afc-fade { from { opacity: 0; } to { opacity: 1; } }
+
+.afc-modal {
+  width: min(34rem, 100%);
+  /* Grid items default to min-width:auto, which floors at min-content and lets
+     a long heading push the dialog wider than the viewport on a 320px phone. */
+  min-width: 0;
+  max-height: min(85vh, 44rem);
+  display: flex; flex-direction: column;
+  background: var(--afc-bg-surface);
+  border-radius: var(--afc-radius-lg);
+  box-shadow: var(--afc-shadow-lg);
+  animation: afc-modal-in var(--afc-dur-base) var(--afc-ease-afc);
+}
+@keyframes afc-modal-in { from { opacity: 0; transform: translateY(12px) scale(0.98); } to { opacity: 1; transform: none; } }
+.afc-modal__head { padding: var(--afc-space-5) var(--afc-space-5) var(--afc-space-3); }
+.afc-modal__body { padding: 0 var(--afc-space-5) var(--afc-space-4); overflow-y: auto; }
+.afc-modal__foot {
+  display: flex; justify-content: flex-end; gap: var(--afc-space-3);
+  padding: var(--afc-space-4) var(--afc-space-5);
+  border-top: 1px solid var(--afc-border-subtle);
+  background: var(--afc-bg-inset);
+}
+/* Destructive confirm: author the SAFE action first in the footer so it is both
+   first in the tab order and visually dominant. There is no CSS reordering —
+   DOM order is the accessibility contract. */
+
+@media (max-width: 47.99rem) {
+  .afc-scrim { align-items: flex-end; padding: 0; }
+  .afc-modal { width: 100%; max-height: 92vh; border-radius: var(--afc-radius-lg) var(--afc-radius-lg) 0 0; }
+  .afc-modal__foot {
+    /* Two tracked uppercase pills will not fit side by side on a phone. Stack
+       them full-width in DOM order so the safe action stays first, and keep the
+       safe-area inset clear of the iOS home indicator. */
+    flex-direction: column; align-items: stretch;
+    padding-bottom: max(var(--afc-space-4), env(safe-area-inset-bottom));
+  }
+  .afc-modal__foot .afc-btn { width: 100%; }
+}
+
+/* ==========================================================================
+12. DEPARTMENT SEAL — the five real marks, one container contract.
+    Containers hold the mark; they do not adopt its colour.
+    ========================================================================== */
+.afc-seal {
+  display: inline-flex; align-items: center; gap: var(--afc-space-3);
+  text-decoration: none; color: var(--afc-seal-ink);
+  /* The recovered marks ship with an opaque white or transparent-padded
+     background. A plate makes that intentional, and gives a mark a home on
+     either theme. */
+  padding: var(--afc-space-2) var(--afc-space-3);
+  border-radius: var(--afc-radius-sm);
+  background: var(--afc-bg-surface);
+  border: 1px solid var(--afc-border-subtle);
+}
+/* OPTICAL NORMALISATION — the five marks do not share a canvas.
+   Measured ink height inside the element at each modifier:
+     JTLW 33px · WECA 51 · AFCMF 56 · YDD 52 · AFCF 56 · Africa for Christ 48
+   Setting one `height` therefore renders them 1.70x apart in ink, and the
+   ink AREA spans 3.88x — a row of supposed equals that does not read as
+   equals. Each mark instead carries a measured `--afc-seal-optical` factor
+   that scales the artwork so the INK lands on a common optical height.
+   These factors are measured, not tuned by eye; re-derive them with
+   tools/seal-weight-check.mjs after replacing any mark file. */
+.afc-seal img {
+  display: block;
+  width: auto;
+  height: calc(2.25rem * var(--afc-seal-optical, 1));
+  max-width: 100%;
+}
+.afc-seal--lg img { height: calc(3.25rem * var(--afc-seal-optical, 1)); }
+.afc-seal--sm img { height: calc(1.5rem * var(--afc-seal-optical, 1)); }
+
+/* Per-mark optical factors, keyed to the mark file, not the department.
+   A department with two marks gets one factor per mark. */
+[data-seal='jtlw']      { --afc-seal-optical: 1.70; }
+[data-seal='weca']      { --afc-seal-optical: 1.13; }
+[data-seal='afcmf']     { --afc-seal-optical: 1.00; }
+[data-seal='ydd']       { --afc-seal-optical: 1.08; }
+[data-seal='afcf']      { --afc-seal-optical: 1.00; }
+[data-seal='afc4c']     { --afc-seal-optical: 1.17; }
+.afc-seal__text { display: flex; flex-direction: column; line-height: 1.15; }
+.afc-seal__name { font-family: var(--afc-font-serif); font-size: var(--afc-text-md); letter-spacing: var(--afc-track-tight); }
+.afc-seal__sub { font-size: var(--afc-text-2xs); letter-spacing: var(--afc-track-label); text-transform: uppercase; color: var(--afc-text-muted); }
+
+/* ==========================================================================
+   13. UTILITIES — deliberately short. If you need a new one, add a token.
+   ========================================================================== */
+.afc-stack   { display: flex; flex-direction: column; gap: var(--afc-space-4); min-width: 0; }
+.afc-stack--sm { gap: var(--afc-space-2); }
+.afc-stack--lg { gap: var(--afc-space-6); }
+.afc-row     { display: flex; align-items: center; gap: var(--afc-space-3); flex-wrap: wrap; min-width: 0; }
+.afc-row--end { justify-content: flex-end; }
+.afc-row--between { justify-content: space-between; }
+.afc-grow { flex: 1 1 auto; }
+.afc-visually-hidden {
+  position: absolute !important; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0;
+}
+.afc-skip-link {
+  position: absolute; inset-inline-start: var(--afc-space-3); inset-block-start: -4rem;
+  z-index: var(--afc-z-toast); padding: var(--afc-space-3) var(--afc-space-4);
+  background: var(--afc-bg-surface); color: var(--afc-text-primary);
+  border-radius: var(--afc-radius-md); box-shadow: var(--afc-shadow-lg);
+  transition: inset-block-start var(--afc-dur-fast) var(--afc-ease-afc);
+}
+.afc-skip-link:focus { inset-block-start: var(--afc-space-3); }
+
+/* Focus must survive on every interactive atom in the layer. */
+a:focus-visible, button:focus-visible, [tabindex]:focus-visible, summary:focus-visible {
+  outline: none;
+  box-shadow: var(--afc-shadow-focus);
+  border-radius: var(--afc-radius-sm);
+}
+
+/* ==========================================================================
+   14. PRINT — Sunday bulletin, attendance sheets, welfare receipts.
+   Black on white, no fills, no pills. Never rely on colour to carry a column.
+   ========================================================================== */
+@media print {
+  :root { --afc-bg-canvas: #fff; --afc-bg-surface: #fff; --afc-text-primary: #000; --afc-text-secondary: #333; }
+  body.afc { background: #fff; color: #000; font-size: 11pt; }
+  .afc-topbar, .afc-nav, .afc-toast-stack, .afc-btn, .afc-pagination { display: none !important; }
+  .afc-card, .afc-table th, .afc-table td { border-color: #999; box-shadow: none; }
+  .afc-table thead th { position: static; background: #eee; }
+  a[href^='http']::after { content: ' (' attr(href) ')'; font-size: 9pt; color: #555; }
+}
