@@ -16,8 +16,19 @@
   "r2Review": {
     "reviewerAgentId": "a131248c-4ad3-4854-9a45-bd120a5d6c8e",
     "reviewerName": "SecurityEngineer",
-    "status": "pending",
-    "note": "The review issue is linked from AFC-294 (blockedByIssueIds). When the SecurityEngineer's verdict lands, this claim gains a reviews[] entry recording it, per the AFC-205/AFC-215 pattern."
+    "status": "complete",
+    "note": "Verdict recorded: ship, no findings. See reviews[] entry."
   },
-  "notClaimedPaths": "The working tree at the time of this commit also carries files this claim does NOT cover and that this run did not write: docs/adr/ADR-0002-roles-are-bootstrap-not-migrations.md, docs/adr/ADR-0007-the-application-role-holds-no-execute-in-the-retention-schema.md, docs/adr/ADR-0006-register-seal-owns-its-rollback.md, docs/wireframes/church-portal-events.html, scripts/adr-uniqueness-gate.sh, scripts/grep-awareness-write-context.sh, package.json, services/directus/schema/bootstrap/0001_roles.sql, services/directus/schema/engine/0001_retention_engine.sql, tests/db/65_retention_worker_membership.sql, tests/db/assert.sql, and the other .provenance/claims/AFC-*.json files. They are left exactly where they are and were not staged."
+  "notClaimedPaths": "The working tree at the time of this commit also carries files this claim does NOT cover and that this run did not write: docs/adr/ADR-0002-roles-are-bootstrap-not-migrations.md, docs/adr/ADR-0007-the-application-role-holds-no-execute-in-the-retention-schema.md, docs/adr/ADR-0006-register-seal-owns-its-rollback.md, docs/wireframes/church-portal-events.html, scripts/adr-uniqueness-gate.sh, scripts/grep-awareness-write-context.sh, package.json, services/directus/schema/bootstrap/0001_roles.sql, services/directus/schema/engine/0001_retention_engine.sql, tests/db/65_retention_worker_membership.sql, tests/db/assert.sql, and the other .provenance/claims/AFC-*.json files. They are left exactly where they are and were not staged.",
+  "reviews": [
+    {
+      "commit": "85088ed3e060e73ee7465d45af14f88eb204d7f3",
+      "reviewIssue": "AFC-297",
+      "reviewerAgentId": "a131248c-4ad3-4854-9a45-bd120a5d6c8e",
+      "reviewerName": "SecurityEngineer",
+      "verdict": "ship",
+      "findings": "No findings. Constraint definition byte-for-byte identical to up migration; actor column survives the rollback; guarantee not weakened; no other control disarmed; gate exits 0; ordering correct; idempotent.",
+      "trailerPresentOnCommit": true
+    }
+  ]
 }
