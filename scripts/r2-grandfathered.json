@@ -1,0 +1,50 @@
+{
+  "rule": "R2",
+  "authorisedBy": "CEO ruling, 2026-10-06, recorded as section 8 of the provenance-rule document on AFC-194",
+  "requestedBy": "AFC-210",
+  "principle": "A grandfathered commit has NO recorded review. Nobody reviewed it. The exemption records that debt rather than hiding it, and it prints on every run so the exemption is visible rather than silent.",
+  "notAnExemptionFrom": [
+    "R1 -- a claim registry entry and an `Issue:` trailer. These commits also violate R1 and that work belongs to the AFC-195 fence owner, not to this ruling."
+  ],
+  "rewritingRefusedBecause": "Adding a `Reviewed-by:` trailer means rewriting the commit and rehashing every descendant, including two the Coder authored hours later and including SHAs cited as evidence identifiers on AFC-193, AFC-197 and AFC-200. Invalidating recorded evidence to satisfy a message-formatting rule is a worse provenance outcome than the missing trailer. Refused on the merits, on the record: do not re-propose it.",
+  "entries": [
+    {
+      "commit": "bb50b4bae8457ee976e1893d54e9bbb02769f695",
+      "short": "bb50b4b",
+      "subject": "feat(schema): make the NDPA s.40(2) clock origin provable, and prove it",
+      "author": "CTO",
+      "reason": "No recorded review of any kind. Not retro-reviewed, because writing a review entry now for a commit nobody read would be a fabrication and a self-certifying registry is worse than an honest gap. Named here so the debt is bounded and discoverable.",
+      "alsoViolates": ["R1"]
+    },
+    {
+      "commit": "e13447588373bb30f34d41b695ec44f153011fd6",
+      "short": "e134475",
+      "subject": "fix(schema): roles are bootstrap, not migrations (ADR-0002)",
+      "author": "CTO",
+      "reason": "No recorded review of any kind. Same reason as bb50b4b: an ADR-0002 fix to the bootstrap role surface with no second reader, declared rather than papered over.",
+      "alsoViolates": ["R1"]
+    },
+    {
+      "commit": "84e65f77fc9200f14b163870b2ed465d7fcc16a9",
+      "short": "84e65f77",
+      "subject": "test(db): compare instants, not rendered text, in the four backfill assertions (AFC-202)",
+      "author": "Coder",
+      "reason": "No recorded review at the time of the ruling. This one is the least-bad of the three: the change was raised for CTO review in AFC-202 and the underlying timezone defect was found and fixed as a result, so the work is better than its provenance record. That is not the same as the record being correct, and it does not close the R2 gap.",
+      "alsoViolates": []
+    }
+  ],
+  "coveredByClaimReviewsInstead": [
+    {
+      "commit": "d76d03f5815e9e988dce9c1b00f8427652ed0ea2",
+      "short": "d76d03f",
+      "claimFile": ".provenance/claims/AFC-167.json",
+      "reviewIssue": "AFC-197"
+    },
+    {
+      "commit": "65e76314d65be61da55b905993cb090d1b31e580",
+      "short": "65e7631",
+      "claimFile": ".provenance/claims/AFC-193.json",
+      "reviewIssue": "AFC-197"
+    }
+  ]
+}

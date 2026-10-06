@@ -1,0 +1,15 @@
+{
+  "issue": "AFC-210",
+  "authorAgentId": "8f6e42d7-fb6e-4e6c-904b-dfdda50000ed",
+  "claimedAt": "2026-10-06T05:20:00+01:00",
+  "paths": [
+    "scripts/dirty-path-guard.sh",
+    "scripts/r2-grandfathered.json",
+    ".provenance/claims/AFC-210.json"
+  ],
+  "basis": "Implementation of the CEO ruling of 2026-10-06 on AFC-210 (revision 2, section 8, of the provenance-rule document on AFC-194). Three parts: --check-commit accepts R2 in either of its two forms (a Reviewed-by: trailer, or a complete claim-file reviews[] entry naming the sha, a review issue, a reviewer agent and a verdict -- four fields, a partial entry is a violation); the three unreviewed commits are grandfathered in scripts/r2-grandfathered.json with their reasons attached and printed on every run; and --check-commit is wired into the dirty-path-guard CI job with fetch-depth: 0, which is what makes the R4 claim true for R2 instead of merely asserted.",
+  "notCompliancePath": "None of these three paths is on the R2 list. R2 names services/directus/schema/engine/**, services/directus/schema/migrations/**, tests/db/** and scripts/retention-literal-gate.sh specifically -- not scripts/ as a whole. scripts/dirty-path-guard.sh and scripts/r2-grandfathered.json are on the DIRTY-guard list (all of scripts/) and not on R2. Asserted by self-test 9e, which fails if the two lists are ever conflated.",
+  "carriesNoReviewedByTrailer": "Correct, and deliberately so. Per AFC-194 section 5, a CTO-authored compliance-path commit would nominally take 'Reviewed-by: Operations', and that is a disclosure rather than a review -- the CEO states it will not be counted as a second signature. These files are outside R2's scope, so no trailer is required, and attaching one here would claim a review that did not happen. The load-bearing review here was of the DECISION, not of these lines: the CEO read the AFC-197 verdict directly before ruling, and refused Option B on the merits.",
+  "doesNotClaim": "A claim asserts authorship, not correctness. It is not a licence, it cannot exempt anything from the retention-literal gate, and it does not review anything.",
+  "residualDebtNotClosedHere": "R1 violations on these same five commits -- four missing Issue: trailers and four unregistered paths -- are NOT addressed by this change and belong to the AFC-195 fence owner. The new CI step is therefore red on main by design until R1 is closed; see the expected-red note in .github/workflows/ci.yml."
+}

@@ -66,17 +66,59 @@ jobs:
   #    here on purpose: that job owns this file next, and it should add the
   #    edges itself rather than have them appear under its diff.
   # --------------------------------------------------------------------------
+  #    AFC-210 added --check-commit below. Until it landed, the dirty-tree mode
+  #    above was the only half of this guard CI ever ran, and the half that
+  #    measures committed history -- R2 itself -- had never executed in a
+  #    pipeline at any point. A gate nobody's CI calls is a tool, not a
+  #    control, and R4 was claiming coverage it did not have. This step is what
+  #    makes the R4 claim true for R2.
+  # --------------------------------------------------------------------------
   dirty-path-guard:
     name: Compliance-path dirty guard
     runs-on: ubuntu-latest
     steps:
+      # Full history, deliberately. --check-commit answers questions about
+      # commits, and actions/checkout defaults to fetch-depth: 1, which leaves
+      # exactly one commit to inspect. A provenance check that can only see the
+      # tip is a check on the tip, not on the provenance.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Dirty-path guard self-test (a guard must be able to fail)
         run: bash scripts/dirty-path-guard.sh --self-test
 
       - name: Compliance-path dirty guard
         run: bash scripts/dirty-path-guard.sh
+
+      # R1 and R2 over the range this event actually introduced: on a
+      # pull_request that is the PR's own commits, on a push to main the commits
+      # the push added. Checking all of main every run would be slower each time
+      # and would re-report settled history as if it were new.
+      #
+      # EXPECTED RED UNTIL R1 IS CLOSED, and deliberately not `continue-on-error`.
+      # This step is red on main today and that is honest: four compliance-path
+      # commits in history carry no `Issue:` trailer and four paths were never
+      # registered in a claim file. R2 is closed -- two commits carry a
+      # review record, three are grandfathered with the reason printed on every
+      # run. R1 is not, and the R1 debt belongs to the AFC-195 fence owner
+      # rather than to the decision that exposed it.
+      #
+      # It is left failing rather than made advisory on purpose. A gate
+      # configured so its failure is ignorable trains the team to scroll past it,
+      # which is how a control stops existing while still appearing in the
+      # pipeline. An honestly red gate gets fixed.
+      - name: Compliance-path commit provenance (R1 claim, R2 reviewer)
+        run: |
+          if [ -n "${{ github.event.pull_request.base.sha }}" ]; then
+            range="${{ github.event.pull_request.base.sha }}..HEAD"
+          elif [ -n "${{ github.event.before }}" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+            range="${{ github.event.before }}..HEAD"
+          else
+            range=HEAD
+          fi
+          echo "provenance check over $range"
+          bash scripts/dirty-path-guard.sh --check-commit "$PWD" "$range"
 
   retention-gate:
     name: Retention literal gate

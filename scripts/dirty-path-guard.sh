@@ -73,6 +73,50 @@
 #   The registry is NOT an allowlist for the dirty-tree guard. It is not read in
 #   that mode at all. A quarantined file stays refused.
 #
+#   The registry is read in --check-commit mode for two things.
+#
+#   R1 -- `paths`: which claim covers which file.
+#   R2 -- `reviews[]`: a review that happened but left no trailer on the commit.
+#
+#     {
+#       "reviews": [{
+#         "commit":                 "<full sha>",
+#         "reviewIssue":            "AFC-197",
+#         "reviewerAgentId":        "<agent-uuid>",
+#         "reviewerName":           "Coder",
+#         "verdict":                "ship with fixes",
+#         "findings":               "F1-F6",
+#         "trailerPresentOnCommit": false
+#       }]
+#     }
+#
+#   R2 has two acceptable forms (AFC-194 section 8.4, CEO ruling 2026-10-06):
+#   a `Reviewed-by:` trailer, OR an entry like the one above. A claim entry
+#   counts only when it names the commit sha, a review issue, a reviewer and a
+#   verdict. An entry missing any of those is a VIOLATION, not a skip -- a
+#   partial entry that counted would let the registry certify commits nobody
+#   read, which is the exact failure the registry exists to prevent.
+#
+#   The record is stronger than the trailer it substitutes for: a trailer names
+#   a person, this names a person, an issue, a verdict and the findings.
+#   `trailerPresentOnCommit: false` keeps the deviation declared rather than
+#   hidden.
+#
+# THE R2 GRANDFATHER LIST  (scripts/r2-grandfathered.json)
+#   Three commits are exempt from R2 with the reason attached, by CEO ruling:
+#   they have no recorded review, and adding one retroactively would be a
+#   fabrication. The file is named and auditable rather than a mystery, and the
+#   exemption PRINTS every time it is used.
+#
+#   It is deliberately under scripts/, which is a DIRTY-guarded prefix. An
+#   exemption list that no gate watches is a back door with a changelog: adding
+#   an entry to an unguarded file would silence R2 for any commit in history.
+#   Here, editing it is itself an unreviewed compliance-path change until it is
+#   committed.
+#
+#   Fail-closed: no file, or no entries, means no exemption. A missing file can
+#   only make the gate stricter.
+#
 # WHAT THIS GUARD DOES NOT DO
 #   It does not write to the working tree. It does not stage, stash, reset,
 #   checkout, or install a hook. It reports. A guard that repairs the tree can
@@ -117,6 +161,9 @@ REVIEW_REQUIRED_PATHS=(
 )
 
 CLAIMS_DIR=".provenance/claims"
+
+# The R2 grandfather list. Lives under scripts/ on purpose -- see the header.
+GRANDFATHERED_FILE="scripts/r2-grandfathered.json"
 
 # fnmatch-ish: '*' matches within a path segment, '**' matches across them.
 glob_match() {
@@ -537,7 +584,213 @@ Reviewed-by: Someone
     rc=1
   fi
 
-  # 10. Not a git repository MUST exit 2, not 0.
+# ---------------------------------------------------------------------------
+  # 9f-9k. R2 FORM 2 -- THE CLAIM REGISTRY AS A REVIEW RECORD.
+  #
+  #     Shape, and why these assertions are grouped the way they are.
+  #
+  #     ONE compliance-path commit, created once and inspected repeatedly. Its
+  #     sha is fixed the moment it lands, so every fixture below is a variation
+  #     of what the registry says about that same sha. That ordering is forced:
+  #     a reviews[] entry must name the commit it reviewed, so it is written
+  #     AFTER the commit -- exactly how .provenance/claims/AFC-167.json and
+  #     AFC-193.json came to exist under AFC-195.
+  #
+  #     The commit carries an `Issue:` trailer and sits under a registered
+  #     claim, so R1 is clean throughout and every red below is R2 and nothing
+  #     else. A test that can fail for two reasons proves nothing about either.
+  #
+  #     Each inspection is scoped to "$rev9f^..$rev9f". A bare sha passed as the
+  #     range makes git rev-list walk every ancestor, and these assertions would
+  #     then be reporting on commits planted by earlier steps -- a green check
+  #     that proves nothing about its own subject.
+  printf 'SELECT 6;\n' > "$repo/tests/db/72_record_under_test.sql"
+  git -C "$repo" add -A
+  git -C "$repo" commit -q -m "feat(retention): the commit every R2 form-2 fixture reads
+
+Issue: AFC-998
+"
+  local rev9f
+  rev9f=$(git -C "$repo" rev-parse HEAD)
+  local rev_range="$rev9f^..$rev9f"
+
+  # The reviews[] entry the fixture will carry for $rev9f.
+  #   $1 = a field name to omit, or "NONE" for an empty reviews[] array.
+  write_claim_996() {
+    node -e '
+      const fs = require("fs");
+      const out = process.argv[1], sha = process.argv[2], drop = process.argv[3];
+      const entry = {
+        commit: sha,
+        reviewIssue: "AFC-995",
+        reviewerAgentId: "agent-reviewer",
+        verdict: "approve",
+        findings: "F1"
+      };
+      const claim = {
+        issue: "AFC-996",
+        authorAgentId: "agent-author",
+        claimedAt: "2026-10-06T02:57:00Z",
+        paths: ["tests/db/**", ".provenance/**"]
+      };
+      if (drop === "NONE") {
+        claim.reviews = [];
+      } else {
+        if (drop) delete entry[drop];
+        claim.reviews = [entry];
+      }
+      fs.writeFileSync(out, JSON.stringify(claim, null, 2) + "\n");
+    ' "$repo/.provenance/claims/AFC-996.json" "$rev9f" "${1:-}"
+  }
+
+  # 9f. A COMPLETE reviews[] entry MUST satisfy R2 on a commit with no trailer.
+  #
+  #     This is the whole of Option A. AFC-197's verdict on d76d03f is a real
+  #     review and the trailer cannot be added without rewriting the commit, so
+  #     a finished review that left no trailer has to count. If this ever goes
+  #     red the honest options are a history rewrite or a rule change -- not a
+  #     quieter gate.
+  write_claim_996 ""
+  git -C "$repo" add -A
+  git -C "$repo" commit -q -m "chore(provenance): record the review of 72_record_under_test"
+  out=$(check_commit "$repo" "$rev_range" 2>&1)
+  if [ $? -ne 0 ]; then
+    echo "SELF-TEST FAIL: a complete reviews[] entry did not satisfy R2"
+    echo "$out" | sed 's/^/    /'
+    rc=1
+  elif ! printf '%s' "$out" | grep -q 'R2 review record'; then
+    echo "SELF-TEST FAIL: commit passed, but not via the claim-file review record"
+    echo "$out" | sed 's/^/    /'
+    rc=1
+  elif ! printf '%s' "$out" | grep -q 'AFC-995'; then
+    echo "SELF-TEST FAIL: review record accepted without printing the review issue"
+    echo "$out" | sed 's/^/    /'
+    rc=1
+  else
+    echo "  self-test ok: complete claim-file review record accepted with no trailer"
+  fi
+
+  # 9g. THE LOAD-BEARING ASSERTION. A reviews[] entry missing ANY ONE of the
+  #     four required fields MUST be a violation -- not a pass, not a skip.
+  #
+  #     A gate that accepts a partial entry is worse than one that ignores the
+  #     registry outright: it would print "ok" for a commit the registry says
+  #     nothing about, and the claim file would then be the reason nobody
+  #     noticed. Four drops, four violations.
+  local fld
+  for fld in commit reviewIssue reviewerAgentId verdict; do
+    write_claim_996 "$fld"
+    git -C "$repo" add -A
+    git -C "$repo" commit -q -m "chore(provenance): drop $fld from the review record fixture"
+    out=$(check_commit "$repo" "$rev_range" 2>&1)
+    if [ $? -eq 0 ]; then
+      echo "SELF-TEST FAIL: a reviews[] entry missing '$fld' was accepted as a review"
+      echo "$out" | sed 's/^/    /'
+      rc=1
+    elif ! printf '%s' "$out" | grep -q "INCOMPLETE\|missing $fld\|no 'Reviewed-by:' trailer"; then
+      # Two legitimate routes to one verdict. An entry that still names this sha
+      # but lacks a field is reported as INCOMPLETE and the field is named.
+      # Dropping `commit` itself leaves an entry that names nothing at all, so
+      # it surfaces as an absent record -- same violation, different route.
+      # Asserting the verdict rather than the wording keeps this test about the
+      # gate's decision and not about my phrasing.
+      echo "SELF-TEST FAIL: missing '$fld' was rejected without saying why"
+      echo "$out" | sed 's/^/    /'
+      rc=1
+    else
+      echo "  self-test ok: reviews[] missing '$fld' rejected"
+    fi
+  done
+
+  # 9h. NEITHER trailer NOR record still fails. The positive case must not have
+  #     made the gate permissive: a compliance-path commit with nothing behind
+  #     it is the original violation and has to stay one.
+  #
+  #     The claim keeps its file and an EMPTY reviews[] array, so this also
+  #     proves an empty array is not mistaken for a review. Deleting the file
+  #     would have tested a different thing.
+  write_claim_996 "NONE"
+  git -C "$repo" add -A
+  git -C "$repo" commit -q -m "chore(provenance): empty the review record fixture"
+  out=$(check_commit "$repo" "$rev_range" 2>&1)
+  if [ "$?" -eq 0 ]; then
+    echo "SELF-TEST FAIL: a commit with neither trailer nor record passed"
+    echo "$out" | sed 's/^/    /'
+    rc=1
+  elif ! printf '%s' "$out" | grep -q "no 'Reviewed-by:' trailer"; then
+    echo "SELF-TEST FAIL: unreviewed commit failed without the R2 explanation"
+    echo "$out" | sed 's/^/    /'
+    rc=1
+  else
+    echo "  self-test ok: no trailer and no record still fails, and says why"
+  fi
+
+  # 9i. A GRANDFATHERED sha passes AND PRINTS ITS REASON.
+  #
+  #     The printing IS the assertion, not a nicety. An exemption that is
+  #     silent is indistinguishable from a clean pass to anyone reading CI,
+  #     which is precisely how a grandfathered commit becomes an invisible hole.
+  #     The output has to carry GRANDFATHERED and the reason, every single time.
+  #
+  #     The claim above is already empty, so this is the only thing standing
+  #     between the commit and a violation -- which is also the real-world shape:
+  #     an exemption is consulted precisely when nothing else would pass.
+  cat > "$repo/$GRANDFATHERED_FILE" <<JSON
+{ "entries": [
+  { "commit": "$rev9f", "short": "${rev9f:0:7}",
+    "reason": "No recorded review; exempt by declaration so the debt stays visible." }
+] }
+JSON
+  git -C "$repo" add -A
+  git -C "$repo" commit -q -m "chore(provenance): declare the fixture exemption"
+  out=$(check_commit "$repo" "$rev_range" 2>&1)
+  if [ "$?" -ne 0 ]; then
+    echo "SELF-TEST FAIL: a grandfathered commit did not pass"
+    echo "$out" | sed 's/^/    /'
+    rc=1
+  elif ! printf '%s' "$out" | grep -q 'R2 GRANDFATHERED'; then
+    echo "SELF-TEST FAIL: grandfathered commit passed WITHOUT printing its status"
+    echo "$out" | sed 's/^/    /'
+    rc=1
+  elif ! printf '%s' "$out" | grep -q 'debt stays visible'; then
+    echo "SELF-TEST FAIL: grandfather status printed without the reason"
+    echo "$out" | sed 's/^/    /'
+    rc=1
+  else
+    echo "  self-test ok: grandfathered sha passes and prints its reason"
+  fi
+
+  # 9j. An exemption with NO REASON is not an exemption. Otherwise the list is
+  #     just a place to add shas with no justification, which is Option C turned
+  #     back into the thing C was chosen over.
+  cat > "$repo/$GRANDFATHERED_FILE" <<JSON
+{ "entries": [ { "commit": "$rev9f", "short": "${rev9f:0:7}", "reason": "" } ] }
+JSON
+  git -C "$repo" add -A
+  git -C "$repo" commit -q -m "chore(provenance): unreasoned exemption fixture"
+  if check_commit "$repo" "$rev_range" >/dev/null 2>&1; then
+    echo "SELF-TEST FAIL: a grandfather entry with no reason was honoured"
+    rc=1
+  else
+    echo "  self-test ok: grandfather entry without a reason refused"
+  fi
+
+  # 9k. Fail closed on a CORRUPT list. A grandfather file that will not parse
+  #     must not read as "no exemptions, everything else is fine". It has to
+  #     make the gate red, or a truncated file is a silent green.
+  printf '{ this is not json\n' > "$repo/$GRANDFATHERED_FILE"
+  git -C "$repo" add -A
+  git -C "$repo" commit -q -m "chore(provenance): corrupt exemption fixture"
+  if check_commit "$repo" "$rev_range" >/dev/null 2>&1; then
+    echo "SELF-TEST FAIL: a corrupt grandfather list was read as valid"
+    rc=1
+  else
+    echo "  self-test ok: corrupt grandfather list fails closed"
+  fi
+
+  rm -f "$repo/$GRANDFATHERED_FILE" "$repo/.provenance/claims/AFC-996.json"
+  git -C "$repo" add -A
+  git -C "$repo" commit -q -m "chore(provenance): drop the R2 form-2 fixtures"  # 10. Not a git repository MUST exit 2, not 0.
   mkdir -p "$tmp/not-a-repo"
   guard "$tmp/not-a-repo" >/dev/null 2>&1
   if [ $? -ne 2 ]; then
@@ -592,8 +845,105 @@ claimed_by() {
   return 1
 }
 
+# R2 form 2: does a claim file carry a reviews[] entry that is a COMPLETE review
+# record for this commit sha?
+#
+# Four fields are load-bearing -- sha, review issue, reviewer agent, verdict.
+# A claim naming only two of them is not a review record, and treating it as
+# one would let the registry certify a commit nobody read, which is the exact
+# failure the registry exists to prevent. So a partial entry is a VIOLATION
+# (exit 3), not a skip and not a pass.
+#
+# Prints "issue|reviewer|verdict|claimFile" on success.
+#   0  complete review record found
+#   1  no reviews[] entry for this sha at all
+#   2  an entry exists but names a different sha
+#   3  an entry names this sha but is missing a required field
+#   4  the registry could not be read
+review_record() {
+  local root="$1" sha="$2"
+  [ -d "$root/$CLAIMS_DIR" ] || return 1
+  local f
+  for f in "$root/$CLAIMS_DIR"/*.json; do
+    [ -e "$f" ] || continue
+    node -e '
+      const fs = require("fs");
+      let d;
+      try { d = JSON.parse(fs.readFileSync(process.argv[1], "utf8")); }
+      catch { process.exit(4); }
+      const sha = process.argv[2];
+      const reviews = Array.isArray(d.reviews) ? d.reviews : [];
+      if (reviews.length === 0) process.exit(1);
+
+      // Prefix-match on the sha so a 7-char abbreviation in a hand-written
+      // claim is still recognised, but require it to be unambiguous.
+      const hits = reviews.filter((r) => r && typeof r.commit === "string" &&
+        (r.commit === sha || (r.commit.length >= 7 && sha.startsWith(r.commit))));
+      if (hits.length === 0) process.exit(2);
+
+      // Best entry wins, and completeness is judged per entry rather than
+      // across them: two half-populated entries do not add up to a review.
+      const missing = (r) => {
+        const m = [];
+        if (typeof r.commit !== "string" || !r.commit) m.push("commit");
+        if (typeof r.reviewIssue !== "string" || !r.reviewIssue.trim()) m.push("reviewIssue");
+        if (typeof r.reviewerAgentId !== "string" || !r.reviewerAgentId.trim()) m.push("reviewerAgentId");
+        if (typeof r.verdict !== "string" || !r.verdict.trim()) m.push("verdict");
+        return m;
+      };
+      let best = null;
+      for (const r of hits) {
+        if (missing(r).length === 0) { best = r; break; }
+        if (best === null) best = r;
+      }
+      const miss = missing(best);
+      if (miss.length > 0) {
+        process.stderr.write(`${process.argv[1]}: reviews[] entry for ${best.commit || sha} is missing ${miss.join(", ")}\n`);
+        process.exit(3);
+      }
+      process.stdout.write([best.reviewIssue, best.reviewerAgentId, best.verdict, process.argv[1]].join("|"));
+    ' "$f" "$sha"
+    local rc=$?
+    case "$rc" in
+      0) return 0 ;;
+      3) return 3 ;;
+      4) return 4 ;;
+      # 1 and 2 mean "this file has nothing for this commit"; keep scanning.
+    esac
+  done
+  # Distinguish "no entry anywhere" from "entry names a different sha" only when
+  # some file actually mentioned reviews at all.
+  if grep -qs '"reviews"' "$root/$CLAIMS_DIR"/*.json 2>/dev/null; then return 2; fi
+  return 1
+}
+
+# Is this commit R2-grandfathered? Prints the reason (and short sha) on success.
+# Fail-closed: a missing or unreadable list means NO exemption, so the worst
+# case for a broken list is a red gate, never a silent pass.
+grandfathered_lookup() {
+  local root="$1" sha="$2"
+  local f="$root/$GRANDFATHERED_FILE"
+  [ -f "$f" ] || return 1
+  node -e '
+    const fs = require("fs");
+    let d;
+    try { d = JSON.parse(fs.readFileSync(process.argv[1], "utf8")); }
+    catch { process.exit(2); }
+    const sha = process.argv[2];
+    const entries = Array.isArray(d.entries) ? d.entries : [];
+    const hit = entries.find((e) => e && typeof e.commit === "string" &&
+      (e.commit === sha || (e.commit.length >= 7 && sha.startsWith(e.commit))));
+    if (!hit) process.exit(1);
+    // A grandfather entry with no reason is not an exemption, it is an
+    // unexplained hole. Refuse it.
+    if (typeof hit.reason !== "string" || !hit.reason.trim()) process.exit(2);
+    process.stdout.write([hit.short || hit.commit.slice(0, 7), hit.reason.trim()].join("|"));
+  ' "$f" "$sha"
+}
+
 # ---------------------------------------------------------------------------
-# Commit check. R1 (a registered claim) + R2 (a named reviewer).
+# Commit check. R1 (a registered claim) + R2 (a named reviewer, by trailer or
+# by a complete claim-file review record, less declared exemptions).
 # ---------------------------------------------------------------------------
 check_commit() {
   local root="${1:-$ROOT_DEFAULT}" range="${2:-HEAD}"
@@ -626,17 +976,77 @@ check_commit() {
     echo "  touches the R2 compliance path:"
     for p in "${flagged[@]}"; do echo "    $p"; done
 
-    # R2 -- named reviewer, as a trailer.
-    local reviewer
+    # R2 -- a named reviewer. Two acceptable forms (AFC-194 section 8.4):
+    #   (a) a `Reviewed-by:` trailer on the commit;
+    #   (b) a claim-file reviews[] entry naming this sha, a review issue, a
+    #       reviewer agent and a verdict.
+    # In that order, then the declared grandfather list. (b) exists because a
+    # completed review that left no trailer is a real review, and pretending
+    # otherwise would make the registry the honest record of nothing.
+    local reviewer record rr_rc gf gf_rc
     reviewer=$(printf '%s
 ' "$body" | sed -n 's/^Reviewed-by:[[:space:]]*//p' | head -1)
-    if [ -z "$reviewer" ]; then
-      echo "  R2 VIOLATION: no 'Reviewed-by:' trailer."
-      echo "    A compliance-path commit needs a named reviewer. Add:"
-      echo "        Reviewed-by: <agent or reviewer>"
-      rc=1
+    if [ -n "$reviewer" ]; then
+      echo "  ok  Reviewed-by: $reviewer (trailer)"
     else
-      echo "  ok  Reviewed-by: $reviewer"
+      record=$(review_record "$root" "$rev")
+      rr_rc=$?
+      case "$rr_rc" in
+        0)
+          echo "  ok  R2 review record (claim registry, no trailer needed):"
+          echo "        review issue: $(cut -d'|' -f1 <<<"$record")"
+          echo "        reviewer:     $(cut -d'|' -f2 <<<"$record")"
+          echo "        verdict:      $(cut -d'|' -f3 <<<"$record")"
+          echo "        recorded in:  $(cut -d'|' -f4 <<<"$record")"
+          ;;
+        3)
+          echo "  R2 VIOLATION: the claim registry carries a reviews[] entry for"
+          echo "    this commit, but it is INCOMPLETE."
+          echo "    A review record needs all four of: commit sha, reviewIssue,"
+          echo "    reviewerAgentId, verdict. Missing any one is not a review -- it"
+          echo "    is the shape a registry grows when it starts approving itself."
+          echo "    Complete the entry in the file named above, or add a"
+          echo "        Reviewed-by: <agent or reviewer>"
+          echo "    trailer to the commit."
+          rc=1
+          ;;
+        4)
+          echo "  R2 VIOLATION: $CLAIMS_DIR holds a file that is not valid JSON, so"
+          echo "    no review record can be read from it. Refusing to certify."
+          rc=2
+          ;;
+        *)
+          # No complete record. Try the declared exemptions before failing.
+          gf=$(grandfathered_lookup "$root" "$rev")
+          gf_rc=$?
+          if [ "$gf_rc" -eq 0 ]; then
+            local gshort greason
+            gshort=$(cut -d'|' -f1 <<<"$gf")
+            greason=$(cut -d'|' -f2 <<<"$gf")
+            echo "  ok  R2 GRANDFATHERED: $gshort"
+            echo "        No reviewer trailer and no review record -- and none will be"
+            echo "        fabricated. This commit is exempt by CEO ruling of 2026-10-06"
+            echo "        ($GRANDFATHERED_FILE, AFC-194 section 8.2) for this reason:"
+            echo "          $greason"
+            echo "        Printed on every run on purpose. A silent exemption is"
+            echo "        indistinguishable from a clean pass."
+          elif [ "$gf_rc" -eq 2 ]; then
+            echo "  R2 VIOLATION: $GRANDFATHERED_FILE names this commit but carries"
+            echo "    no reason, or is not valid JSON. An unexplained exemption is not"
+            echo "    an exemption. Fix the list or add a real review record."
+            rc=1
+          else
+            echo "  R2 VIOLATION: no 'Reviewed-by:' trailer and no complete review"
+            echo "    record in $CLAIMS_DIR/*.json for ${rev:0:12}."
+            echo "    A compliance-path commit needs a named reviewer. Add EITHER:"
+            echo "        Reviewed-by: <agent or reviewer>"
+            echo "    as a trailer, OR a reviews[] entry in the claim file naming this"
+            echo "    sha with reviewIssue, reviewerAgentId and verdict. Four fields"
+            echo "    or it does not count."
+            rc=1
+          fi
+          ;;
+      esac
     fi
 
     # R1 -- a registered claim covering every flagged path, and the commit
@@ -663,7 +1073,7 @@ check_commit() {
     fi
   done
 
-  if [ "$rc" -eq 1 ]; then
+  if [ "$rc" -ne 0 ]; then
     cat <<'MSG'
 
 FAIL: a compliance-path commit has no registered claim or no named reviewer.
@@ -674,7 +1084,14 @@ CI the second reviewer for every control a machine can decide.
   - R1: every change lands on an issue with a named author, or it does not
     land. Register the claim in .provenance/claims/<ISSUE>.json and add an
     `Issue:` trailer.
-  - R2: a commit touching the compliance path carries a `Reviewed-by:` trailer.
+  - R2: a commit touching the compliance path names its reviewer, EITHER as a
+    `Reviewed-by:` trailer, OR as a `reviews[]` entry in a claim file that
+    names this sha together with a reviewIssue, a reviewerAgentId and a
+    verdict. An entry missing any one of those four is a violation, not a skip.
+
+Commits exempt from R2 are named in scripts/r2-grandfathered.json with their
+reason, and print their exemption every time they are seen. There are three,
+and nobody reviewed them; that is recorded rather than papered over.
 
 A claim registry entry asserts who wrote the change. It is not a substitute for
 a review, and it cannot exempt anything from the retention-literal gate.
