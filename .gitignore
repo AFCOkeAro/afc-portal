@@ -44,3 +44,11 @@ scripts/_diag.mjs
 # repo root. No legitimate tracked file lives at the root with this suffix.
 /*-tmp.mjs
 /*-tmp.js
+
+# Derived design renders (AFC-223). The PNG exports of
+# docs/wireframes/church-portal-events-hifi.html are ~8.8 MB of binary output
+# regenerated from that one tracked HTML file. The render manifest in the same
+# directory IS tracked; it is what records where the PNGs live. Ignore the
+# directory's PNGs specifically, never the directory, so the manifest stays
+# tracked and cannot go missing with them.
+docs/wireframes/*-png/*.png

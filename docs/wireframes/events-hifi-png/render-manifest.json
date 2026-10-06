@@ -1,0 +1,277 @@
+{
+  "screens": [
+    {
+      "id": "E1",
+      "device": "desktop",
+      "width": 1440,
+      "primaryWidth": 1440,
+      "name": "Events list — branch / area / calendar views, filters by type and status",
+      "kind": "device-frame",
+      "rendered_width": 1440,
+      "rendered_height": 1520
+    },
+    {
+      "id": "E1",
+      "device": "desktop",
+      "width": 1440,
+      "primaryWidth": 1440,
+      "name": "Events list — branch / area / calendar views, filters by type and status",
+      "rendered_width": 1440,
+      "rendered_height": 2364
+    },
+    {
+      "id": "E2",
+      "device": "desktop",
+      "width": 1440,
+      "primaryWidth": 1440,
+      "name": "Event detail — hero, overview, when/where, programme with tracks, sessions and speakers, capacity, register CTA",
+      "kind": "device-frame",
+      "rendered_width": 1440,
+      "rendered_height": 3394
+    },
+    {
+      "id": "E2",
+      "device": "desktop",
+      "width": 1440,
+      "primaryWidth": 1440,
+      "name": "Event detail — hero, overview, when/where, programme with tracks, sessions and speakers, capacity, register CTA",
+      "rendered_width": 1440,
+      "rendered_height": 5533
+    },
+    {
+      "id": "E3",
+      "device": "desktop",
+      "width": 1440,
+      "primaryWidth": 1440,
+      "name": "Create / edit event — sessions, speakers, tracks, capacity, registration window, consent rules",
+      "kind": "device-frame",
+      "rendered_width": 1440,
+      "rendered_height": 5437
+    },
+    {
+      "id": "E3",
+      "device": "desktop",
+      "width": 1440,
+      "primaryWidth": 1440,
+      "name": "Create / edit event — sessions, speakers, tracks, capacity, registration window, consent rules",
+      "rendered_width": 1440,
+      "rendered_height": 6488
+    },
+    {
+      "id": "E4",
+      "device": "mobile",
+      "width": 1440,
+      "primaryWidth": 390,
+      "name": "Public event page — no portal chrome, plain language, data minimisation stated up front",
+      "kind": "device-frame",
+      "index": 1,
+      "rendered_width": 390,
+      "rendered_height": 844
+    },
+    {
+      "id": "E4",
+      "device": "mobile",
+      "width": 1440,
+      "primaryWidth": 390,
+      "name": "Public event page — no portal chrome, plain language, data minimisation stated up front",
+      "kind": "device-frame",
+      "index": 2,
+      "rendered_width": 390,
+      "rendered_height": 844
+    },
+    {
+      "id": "E4",
+      "device": "mobile",
+      "width": 1440,
+      "primaryWidth": 390,
+      "name": "Public event page — no portal chrome, plain language, data minimisation stated up front",
+      "rendered_width": 1440,
+      "rendered_height": 1884
+    },
+    {
+      "id": "E5",
+      "device": "mobile",
+      "width": 1440,
+      "primaryWidth": 390,
+      "name": "Registration form — guardian branch for under-18s, emergency/medical for camps, waitlist state, ticket code",
+      "kind": "device-frame",
+      "index": 1,
+      "rendered_width": 390,
+      "rendered_height": 844
+    },
+    {
+      "id": "E5",
+      "device": "mobile",
+      "width": 1440,
+      "primaryWidth": 390,
+      "name": "Registration form — guardian branch for under-18s, emergency/medical for camps, waitlist state, ticket code",
+      "kind": "device-frame",
+      "index": 2,
+      "rendered_width": 390,
+      "rendered_height": 844
+    },
+    {
+      "id": "E5",
+      "device": "mobile",
+      "width": 1440,
+      "primaryWidth": 390,
+      "name": "Registration form — guardian branch for under-18s, emergency/medical for camps, waitlist state, ticket code",
+      "kind": "device-frame",
+      "index": 3,
+      "rendered_width": 390,
+      "rendered_height": 844
+    },
+    {
+      "id": "E5",
+      "device": "mobile",
+      "width": 1440,
+      "primaryWidth": 390,
+      "name": "Registration form — guardian branch for under-18s, emergency/medical for camps, waitlist state, ticket code",
+      "kind": "device-frame",
+      "index": 4,
+      "rendered_width": 390,
+      "rendered_height": 844
+    },
+    {
+      "id": "E5",
+      "device": "mobile",
+      "width": 1440,
+      "primaryWidth": 390,
+      "name": "Registration form — guardian branch for under-18s, emergency/medical for camps, waitlist state, ticket code",
+      "rendered_width": 1440,
+      "rendered_height": 3391
+    },
+    {
+      "id": "E6",
+      "device": "mobile",
+      "width": 1440,
+      "primaryWidth": 390,
+      "name": "Door check-in — ticket/QR scan and usher name search, per session, duplicate-safe",
+      "kind": "device-frame",
+      "index": 1,
+      "rendered_width": 390,
+      "rendered_height": 844
+    },
+    {
+      "id": "E6",
+      "device": "mobile",
+      "width": 1440,
+      "primaryWidth": 390,
+      "name": "Door check-in — ticket/QR scan and usher name search, per session, duplicate-safe",
+      "kind": "device-frame",
+      "index": 2,
+      "rendered_width": 390,
+      "rendered_height": 844
+    },
+    {
+      "id": "E6",
+      "device": "mobile",
+      "width": 1440,
+      "primaryWidth": 390,
+      "name": "Door check-in — ticket/QR scan and usher name search, per session, duplicate-safe",
+      "rendered_width": 1440,
+      "rendered_height": 2093
+    },
+    {
+      "id": "E7",
+      "device": "mobile",
+      "width": 1440,
+      "primaryWidth": 390,
+      "name": "Invite a friend + member invitation — invitee fields, channel, rendered template preview, rate-limit counters",
+      "kind": "device-frame",
+      "index": 1,
+      "rendered_width": 390,
+      "rendered_height": 844
+    },
+    {
+      "id": "E7",
+      "device": "mobile",
+      "width": 1440,
+      "primaryWidth": 390,
+      "name": "Invite a friend + member invitation — invitee fields, channel, rendered template preview, rate-limit counters",
+      "kind": "device-frame",
+      "index": 2,
+      "rendered_width": 390,
+      "rendered_height": 844
+    },
+    {
+      "id": "E7",
+      "device": "mobile",
+      "width": 1440,
+      "primaryWidth": 390,
+      "name": "Invite a friend + member invitation — invitee fields, channel, rendered template preview, rate-limit counters",
+      "rendered_width": 1440,
+      "rendered_height": 3290
+    },
+    {
+      "id": "E8",
+      "device": "mobile",
+      "width": 1440,
+      "primaryWidth": 390,
+      "name": "Event attendance capture — male/female by category, per session",
+      "kind": "device-frame",
+      "index": 1,
+      "rendered_width": 390,
+      "rendered_height": 844
+    },
+    {
+      "id": "E8",
+      "device": "mobile",
+      "width": 1440,
+      "primaryWidth": 390,
+      "name": "Event attendance capture — male/female by category, per session",
+      "rendered_width": 1440,
+      "rendered_height": 1812
+    },
+    {
+      "id": "E9",
+      "device": "desktop",
+      "width": 1440,
+      "primaryWidth": 1440,
+      "name": "Event report — registrations, attendance, blessings, funnel, CSV export",
+      "kind": "device-frame",
+      "rendered_width": 1440,
+      "rendered_height": 2782
+    },
+    {
+      "id": "E9",
+      "device": "desktop",
+      "width": 1440,
+      "primaryWidth": 1440,
+      "name": "Event report — registrations, attendance, blessings, funnel, CSV export",
+      "rendered_width": 1440,
+      "rendered_height": 4014
+    },
+    {
+      "id": "E10",
+      "device": "desktop",
+      "width": 1440,
+      "primaryWidth": 1440,
+      "name": "Calendar — event alongside services, programmes, coaching, celebrations",
+      "kind": "device-frame",
+      "rendered_width": 1440,
+      "rendered_height": 1500
+    },
+    {
+      "id": "E10",
+      "device": "desktop",
+      "width": 1440,
+      "primaryWidth": 1440,
+      "name": "Calendar — event alongside services, programmes, coaching, celebrations",
+      "rendered_width": 1440,
+      "rendered_height": 3287
+    }
+  ],
+  "console": [],
+  "width_mismatch": [],
+  "rendered_browser_locale": "en-GB (date inputs day-first, Africa/Lagos order)",
+  "provenance": {
+    "decision": "PNG exports are NOT tracked in git. This manifest is; the PNGs are not. Recorded by AFC-223.",
+    "reason": "8.8 MB of derived binaries for 26 screens. Regenerable from the single source of truth, and versioned already as an attachment. Repo weight for a reviewer who opens them once is not a good trade.",
+    "source_of_truth": "docs/wireframes/church-portal-events-hifi.html (tracked). Screens, tokens and layout all live there.",
+    "canonical_copy": "Attachment 11b39e13-8b38-4a62-ac19-bb0768256ed2 on AFC-198, 'Church Portal - Events PNG exports', church-portal-events-hifi-png.zip. Verified HTTP 200 / 8,629,896 bytes; all 27 entries inflate to bytes identical to the working-tree copies. Attachment storage does not depend on the workspace, so this survives a tree wipe.",
+    "regenerate": "No render script is committed and none is planned. The renders were produced by a one-off headless-browser pass with no playwright/chromium dependency in this repo, so there is nothing here to re-run. If the PNGs are ever needed again, re-render from the tracked HTML; do not restore them from the tree.",
+    "filename_convention": "Bare E<n>.png is the primary export for that screen. @1440 / @390 suffix marks a second capture at that width. @390-2/-3/-4 are repeat captures of the same screen at 390 during iteration and are retained only as history.",
+    "known_defect_in_attached_html": "Attachment 812e0d8b-dd5b-42e4-8abb-90b8fc9d67b2 on AFC-198 is CORRUPTED: a Cloudflare email-protection pass rewrote 8 PNG filename references (E1@1440, E2@1440, E3@1440, E4@390, E4@390-2, E8@390, E9@1440, E10@1440) into anti-spam email links. The tracked HTML is clean. The document events-hifi-source is separately lossy: 4 U+FFFD where middle dots belong. Git is therefore the only clean copy of the hi-fi file."
+  }
+}
