@@ -2,6 +2,34 @@
 --
 -- awareness_at -- the NDPA s.40(2) clock origin. AFC-166 / ADR-159-2 D7.
 --
+-- WHAT THIS FILE OWNS, AND WHAT IT RE-ASSERTS.
+--
+-- This file defines FOUR triggers. Two of them are its own:
+--
+--   incidents_immutable_awareness  BEFORE UPDATE    -- the clock never moves
+--   incidents_no_caller_clock       BEFORE INSERT    -- no caller sets the clock
+--
+-- and their two functions, incidents_guard_awareness() and
+-- incidents_forbid_caller_set_awareness(). They are clock guards: every one of
+-- them reads awareness_at or awareness_at_source, and they exist because that
+-- column exists.
+--
+-- The other two are NOT this file's, and this file does not claim them:
+--
+--   incidents_no_delete            BEFORE DELETE    -- THE EVIDENCE SEAL
+--   incidents_no_truncate          BEFORE TRUNCATE  -- THE EVIDENCE SEAL
+--
+-- Both are owned by 20261006_0001_incidents.sql, because "incidents rows are
+-- never deleted" is a property of the register and predates awareness_at. They
+-- are re-created here verbatim and idempotently, for one reason: every
+-- currently-deployed database applied 0001 before that change and will never
+-- re-run it, so on those databases this file is the only forward step that can
+-- install the seal. Re-asserting is how a database whose 0001 predates the
+-- change is never left unsealed by a partial deploy. It is not a second owner,
+-- and 0001's down script remains the only path that removes the seal.
+--
+-- docs/adr/ADR-0003-register-seal-owns-its-rollback.md has the decision.
+--
 -- THE CONTROL IS THE TRIGGER IN THIS FILE. Not Directus permissions, not
 -- application discipline. Reason (security lens): data-model-v4.md 5 gives
 -- super admin CRUD on every collection, and Directus holds exactly one DB
@@ -23,8 +51,10 @@
 -- one fewer thing that needs table ownership in production.
 --
 -- Rollback: rollback/20261006_0002_incidents_awareness_at.down.sql
--- (DROP TRIGGER + DROP FUNCTION + DROP COLUMN. Additive only; nothing is
--- destroyed.)
+-- It drops the clock objects and the two awareness columns -- which destroys the
+-- recorded clock origins -- and then RE-ASSERTS the evidence seal, so the
+-- reversal cannot leave the register open. See that file's header for the full
+-- list of what it removes.
 
 -- ---------------------------------------------------------------------------
 -- 1. Columns, nullable.
@@ -145,7 +175,18 @@ CREATE TRIGGER incidents_no_caller_clock
   FOR EACH ROW EXECUTE FUNCTION incidents_forbid_caller_set_awareness();
 
 -- ---------------------------------------------------------------------------
--- 6. Guard: an incident row is never deleted. It transitions to closed.
+-- 6. EVIDENCE SEAL, RE-ASSERTED. NOT OWNED BY THIS FILE.
+--
+-- 0001 owns both of these. They are repeated here verbatim, bodies and error
+-- strings byte for byte, because a different message would break the expected
+-- 23001 in tests/db/20_immutability.sql and any operator runbook that greps for
+-- it. The re-assert is what makes ADR-0003 work on databases that were
+-- migrated before 0001 grew the seal: those databases will never re-run 0001,
+-- so this file is the only forward step that can install it.
+--
+-- Consequence worth stating plainly: this file is not a second owner. If a
+-- future change edits these definitions it must edit 0001 as well, or the two
+-- will drift and one of them will win depending on which migration ran last.
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION incidents_forbid_delete() RETURNS trigger
 LANGUAGE plpgsql AS $$
@@ -155,10 +196,14 @@ BEGIN
     USING ERRCODE = 'restrict_violation';
 END $$;
 
+COMMENT ON FUNCTION incidents_forbid_delete() IS
+  'Enforces the NDPA s.40(2) evidence rule for every identity including the table owner. Owned by 0001 and re-asserted by 0002 and by 0002''s down script; only rollback/0001 removes it, and only while the register is empty.';
+
 -- ---------------------------------------------------------------------------
--- 7. Guard: TRUNCATE bypasses row-level DELETE triggers entirely, so a
---    table-level statement trigger is the only thing that closes it.
---    Without this, `TRUNCATE incidents` is a full register wipe.
+-- 7. EVIDENCE SEAL, RE-ASSERTED. NOT OWNED BY THIS FILE. Same reason as 6.
+--
+--    TRUNCATE bypasses row-level DELETE triggers entirely, so a table-level
+--    statement trigger is the only thing that closes it.
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION incidents_forbid_truncate() RETURNS trigger
 LANGUAGE plpgsql AS $$

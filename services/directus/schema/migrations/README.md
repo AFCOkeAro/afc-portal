@@ -8,16 +8,36 @@ readable in a diff rather than generated.
 
 | File | What it does |
 | --- | --- |
-| `20261006_0001_incidents.sql` | The `incidents` register, plus the role split and the column-level grants. |
-| `20261006_0002_incidents_awareness_at.sql` | The NDPA s.40(2) clock origin: columns, defaults, backfill, the four guard triggers, the ordering constraint, and the clock view. **This is the control.** |
+| `20261006_0001_incidents.sql` | The `incidents` register, the role split, the column-level grants, **and the evidence seal** (`incidents_no_delete` / `incidents_no_truncate`). The seal is owned here because "incidents rows are never deleted" is a property of the register and predates `awareness_at`. See [ADR-0003](/AFC/issues/AFC-253#document-adr). |
+| `20261006_0002_incidents_awareness_at.sql` | The NDPA s.40(2) clock origin: columns, defaults, backfill, the two **clock** guards (`incidents_immutable_awareness` / `incidents_no_caller_clock`), the ordering constraint, and the clock view. It also **re-asserts `0001`'s two evidence guards** verbatim, so a database whose `0001` predates that change is repaired rather than stranded by a partial deploy. It does not own them. |
 | `20261006_0003_incidents_awareness_field_policy.sql` | Strips `awareness_at` from every Directus create/update policy, including super admin. Second layer only — see [ADR-0001](/AFC/issues/AFC-166). |
 | `20261006_0004_retention.sql` | The retention and legal-hold substrate: `people` (the retention anchor only), the two source maps, `retention_policies`, `retention_clocks`, `legal_holds`, `retention_runs`, `retention_run_items`, the F1/F2/F3 constraints, and the ownership triggers. **Ships with no policy rows** — the schedule is board-ratified and counsel is confirming it. |
-| `rollback/20261006_0002_incidents_awareness_at.down.sql` | Reversal for 0002. |
+| `rollback/20261006_0001_incidents.down.sql` | Reversal for 0001, and **the only path that removes the evidence seal**. **Refuses to run while the register holds any row.** |
+| `rollback/20261006_0002_incidents_awareness_at.down.sql` | Reversal for 0002. Drops the clock objects and both awareness columns, then **re-asserts the evidence seal**, so it cannot end in an unsealed register. |
 | `rollback/20261006_0004_retention.down.sql` | Reversal for 0004. **Refuses to run while a legal hold is active or any clock is recorded as erased**, because it would destroy exactly the evidence those two things exist to preserve. Verified in all three directions: refused with a hold, refused with an erased clock, clean when neither. |
 
 `0001` and `0002` are separate on purpose: the backfill in `0002` has to cope with
 rows that predate the clock origin, and that is only true if the register existed
 before `awareness_at` did.
+
+## Who owns the evidence seal
+
+`0001` owns it. `incidents_forbid_delete()` and `incidents_forbid_truncate()` read
+no column and belong to no migration that added one — they enforce the rule
+`0001`'s own `COMMENT ON TABLE` already states, that rows are evidence and are
+never deleted. `0002` re-asserts them idempotently; that is a repair path for
+already-deployed databases, not a second owner.
+
+This layering is the fix for a defect that survived two reviews
+([AFC-253](/AFC/issues/AFC-253), found by SecurityEngineer in the R2 review of
+`1f43c9e`). While the guards lived only in `0002`, `0002`'s down script dropped
+them with the clock objects, so reversing the clock migration disarmed the
+register: `DELETE` and `TRUNCATE` both succeeded afterwards for the table owner
+and for any session holding table-level `DELETE` and `TRUNCATE` — which is what
+`20_immutability.sql` grants every v4 role. `directus_app` still saw `42501`,
+because the grant layer survives independently, so a check on that identity alone
+read green over an open register. Assert the owner and a fully-granted role, never
+`directus_app` by itself.
 
 ## The engine is not a migration
 
@@ -77,13 +97,27 @@ script under `services/directus/backup/`, never in the migration.
 
 ## Rollback
 
-`services/directus/schema/migrations/rollback/20261006_0002_incidents_awareness_at.down.sql`
-— `DROP TRIGGER`, `DROP FUNCTION`, `DROP COLUMN`. Nothing is destroyed, so it is
-reversible.
+`rollback/20261006_0002_incidents_awareness_at.down.sql` — `DROP TRIGGER`, `DROP FUNCTION`,
+`DROP COLUMN` for the clock objects and both awareness columns, then a **re-assert of
+`0001`'s evidence seal** and a `RAISE NOTICE` saying so. It is re-runnable.
 
-Note what it *does* destroy: the recorded clock origins. Run it only if the migration
-itself is being abandoned. The correct action for a wrong `awareness_at` value is a new
-incident row referencing the original.
+**The reversal leaves the register sealed.** That is the point: reversing the clock
+migration must not open the breach register, and it used to. Its header now names
+every object it removes, because the previous header — "Additive only; nothing is
+destroyed" — is the reason nobody saw the defect.
+
+`rollback/20261006_0001_incidents.down.sql` is the **only** path that removes the
+evidence seal, and it **refuses while the register holds any row** with a
+`restrict_violation` naming the count. An NDPA s.40(2) register has no drop path
+while it holds evidence: the file drops the two guards and the table on an empty
+register, and on a non-empty one it tells the operator to take a verified copy and
+record where it went. There is no session flag gating any of this
+([ADR-0003](/AFC/issues/AFC-253), Alternative C) — a reversal path that has to be
+unlocked is a deploy with no rollback path.
+
+Note what `0002`'s reversal *does* destroy: the recorded clock origins. Run it only if
+the migration itself is being abandoned. The correct action for a wrong `awareness_at`
+value is a new incident row referencing the original.
 
 ## Tests
 

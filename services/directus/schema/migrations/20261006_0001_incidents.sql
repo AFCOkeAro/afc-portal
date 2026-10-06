@@ -7,6 +7,11 @@
 -- 20261006_0002 has to cope with. Splitting them keeps the backfill honest --
 -- see docs/adr/ADR-0001-incidents-awareness-clock-origin.md.
 --
+-- The base table is not, however, "the table and nothing else". It also owns
+-- the evidence seal, because the seal is a property of the register rather than
+-- of any column on it. See "THE EVIDENCE SEAL" below and
+-- docs/adr/ADR-0003-register-seal-owns-its-rollback.md.
+--
 -- Owner: migration role (directus_migrator). Never run as the Directus
 -- runtime role -- see ADR-0001 "credential split".
 
@@ -39,6 +44,84 @@ COMMENT ON TABLE incidents IS
 CREATE INDEX IF NOT EXISTS incidents_status_idx ON incidents (status);
 CREATE INDEX IF NOT EXISTS incidents_reported_at_idx ON incidents (reported_at)
   WHERE reported_at IS NOT NULL;
+
+-- ---------------------------------------------------------------------------
+-- THE EVIDENCE SEAL. 0001 OWNS IT -- ADR-0003.
+--
+-- WHY IT LIVES HERE AND NOT IN 0002.
+--
+-- These two guards are properties of "`incidents` is evidence". They are not
+-- properties of "`awareness_at` exists": neither function reads a single column,
+-- and neither trigger has a WHEN clause. The COMMENT ON TABLE above states the
+-- rule in the product's own words -- "Rows are evidence: they transition to
+-- closed, they are never deleted" -- and this file is where the table is
+-- created, so this is where the enforcement of that sentence belongs. They
+-- predate awareness_at by construction: a register that could be truncated was
+-- never a register, and awareness_at added an obligation to it rather than
+-- creating one.
+--
+-- WHY THE LAYERING WAS A DEFECT, AND THIS IS THE FIX.
+--
+-- The guards used to live only in 20261006_0002, and
+-- rollback/20261006_0002_incidents_awareness_at.down.sql dropped them along with
+-- the clock objects. Reversing the clock migration therefore disarmed the
+-- register: after that script, DELETE and TRUNCATE both succeeded for the table
+-- owner and for any session holding table-level DELETE and TRUNCATE -- which is
+-- what 20_immutability.sql hands every v4 role, and the only identity Directus
+-- has is directus_app. Reproduced by execution; the tables are on AFC-253.
+--
+-- directus_app still saw 42501 afterwards, because the column-grant layer below
+-- survives independently, so a check on that one identity read green over a
+-- register that was no longer sealed. That is why the acceptance criterion is
+-- the owner and a fully-granted app-style role, never directus_app alone.
+--
+-- Three things make the seal safe to keep here:
+--   * it is re-asserted by 0002, so a database whose 0001 predates this change
+--     is repaired rather than stranded;
+--   * rollback/20261006_0002_incidents_awareness_at.down.sql re-asserts it after
+--     its own drops, so that reversal can no longer end in an unsealed register;
+--   * the only path that removes it is rollback/20261006_0001_incidents.down.sql,
+--     which refuses while the register holds any row.
+--
+-- IDEMPOTENT BY CONSTRUCTION: CREATE OR REPLACE on both functions,
+-- DROP TRIGGER IF EXISTS before CREATE TRIGGER on both guards. Safe to re-run
+-- this file over a register that is already sealed.
+-- ---------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION incidents_forbid_delete() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+  RAISE EXCEPTION
+    'incidents rows are not deletable (breach register evidence). Set status = ''closed'' instead.'
+    USING ERRCODE = 'restrict_violation';
+END $$;
+
+COMMENT ON FUNCTION incidents_forbid_delete() IS
+  'Enforces the NDPA s.40(2) evidence rule for every identity including the table owner. Owned by 0001 and re-asserted by 0002 and by 0002''s down script; only rollback/0001 removes it, and only while the register is empty.';
+
+-- TRUNCATE bypasses row-level DELETE triggers entirely, so a table-level
+-- statement trigger is the only thing that closes it. Without this,
+-- `TRUNCATE incidents` is a full register wipe.
+CREATE OR REPLACE FUNCTION incidents_forbid_truncate() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+  RAISE EXCEPTION
+    'incidents cannot be truncated (breach register evidence).'
+    USING ERRCODE = 'restrict_violation';
+END $$;
+
+COMMENT ON FUNCTION incidents_forbid_truncate() IS
+  'Closes the TRUNCATE hole, which no row-level guard can reach. Owned by 0001 and re-asserted by 0002 and by 0002''s down script.';
+
+DROP TRIGGER IF EXISTS incidents_no_delete ON incidents;
+CREATE TRIGGER incidents_no_delete
+  BEFORE DELETE ON incidents
+  FOR EACH ROW EXECUTE FUNCTION incidents_forbid_delete();
+
+DROP TRIGGER IF EXISTS incidents_no_truncate ON incidents;
+CREATE TRIGGER incidents_no_truncate
+  BEFORE TRUNCATE ON incidents
+  FOR EACH STATEMENT EXECUTE FUNCTION incidents_forbid_truncate();
 
 -- ---------------------------------------------------------------------------
 -- Roles and privileges.
@@ -105,7 +188,10 @@ GRANT UPDATE (
   detected_at, reported_at, detected_by,
   acknowledged_at, contained_at, closed_at
 ) ON incidents TO directus_app;
--- No DELETE grant, and 0002 adds a trigger that forbids DELETE anyway. Two
--- layers, both required to be removed before a row can disappear.
+-- No DELETE grant, and the evidence seal above adds a trigger that forbids
+-- DELETE anyway. Two layers, both required to be removed before a row can
+-- disappear -- and they are owned by different files on purpose: this layer is
+-- a property of the grants below, the seal is a property of the table, so
+-- rolling back the grants is not a path to an unsealed register.
 
 REVOKE ALL ON incidents FROM PUBLIC;
