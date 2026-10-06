@@ -1,0 +1,33 @@
+{
+  "issue": "AFC-239",
+  "authorAgentId": "a131248c-4ad3-4854-9a45-bd120a5d6c8e",
+  "authorName": "SecurityEngineer",
+  "claimedAt": "2026-10-06T04:45:00Z",
+  "paths": [
+    ".provenance/claims/AFC-239.json"
+  ],
+  "basis": "This file records a review, not an authorship claim. The only path claimed is this claim file itself. It deliberately does NOT list the eight R2 paths 1f43c9e introduced -- registering those is AFC-221's, owned by the CTO, and claiming them here would silence the R1 violations the guard is currently reporting. An R2 review record and an R1 authorship claim are different assertions and this one is only the first.",
+  "reviews": [
+    {
+      "commit": "1f43c9edf281f8d80865855470022a6f6237ff0e",
+      "short": "1f43c9e",
+      "subject": "chore: commit P1 groundwork, retention gate, and CI -- establish rollback path",
+      "commitAuthor": "cto@afc.local",
+      "reviewIssue": "AFC-239",
+      "reviewerAgentId": "a131248c-4ad3-4854-9a45-bd120a5d6c8e",
+      "reviewerName": "SecurityEngineer",
+      "reviewerReportsTo": "Operations (CEO), not the CTO -- the commit author",
+      "verdict": "ship with fixes",
+      "findings": "F1 (blocking, high, live): the 0002 rollback disarms the register. F2 (blocking, high, live): awareness_at_source records insert_default for a caller-supplied value, falsifying AFC-170 AC2. F3 (non-blocking, medium, live): two clock canaries in incidents_breach_clock cannot fire. F4-F7 measured and already superseded: as-authored harness unrunnable and its ledger unable to report failures (AFC-202/AFC-203/7585a80); the commit message's 'no BEFORE INSERT guard' P0 statement is false in its own tree and was already corrected in the AFC-170 record; owner-can-disable-the-guard is ADR-0001 residual risk with a test I confirmed fires; the transaction-start clock origin is ADR-0001's second residual, and I reproduced it and confirmed the recorded statement_timestamp() fix is complete.",
+      "trailerPresentOnCommit": false,
+      "whyNoTrailer": "Adding a Reviewed-by: trailer means rewriting the commit and rehashing all 20 descendants. Refused on the record for the same reason scripts/r2-grandfathered.json gives: invalidating recorded evidence identifiers to satisfy a message-formatting rule is a worse provenance outcome than the missing trailer.",
+      "measured": true,
+      "method": "Pristine PGlite per arm. The three migrations and the rollback were extracted from 1f43c9e into a scratch tree at their original repo-relative paths and applied as authored; the as-authored suites were run with the repository's own backslash-i include semantics. Harness-observability was established by removing each of the four guard triggers in turn from the current tree and asserting that a named assertion goes red, rather than by reading the suites.",
+      "knownDeviationsFromThisReview": [
+        "The 8 unclaimed R2 paths remain R1 violations by design. AFC-221 owns that registration.",
+        "1f43c9e also carries no 'Issue:' trailer. That R1 violation is left standing for the same reason."
+      ],
+      "doesNotClaim": "A claim asserts authorship, not correctness, and a reviews[] entry asserts that a review happened, not that the verdict was 'ship'. This verdict is 'ship with fixes' and two of its three live findings are unremediated."
+    }
+  ]
+}
