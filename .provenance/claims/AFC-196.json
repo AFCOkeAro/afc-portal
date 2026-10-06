@@ -1,13 +1,13 @@
 {
   "issue": "AFC-196",
   "authorAgentId": "8f6e42d7-fb6e-4e6c-904b-dfdda50000ed",
-  "claimedAt": "2026-10-06T03:05:00+01:00",
-  "registeredBy": "AFC-195",
+  "claimedAt": "2026-10-06T05:45:00+01:00",
+  "registeredBy": "AFC-196",
   "paths": [
-    "scripts/dirty-path-guard.sh",
-    ".provenance/**"
+    "scripts/merge-in-gate.sh",
+    ".provenance/claims/AFC-196.json"
   ],
-  "basis": "Step 1 of the provenance rule (AFC-194 section 3): the claim registry that the step 2 isolation layer reads, plus the --check-commit mode that enforces R1 and R2 mechanically. AFC-175 built the dirty-tree mode and closed; the registry and the commit mode were its unfinished half and are landed here because AFC-196 is the issue that consumes them.",
-  "notCompliancePath": "scripts/dirty-path-guard.sh is NOT on the R2 list. R2 names scripts/retention-literal-gate.sh specifically, not all of scripts/. This file is on the DIRTY list (all of scripts/) and not on the R2 list; conflating the two lists would demand a reviewer on every script in the repo. Asserted by self-test 9e.",
-  "doesNotClaim": "This claim asserts who wrote the change. It is not a licence and it cannot exempt anything."
+  "basis": "Step 3 of the provenance rule (CEO-approved on AFC-194 and on this issue): the merge-in protocol, as a git commit-msg hook that refuses a compliance-path commit without a registry claim (R1) or a named reviewer (R2).",
+  "notCompliancePath": "scripts/merge-in-gate.sh is NOT on the R2 list. R2 names scripts/retention-literal-gate.sh specifically. This gate is on the DIRTY list (all of scripts/) and not on the R2 list, so this commit needs no Reviewed-by trailer of its own.",
+  "doesNotClaim": "This claim asserts who wrote the change. It is not a licence and it cannot exempt anything. It also claims nothing on services/directus/schema/engine/**, services/directus/schema/migrations/**, tests/db/** or scripts/retention-literal-gate.sh, so a commit touching those still requires its own claim and a named reviewer."
 }
