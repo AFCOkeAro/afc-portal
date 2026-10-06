@@ -240,10 +240,11 @@ END $$;
 --   * directus_app ships with NO provisioned principal, so a real release
 --     attempt under it is REFUSED rather than stored with a releaser nobody
 --     chose, and the hold is still holding;
---   * only once the owner role provisions one does the release work, and the
---     releaser it stores is the PROVISIONED principal -- compared against the
---     uuid the caller had in hand, so a function that went back to honouring an
---     argument goes red rather than quietly agreeing;
+--   * and once the owner role DOES provision one, the release is still refused --
+--     now by the GRANT LIST, 42501 rather than 23001. AFC-208: the absence of the
+--     row was not a control, it was the row an operator inserts to make the
+--     feature work, and a control that switches itself off on first use is not a
+--     control. The mechanism travels to AFC-243; the grant does not;
 --   * and nobody but the owner may decide that mapping.
 --
 -- WHY THE RELEASE ATTEMPTS USE SET SESSION AUTHORIZATION AND NOT probe().
@@ -318,11 +319,59 @@ BEGIN
     (SELECT count(*)::text FROM retention_principals WHERE role_name = 'directus_app'), '0',
     'priv', 'precondition: directus_app ships with no provisioned principal');
 
-  -- THE ATTEMPT, as the role that actually holds EXECUTE, authenticated as.
+  -- THE ATTEMPT -- and AFC-208 moved who performs it, deliberately.
+  --
+  -- This block used to impersonate directus_app and assert 23001: "no
+  -- provisioned principal, so no attribution, so refused". That was a true
+  -- statement about the tree it was written against, and it stopped being the
+  -- right statement the moment the grant was revoked, because the grant list now
+  -- answers first with 42501 and the attribution check is never reached.
+  --
+  -- Both refusals are real and they mean different things to an operator reading
+  -- a log. So each is asserted where it is decided:
+  --
+  --   42501  the role may not call the function          <- the later block, as
+  --                                                         directus_app
+  --   23001  the role may call it and nobody is attributable <- here, as the
+  --                                                         harness session role,
+  --                                                         which has no
+  --                                                         provisioned principal
+  --
+  -- Driving 23001 through directus_app would be asserting a layer that is now
+  -- unreachable behind another one, which is how an assertion ends up green for
+  -- the wrong reason.
+  SET SESSION AUTHORIZATION directus_app;
+  v_got := 'NOT REFUSED -- the release went through with nobody entitled to it';
+  BEGIN
+    PERFORM retention.release_hold(v_hold);
+  EXCEPTION WHEN OTHERS THEN
+    v_got := SQLSTATE;
+  END;
+  EXECUTE 'SET SESSION AUTHORIZATION ' || quote_ident(v_holder);
+
+  PERFORM test_support.assert_equals(v_got, '42501',
+    'priv', 'the grant list refuses the application role before the attribution check is reached: the refusal names the grant, not the mapping');
+
+  -- The attribution mechanism itself, asserted where it is actually decided.
+  --
+  -- It is driven as directus_migrator, the engine's owner, because ownership is
+  -- the only EXECUTE that survives the revoke: directus_app is now refused by
+  -- the grant list above, and the harness session role is already provisioned by
+  -- 61 so it releases happily. The owner is not provisioned anywhere, so it
+  -- reaches the attribution check and is refused BY it.
+  --
+  -- This is the shape the control will actually meet in production, which is why
+  -- it is worth keeping: the owner's own release path refuses when nobody is
+  -- attributable, rather than writing a releaser nobody chose.
+  --
   -- 23001 rather than 22023: this is a control refusing an operation, and the
   -- distinction from "you passed something invalid" is what an operator reads a
   -- log to make.
-  SET SESSION AUTHORIZATION directus_app;
+  PERFORM test_support.assert_equals(
+    (SELECT count(*)::text FROM retention_principals WHERE role_name = 'directus_migrator'), '0',
+    'priv', 'precondition on the refusal below: the owner role really does have no provisioned principal');
+
+  SET SESSION AUTHORIZATION directus_migrator;
   v_got := 'NOT REFUSED -- the release went through with nobody attributed';
   BEGIN
     PERFORM retention.release_hold(v_hold);
@@ -332,7 +381,7 @@ BEGIN
   EXECUTE 'SET SESSION AUTHORIZATION ' || quote_ident(v_holder);
 
   PERFORM test_support.assert_equals(v_got, '23001',
-    'priv', 'a release under a role with no provisioned principal is refused, not stored with a releaser the caller chose');
+    'priv', 'even the owner is refused when nobody is attributable: a releaser is never one the caller chose, and never one nobody chose either');
 
   PERFORM test_support.assert_equals(current_user, v_holder,
     'priv', 'the harness session identity is restored after impersonation, so the blocks below are not running as somebody unexpected');
@@ -358,38 +407,56 @@ BEGIN
     $q$UPDATE retention_principals SET principal_id = gen_random_uuid()$q$,
     '23001', 'priv', 'a role with ALL on the mapping still cannot re-point a release attribution: refused by the trigger');
 
-  -- Provision, under the owner role. This is the shape a deployment uses, and
-  -- it is the only thing standing between the refusal above and a release.
+  -- Provision, under the owner role -- and the release STILL does not work.
+  -- AFC-208 inverted this block. It used to assert that provisioning a principal
+  -- makes the release succeed, and that was a true statement about the tree it
+  -- was written against: directus_app held EXECUTE, and the only thing between a
+  -- pooled connection and every legal hold in the system was the absence of a row
+  -- in a table no migration populates.
+  --
+  -- The absence of that row is not a control. This is the row an operator inserts
+  -- to make the feature work, so a control that depends on it is a control that
+  -- switches itself off on first use. Measured: with the row present and the
+  -- grant in place, a directus_app session released any hold it could read and the
+  -- record was stamped with the principal mapped to directus_app -- and the next
+  -- scheduled run erased the record.
   PERFORM test_support.as_role('directus_migrator',
     format($c$INSERT INTO retention_principals (role_name, principal_id, note)
            VALUES ('directus_app', %L::uuid, 'DPO service principal')$c$, v_principal));
 
-  -- And now the release works, still authenticated as directus_app, and the
-  -- releaser it stores is the PROVISIONED principal. Compared as a value
-  -- against a value: this is the assertion the old "IS NOT NULL" should have
-  -- been, and the only way it can fail is if the stored releaser is not the one
-  -- the database chose.
+  PERFORM test_support.assert_equals(
+    (SELECT count(*)::text FROM retention_principals WHERE role_name = 'directus_app'), '1',
+    'priv', 'control A precondition: the principal IS provisioned now, so the refusal below is a grant decision and not a missing row');
+
+  -- 42501 and not 23001, and that is the assertion. Before the revoke, this
+  -- session was refused for the wrong reason -- the mapping was absent -- and a
+  -- row turned it into a release. Now it is refused by the GRANT LIST, which no
+  -- row in any table can undo, and the two are told apart by the sqlstate: an
+  -- operator reading a log can see whether a role may call a function or merely
+  -- has nobody attributed.
   SET SESSION AUTHORIZATION directus_app;
-  v_got := 'not attempted';
+  v_got := 'NOT REFUSED -- the release went through with nobody entitled to it';
   BEGIN
     PERFORM retention.release_hold(v_hold);
     v_got := 'released';
   EXCEPTION WHEN OTHERS THEN
-    v_got := 'raised ' || SQLSTATE;
+    v_got := SQLSTATE;
   END;
   EXECUTE 'SET SESSION AUTHORIZATION ' || quote_ident(v_holder);
 
-  PERFORM test_support.assert_equals(v_got, 'released',
-    'priv', 'directus_app can release a hold through the function, once the owner role has provisioned the attribution');
+  PERFORM test_support.assert_equals(v_got, '42501',
+    'priv', 'a provisioned principal does NOT give the application role the ability to release a hold: the grant list refuses it');
 
+  -- And the hold is still holding, on the row rather than on the absence of an
+  -- error. A refusal that arrived after the UPDATE would produce the same log
+  -- line and a hold that no longer holds.
   PERFORM test_support.assert_equals(
-    (SELECT released_by::text FROM legal_holds WHERE id = v_hold), v_principal::text,
-    'priv', 'and the releaser recorded is the principal the database maps the session role to');
+    (SELECT count(*)::text FROM legal_holds WHERE id = v_hold AND released_at IS NULL), '1',
+    'priv', 'and the hold is still holding: the refusal came from the grant list, before any write');
 
-  -- And it is not the uuid the caller had in hand when the abuse was attempted.
   PERFORM test_support.assert_true(
-    (SELECT released_by::text FROM legal_holds WHERE id = v_hold) <> v_forged::text,
-    'priv', 'specifically not a uuid the caller supplied');
+    (SELECT released_by IS NULL FROM legal_holds WHERE id = v_hold),
+    'priv', 'and nothing stamped a releaser onto it, so the audit trail has no entry at all rather than a wrong one');
 
   -- A hold cannot be forged as already released.
   PERFORM test_support.assert_raises('directus_app',
