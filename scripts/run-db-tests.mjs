@@ -5,11 +5,17 @@
 //
 //   pnpm test:db                     local: an in-process PostgreSQL 16
 //   PG_URL=postgres://... pnpm test:db
-//                                    CI: an existing instance
+//                                    a real server; the runner creates and drops
+//                                    its OWN scratch database on it and never
+//                                    touches the database PG_URL names (AFC-204)
 //   node scripts/run-db-tests.mjs --self-test
 //                                    watch this instrument fail (AFC-203)
 //
 // One code path, so local and CI assert the same things.
+//
+// FRESHNESS, in one line (AFC-204): both modes begin in an empty database created by
+// this process, and neither mode can reach a database this process did not create.
+// The reasoning, and the safety cases, are in scripts/lib/scratch-db.mjs.
 //
 // The instance is bootstrapped the way production has to be bootstrapped:
 // migrations run as directus_migrator, which owns the tables, while Directus
@@ -26,6 +32,7 @@
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { openScratchDatabase, SCRATCH_PREFIX, isScratchDatabaseName, scratchDatabaseName } from './lib/scratch-db.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const MIGRATIONS = join(REPO, 'services/directus/schema/migrations');
@@ -132,24 +139,45 @@ function exitCodeFor(failed, rows) {
 async function connect() {
   const external = process.env.PG_URL;
   if (external) {
-    const { Client } = await import('pg');
-    const client = new Client({ connectionString: external });
+    // AFC-204. What used to be here connected to PG_URL's database and applied
+    // migrations to it, so the suites' fixed-ref fixtures survived into the next run
+    // and a green run could not be distinguished from a run over its own leftovers.
+    // It also meant DATABASE_URL -- which on some hosts is a live application
+    // database -- got the full migration sequence written into it.
+    //
+    // Now the server is used for exactly two things: CREATE DATABASE for a name
+    // this process generated, and DROP DATABASE for that same name on the way out.
+    // The connection the migrations run on is opened to the scratch database and is
+    // asserted to be there before any DDL is issued.
+    const notes = [];
+    let scratch;
+    try {
+      scratch = await openScratchDatabase(external, {
+        log,
+        onNotice: (m) => notes.push(String(m.message)),
+        keep: process.env.AFC_DB_TEST_KEEP_SCRATCH === '1',
+      });
+    } catch (e) {
+      // A refusal is exit 2 and a named exit code, not a crash: "I would not run
+      // under these conditions" and "I broke" must not read the same in a pipeline.
+      console.error(`\n  REFUSING TO RUN: ${e.message}\n`);
+      process.exit(e.code === 'scratch_database_unavailable' || e.name === 'ScratchDatabaseError' ? 2 : 1);
+    }
+    for (const line of scratch.header) log(line);
+    const client = scratch.client;
     // node-postgres re-emits every NOTICE the backend raises on the client, in
     // the order it raised them, before the in-flight query settles -- so a
     // notice raised by the statement that is about to fail has already been
-    // collected by the time the rejection lands. No privileges needed.
-    const notes = [];
-    client.on('notice', (m) => notes.push(String(m.message)));
-    await client.connect();
+    // collected by the time the rejection lands. No privileges needed. (openScratchDatabase
+    // registered the handler before its own probe query, so nothing is missed.)
     const v = await client.query('SELECT version()');
-    log(`Connected to ${new URL(external).host}`);
     log(`Server: ${v.rows[0].version}`);
     return {
       version: v.rows[0].version,
       exec: async (sql) => { await client.query(sql); },
       query: async (sql) => (await client.query(sql)).rows,
       drain: () => notes.splice(0, notes.length),
-      close: async () => { await client.end(); },
+      close: async () => { await scratch.dispose(); },
     };
   }
 
@@ -171,6 +199,9 @@ async function connect() {
   const onNotice = (n) => notes.push(String(n.message));
   const v = await db.query('SELECT version()');
   log('Local mode: in-process PostgreSQL, no service container, nothing left on disk');
+  log('Scratch database : the PGlite instance of this process, created empty and closed when it exits');
+  log('Guarantee        : same guarantee as PG_URL mode -- every run starts in an empty database that this');
+  log('                   process created. No server database is contacted, so none can be altered.');
   log(`Server: ${v.rows[0].version}`);
   return {
     version: v.rows[0].version,
@@ -272,6 +303,27 @@ async function main() {
     // ---------------------------------------------------------------
     // Pre-flight: refuse to run against a database that already has state.
     //
+    // AFC-204 NOTE, added when the scratch database landed (see
+    // scripts/lib/scratch-db.mjs for the full argument). What this block
+    // originally was: THE fix. What it is now: the second line of defence.
+    // The guarantee is now structural -- the connection below is a scratch
+    // database this process created and drops, so there is nothing here for a
+    // stale-fixture check to catch. It is kept because it is cheap and because
+    // a future edit that wired the migrations back to the database in PG_URL
+    // would land on this check rather than on a silent green run.
+    //
+    // It is NOT a substitute for the scratch database, and the reason is
+    // measured rather than argued. This check recognises "a previous run of
+    // this suite" by the NAMES it expects. A database holding only unrelated
+    // tables -- `sentinel_marker`, `unrelated_widgets` -- is not one of those
+    // names, so this check reported "empty" and the migration sequence wrote
+    // `incidents`, `incidents_breach_clock` and five indexes into it. Detecting
+    // our objects cannot be made exhaustive, and a classification that is not
+    // exhaustive is the original defect wearing a different hat.
+    //
+    // The rest of this comment describes the refusal as the mechanism. It is
+    // not, any more; it is the fallback if the scratch mechanism is removed.
+    // ---------------------------------------------------------------
     // This suite creates clusters of objects that CREATE ... IF NOT EXISTS
     // silently accepts: probe schemas, seeded fixtures, roles whose grants
     // accumulate. Re-running against a used database therefore does not
@@ -331,7 +383,7 @@ async function main() {
       process.exitCode = 2;
       return;
     }
-    log('Pre-flight: target database is empty');
+    log('Pre-flight: the database under test is empty');
     // ---------------------------------------------------------------
     // Bootstrap, as the cluster owner. This is the REAL bootstrap file, not a
     // copy of it, and that is load-bearing rather than tidiness.
@@ -479,6 +531,165 @@ const GREEN_SUITE = `
                                     'self-test', 'green three');
 `;
 
+// A URL that names a database like a real one, because "named like a real one" is the
+// case the safety constraint is about. `not-a-secret` is a placeholder string, not a
+// credential: it is here so the assertion can prove the header never echoes it.
+const SELF_TEST_PG_URL = 'postgres://tester:not-a-secret@db.internal:5432/afc_church_production';
+
+/**
+ * A recording stand-in for node-postgres.
+ *
+ *   createdb:   whether the role may CREATE DATABASE
+ *   landOn:     what current_database() claims -- 'elsewhere' is the lie the runner
+ *               has to catch
+ *   failCreate: CREATE DATABASE fails, as it would on a server out of room or out of
+ *               databases
+ *
+ * Every connection and every statement is recorded, because the properties worth
+ * asserting here are the ones about what did NOT happen.
+ */
+function recordingClients(opts = {}) {
+  const recs = [];
+  const factory = (connectionString) => {
+    const rec = {
+      connectionString,
+      db: decodeURIComponent(new URL(connectionString).pathname.replace(/^\//, '')),
+      sql: [],
+      connected: false,
+      ended: false,
+    };
+    recs.push(rec);
+    return {
+      on() {},
+      async connect() { rec.connected = true; },
+      async end() { rec.ended = true; },
+      async query(sql) {
+        rec.sql.push(sql);
+        if (/rolcreatedb/.test(sql)) {
+          return { rows: [{ usename: 'afc_tester', rolcreatedb: opts.createdb !== false, rolsuper: false }] };
+        }
+        if (/current_database/.test(sql)) {
+          return { rows: [{ db: opts.landOn === 'elsewhere' ? 'postgres' : rec.db }] };
+        }
+        if (/^CREATE DATABASE/i.test(sql)) {
+          if (opts.failCreate) throw Object.assign(new Error('could not create database'), { code: '53100' });
+          return { rows: [] };
+        }
+        if (/^DROP DATABASE/i.test(sql)) return { rows: [] };
+        if (/SELECT version/i.test(sql)) return { rows: [{ version: 'PostgreSQL 18.1 (recording double)' }] };
+        throw new Error(`the recording double was asked for a statement it does not model: ${sql}`);
+      },
+    };
+  };
+  const allSql = () => recs.flatMap((r) => r.sql);
+  return { factory, recs, allSql };
+}
+
+/** Anything that creates, destroys or writes. The safety case is about this list. */
+const isSchemaBearing = (s) => /^\s*(CREATE|DROP|ALTER|TRUNCATE|INSERT|UPDATE|DELETE|GRANT|REVOKE)\b/i.test(s);
+
+/**
+ * AFC-204. The freshness guarantee, asserted as a set of negative properties.
+ *
+ * Every assertion here is about something the runner must NOT do, so none of them can
+ * be established by running against a real server and seeing it come out green -- a
+ * real server cannot tell you which statements were never issued. That is what the
+ * recording double is for.
+ */
+async function freshnessSelfTest(ok) {
+  log('\nSelf-test: the freshness guarantee (AFC-204)');
+
+  // --- names, and the gate on destruction -----------------------------------
+  const name = scratchDatabaseName();
+  ok(name.startsWith(SCRATCH_PREFIX), `a generated name is unmistakably a scratch name (${name})`);
+  ok(isScratchDatabaseName(name), 'a generated name passes the drop gate');
+  for (const real of [
+    'paperclip', 'postgres', 'template1', 'afc', 'afc_dbtests',
+    SCRATCH_PREFIX,                                   // no pid, no nonce
+    `${SCRATCH_PREFIX}1_zzzzzzzz`,                     // nonce is not hex
+    `${SCRATCH_PREFIX}../../etc/passwd`,               // traversal
+    `${SCRATCH_PREFIX}1_deadbeef"; DROP DATABASE paperclip`, // injection
+  ]) {
+    ok(!isScratchDatabaseName(real), `the drop gate refuses a name this module did not mint (${real.slice(0, 48)})`);
+  }
+
+  // --- a role that cannot have the guarantee must not get a fallback --------
+  const denied = recordingClients({ createdb: false });
+  let refusal = null;
+  try {
+    await openScratchDatabase(SELF_TEST_PG_URL, { clientFactory: denied.factory, log: () => {} });
+  } catch (e) { refusal = e; }
+  ok(refusal?.code === 'createdb_required', 'a role without CREATEDB is refused');
+  ok(
+    !denied.allSql().some((s) => /^CREATE DATABASE/i.test(s)),
+    'nothing is created when the guarantee cannot be honoured -- no silent fallback to migrating in place',
+  );
+
+  // --- the run itself -------------------------------------------------------
+  const rec = recordingClients();
+  const scratch = await openScratchDatabase(SELF_TEST_PG_URL, { clientFactory: rec.factory, log: () => {} });
+
+  const beforeTeardown = rec.allSql().filter(isSchemaBearing);
+  ok(
+    beforeTeardown.length === 1 && beforeTeardown[0] === `CREATE DATABASE "${scratch.name}" TEMPLATE template0`,
+    `before teardown the only schema-bearing statement is CREATE DATABASE for the scratch name (${beforeTeardown.length} seen)`,
+  );
+  ok(
+    !rec.recs.some((r) => r.db === 'afc_church_production'),
+    'the database named in PG_URL is never opened -- not even to read its version',
+  );
+  const scratchConn = rec.recs.find((r) => r.db === scratch.name);
+  ok(!!scratchConn, 'the connection the migrations run on is a connection to the scratch database');
+  ok(
+    !!scratchConn && scratchConn.sql.length === 1 && /current_database/.test(scratchConn.sql[0]),
+    'the scratch connection is asked for its identity, and nothing else, before any DDL reaches it',
+  );
+
+  // --- the header is the citable part --------------------------------------
+  const header = scratch.header.join('\n');
+  ok(header.includes(scratch.name), 'the header names the scratch database');
+  ok(/^Guarantee/m.test(header), 'the header prints the guarantee, not only the facts it rests on');
+  ok(header.includes('afc_church_production'), 'the header names the database it is NOT touching');
+  ok(!header.includes('not-a-secret') && !header.includes('tester@'), 'the header never echoes the PG_URL credentials');
+
+  // --- teardown -------------------------------------------------------------
+  await scratch.dispose();
+  await scratch.dispose(); // idempotent: the finally block and a signal can both reach it
+  const drops = rec.allSql().filter((s) => /^DROP DATABASE/i.test(s));
+  ok(
+    drops.length === 1 && drops[0] === `DROP DATABASE "${scratch.name}"`,
+    `teardown drops exactly the database this run created, exactly once (${drops.length} drops)`,
+  );
+  ok(
+    rec.recs.filter((r) => r.connected).every((r) => r.ended),
+    'every connection this run opened is closed, so the DROP cannot fail on its own backend',
+  );
+
+  // --- a connection that lands in the wrong database -----------------------
+  const wrong = recordingClients({ landOn: 'elsewhere' });
+  let mismatch = null;
+  try {
+    await openScratchDatabase(SELF_TEST_PG_URL, { clientFactory: wrong.factory, log: () => {} });
+  } catch (e) { mismatch = e; }
+  ok(mismatch?.code === 'identity_mismatch', 'a scratch connection that reports a different database is refused');
+  ok(
+    wrong.allSql().filter(isSchemaBearing).every((s) => s.includes(SCRATCH_PREFIX)),
+    'every schema statement in that case names the scratch database and nothing else',
+  );
+
+  // --- a CREATE that failed must leave nothing behind ----------------------
+  const noRoom = recordingClients({ failCreate: true });
+  let failed = null;
+  try {
+    await openScratchDatabase(SELF_TEST_PG_URL, { clientFactory: noRoom.factory, log: () => {} });
+  } catch (e) { failed = e; }
+  ok(failed?.code === 'create_failed', 'a failed CREATE DATABASE is reported, not swallowed');
+  ok(
+    !noRoom.allSql().some((s) => /^DROP/i.test(s)),
+    'a run that created no database drops no database -- including one that was already there',
+  );
+}
+
 async function selfTest() {
   let rc = 0;
   const ok = (cond, what) => {
@@ -507,6 +718,19 @@ async function selfTest() {
     ]).rows.length === 2,
     'ledger keeps order, drops chatter, and round-trips | and newline in a detail',
   );
+
+  // --- the freshness guarantee, against a recording double -----------------
+  //
+  // Same argument as the ledger above, applied to AFC-204: a safety property that has
+  // never been watched fail is a comment. The properties asserted here are NEGATIVE
+  // -- no DDL reached the target, no database was dropped that this run did not
+  // create, no fallback happened when the guarantee could not be honoured -- and a
+  // negative is exactly what a real server cannot demonstrate by running green. So
+  // the engine is a double that records every statement, and the assertions are on
+  // the RECORD, not on the outcome.
+  //
+  // It needs no server, so it runs in the CI job that runs the PGlite gate.
+  await freshnessSelfTest(ok);
 
   const db = await connect();
   try {

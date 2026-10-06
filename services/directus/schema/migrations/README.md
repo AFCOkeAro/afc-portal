@@ -97,3 +97,11 @@ bootstrapped, applies the migrations as the owner, then runs `tests/db/*.sql`.
 `tests/db/40_clock.sql` and `30_backfill_survival.sql` use `\i` to include a
 migration against a throwaway schema; the runner expands that, and the files still
 run under `psql` unchanged.
+
+**Do not create a database for the runner and point it there.** With `PG_URL` set it
+creates its own — an `afc_dbtest_scratch_*` database — migrates that, and drops it on
+the way out. The database named in `PG_URL` is never opened, which matters because
+`DATABASE_URL` on some hosts is a live application database. The role in `PG_URL`
+needs `CREATEDB`; without it the runner refuses rather than falling back to migrating
+in place, and it prints the guarantee it is operating under in its first lines. See
+`scripts/lib/scratch-db.mjs`.
