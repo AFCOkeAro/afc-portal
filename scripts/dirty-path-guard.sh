@@ -1304,6 +1304,22 @@ Issue: AFC-996
   #      must still be caught with the punctuation attached. Fixing the false
   #      positives by loosening the scan would pass the first half of this and
   #      fail the second, which is the only way to make this assertion real.
+  #
+  #      AFC-278's N2 added the fourth shape class, and it is the one that had
+  #      NO coverage at all: the metacharacter IMMEDIATELY after a closing quote,
+  #      with no space. `--check-commit "$PWD" "$range">out.txt` is two arguments
+  #      and was not flagged; the unconditional discard at the metacharacter
+  #      could not tell a quoted argument from an unquoted fd prefix. Both
+  #      directions are planted, so neither an unconditional discard nor a
+  #      blanket refusal of quoted tokens passes this.
+  #
+  #      AFC-278's N1 was the opposite defect: the header's audited list named
+  #      every shape EXCEPT the Makefile recipe, and the reviewer measured the
+  #      coverage as correct in both directions. A claim that is true and
+  #      unplanted rots, so the recipe shapes are planted here too -- tab-
+  #      indented, bash-prefixed and bare. The header line is now earned rather
+  #      than asserted, which is the only kind of documentation that survives the
+  #      next edit to the matcher.
   local punct_repo="$tmp/arity-punct"
   mkdir -p "$punct_repo/scripts"
   git -C "$punct_repo" init -q
@@ -1319,6 +1335,10 @@ Issue: AFC-996
     'bash scripts/dirty-path-guard.sh --check-commit "$range" ; echo done'
     'bash scripts/dirty-path-guard.sh --check-commit "$range" || echo fail'
     'bash scripts/dirty-path-guard.sh --check-commit "$range" > out.txt'
+    'bash scripts/dirty-path-guard.sh --check-commit "$range">out.txt'
+    'bash scripts/dirty-path-guard.sh --check-commit "$range"&'
+    $'\tbash scripts/dirty-path-guard.sh --check-commit "$range"'
+    $'\tscripts/dirty-path-guard.sh --check-commit "$range"'
   )
   local -a two_arg_bad=(
     'bash scripts/dirty-path-guard.sh --check-commit "$PWD" "$range"'
@@ -1326,6 +1346,10 @@ Issue: AFC-996
     'bash scripts/dirty-path-guard.sh --check-commit "$PWD" "$range" > out.txt'
     'bash scripts/dirty-path-guard.sh --check-commit "$PWD" "$range" | tee out'
     'bash scripts/dirty-path-guard.sh --check-commit "$PWD" "$range" 2>/dev/null'
+    'bash scripts/dirty-path-guard.sh --check-commit "$PWD" "$range">out.txt'
+    'bash scripts/dirty-path-guard.sh --check-commit "$PWD" "$range"&'
+    $'\tbash scripts/dirty-path-guard.sh --check-commit "$PWD" "$range"'
+    $'\tscripts/dirty-path-guard.sh --check-commit "$PWD" "$range"'
   )
   local punct_bad=0
   : > "$punct_file"
@@ -1375,14 +1399,33 @@ Issue: AFC-996
   #      goes red. Between them, neither half can move alone -- which is what
   #      "the constant is decorative" looked like before.
   #
+  #      AFC-278's N4: the refusal now covers the SIBLING BRANCH too. Root mode
+  #      took `guard "${2:-$ROOT_DEFAULT}"` and ignored everything past it, so
+  #      `guard "" ROOT SURPLUS` was byte-identical to `guard "" ROOT`. The
+  #      header claimed one refusal covered both modes; it did not. Both are
+  #      driven here, and the ignored-argument COUNT is checked against the
+  #      names printed (N3 was exactly that count lying).
+  #
   # Installed into punct_repo NOW, after the audits above, so the copy is not
   # part of what they scan. An audit that reads its own subject is a subject
   # that can flatter itself.
   cp "$0" "$punct_repo/scripts/dirty-path-guard.sh"
   chmod +x "$punct_repo/scripts/dirty-path-guard.sh"
-  local surplus_rc surplus_out
+  local surplus_rc surplus_out root_surplus_rc root_surplus_out
   surplus_out=$(bash "$punct_repo/scripts/dirty-path-guard.sh" --check-commit "$bad_rev" surplus 2>&1)
   surplus_rc=$?
+  local cli_guard="$punct_repo/scripts/dirty-path-guard.sh"
+  root_surplus_out=$(bash "$cli_guard" "" "$punct_repo" ignored-a ignored-b 2>&1)
+  root_surplus_rc=$?
+  local said_count listed_count
+  said_count=$(printf '%s\n' "$surplus_out" | sed -n 's/^Refusing \([0-9][0-9]*\) argument.*/\1/p')
+  # The names the refusal lists, and only those: the block between the
+  # "These were ignored:" line and the blank line that closes it.
+  listed_count=$(printf '%s\n' "$surplus_out" | awk '
+    /were ignored:/ { f = 1; next }
+    f && /^[[:space:]]*$/ { f = 0 }
+    f && /^[[:space:]]/ { n++ }
+    END { print n + 0 }')
   if [ "$surplus_rc" -eq 0 ] || [ "$surplus_rc" -eq 1 ]; then
     echo "SELF-TEST FAIL: the CLI accepted a surplus argument (exit $surplus_rc)"
     echo "    the dispatcher must refuse at the boundary, not quietly ignore it."
@@ -1392,8 +1435,24 @@ Issue: AFC-996
     echo "SELF-TEST FAIL: the CLI refused a surplus argument without saying so"
     printf '%s\n' "$surplus_out" | sed 's/^/    /'
     rc=1
+  elif [ "$said_count" != "$listed_count" ]; then
+    echo "SELF-TEST FAIL: the refusal says it ignored $said_count argument(s) and lists $listed_count"
+    echo "    a count that disagrees with the list under it is a count nobody"
+    echo "    trusts, and this is output a human reads under time pressure."
+    printf '%s\n' "$surplus_out" | sed 's/^/    /'
+    rc=1
+  elif [ "$root_surplus_rc" -eq 0 ]; then
+    echo "SELF-TEST FAIL: root mode accepted a surplus argument (exit 0)"
+    echo "    the header claims the dispatcher refuses a surplus in BOTH modes."
+    echo "    Root mode silently ignored one, which is the same defect class."
+    rc=1
+  elif ! printf '%s' "$root_surplus_out" | grep -q 'ignored-a'; then
+    echo "SELF-TEST FAIL: root mode refused a surplus argument without naming it"
+    printf '%s\n' "$root_surplus_out" | sed 's/^/    /'
+    rc=1
   else
-    echo "  self-test ok: the dispatcher refuses a surplus argument at the boundary (exit $surplus_rc)"
+    echo "  self-test ok: the dispatcher refuses a surplus argument at the boundary in BOTH"
+    echo "                modes (exit $surplus_rc, exit $root_surplus_rc), and counts what it ignored"
   fi
 
   return $rc
@@ -1675,6 +1734,15 @@ grandfathered_lookup() {
 #     the block-scalar `ci.yml` shape          bash scripts/… --check-commit "$r"
 #     `sh`, `./scripts/`, bare `scripts/`, $REPO/scripts/ as the path
 #     `| tee`, `; echo`, `|| echo`, `> out`, `2>&1` after the argument
+#     a Makefile recipe line, `bash`-prefixed and bare, tab-indented -- the
+#       matcher only requires that a command-position line NAMES this script,
+#       and a tab-indented recipe is command position. (AFC-278's N1: coverage
+#       was measured correct in both directions at 7b61b30 and at cc85bcc; only
+#       this list omitted it. A limit that is not written down is the kind that
+#       gets rediscovered as a defect.)
+#     a metacharacter immediately after a closing quote, `"$range">out.txt` --
+#       see the qtok comment in the matcher: that is a QUOTED token, so it is
+#       counted, and the two-argument form is caught. (AFC-278's N2.)
 #
 #   NOT audited -- every one of these is a shape a caller can actually take:
 #     run: bash scripts/… --check-commit      single-line `run:` prefix
@@ -1702,10 +1770,19 @@ grandfathered_lookup() {
 #   that mislead; a documented limit is a decision.
 #
 #   None of this weakens the control, because the DISPATCHER refuses a surplus
-#   argument on its own (see the case at the foot of this file). The audit
-#   names the file and line before anything runs; the dispatcher is the
-#   boundary that refuses. Two layers, and the second one does not depend on
-#   the first having found anything.
+#   argument on its own, in BOTH modes (see the case at the foot of this file:
+#   --check-commit accepts the flag plus one REV; the no-argument mode accepts
+#   at most a ROOT; anything further is refused with exit 2 rather than
+#   ignored). The audit names the file and line before anything runs; the
+#   dispatcher is the boundary that refuses. Two layers, and the second one does
+#   not depend on the first having found anything.
+#
+#   That sentence was false for the no-argument mode until AFC-278: `guard ""
+#   ROOT SURPLUS` returned byte-identical output to `guard "" ROOT`, exit 0 both
+#   times. Same defect class, sibling branch. The fix went into the dispatcher
+#   rather than into this paragraph, because a paragraph that has to be weakened
+#   every time the code turns out to be right is a paragraph that gets believed
+#   over the code.
 #
 # ARGUMENTS ARE COUNTED, NOT GUESSED
 #   Quote-aware, and it stops at the first unquoted shell metacharacter or at a
@@ -1713,8 +1790,8 @@ grandfathered_lookup() {
 #   is not the guard's problem. Getting this wrong in either direction is worse
 #   than not having the assertion: too strict and it cries wolf on legitimate
 #   pipelines, too loose and it misses the bug it exists to catch. Both ways
-#   round were shipped once already -- see assertion 11g, which plants every
-#   shape in this paragraph in both directions.
+#   round were shipped once already -- assertion 11g plants the prose shapes and
+#   11h plants every punctuation shape, each in both directions.
 # How many tracked lines invoke the guard as a command at all? Informational
 # only. Zero is not a failure -- a fresh clone or a throwaway fixture has no
 # callers -- but it is printed, because R4 claims CI calls this gate and a
@@ -1750,11 +1827,13 @@ _audit_callers() {
         if (i == 0) next
         found++
         rest = substr(line, i + 15)
-        n = 0; intok = 0; q = ""; k = 1; L = length(rest)
+        # qtok: does the token being accumulated END IN A CLOSING QUOTE? The
+        # discard at the metacharacter test below is conditional on it.
+        n = 0; intok = 0; q = ""; qtok = 0; k = 1; L = length(rest)
         while (k <= L) {
           c = substr(rest, k, 1)
-          if (q != "") { if (c == q) q = ""; intok = 1; k++; continue }
-          if (c == "\"" || c == "'"'"'") { q = c; intok = 1; k++; continue }
+          if (q != "") { if (c == q) { q = ""; qtok = 1 }; intok = 1; k++; continue }
+          if (c == "\"" || c == "'"'"'") { q = c; qtok = 0; intok = 1; k++; continue }
           # `&` joins the class, and the pending token is DISCARDED rather than
           # flushed. Both halves are the AFC-241 review finding:
           #
@@ -1764,16 +1843,32 @@ _audit_callers() {
           #
           #   A break did not discard the pending token, so the `2` of a `2>&1`
           #   was counted as an argument even though the `>` stopped the scan.
-          #   A token sitting immediately before a metacharacter is a
-          #   redirection, never an argument.
+          #
+          # THE DISCARD IS CONDITIONAL, and the condition is not decoration.
+          # An UNQUOTED token immediately before a metacharacter is a
+          # redirection and never an argument: `2>&1`, `>out`, `&`. A token that
+          # ENDED IN A CLOSING QUOTE is a complete argument, and the
+          # metacharacter after it belongs to something else:
+          #
+          #     --check-commit "$PWD" "$range">out.txt    two arguments
+          #     --check-commit "$range">out.txt            ONE argument
+          #
+          # Discarding unconditionally made the second line read as zero
+          # arguments and the first as one, which is a false NEGATIVE on the
+          # exact shape the assertion exists to catch -- the N2 finding of
+          # AFC-278, and the reason the prose in this file used to assert a
+          # universal that its own code did not honour. qtok carries the fact
+          # that a token closed.
           #
           # Appending `&& echo` to a working CI line is the single most likely
           # next edit to it, and a gate that goes red there gets muted. A muted
-          # guard is worse than no guard, because CI still reports green.
-          if (c ~ /[|><;()&]/) { intok = 0; break }
+          # guard is worse than no guard, because CI still reports green. The
+          # same argument runs the other way for a gate that goes GREEN on a
+          # two-argument caller.
+          if (c ~ /[|><;()&]/) { if (!qtok) intok = 0; break }
           if (c == "#" && !intok) break
-          if (c ~ /[[:space:]]/) { if (intok) { n++; intok = 0 } k++; continue }
-          intok = 1; k++
+          if (c ~ /[[:space:]]/) { if (intok) { n++; intok = 0 } qtok = 0; k++; continue }
+          intok = 1; qtok = 0; k++
         }
         if (intok) n++
         if (n > max) bad++
@@ -2053,6 +2148,36 @@ fi
 
 case "${1:-}" in
   "")
+    # THE SAME ARITY CONTRACT, THE SIBLING BRANCH. AFC-278 measured this and
+    # found the claim in the header false here: `guard "" ROOT SURPLUS` returned
+    # byte-identical output to `guard "" ROOT`, both exit 0. The refusal below
+    # existed only for --check-commit, so the sentence "the dispatcher refuses
+    # a surplus argument on its own" was true of one mode and not the other.
+    #
+    # Mode          accepts                    surplus
+    #   no args     ROOT_DEFAULT               refused
+    #   "" ROOT     ROOT                       refused
+    #
+    # Exit 2, for the same reason as --check-commit below: exit 1 is reserved
+    # for "the gate ran and found a violation", and a caller must never be able
+    # to confuse the two. A silently ignored argument is a defect reported by
+    # nobody.
+    if [ "$#" -gt 2 ]; then
+      {
+        echo "usage: $0 [\"\" [ROOT]]"
+        echo
+        echo "Refusing $(( $# - 2 )) argument(s) after the ROOT; this dispatcher"
+        echo "accepts at most one, and these were ignored:"
+        shift 2
+        printf '    %s\n' "$@"
+        echo
+        echo "ROOT is this script's own repository location, not a parameter you"
+        echo "invented. A second argument here is read by nobody -- and unlike"
+        echo "--check-commit, this mode never reaches check_commit(), so there is"
+        echo "no second layer that would notice it later either."
+      } >&2
+      exit 2
+    fi
     guard "${2:-$ROOT_DEFAULT}"; exit $? ;;
 
   "--check-commit")
@@ -2081,8 +2206,13 @@ case "${1:-}" in
       {
         echo "usage: $0 --check-commit [REV]"
         echo
-        echo "Refusing $# arguments after --check-commit; this dispatcher accepts"
-        echo "$CHECK_COMMIT_MAX_ARGS optional argument, the REV. These were ignored:"
+        # `$#` counts the FLAG too, so it over-reported by one: it said four and
+        # listed three. This is gate output a human reads under time pressure,
+        # and a number that disagrees with the list under it is a number nobody
+        # trusts. (AFC-278's N3.)
+        echo "Refusing $(( $# - 1 )) argument(s) after --check-commit; this"
+        echo "dispatcher accepts $CHECK_COMMIT_MAX_ARGS optional argument, the"
+        echo "REV. These were ignored:"
         shift
         printf '    %s\n' "$@"
         echo
