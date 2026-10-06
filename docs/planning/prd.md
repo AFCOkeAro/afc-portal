@@ -378,7 +378,16 @@ Each has a recommended default. These do not block this planning package; they b
 | OQ-6 | Domain and branding | `portal.<church-domain>` + church wordmark | DNS/launch |
 | OQ-7 | Email/SMTP provider | Resend (free tier) or Postmark (~$15/mo) | Notifications |
 | OQ-8 | Online payment for event/camp fees | No online payment in MVP; record + reconcile manually | Registration flow |
-| OQ-9 | Data residency preference (EU vs other) | EU (Hetzner Falkenstein/Helsinki) unless policy says otherwise | Hosting region |
+
+### Resolved
+
+| # | Question | Resolution | Decided |
+| --- | --- | --- | --- |
+| OQ-9 | Data residency preference (EU vs other) | **The region is not a PRD default and no longer appears here as one.** It is a required provisioning parameter — `DEPLOY_REGION` in `services/directus/.env.example`, `<country>:<provider location code>`, no default. Chosen once by a human at the point the production VPS is bought; every document refers to that variable rather than naming a location. | AFC-171, ADR "Pin the production hosting region" |
+
+**Why OQ-9 is no longer an open question with a recommended default.** This row used to read *"EU (Hetzner Falkenstein/Helsinki) unless policy says otherwise"* — which was **two** locations, presented as a recommended default inside an open question, and which downstream documents were quoting as though it were a decision. It was not. It was the provider named in an `infra-spec` sizing example, read back as a policy. A reader had no way to tell the difference, which is the same defect we walked back in a letter to a law firm.
+
+The **residual** question is real and still open, and it is a different one: whether Nigerian children's and health data may lawfully sit in a platform hosted outside Nigeria, and on what transfer ground. That is Q21, with counsel, under procurement on [AFC-160](/AFC/issues/AFC-160). It is a legal question, and it is asked without naming a region for the same reason this row no longer does.
 
 Full infrastructure and repository specifics are in `infra-spec` and `repo-plan`.
 

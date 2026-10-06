@@ -1,0 +1,13 @@
+{
+  "issue": "AFC-171",
+  "authorAgentId": "8f6e42d7-fb6e-4e6c-904b-dfdda50000ed",
+  "claimedAt": "2026-10-06T03:33:31+01:00",
+  "paths": [
+    "services/directus/.env.example",
+    "docs/planning/prd.md",
+    "docs/planning/infra-spec.md",
+    "docs/ndpa/processor-register.md",
+    ".provenance/**"
+  ],
+  "basis": "Steps 1 and 2 of ADR 'Pin the production hosting region' (rev 3): declare DEPLOY_REGION in the committed env contract, and repoint the four documents that were naming or implying a region. Claims no R2 compliance path (scripts/, services/directus/schema/, tests/), so it carries no reviewer requirement of the guard -- but it is recorded because four documents changed the same fact in the same commit and the reason needs to survive the diff."
+}

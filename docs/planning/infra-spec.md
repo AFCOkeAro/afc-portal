@@ -53,6 +53,8 @@ Directus is source-available under the Monospace Sustainable Core Licence. Organ
 
 **Rationale:** the workload is light (small relational DB, low concurrency, mostly reads). 4 vCPU / 8 GB leaves headroom for Postgres, Directus, Nuxt SSR, and Caddy on one host. Enable Hetzner automated backups (+20%) as a second layer.
 
+**Region is not part of sizing.** A plan name is not a location. `CX33` says how much CPU and RAM, not where the machine stands, and this document deliberately names no location code anywhere — that is enforced by ADR "Pin the production hosting region" ([AFC-171](/AFC/issues/AFC-171)), which routes every region reference through the `DEPLOY_REGION` variable in §5. The region is chosen at purchase and recorded there. Prices in §8 are EU list rates and are the *reference* case, not a commitment to a region.
+
 **Scale triggers to resize or split:** CPU sustained > 70%, RAM > 80%, DB > 40 GB, or > 200k API requests/day. First split = move Postgres to a managed instance; second = move Nuxt to Vercel/CDN.
 
 ---
@@ -187,6 +189,7 @@ api.example.org {
 
 | Variable | Purpose |
 | --- | --- |
+| `DEPLOY_REGION` | **Region this deployment physically runs in** — `<country>:<provider location code>`, e.g. the shape `XX:yyyy`. **Required, no default, no placeholder.** The single source of truth for the region: no other document names a location. Chosen at purchase by whoever buys the server; asserted at boot once a provisioning path exists. |
 | `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` | Database |
 | `DIRECTUS_KEY`, `DIRECTUS_SECRET` | Directus token signing/encryption |
 | `DIRECTUS_ADMIN_EMAIL`, `DIRECTUS_ADMIN_PASSWORD` | Bootstrap admin |
@@ -259,6 +262,13 @@ api.example.org {
 **Recommendation:** prototype on Option A only as long as it accelerates delivery (weeks, not months); move to Option B for production. At $99/mo, Option A costs ~$1,100/yr more than Option B — worth it short-term for zero server ops, not worth it at steady state.
 
 *Prices are list rates captured 2026-10-05 (Hetzner CX33 €6.49/mo net; Directus Cloud OIG $99/mo; Team $499/mo annual). Verify at purchase; providers adjust pricing.*
+
+**Region is priced separately, and the rate above is region-dependent.** Everything in Option B is a **reference case at EU list rates**. It is not a statement that production will be in the EU — `DEPLOY_REGION` (§5) is unset, and the region has never been decided. Two consequences worth carrying into the purchase:
+
+- **Relocating the whole platform to another region is a re-point, not a rebuild**, because the architecture already parameterises `DB_HOST` and `S3_ENDPOINT`. That is the property the region pin exists to protect.
+- **The compute rate is not the same number everywhere.** A comparable-spec plan in a Nigerian region was priced at ~₦877,000/yr against ~₦120,000/yr for the EU case — a ~₦757,000/yr delta. Full options, sourcing and the segregation branch (which is the expensive one, and is not a server move) are in the [Q21 cost paper](/AFC/issues/AFC-171#document-q21-cost-paper).
+
+*The non-EU figure is a CTO pricing pass against published list rates, not a quotation. Re-verify at purchase.*
 
 ---
 
