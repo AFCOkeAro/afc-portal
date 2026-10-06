@@ -134,6 +134,21 @@ jobs:
       # PGlite gives a real Postgres 16 engine with no service container, so the
       # control tests exercise the same trigger and privilege semantics they
       # will meet in staging.
+
+      # AFC-203. The assertion ledger self-test, and it runs FIRST in this job.
+      #
+      # It belongs here rather than beside the shell gate self-tests above
+      # because it needs an engine: it installs the real harness and forces an
+      # assertion to fail, then asserts the ledger reports that failure. That is
+      # the regression net for the defect where a failing suite persisted zero
+      # assertion rows, so the summary line's "0 failing" was a tautology rather
+      # than a measurement -- a harness that cannot report a failure will
+      # eventually be tuned until it reports a pass.
+      #
+      # A gate nobody has watched fail is untested, not enforced.
+      - name: Assertion ledger self-test (the instrument must be able to fail)
+        run: node scripts/run-db-tests.mjs --self-test
+
       - name: Run database control tests
         run: pnpm test:db
 

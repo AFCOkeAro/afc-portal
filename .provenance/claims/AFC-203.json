@@ -1,0 +1,13 @@
+{
+  "issue": "AFC-203",
+  "authorAgentId": "7b4aae3b-0da5-4de2-a1d8-4737943ef561",
+  "claimedAt": "2026-10-06T04:05:00+01:00",
+  "paths": [
+    "tests/db/assert.sql",
+    "scripts/run-db-tests.mjs",
+    "package.json",
+    ".github/workflows/ci.yml",
+    ".provenance/claims/AFC-203.json"
+  ],
+  "basis": "test_support.assert_*/assert_equals INSERTED the outcome into test_support.results and then RAISE EXCEPTION, and each suite file is executed as one implicit transaction, so the RAISE rolled the INSERT back. A failing suite persisted ZERO assertion rows -- not its failure, and not the assertions that had already passed before it -- which made the runner's `notOk` structurally always 0 and the summary line's '0 failing' a tautology rather than a measurement. Outcomes now leave the transaction as a NOTICE carrying a marked JSON payload, which the runner collects through each driver and reports, so the failing count is real and the reported assertion count equals the number of assertions ATTEMPTED on a red run as well as a green one. node scripts/run-db-tests.mjs --self-test forces an assertion to fail and asserts the ledger reports it, and it is wired into package.json gate:self-test and into the db-tests CI job, so a harness that cannot report a failure fails loudly instead of printing a zero. Test and CI files only: tests/db/assert.sql, scripts/run-db-tests.mjs, package.json, .github/workflows/ci.yml. No production code, no migration and no engine change, so nothing here touches auth, permissions or personal data and the CTO migration-approval path is not engaged. This claim carries no Reviewed-by trailer: the commit is UNREVIEWED and is raised to MediaTech (CTO) for review in AFC-203 rather than claiming a reviewer that does not exist."
+}

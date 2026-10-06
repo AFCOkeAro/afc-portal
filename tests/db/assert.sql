@@ -16,23 +16,81 @@
 -- So the probe runs, its result is captured into plpgsql variables (which are
 -- not transactional), and the enclosing block is then made to roll back by
 -- raising a sentinel that the immediate handler swallows.
-
+--
+-- ---------------------------------------------------------------------
+-- THE LEDGER: an outcome leaves the database as a NOTICE (AFC-203)
+-- ---------------------------------------------------------------------
+-- THERE IS DELIBERATELY NO test_support.results TABLE. It used to be the ledger:
+--
+--     INSERT INTO test_support.results (suite, name, ok, detail) VALUES (...);
+--     IF NOT ok THEN RAISE EXCEPTION 'ASSERTION FAILED: ...'; END IF;
+--
+-- Every suite file is executed as ONE implicit transaction -- the driver sends
+-- the whole file as a single multi-statement query -- so the RAISE rolled the
+-- INSERT back along with the work it had just described. A failed suite
+-- persisted ZERO rows: not the failure, and not the assertions that had already
+-- passed before it. Measured, on a clean tree: rows before=311, after=311,
+-- probe rows persisted=0, from two passing assertions and one failing one.
+--
+-- That made the runner's summary line a tautology rather than a measurement.
+-- `notOk` counted rows where ok = false, and no such row could physically exist,
+-- so every run of this suite printed `0 failing` -- including every run that
+-- failed on an assertion. The assertion COUNT was wrong too: a suite that died
+-- at its first assertion contributed 0 rows instead of its real count, so a
+-- reader could not tell from the ledger whether the assertions after the
+-- failure had been evaluated. That is the one question the ledger exists to
+-- answer.
+--
+-- A ledger that structurally cannot record a failure is worse than no ledger,
+-- because it prints a number.
+--
+-- A NOTICE is not transactional: the backend writes it to the client as it is
+-- executed, so it survives the rollback that destroys the work it describes.
+-- Verified on PGlite for all three shapes -- a notice raised inside a discarded
+-- subtransaction, one inside a transaction that is then ROLLBACKed, and one
+-- inside a statement that raises on the next line -- and in every shape the
+-- notice arrived.
+--
+-- Consequences the runner relies on:
+--   * one notice per ASSERTION ATTEMPTED, emitted before the RAISE, so the
+--     reported count equals the number of assertions attempted on a RED run as
+--     well as on a green one;
+--   * the outcome of a failing assertion reaches the runner even though its
+--     transaction is rolled back, so `0 failing` is finally a measurement.
+--
+-- The payload is JSON behind a fixed marker so that a detail string may contain
+-- anything -- quotes, newlines, the marker itself -- and still arrive intact. The
+-- runner refuses to run rather than under-count if a marked message will not
+-- parse, so a broken ledger cannot masquerade as a shorter one.
+--
+-- DO NOT ADD THE TABLE BACK. A row written inside the transaction that fails is
+-- a row that is missing on exactly the runs that need it, and anyone who queries
+-- it instead of the notice stream is reading a false green.
 CREATE SCHEMA IF NOT EXISTS test_support;
 
-CREATE TABLE IF NOT EXISTS test_support.results (
-  seq    serial PRIMARY KEY,
-  suite  text        NOT NULL,
-  name   text        NOT NULL,
-  ok     boolean     NOT NULL,
-  detail text
-);
-
--- Test-only schema: the roles below need to record results while impersonated.
--- This harness never runs against production, so PUBLIC access here buys
--- simplicity rather than exposure.
+-- Test-only schema: the roles below need to read the harness's config while
+-- impersonated. This harness never runs against production, so PUBLIC access
+-- here buys simplicity rather than exposure. Recording an outcome needs no
+-- privilege at all, which is the other reason it is a NOTICE and not a write.
 GRANT USAGE ON SCHEMA test_support TO PUBLIC;
-GRANT INSERT, SELECT ON test_support.results TO PUBLIC;
-GRANT USAGE, SELECT ON SEQUENCE test_support.results_seq_seq TO PUBLIC;
+
+-- The one and only way an assertion outcome leaves this transaction.
+--
+-- The marker is duplicated in scripts/run-db-tests.mjs. Change one and you
+-- change both, or the ledger silently empties -- which is exactly what
+-- `node scripts/run-db-tests.mjs --self-test` exists to catch.
+CREATE OR REPLACE FUNCTION test_support._record(
+  p_suite text, p_name text, p_ok boolean, p_detail text DEFAULT NULL
+) RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+  RAISE NOTICE 'AFC_ASSERT/1 %',
+    json_build_object(
+      'suite', p_suite,
+      'name',  p_name,
+      'ok',    COALESCE(p_ok, false),
+      'detail', p_detail
+    )::text;
+END $$;
 
 -- The role that owns this harness. Captured once, because SET LOCAL ROLE leaks
 -- out of every helper and no test may rely on the ambient role: NULL means "the
@@ -119,8 +177,7 @@ CREATE OR REPLACE FUNCTION test_support.assert_true(
   p_cond boolean, p_suite text, p_name text, p_detail text DEFAULT NULL
 ) RETURNS void LANGUAGE plpgsql AS $$
 BEGIN
-  INSERT INTO test_support.results (suite, name, ok, detail)
-  VALUES (p_suite, p_name, COALESCE(p_cond, false), p_detail);
+  PERFORM test_support._record(p_suite, p_name, COALESCE(p_cond, false), p_detail);
   IF NOT COALESCE(p_cond, false) THEN
     RAISE EXCEPTION 'ASSERTION FAILED: [%] % -- %', p_suite, p_name, COALESCE(p_detail, 'no detail');
   END IF;
@@ -141,20 +198,17 @@ BEGIN
   v_got := test_support.probe(p_role, p_stmt);
 
   IF v_got IS NULL THEN
-    INSERT INTO test_support.results (suite, name, ok, detail)
-    VALUES (p_suite, p_name, false,
-            'no error raised, expected ' || p_expected_sqlstate || ' from: ' || p_stmt);
+    PERFORM test_support._record(p_suite, p_name, false,
+      'no error raised, expected ' || p_expected_sqlstate || ' from: ' || p_stmt);
     RAISE EXCEPTION 'ASSERTION FAILED: [%] % -- statement succeeded but % was expected: %',
       p_suite, p_name, p_expected_sqlstate, p_stmt;
   ELSIF split_part(v_got, ' | ', 1) <> p_expected_sqlstate THEN
-    INSERT INTO test_support.results (suite, name, ok, detail)
-    VALUES (p_suite, p_name, false,
-            'expected ' || p_expected_sqlstate || ' got ' || v_got || ' from: ' || p_stmt);
+    PERFORM test_support._record(p_suite, p_name, false,
+      'expected ' || p_expected_sqlstate || ' got ' || v_got || ' from: ' || p_stmt);
     RAISE EXCEPTION 'ASSERTION FAILED: [%] % -- expected % got % : %',
       p_suite, p_name, p_expected_sqlstate, v_got, p_stmt;
   ELSE
-    INSERT INTO test_support.results (suite, name, ok, detail)
-    VALUES (p_suite, p_name, true, v_got);
+    PERFORM test_support._record(p_suite, p_name, true, v_got);
   END IF;
 END $$;
 
@@ -167,13 +221,12 @@ BEGIN
   v_got := test_support.probe(p_role, p_stmt);
 
   IF v_got IS NOT NULL THEN
-    INSERT INTO test_support.results (suite, name, ok, detail)
-    VALUES (p_suite, p_name, false, 'unexpected ' || v_got || ' from: ' || p_stmt);
+    PERFORM test_support._record(p_suite, p_name, false,
+      'unexpected ' || v_got || ' from: ' || p_stmt);
     RAISE EXCEPTION 'ASSERTION FAILED: [%] % -- statement raised % but should not have: %',
       p_suite, p_name, v_got, p_stmt;
   ELSE
-    INSERT INTO test_support.results (suite, name, ok, detail)
-    VALUES (p_suite, p_name, true, 'no error, as expected');
+    PERFORM test_support._record(p_suite, p_name, true, 'no error, as expected');
   END IF;
 END $$;
 
@@ -181,8 +234,7 @@ CREATE OR REPLACE FUNCTION test_support.assert_equals(
   p_actual text, p_expected text, p_suite text, p_name text
 ) RETURNS void LANGUAGE plpgsql AS $$
 BEGIN
-  INSERT INTO test_support.results (suite, name, ok, detail)
-  VALUES (p_suite, p_name, p_actual IS NOT DISTINCT FROM p_expected,
+  PERFORM test_support._record(p_suite, p_name, p_actual IS NOT DISTINCT FROM p_expected,
           'actual=' || COALESCE(p_actual, 'NULL') || ' expected=' || COALESCE(p_expected, 'NULL'));
   IF p_actual IS DISTINCT FROM p_expected THEN
     RAISE EXCEPTION 'ASSERTION FAILED: [%] % -- actual % expected %',
@@ -225,8 +277,7 @@ DECLARE
   -- instead of passing on a NULL comparison.
   v_ok boolean := p_actual IS NOT DISTINCT FROM p_expected;
 BEGIN
-  INSERT INTO test_support.results (suite, name, ok, detail)
-  VALUES (p_suite, p_name, v_ok,
+  PERFORM test_support._record(p_suite, p_name, v_ok,
           'actual=' || COALESCE(v_actual, 'NULL')
           || ' expected=' || COALESCE(v_expected, 'NULL'));
   IF NOT v_ok THEN
