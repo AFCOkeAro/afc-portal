@@ -1115,6 +1115,117 @@ Issue: AFC-996
     echo "                and the one real one-argument caller is still counted"
   fi
 
+  # 11h. ORDINARY SHELL PUNCTUATION ON A CORRECT CALLER. The AFC-241 review
+  #      finding, planted in both directions.
+  #
+  #      11g above proves prose is not flagged and that a bare one-argument
+  #      caller is counted. It did NOT plant a one-argument caller carrying the
+  #      punctuation every real pipeline line ends in -- `&&`, `|`, `;`, `>`,
+  #      `2>&1` -- and that omission is the whole of the review's finding:
+  #      `--check-commit "$range" && echo "R2 gate done"` counted FOUR arguments
+  #      and took the live ci.yml caller red, because `&` was missing from the
+  #      metacharacter class. A `break` that did not discard the pending token
+  #      counted the `2` of a `2>&1` as an argument too.
+  #
+  #      A gate that cries wolf on the next routine edit to a working CI line
+  #      gets muted, and a muted guard is worse than no guard because CI still
+  #      reports green. So every shape is planted in BOTH directions: the
+  #      one-argument forms must come back unflagged, and the two-argument forms
+  #      must still be caught with the punctuation attached. Fixing the false
+  #      positives by loosening the scan would pass the first half of this and
+  #      fail the second, which is the only way to make this assertion real.
+  local punct_repo="$tmp/arity-punct"
+  mkdir -p "$punct_repo/scripts"
+  git -C "$punct_repo" init -q
+  git -C "$punct_repo" config user.email guard@afc.test
+  git -C "$punct_repo" config user.name  "AFC guard self-test"
+  local punct_file="$punct_repo/scripts/callers.sh"
+  local -a one_arg_ok=(
+    'bash scripts/dirty-path-guard.sh --check-commit "$range"'
+    'bash scripts/dirty-path-guard.sh --check-commit "$range" && echo "R2 gate done"'
+    'bash scripts/dirty-path-guard.sh --check-commit "$range" && git log --oneline -1'
+    'bash scripts/dirty-path-guard.sh --check-commit "$range" 2>&1'
+    'bash scripts/dirty-path-guard.sh --check-commit "$range" | tee out'
+    'bash scripts/dirty-path-guard.sh --check-commit "$range" ; echo done'
+    'bash scripts/dirty-path-guard.sh --check-commit "$range" || echo fail'
+    'bash scripts/dirty-path-guard.sh --check-commit "$range" > out.txt'
+  )
+  local -a two_arg_bad=(
+    'bash scripts/dirty-path-guard.sh --check-commit "$PWD" "$range"'
+    'bash scripts/dirty-path-guard.sh --check-commit "$PWD" "$range" && echo x'
+    'bash scripts/dirty-path-guard.sh --check-commit "$PWD" "$range" > out.txt'
+    'bash scripts/dirty-path-guard.sh --check-commit "$PWD" "$range" | tee out'
+    'bash scripts/dirty-path-guard.sh --check-commit "$PWD" "$range" 2>/dev/null'
+  )
+  local punct_bad=0
+  : > "$punct_file"
+  local line
+  for line in "${one_arg_ok[@]}"; do printf '%s\n' "$line" >> "$punct_file"; done
+  git -C "$punct_repo" add -A
+  git -C "$punct_repo" commit -q -m "probe: correct one-argument callers, with punctuation"
+  probe_out=$(audit_callers "$punct_repo")
+  if [ -n "$probe_out" ]; then
+    echo "SELF-TEST FAIL: audit_callers flagged a CORRECT one-argument caller"
+    echo "    each of these passes $CHECK_COMMIT_MAX_ARGS argument(s). A gate that cries"
+    echo "    wolf here gets muted, and a muted guard is worse than none."
+    printf '%s\n' "$probe_out" | sed 's/^/    /'
+    punct_bad=1
+  fi
+  # Now the offending shapes, with the same punctuation still attached.
+  local bad_line
+  for bad_line in "${two_arg_bad[@]}"; do printf '%s\n' "$bad_line" >> "$punct_file"; done
+  git -C "$punct_repo" add -A
+  git -C "$punct_repo" commit -q -m "probe: two-argument callers, with punctuation"
+  probe_out=$(audit_callers "$punct_repo")
+  local expect_bad="${#two_arg_bad[@]}" got_bad
+  got_bad=$(printf '%s' "$probe_out" | grep -c . )
+  if [ "$got_bad" -ne "$expect_bad" ]; then
+    echo "SELF-TEST FAIL: audit_callers flagged $got_bad of $expect_bad two-argument callers"
+    echo "    punctuation after a bad caller must not hide it, and must not add a"
+    echo "    false positive. Flagged:"
+    printf '%s\n' "$probe_out" | sed 's/^/    /'
+    punct_bad=1
+  fi
+  if [ "$punct_bad" -eq 0 ]; then
+    echo "  self-test ok: ${#one_arg_ok[@]} correct caller(s) with shell punctuation"
+    echo "                unflagged, $expect_bad two-argument caller(s) still caught"
+  else
+    rc=1
+  fi
+
+  # 11i. THE BOUNDARY REFUSES, NOT JUST THE AUDIT. AFC-241 found the dispatcher
+  #      SILENTLY ignored a surplus argument: `--check-commit <rev> surplus`
+  #      returned exactly what `--check-commit <rev>` returned, so the contract
+  #      was enforced one layer above the boundary and never at it.
+  #
+  #      This also binds CHECK_COMMIT_MAX_ARGS to the dispatcher. 11f pins the
+  #      constant from the audit side: raise it to 2 and the planted two-argument
+  #      caller stops being flagged, so 11f goes red. This pins it from the
+  #      other side: widen the dispatcher to accept a second argument and this
+  #      goes red. Between them, neither half can move alone -- which is what
+  #      "the constant is decorative" looked like before.
+  #
+  # Installed into punct_repo NOW, after the audits above, so the copy is not
+  # part of what they scan. An audit that reads its own subject is a subject
+  # that can flatter itself.
+  cp "$0" "$punct_repo/scripts/dirty-path-guard.sh"
+  chmod +x "$punct_repo/scripts/dirty-path-guard.sh"
+  local surplus_rc surplus_out
+  surplus_out=$(bash "$punct_repo/scripts/dirty-path-guard.sh" --check-commit "$bad_rev" surplus 2>&1)
+  surplus_rc=$?
+  if [ "$surplus_rc" -eq 0 ] || [ "$surplus_rc" -eq 1 ]; then
+    echo "SELF-TEST FAIL: the CLI accepted a surplus argument (exit $surplus_rc)"
+    echo "    the dispatcher must refuse at the boundary, not quietly ignore it."
+    echo "    exit 1 is reserved for 'the gate ran and found a violation'."
+    rc=1
+  elif ! printf '%s' "$surplus_out" | grep -q 'surplus'; then
+    echo "SELF-TEST FAIL: the CLI refused a surplus argument without saying so"
+    printf '%s\n' "$surplus_out" | sed 's/^/    /'
+    rc=1
+  else
+    echo "  self-test ok: the dispatcher refuses a surplus argument at the boundary (exit $surplus_rc)"
+  fi
+
   return $rc
 }
 
@@ -1288,15 +1399,54 @@ grandfathered_lookup() {
 #   explain the bug, this file's own dispatcher. Auditing prose would make the
 #   assertion a nuisance and it would be muted within a week, which is the
 #   documented way a control stops existing while still appearing in the
-#   pipeline. The limit is stated here rather than hidden: a caller that hides
-#   the script behind a variable, a wrapper, or `eval` is not covered.
+#   pipeline.
+#
+# WHAT IS NOT AUDITED, COMPLETE LIST (AFC-241 review, measured over 15 shapes)
+#
+#   Audited:
+#     the block-scalar `ci.yml` shape          bash scripts/… --check-commit "$r"
+#     `sh`, `./scripts/`, bare `scripts/`, $REPO/scripts/ as the path
+#     `| tee`, `; echo`, `|| echo`, `> out`, `2>&1` after the argument
+#
+#   NOT audited -- every one of these is a shape a caller can actually take:
+#     run: bash scripts/… --check-commit      single-line `run:` prefix
+#     - run: bash scripts/… --check-commit    YAML sequence-item prefix
+#     sudo bash scripts/… --check-commit      `sudo` prefix
+#     env CI=1 bash scripts/… --check-commit  `env` prefix
+#     bash scripts/… \  + newline              line continuation: the arguments
+#                                            are on the NEXT line
+#     run_guard() { … }                        a shell-function wrapper
+#     eval "…"                                 eval
+#     a package.json "scripts" entry          a JSON string, not a shell line
+#     --check-commit $(git rev-parse HEAD) …  UNQUOTED command substitution as
+#                                            the first argument: `(` is a
+#                                            metacharacter, so the scan stops
+#                                            there and any argument AFTER it is
+#                                            not counted. Quoting it —
+#                                            "$(git rev-parse HEAD)" — is
+#                                            counted correctly, and that is
+#                                            the form this repository uses.
+#                                            Closing this would need real shell
+#                                            parsing, not a character scan.
+#
+#   The last item is the one that could hide a real defect, so it is written
+#   down here rather than left to be discovered. Unstated limits are the ones
+#   that mislead; a documented limit is a decision.
+#
+#   None of this weakens the control, because the DISPATCHER refuses a surplus
+#   argument on its own (see the case at the foot of this file). The audit
+#   names the file and line before anything runs; the dispatcher is the
+#   boundary that refuses. Two layers, and the second one does not depend on
+#   the first having found anything.
 #
 # ARGUMENTS ARE COUNTED, NOT GUESSED
 #   Quote-aware, and it stops at the first unquoted shell metacharacter or at a
 #   `#` comment. `--check-commit "$range" | tee out` is one argument; the `tee`
 #   is not the guard's problem. Getting this wrong in either direction is worse
 #   than not having the assertion: too strict and it cries wolf on legitimate
-#   pipelines, too loose and it misses the bug it exists to catch.
+#   pipelines, too loose and it misses the bug it exists to catch. Both ways
+#   round were shipped once already -- see assertion 11g, which plants every
+#   shape in this paragraph in both directions.
 # How many tracked lines invoke the guard as a command at all? Informational
 # only. Zero is not a failure -- a fresh clone or a throwaway fixture has no
 # callers -- but it is printed, because R4 claims CI calls this gate and a
@@ -1337,7 +1487,22 @@ _audit_callers() {
           c = substr(rest, k, 1)
           if (q != "") { if (c == q) q = ""; intok = 1; k++; continue }
           if (c == "\"" || c == "'"'"'") { q = c; intok = 1; k++; continue }
-          if (c ~ /[|><;()]/) break
+          # `&` joins the class, and the pending token is DISCARDED rather than
+          # flushed. Both halves are the AFC-241 review finding:
+          #
+          #   `&` was missing, so `&&` and a bare `&` were read as two ordinary
+          #   tokens and everything after them was counted as an argument --
+          #   `--check-commit "$range" && echo done` counted FOUR.
+          #
+          #   A break did not discard the pending token, so the `2` of a `2>&1`
+          #   was counted as an argument even though the `>` stopped the scan.
+          #   A token sitting immediately before a metacharacter is a
+          #   redirection, never an argument.
+          #
+          # Appending `&& echo` to a working CI line is the single most likely
+          # next edit to it, and a gate that goes red there gets muted. A muted
+          # guard is worse than no guard, because CI still reports green.
+          if (c ~ /[|><;()&]/) { intok = 0; break }
           if (c == "#" && !intok) break
           if (c ~ /[[:space:]]/) { if (intok) { n++; intok = 0 } k++; continue }
           intok = 1; k++
@@ -1579,11 +1744,50 @@ if [ "${1:-}" = "--self-test" ]; then
   exit $?
 fi
 
-# ---------------------------------------------------------------------------
-
 case "${1:-}" in
-  "")                 guard "${2:-$ROOT_DEFAULT}"; exit $? ;;
-  "--check-commit")   check_commit "$ROOT_DEFAULT" "${2:-HEAD}"; exit $? ;;
+  "")
+    guard "${2:-$ROOT_DEFAULT}"; exit $? ;;
+
+  "--check-commit")
+    # THE ARITY CONTRACT IS ENFORCED HERE, not only by audit_callers().
+    #
+    # AFC-241's review found two things and both are fixed by this branch:
+    #
+    #   The dispatcher SILENTLY IGNORED a surplus argument. `--check-commit
+    #   <rev> surplus` returned exactly what `--check-commit <rev>` returned, so
+    #   the contract was enforced only by the audit -- one layer above the
+    #   boundary -- and never at the boundary itself. A caller could hand this
+    #   guard two arguments and be told nothing was wrong.
+    #
+    #   CHECK_COMMIT_MAX_ARGS was not BOUND to the dispatcher. It was a contract
+    #   between the matcher and a human being, not between the matcher and the
+    #   code that honours it. Widening this dispatcher to accept a second
+    #   argument left the self-test 30/30 green, because nothing here read the
+    #   constant. It does now, from both sides: assertion 11h pins THIS branch,
+    #   and 11f pins the constant from the audit side, so raising either one
+    #   without the other turns the suite red.
+    #
+    # Exit 2, matching the usage-error exit the catch-all below already uses.
+    # Exit 1 is reserved for "the gate ran and found a violation", and a caller
+    # must never be able to confuse the two.
+    if [ "$#" -gt $((1 + CHECK_COMMIT_MAX_ARGS)) ]; then
+      {
+        echo "usage: $0 --check-commit [REV]"
+        echo
+        echo "Refusing $# arguments after --check-commit; this dispatcher accepts"
+        echo "$CHECK_COMMIT_MAX_ARGS optional argument, the REV. These were ignored:"
+        shift
+        printf '    %s\n' "$@"
+        echo
+        echo "A second argument here is a ROOT, and ROOT is this script's own"
+        echo "location -- it is not a parameter. That arrangement is exactly how"
+        echo "f64cc7d found this dispatcher reversed, and a second argument will"
+        echo "put your revision back in the ROOT slot."
+      } >&2
+      exit 2
+    fi
+    check_commit "$ROOT_DEFAULT" "${2:-HEAD}"; exit $? ;;
+
   "--claims")         emit_claims "${2:-$ROOT_DEFAULT}"; exit 0 ;;
   --self-test)        : ;;
   *) echo "usage: $0 [--self-test|--claims|--check-commit [REV]]" >&2; exit 2 ;;
