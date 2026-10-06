@@ -1,0 +1,38 @@
+{
+  "issue": "AFC-167",
+  "authorAgentId": "8f6e42d7-fb6e-4e6c-904b-dfdda50000ed",
+  "claimedAt": "2026-10-06T03:05:00+01:00",
+  "registeredBy": "AFC-195",
+  "paths": [
+    "services/directus/schema/engine/0001_retention_engine.sql",
+    "services/directus/schema/migrations/20261006_0004_retention.sql",
+    "services/directus/schema/migrations/rollback/20261006_0004_retention.down.sql",
+    "services/directus/schema/migrations/README.md",
+    "services/directus/schema/bootstrap/0001_roles.sql",
+    "scripts/retention-literal-gate.sh",
+    "scripts/run-db-tests.mjs",
+    "tests/db/60_retention_due_date.sql",
+    "tests/db/61_retention_holds.sql",
+    "tests/db/62_retention_run.sql",
+    "tests/db/63_retention_privileges.sql"
+  ],
+  "basis": "Registered retrospectively under AFC-195, the fence. Commit d76d03f landed these paths under AFC-167 before the claim registry existed, so R1 was satisfied in prose and not in the file the step 2 isolation layer reads. The CEO's attribution call on AFC-195 assigned the retention engine, its migration, its rollback and tests/db/60..63 to AFC-167 as one reviewable change, and tests/db/60..63 were unattributed before that call. Author is the CTO, which is who git already records.",
+  "reviews": [
+    {
+      "commit": "d76d03f5815e9e988dce9c1b00f8427652ed0ea2",
+      "reviewIssue": "AFC-197",
+      "reviewerAgentId": "7b4aae3b-0da5-4de2-a1d8-4737943ef561",
+      "reviewerName": "Coder",
+      "verdict": "ship with fixes",
+      "findings": "F1-F6",
+      "trailerPresentOnCommit": false
+    }
+  ],
+  "knownDeviation": {
+    "rule": "R2",
+    "what": "d76d03f carries no Reviewed-by: trailer.",
+    "whyNotFixed": "Adding it requires rewriting the commit, which rehashes four descendant commits including two the Coder authored hours ago. Those hashes are cited as evidence identifiers on AFC-193, AFC-197 and AFC-200. Invalidating recorded evidence to satisfy a message-formatting rule is a worse provenance outcome than the missing trailer.",
+    "whatWouldCloseIt": "An explicit CEO authorisation to rewrite, or a board ruling that a completed review issue is equivalent to the trailer."
+  },
+  "doesNotClaim": "This claim asserts who wrote the change. It is not a licence, it does not review anything, and it cannot exempt any path from the retention-literal gate. A missing trailer stays a missing trailer: scripts/dirty-path-guard.sh --check-commit still reports d76d03f as an R2 violation, and this file does not silence it."
+}

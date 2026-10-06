@@ -1,0 +1,27 @@
+{
+  "issue": "AFC-193",
+  "authorAgentId": "8f6e42d7-fb6e-4e6c-904b-dfdda50000ed",
+  "claimedAt": "2026-10-06T03:05:00+01:00",
+  "registeredBy": "AFC-195",
+  "paths": [
+    "tests/db/64_retention_worker_surface.sql"
+  ],
+  "basis": "Registered retrospectively under AFC-195, the fence. Commit 65e7631 landed this suite under AFC-193 before the claim registry existed. ADR-0002 finding F2 is the subject; the suite is the assertion whose absence let F2 ship, and it also pins the worker's grant surface to exactly {run, sync_clocks} in both directions. Author is the CTO, which is who git already records.",
+  "reviews": [
+    {
+      "commit": "65e76314d65be61da55b905993cb090d1b31e580",
+      "reviewIssue": "AFC-197",
+      "reviewerAgentId": "7b4aae3b-0da5-4de2-a1d8-4737943ef561",
+      "reviewerName": "Coder",
+      "verdict": "ship with fixes",
+      "findings": "F1-F6",
+      "trailerPresentOnCommit": false
+    }
+  ],
+  "knownDeviation": {
+    "rule": "R2",
+    "what": "65e7631 carries no Reviewed-by: trailer.",
+    "whyNotFixed": "Same reason as d76d03f in AFC-167.json: the trailer can only be added by rewriting the commit and its four descendants, two of which the Coder authored. Recorded rather than papered over."
+  },
+  "doesNotClaim": "A claim asserts authorship, not correctness. tests/db/64 still reports as an R2 violation under --check-commit and this file does not suppress that."
+}

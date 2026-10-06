@@ -1,0 +1,13 @@
+{
+  "issue": "AFC-196",
+  "authorAgentId": "8f6e42d7-fb6e-4e6c-904b-dfdda50000ed",
+  "claimedAt": "2026-10-06T03:05:00+01:00",
+  "registeredBy": "AFC-195",
+  "paths": [
+    "scripts/dirty-path-guard.sh",
+    ".provenance/**"
+  ],
+  "basis": "Step 1 of the provenance rule (AFC-194 section 3): the claim registry that the step 2 isolation layer reads, plus the --check-commit mode that enforces R1 and R2 mechanically. AFC-175 built the dirty-tree mode and closed; the registry and the commit mode were its unfinished half and are landed here because AFC-196 is the issue that consumes them.",
+  "notCompliancePath": "scripts/dirty-path-guard.sh is NOT on the R2 list. R2 names scripts/retention-literal-gate.sh specifically, not all of scripts/. This file is on the DIRTY list (all of scripts/) and not on the R2 list; conflating the two lists would demand a reviewer on every script in the repo. Asserted by self-test 9e.",
+  "doesNotClaim": "This claim asserts who wrote the change. It is not a licence and it cannot exempt anything."
+}

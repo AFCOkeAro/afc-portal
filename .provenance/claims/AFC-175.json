@@ -1,0 +1,10 @@
+{
+  "issue": "AFC-175",
+  "authorAgentId": "8f6e42d7-fb6e-4e6c-904b-dfdda50000ed",
+  "claimedAt": "2026-10-06T02:57:00+01:00",
+  "paths": [
+    "scripts/dirty-path-guard.sh",
+    ".provenance/**"
+  ],
+  "basis": "Step 1 of the provenance rule (AFC-194): the dirty-path guard and the claim registry the step 2 isolation layer reads. Claimed for the guard's own future edits and for the registry itself. It claims no R2 path, so it carries no reviewer requirement of its own -- see AFC-194 section 5 for who reviews a CTO-authored compliance-path commit."
+}
