@@ -950,6 +950,36 @@ REVOKE EXECUTE ON FUNCTION retention.release_hold(uuid) FROM directus_app;
 
 -- USAGE on the schema is the minimum to resolve these names at all. Only the
 -- two roles above get it.
+--
+-- THIS GRANT ALSO CONVERGES, and it is the second silent-repair site. Revoking
+-- USAGE from either role here leaves a cluster where every catalog check reads
+-- healthy, the membership row is fully conferring, and retention_job still fails
+-- on the first row with "permission denied for schema retention" -- AFC-268
+-- measured exactly that, and only the execution assertion in tests/db/65 saw it.
+-- A deploy that silently restores a capability is better than one that silently
+-- loses it, so the restore stays; it now says it happened.
+--
+-- Measured limitation: PGlite's driver discards every RAISE message, so the NOTICE
+-- below cannot be observed on the only engine this project can currently run
+-- (AFC-166). The convergence is asserted in tests/db/65 instead.
+DO $$
+DECLARE
+  v_missing text;
+BEGIN
+  SELECT string_agg(r.rolname, ', ' ORDER BY r.rolname) INTO v_missing
+    FROM unnest(ARRAY['retention_worker','directus_app']) AS want(rolname)
+    JOIN pg_roles r ON r.rolname = want.rolname
+   WHERE NOT has_schema_privilege(r.oid, 'retention', 'USAGE');
+
+  IF v_missing IS NOT NULL THEN
+    RAISE NOTICE
+      'engine: RESTORED USAGE ON SCHEMA retention to %. It was missing and the '
+      'GRANT below put it back, because without it retention_job cannot resolve '
+      'the engine and every catalog check still reads healthy.', v_missing;
+  END IF;
+END
+$$;
+
 GRANT USAGE ON SCHEMA retention TO retention_worker, directus_app;
 
 -- Directus may read the schedule so an operator can answer a data subject's

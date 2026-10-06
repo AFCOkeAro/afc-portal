@@ -14,16 +14,16 @@
 -- fictional privilege boundary. This file is therefore the ONLY place a role is
 -- ever created, and it grants no role attribute to anything.
 --
--- Idempotent: re-running against a cluster that already has these roles is a
--- no-op. Nothing here is ever dropped.
+-- Idempotent for ROLE CREATION: re-running against a cluster that already has
+-- these roles creates nothing. Nothing here is ever dropped.
 --
--- ONE EXCEPTION, AND IT IS THE POINT: the retention membership GRANT below
--- CONVERGES rather than being additive. Re-running it overwrites the existing
--- row's inherit_option, set_option and admin_option with the values declared
--- here. That is deliberate -- this file is the declaration of the deployed
--- capability -- but a mutation that this file calls a no-op anywhere else is a
--- lie an operator will act on, so the divergence is reported by NOTICE before
--- it is overwritten, and "nothing here is ever dropped" stays true.
+-- It is NOT a no-op, and it was described as one until AFC-268 measured it. The
+-- retention membership GRANT below CONVERGES: re-running it overwrites the
+-- existing row's inherit_option, set_option and admin_option with the values
+-- declared here. The same is true of the schema USAGE grant in the engine file.
+-- That is deliberate -- these files are the declaration of the deployed
+-- capability -- but a privilege that changes on every deploy must say so in the
+-- deploy log, which is what the NOTICEs below and in the engine are for.
 
 -- No durations appear in this file, so it is safe under the retention-literal
 -- gate; it is scanned, not exempt.
@@ -106,21 +106,42 @@ GRANT USAGE ON SCHEMA public TO retention_worker;
 -- in the repository that changed a privilege with nothing in the deploy log,
 -- while four notices above told the operator the roles were "already exists, left
 -- alone". An operator who set INHERIT FALSE on purpose after an incident had it
--- undone silently. It is still undone -- but now the deploy log says so, and it
--- says what it overwrote. Measured: this NOTICE fires and the row becomes
--- inherit=true set=true admin=false.
+-- undone silently.
+--
+-- AFC-268 measured the first version of this block and found it silent in all
+-- three of its cases, for two separate reasons, both fixed here:
+--
+--   * the ABSENT case was not covered at all -- the row being gone is the most
+--     consequential change of the three, because bootstrap CREATED the
+--     membership rather than adjusting it, and `IF FOUND` skipped it;
+--   * PGlite's driver discards every RAISE message, so nothing emitted from this
+--     block could be observed on the only engine this project can currently run
+--     (AFC-166). Measured: RAISE NOTICE and RAISE WARNING, from a DO block and
+--     from a function, all arrive as an empty list. So the NOTICE is correct
+--     PostgreSQL and UNVERIFIED here, and the convergence itself is asserted in
+--     tests/db/65 instead -- see the note at the end of this block.
 DO $$
 DECLARE
   v_old record;
+  v_absent boolean;
 BEGIN
   SELECT inherit_option, set_option, admin_option INTO v_old
     FROM pg_auth_members
    WHERE roleid = 'retention_worker'::regrole
      AND member  = 'retention_job'::regrole;
+  v_absent := NOT FOUND;
 
-  IF FOUND AND (v_old.inherit_option IS DISTINCT FROM true
-             OR v_old.set_option    IS DISTINCT FROM true
-             OR v_old.admin_option  IS DISTINCT FROM false) THEN
+  IF v_absent THEN
+    RAISE NOTICE
+      'bootstrap: CREATED retention_job -> retention_worker. The membership was '
+      'absent and this file granted it WITH INHERIT TRUE, SET TRUE, ADMIN FALSE. '
+      'If it was removed deliberately, the next deploy put it back.';
+  ELSIF (v_old.inherit_option IS DISTINCT FROM true
+     OR v_old.set_option    IS DISTINCT FROM true
+     OR v_old.admin_option  IS DISTINCT FROM false) THEN
+    -- ADMIN TRUE is the one an operator would want named loudly: it means
+    -- retention_job could pass the erasure capability onward to anyone it was
+    -- asked to.
     RAISE NOTICE
       'bootstrap: CONVERGED retention_job -> retention_worker (inherit %->true, '
       'set %->true, admin %->false). The deployed capability is declared in this '

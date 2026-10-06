@@ -361,3 +361,87 @@ easily repeated:
 
 A subset is not a bound. When a control covers part of an invariant, say which part, in
 the message, where the operator reads it.
+
+---
+
+# Part 4 — Third review: the repair was correct, and it was silent
+
+[AFC-268](/AFC/issues/AFC-268) returned **ship**. All three blocking findings from
+[AFC-215](/AFC/issues/AFC-215) and [AFC-247](/AFC/issues/AFC-247) are closed, and the
+role design has been through three independent falsification passes without changing.
+
+One judgement was settled in the reviewer's own words, and it is the one worth writing
+down because the default instinct is the opposite:
+
+> The failure modes here are not symmetric. Failing closed on drift leaves people's
+> personal data un-erased past its retention date, which is the NDPA breach.
+> Re-arming a capability the law requires is the correct direction for this specific
+> control.
+
+So the repair stays. What is not acceptable is that it is silent — and this pass found
+the silence had **two causes**, only one of which was mine.
+
+## Cause 1 — a real gap, found by reading
+
+The first version of the reporting block only fired when the membership row **existed**
+with divergent options (`IF FOUND AND …`). The absent case was not covered at all — and
+absent is the most consequential of the three cases, because bootstrap then *created*
+the membership rather than adjusting it. That case is now reported separately.
+
+## Cause 2 — the reporting is unverifiable on the only engine we can run
+
+The reviewer measured all three mutations and found no log line naming any of them. That
+was not a defect in the NOTICE; it is a property of the engine:
+
+```
+RAISE NOTICE from a DO block            -> []
+RAISE WARNING from a DO block           -> []
+RAISE NOTICE from a plpgsql function    -> []
+```
+
+**PGlite's driver discards every `RAISE` message.** So the NOTICE is correct PostgreSQL
+and **unverified in execution** here, and the reviewer's "log line: none" is exactly what
+a driver that drops them produces. Neither of us can currently observe it.
+
+The honest consequence is written into the code rather than glossed: the reporting is
+asserted by reading, and the thing that actually converges is asserted by measurement.
+
+## What was measured, and what was not
+
+| case | bootstrap | converged to | who can pass the capability on |
+| --- | --- | --- | --- |
+| membership revoked | PASSED | `inherit t, set t, admin f` | no |
+| `INHERIT FALSE, SET FALSE` | PASSED | `inherit t, set t, admin f` | no |
+| `ADMIN TRUE` | PASSED | `inherit t, set t, admin f` | no |
+
+`ADMIN TRUE` is the row that mattered: it means `retention_job` could hand the erasure
+capability to anyone it was asked to, and bootstrap revoked it with no record. That
+restore is now measured and reported.
+
+## The second silent-repair site
+
+[AFC-268](/AFC/issues/AFC-268) identified one more, and it is mine from `cc8396d`. The
+engine's `GRANT USAGE ON SCHEMA retention` converges too: revoke `USAGE` from the
+worker, and re-running the engine restores it silently. This is the drift that
+`REVOKE USAGE ON SCHEMA retention` exposes, where every catalog check reads healthy and
+`retention_job` fails with `permission denied for schema retention`. Same fix, same
+argument, now in place.
+
+## What this adds to the standing rules
+
+Part 2: a privilege assertion needs a case where the privilege is wrong.
+Part 3: an assertion's message is part of the assertion.
+
+Part 4 is narrower and, I think, the most operational of the three:
+
+> **A reporting mechanism you cannot observe is not a reporting mechanism.** Before
+> claiming a control "reports", run it on the engine you will actually ship, and see the
+> output. The control may be correct and the evidence for it absent — which is worse,
+> because the absence reads as "nothing happened" and therefore "nothing was wrong".
+
+This is the same root cause as [AFC-166](/AFC/issues/AFC-166): there is no run of this
+suite, in CI or anywhere, on a server build. Every measurement in all three review passes
+is PostgreSQL 16 compiled to WebAssembly, in a single connection. That is not a reason to
+distrust the results — the reviewer's semantics are ordinary server behaviour — but
+"no reason to doubt" is not "measured", and for an NDPA s.40(2) evidence surface the
+distinction is the whole question.
