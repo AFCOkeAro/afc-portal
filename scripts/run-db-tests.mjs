@@ -268,6 +268,70 @@ async function main() {
   try {
     await db.exec(`SET TIME ZONE '${SESSION_TZ}'`);
     log(`Session TimeZone pinned to ${SESSION_TZ}`);
+
+    // ---------------------------------------------------------------
+    // Pre-flight: refuse to run against a database that already has state.
+    //
+    // This suite creates clusters of objects that CREATE ... IF NOT EXISTS
+    // silently accepts: probe schemas, seeded fixtures, roles whose grants
+    // accumulate. Re-running against a used database therefore does not
+    // re-test the controls -- it tests whatever the previous run left behind,
+    // and reports it in the same green text as a clean run. Measured on real
+    // PostgreSQL 18: a fresh database is 11 suites / 343 assertions / 0
+    // failing, and the immediately following run on that same database is
+    // 10 of 11 suites failing. Both numbers are real. Neither means the
+    // controls changed, and a suite whose verdict depends on whether someone
+    // remembered to use a clean database is not evidence for anything.
+    //
+    // The fix here is to REFUSE, not to clean. Dropping the database named in
+    // PG_URL would be irreversible, and a typo'd or copy-pasted PG_URL aimed
+    // at staging would take staging with it. A test harness that deletes
+    // whatever it was pointed at is a much worse defect than the one it is
+    // fixing, so the harness stops and tells the operator what to do instead.
+    // Default deny: nothing is destroyed on any path through this file.
+    // ---------------------------------------------------------------
+    const dirty = await db.query(`
+      SELECT n.nspname AS schema, c.relname AS relation
+        FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+       WHERE c.relkind IN ('r','p','v','m','S')
+         AND (n.nspname NOT IN ('pg_catalog','information_schema','public')
+              OR c.relname IN ('incidents','people','legal_holds','retention_policies',
+                               'retention_clocks','retention_anchor_sources',
+                               'retention_class_sources','retention_runs',
+                               'retention_run_items'))
+       LIMIT 5`);
+    const extraSchemas = await db.query(`
+      SELECT nspname FROM pg_namespace
+       WHERE nspname LIKE '%\\_probe' OR nspname = 'retention' LIMIT 5`);
+    if (dirty.length || extraSchemas.length) {
+      const found = [
+        ...extraSchemas.map((r) => r.nspname),
+        ...dirty.map((r) => `${r.schema}.${r.relation}`),
+      ];
+      console.error(`
+  REFUSING to run: the target database is not empty.
+
+    ${found.join('\n    ')}
+
+  These objects come from a previous run of this suite. Suites here seed
+  fixtures and rely on CREATE ... IF NOT EXISTS, so a second run on the same
+  database measures the leftovers instead of the controls and reports the
+  result in the same format as a real one.
+
+  Point PG_URL at a database that does not exist yet, or create one and let
+  this run populate it:
+
+    createdb afc_db_tests && PG_URL=postgres://.../afc_db_tests pnpm test:db
+
+  This harness deliberately does NOT drop the database for you. PG_URL is an
+  operator-supplied string and destroying whatever it names is irreversible --
+  a misdirected connection string would delete real data, and a test runner
+  that can do that is a worse problem than a stale fixture.
+`);
+      process.exitCode = 2;
+      return;
+    }
+    log('Pre-flight: target database is empty');
     // ---------------------------------------------------------------
     // Bootstrap, as the cluster owner. This is the REAL bootstrap file, not a
     // copy of it, and that is load-bearing rather than tidiness.
