@@ -78,6 +78,8 @@ Whether it applies to us turns on whether the FBO exemption also removes UHL/EHL
 
 **A conflict the DPCO must resolve:** Art. 7(c) says 31 March; Art. 10(8) gives a first-year filer 15 months from establishment; Art. 10(12) cross-refers to 10(8), not 7(c). **The issued GAID contradicts itself.** 2027-03-31 follows the stricter reading.
 
+**Update 2026-10-06 — the conflict is resolved *for us*, and we did not have to pay for it.** The board established that AFC began **before 12 June 2023**, so **Art. 10(7) governs directly and the Art. 10(8) 15-month limb never reached us.** The date above does not move. What the answer did *not* settle is whether a return was ever filed for the 31 March 2026 cycle — see gap **C8**, which is now the live item on this section.
+
 ---
 
 ## 4. Named owners — and the one that does not exist yet
@@ -109,9 +111,10 @@ Whether it applies to us turns on whether the FBO exemption also removes UHL/EHL
 | C2 | **No named human owner on 4 of 7 entries.** | DPCO/DPO seat unfilled. | **CEO** — complete [AFC-160](/AFC/issues/AFC-160); target signature 2026-10-20, DPO effective 2026-10-31. |
 | C3 | **The drill facilitator is not named** — acceptance criterion 4 asks for a named facilitator. | Same cause. **Interim facilitator is the CEO**, and the CEO runs it unless the DPCO is appointed before 2026-11-06. | **CEO** — confirm by 2026-10-23 (T-14 checkpoint). |
 | C4 | **2028-01-03 and 2028-03-31 are not on the calendar.** | Superseded by the 2026-12-01 early-audit hedge. **Deliberate, per §3.1.** | **DPCO** — after determining the real anchor, create the entries if the 15-month deadline falls after 2027-03-01. |
-| C5 | **AFC's date of establishment is unknown** and decides which conflicting provision sets the first CAR deadline. | Not recorded anywhere in this project. | **Board** — supply it with the [AFC-160](/AFC/issues/AFC-160) decision. Question 7 of 8. |
+| C5 | **CLOSED 2026-10-06 — AFC's date of establishment is now known.** The board answered "before 12 June 2023". | It was not recorded anywhere in this project. Now supplied by the board via [AFC-160](/AFC/issues/AFC-160). | **None — closed.** Consequence: **GAID Art. 10(7) governs, so CAR is due not later than 31 March each year.** The Art. 10(8) 15-month first-filing limb **no longer applies to us** — it only ever reached controllers established after 12 June 2023. **The 2027-03-31 date in §3.3 does not move; it was already the stricter reading, and the answer removes the alternative rather than changing the date.** See C8 for what the answer did *not* settle. |
 | C6 | **The semi-annual report has no deadline in Art. 13.** Art. 7(e)'s "within six (6) months" is ambiguous. | — | **DPO** — confirm the 2027-04-30 cadence is defensible. |
 | C7 | **The recurrence after report #2 is not scheduled.** | Deliberately not created as a placeholder. | **DPO** — once the cadence is established. |
+| C8 | **We have no CAR filing history, and C5 implies a date that has already passed.** | The board's answer of "before 12 June 2023" puts the Art. 10(7) deadline at **31 March each year**. **31 March 2026 was six months ago.** We do not know whether a CAR was ever filed — no filing history is recorded anywhere in this project, because until 2026-10-06 we did not know which provision governed and so did not know what to look for. **This gap was created by C5 being answered, not by C5 being open.** | **CTO** — read the church's own records for any prior CAR filing and who filed it. **Then ask the NDPC directly** whether an FBO is in CAR scope and what it treats as our filing history. **Neither step is a legal engagement and neither needs the counsel spend the board declined on 2026-10-06.** If a filing was missed, Art. 10(9) adds an administrative penalty of **50% of the filing fee**. First clean filing should land **before 2027-03-31**; Art. 10(13) issues a Compliance Audit Returns Certificate on filing, which Art. 48(2) treats as prima facie good faith. |
 
 ---
 
