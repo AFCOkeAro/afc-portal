@@ -1066,3 +1066,262 @@ BEGIN
   END IF;
 END
 $$;
+
+-- ===========================================================================
+-- 8. THE WIDER DELETE ROUTE. AFC-295.
+--
+-- WHY THIS SECTION EXISTS. ADR-0004 Part 5 bounded the PREDEFINED-ROLE route to
+-- blanket DELETE (pg_write_all_data) and deliberately left the wider route open:
+-- a custom group role, or a direct table grant, can hold DELETE on a collection
+-- with no membership of retention_worker and no EXECUTE on retention.run. The
+-- independent review (AFC-291, finding F3) measured that the route is genuinely
+-- open, not merely unasserted: a non-superuser LOGIN holding DELETE on public
+-- can DELETE FROM people -- around an active legal hold, because
+-- legal_holds.scope_id is polymorphic text and not a foreign key to people --
+-- and can remove retention_clocks first, so the ladder never runs. `people`,
+-- `retention_anchor_sources`, `retention_class_sources`, `retention_clocks` and
+-- `retention_policies` carried no DELETE trigger, no RLS and no policy.
+--
+-- The closure is two layers, because "can this credential destroy the row?" and
+-- "did it?" are different questions, and a compliance control should answer both:
+--
+--   8a. RUNTIME. BEFORE DELETE (row) and BEFORE TRUNCATE (statement) guards on
+--       the five collections above. Same shape as incidents_no_delete and
+--       legal_holds_no_delete: permissions are a layer, a trigger is the control.
+--       It closes the ACT whatever route delivered the grant, and the TRUNCATE
+--       trigger closes the hole no row-level guard can reach.
+--
+--   8b. DEPLOY. A capability assertion that no non-superuser LOGIN holds DELETE
+--       or TRUNCATE on ANY retention-managed collection (the five above, plus
+--       legal_holds, retention_principals, retention_run_items and
+--       retention_runs). ADR-0004 Part 5's rule is to bound the CAPABILITY, not
+--       the route, and this is the predicate over the grants themselves that the
+--       rule calls for. It catches a custom group role and a direct table grant,
+--       which no route enumeration would.
+--
+-- WHY THE GUARDS ARE IN THE ENGINE AND NOT IN A MIGRATION. A new migration that
+-- adds a guard to a table it does not create is a migration whose down script
+-- disarms a control over a surviving object -- the AFC-253 shape the
+-- rollback-control gate refuses, and one the gate is right to refuse. The engine
+-- is behaviour, not schema history: it is re-applied on every deploy and has no
+-- rollback that could silently remove a control. The tables keep the migration
+-- that created them.
+--
+-- WHY THE DEPLOY ASSERTION IS HERE AND NOT IN THE SUITE. It must run after the
+-- migrations, so the collections exist, and before tests/db/assert.sql, so the
+-- harness's v4 fixture grants (tests/db/20 on incidents, tests/db/63 on
+-- retention_clocks, retention_policies and the rest) are not yet present. In the
+-- suite the predicate is legitimately non-empty for scaffolding reasons, which is
+-- exactly why the suite cannot make the clean-tree claim and the engine can. The
+-- suite (tests/db/59_retention_delete_guards.sql) drives both layers with a
+-- manufactured drift; the engine asserts the deployed state.
+-- ===========================================================================
+
+-- 8a. The runtime guards.
+--
+-- One function serves both DML verbs, but the two verbs do not share a rule, and
+-- the difference is deliberate:
+--
+--   DELETE   The owner check is current_user, matching
+--            retention_clocks_state_is_engine_owned in migration 0004: inside
+--            retention.run (SECURITY DEFINER) current_user is the engine's owner,
+--            and a future person-erasure path is a SECURITY DEFINER function owned
+--            by the same role. Any other identity is refused -- including a
+--            cluster superuser, which must SET ROLE to the owner deliberately,
+--            exactly as incidents_no_delete already requires. The owner role is
+--            NOLOGIN and bootstrap asserts no LOGIN is a member of it, so "the
+--            owner may delete" is not a route a credential can take.
+--
+--   TRUNCATE Refused for EVERY identity, including the owner, exactly as
+--            incidents_forbid_truncate refuses it. No engine or maintenance path
+--            truncates a retention-managed collection; a reset is a DELETE, which
+--            the owner may still perform on the personal-data collections. Making
+--            it unconditional is what closes the verb a row-level guard cannot see
+--            on all nine collections, not only the five the DELETE branch guards.
+--
+-- The DELETE guard is attached to the five collections that carried no guard. The
+-- TRUNCATE guard is attached to ALL NINE, because four of them (legal_holds,
+-- retention_principals, retention_run_items, retention_runs) carried a DELETE
+-- guard and no TRUNCATE guard, and TRUNCATE is the one verb that reaches them
+-- anyway. The four keep their existing DELETE guards; this file adds only their
+-- statement trigger.
+CREATE OR REPLACE FUNCTION public.retention_managed_collection_guard()
+RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+  IF TG_OP = 'TRUNCATE' THEN
+    RAISE EXCEPTION
+      'public.% is a retention-managed collection and cannot be truncated (AFC-295). TRUNCATE bypasses the legal holds, the retention ladder and the retention_runs manifest -- the NDPA s.40(2) controls -- and no path truncates this collection.',
+      TG_TABLE_NAME
+      USING ERRCODE = 'restrict_violation';
+  END IF;
+
+  IF current_user <> 'directus_migrator' THEN
+    RAISE EXCEPTION
+      'public.% is a retention-managed collection: DELETE is refused outside the retention engine owner (AFC-295). A credential that holds DELETE here erases records around the legal holds, the retention ladder and the retention_runs manifest -- the NDPA s.40(2) controls -- without reaching retention_worker or retention.run.',
+      TG_TABLE_NAME
+      USING ERRCODE = 'restrict_violation';
+  END IF;
+
+  -- A BEFORE DELETE row trigger allows the delete by returning OLD.
+  RETURN OLD;
+END $$;
+
+COMMENT ON FUNCTION public.retention_managed_collection_guard() IS
+  'AFC-295: BEFORE DELETE (row) and BEFORE TRUNCATE (statement) guard for the retention-managed collections. DELETE is refused outside the engine owner (directus_migrator, NOLOGIN and asserted single-holder); TRUNCATE is refused for every identity, like incidents_forbid_truncate, because no path truncates these collections.';
+
+-- The guards are attached in loops so a table added to a set is guarded on every
+-- verb, and so a typo in one table name is a loud error rather than one table
+-- quietly left open. Idempotent: DROP IF EXISTS then CREATE.
+DO $$
+DECLARE
+  v_delete_tables text[] := ARRAY[
+    'people',
+    'retention_anchor_sources',
+    'retention_class_sources',
+    'retention_clocks',
+    'retention_policies'
+  ];
+  v_truncate_tables text[] := ARRAY[
+    'people',
+    'retention_anchor_sources',
+    'retention_class_sources',
+    'retention_clocks',
+    'retention_policies',
+    'legal_holds',
+    'retention_principals',
+    'retention_run_items',
+    'retention_runs'
+  ];
+  t text;
+BEGIN
+  FOREACH t IN ARRAY v_delete_tables LOOP
+    EXECUTE format('DROP TRIGGER IF EXISTS %I ON public.%I', t || '_no_delete', t);
+    EXECUTE format(
+      'CREATE TRIGGER %I BEFORE DELETE ON public.%I '
+      'FOR EACH ROW EXECUTE FUNCTION public.retention_managed_collection_guard()',
+      t || '_no_delete', t);
+  END LOOP;
+
+  FOREACH t IN ARRAY v_truncate_tables LOOP
+    EXECUTE format('DROP TRIGGER IF EXISTS %I ON public.%I', t || '_no_truncate', t);
+    EXECUTE format(
+      'CREATE TRIGGER %I BEFORE TRUNCATE ON public.%I '
+      'FOR EACH STATEMENT EXECUTE FUNCTION public.retention_managed_collection_guard()',
+      t || '_no_truncate', t);
+  END LOOP;
+END $$;
+
+-- 8b. The capability assertion.
+--
+-- A STABLE function so the suite can ask the same question the engine asks,
+-- rather than reproducing the predicate in the test and letting the two drift.
+-- It returns the offending role:collection:privilege triples, or NULL when there
+-- are none. It reads pg_catalog, so it is SECURITY INVOKER and needs no privilege
+-- beyond what the catalog grants everyone.
+CREATE OR REPLACE FUNCTION retention.unbounded_delete_logins()
+RETURNS text
+LANGUAGE sql STABLE AS $$
+  SELECT string_agg(
+           format('%s:%s:%s', r.rolname, t.tbl, p.priv),
+           ', ' ORDER BY r.rolname, t.tbl, p.priv)
+    FROM (VALUES
+            ('people'),
+            ('retention_anchor_sources'),
+            ('retention_class_sources'),
+            ('retention_clocks'),
+            ('retention_policies'),
+            ('legal_holds'),
+            ('retention_principals'),
+            ('retention_run_items'),
+            ('retention_runs')
+         ) AS t(tbl)
+    CROSS JOIN (VALUES ('DELETE'), ('TRUNCATE')) AS p(priv)
+    JOIN pg_class c ON c.oid = to_regclass('public.' || t.tbl)
+    JOIN pg_roles r ON r.rolcanlogin AND NOT r.rolsuper
+   WHERE has_table_privilege(r.oid, c.oid, p.priv);
+$$;
+
+COMMENT ON FUNCTION retention.unbounded_delete_logins() IS
+  'AFC-295: the non-superuser LOGIN roles that hold DELETE or TRUNCATE on any retention-managed collection, as role:collection:privilege, or NULL when none do. The deploy assertion below calls it after the migrations and before the harness fixture grants; tests/db/59 drives it with a manufactured drift.';
+
+-- Explicit, because this function is defined after the blanket revoke above and
+-- would otherwise carry the default PUBLIC EXECUTE. tests/db/63.3 asserts no
+-- retention-schema function grants PUBLIC and that every one is executable by its
+-- owner, so this keeps that assertion true.
+REVOKE ALL ON FUNCTION retention.unbounded_delete_logins() FROM PUBLIC;
+
+-- The deploy assertion itself, as a function rather than an inline DO block, so
+-- tests/db/59 can drive the SAME code with a manufactured drift and require it to
+-- raise. An assertion that cannot be made to fail is a constant with a query in
+-- front of it (ADR-0004 Part 2).
+CREATE OR REPLACE FUNCTION retention.assert_no_login_delete_surface()
+RETURNS void
+LANGUAGE plpgsql STABLE AS $$
+DECLARE
+  v_missing       text;
+  v_bad           text;
+  v_owner_members text;
+BEGIN
+  -- Probe control: every collection this bound names exists. A predicate over a
+  -- table that is not there matches nothing, and a bound that matches nothing is
+  -- indistinguishable from a bound that holds.
+  SELECT string_agg(t, ', ' ORDER BY t) INTO v_missing
+    FROM unnest(ARRAY[
+           'people', 'retention_anchor_sources', 'retention_class_sources',
+           'retention_clocks', 'retention_policies', 'legal_holds',
+           'retention_principals', 'retention_run_items', 'retention_runs'
+         ]) AS t
+   WHERE to_regclass('public.' || t) IS NULL;
+
+  IF v_missing IS NOT NULL THEN
+    RAISE EXCEPTION
+      'retention-managed collection(s) % do not exist, so the DELETE capability bound cannot be evaluated. A bound over a table that is not there is a bound over nothing.',
+      v_missing
+      USING ERRCODE = 'restrict_violation';
+  END IF;
+
+  v_bad := retention.unbounded_delete_logins();
+
+  IF v_bad IS NOT NULL THEN
+    RAISE EXCEPTION
+      'non-superuser LOGIN role(s) hold DELETE or TRUNCATE on a retention-managed collection (%). A credential that can destroy these rows erases records around the legal holds, the retention ladder and the retention_runs manifest -- the NDPA s.40(2) controls -- without reaching retention_worker or retention.run. Revoke it: REVOKE DELETE, TRUNCATE ON <collection> FROM <role>. The same bound is driven in tests/db/59.',
+      v_bad
+      USING ERRCODE = 'restrict_violation';
+  END IF;
+
+  -- THE SECOND ARM, AND WHY IT IS NEEDED. unbounded_delete_logins() uses
+  -- has_table_privilege, which respects INHERIT: a LOGIN granted directus_migrator
+  -- WITH INHERIT FALSE, SET TRUE is NOT reported by it, yet can SET ROLE
+  -- directus_migrator -- whose current_user the runtime DELETE guard allows -- and
+  -- erase. Bootstrap route 3 catches that at deploy with pg_has_role(... 'MEMBER'),
+  -- which is INHERIT-agnostic; this arm makes the engine a backstop rather than
+  -- relying on bootstrap alone. Superusers are excluded for the same reason as
+  -- above: pg_has_role answers true for them against everything.
+  SELECT string_agg(r.rolname, ', ' ORDER BY r.rolname) INTO v_owner_members
+    FROM pg_roles r
+   WHERE r.rolcanlogin
+     AND NOT r.rolsuper
+     AND pg_has_role(r.oid, 'directus_migrator', 'MEMBER');
+
+  IF v_owner_members IS NOT NULL THEN
+    RAISE EXCEPTION
+      'non-superuser LOGIN role(s) % are members of directus_migrator, the SECURITY DEFINER owner of the retention engine and the identity the runtime DELETE guard allows. Membership of the owner executes the erasure path with no grant of its own, and has_table_privilege does not report it when the membership is WITH INHERIT FALSE. Revoke it: REVOKE directus_migrator FROM <role>.',
+      v_owner_members
+      USING ERRCODE = 'restrict_violation';
+  END IF;
+END $$;
+
+COMMENT ON FUNCTION retention.assert_no_login_delete_surface() IS
+  'AFC-295: the deploy-time assertion that no non-superuser LOGIN holds DELETE or TRUNCATE on a retention-managed collection, AND that none is a member of the engine owner. Called at engine install, after the migrations and before the harness fixture grants; tests/db/59 calls it with manufactured drifts and requires it to raise, so it is proven able to fail.';
+
+REVOKE ALL ON FUNCTION retention.assert_no_login_delete_surface() FROM PUBLIC;
+
+-- THE DEPLOY ASSERTION. It runs at install time: after the migrations, so the
+-- collections exist, and before tests/db/assert.sql, so the harness's v4 fixture
+-- grants are not yet present -- which is why the suite cannot make this claim and
+-- the engine can.
+DO $$
+BEGIN
+  PERFORM retention.assert_no_login_delete_surface();
+END $$;

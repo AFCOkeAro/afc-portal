@@ -76,10 +76,14 @@ BEGIN
                                 retention_class_sources, people, fixture_medical_notes
        TO test_table_super');
 
-  -- With ALL granted, a role CAN delete rows directly -- and that is exactly
-  -- why the erasure GRANT is a provisioning decision (63.6) rather than
-  -- something the schema can enforce. What the schema CAN enforce is the part
-  -- that produces a false record: clock state and delete_enabled.
+  -- With ALL granted, a role holds DELETE and TRUNCATE on the collection -- and
+  -- since AFC-295 the schema refuses the act anyway. This comment used to read
+  -- "a role CAN delete rows directly", which was true before AFC-295 and is false
+  -- now: a fully-granted role is refused 23001 by the new per-table guard, not
+  -- 42501 by the grant list. That is what makes the header's "no Directus role,
+  -- however granted, can DELETE a retention-covered record" claim asserted here
+  -- rather than merely narrated. What the schema has always enforced, and still
+  -- does, is the part that produces a false record: clock state and delete_enabled.
   PERFORM test_support.assert_raises('directus_super_admin',
     $q$UPDATE retention_clocks SET state = 'deleted' WHERE state = 'due'$q$,
     '23001', 'priv', 'super_admin: fully granted UPDATE still cannot mark a clock deleted');
@@ -91,6 +95,28 @@ BEGIN
   PERFORM test_support.assert_raises('test_table_super',
     $q$UPDATE retention_policies SET delete_enabled = true WHERE delete_enabled = false$q$,
     '23001', 'priv', 'a role with ALL on the table still cannot enable live erasure');
+
+  -- AFC-295. The guard, not the grant, is what refuses the destructive verbs once
+  -- ALL is granted, because the grant list cannot see either. Both verbs.
+  PERFORM test_support.assert_raises('directus_super_admin',
+    $q$DELETE FROM retention_clocks$q$,
+    '23001', 'priv', 'super_admin: fully granted DELETE still cannot delete a clock -- the AFC-295 guard refuses it');
+
+  PERFORM test_support.assert_raises('test_table_super',
+    $q$TRUNCATE retention_clocks$q$,
+    '23001', 'priv', 'a role with ALL cannot TRUNCATE the clocks -- the AFC-295 statement trigger refuses it');
+
+  -- And a DELETE of a real person row, so the row-level guard is exercised and not
+  -- only the grant list. A probe person is inserted; the refusal discards its
+  -- subtransaction, and the row is removed by the owner afterwards.
+  PERFORM test_support.as_role(NULL,
+    $q$INSERT INTO people (id, status) VALUES ('00000000-0000-0000-0000-00000000c363'::uuid, 'active')$q$);
+  PERFORM test_support.assert_raises('test_table_super',
+    $q$DELETE FROM people WHERE id = '00000000-0000-0000-0000-00000000c363'::uuid$q$,
+    '23001', 'priv', 'a role with ALL cannot DELETE a person row -- the AFC-295 guard refuses it, not the grant list');
+  PERFORM test_support.as_role('directus_migrator',
+    $q$DELETE FROM people WHERE id = '00000000-0000-0000-0000-00000000c363'::uuid$q$);
+  PERFORM test_support.as_role(NULL, $q$SELECT 1$q$);
 
   -- And the erasure target rows are not gone, because nothing claimed to erase
   -- them.

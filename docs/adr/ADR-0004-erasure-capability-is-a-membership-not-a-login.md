@@ -513,34 +513,40 @@ and the invariant should say so rather than disclaim it.
   operational login will now fail the bootstrap step, not just the suite. That is
   intended: this ADR's own logic is that a second erase-capable credential is worse than
   one, and a named wall beats a silent operational exception.
-- **What is still not bounded, stated rather than implied.** The predefined-role clause
-  bounds one predicate. It does not bound:
+- **What the predefined-role clause alone did not bound — and what Part 6 added.** The
+  predefined-role clause bounds one predicate. On its own it does not bound:
   - **a custom group role that confers DELETE, or a direct table grant** — a different
-    predicate, and not asserted in the suite because the harness's own v4 fixture roles
-    hold exactly such grants;
+    predicate, and one the suite could not assert on its own because the harness's own v4
+    fixture roles hold exactly such grants. **Closed in Part 6:** per-table DELETE guards
+    on the five collections that carried none, BEFORE TRUNCATE guards on all nine, plus a
+    deploy-time capability assertion over all nine retention-managed collections, asserted
+    at install time (before the fixture grants exist) and driven in `tests/db/59`.
   - **a superuser** — excluded by `NOT r.rolsuper`; the cluster owner is trusted with
-    everything by definition;
-  - **TRUNCATE** — a separate privilege that `pg_write_all_data` does not confer and that
-    this clause does not bound either.
+    everything by definition. This remains deliberately out of scope: a superuser is not a
+    credential anyone can steal, and bounding it would mean bounding the cluster owner's
+    own authority.
+  - **TRUNCATE** — a separate privilege that `pg_write_all_data` does not confer. **Closed
+    in Part 6:** the statement-level TRUNCATE guards close it at runtime, and the deploy
+    assertion bounds TRUNCATE as well as DELETE.
 
-  For the first of these, the only production guard is that the single application
-  identity, `directus_app`, has DELETE revoked by migration 0004. **That is a grant-layer
-  control on one identity, not a per-table guard, and the review measured the difference
-  plainly: `people` — the identity anchor and the table this issue's finding uses —
-  carries no DELETE trigger, no RLS and no policy, and `DELETE FROM people` succeeds as a
-  non-superuser LOGIN holding `pg_write_all_data`.** Of the `public` collections,
+  The measured difference the review drew, kept here because it is the reason Part 6
+  exists: the only production guard for the direct-grant route was that `directus_app`'s
+  DELETE is revoked by migration 0004 — a grant-layer control on one identity, not a
+  per-table bound. `people` carried no DELETE trigger, no RLS and no policy, and
+  `DELETE FROM people` succeeded as a non-superuser LOGIN holding `pg_write_all_data`.
   `incidents`, `legal_holds`, `retention_principals`, `retention_run_items` and
-  `retention_runs` carry DELETE triggers; `people`, `retention_anchor_sources`,
-  `retention_class_sources`, `retention_clocks` and `retention_policies` do not. A
-  grant-layer control is not a substitute for a bound, and it is named here rather than
-  implied so a reader does not read 65.3 as bounding the wider route.
-- **Open gap, owned.** The wider route is genuinely open, not merely unasserted: a role
-  with DELETE on `public` can remove `retention_clocks` and then `people`, bypassing the
-  hold and the ladder. Option (a) deliberately bounds the predefined-role route and leaves
-  this one; closing it — by per-table DELETE guards on the personal-data collections, or
-  by a deploy-time assertion over the retention-managed collections — is tracked in
-  [AFC-295](/AFC/issues/AFC-295), owned by MediaTech (CTO). This ADR records it as open
-  rather than closing it with a guard that does not exist.
+  `retention_runs` carried DELETE triggers; `people`, `retention_anchor_sources`,
+  `retention_class_sources`, `retention_clocks` and `retention_policies` did not. A
+  grant-layer control is not a substitute for a bound.
+- **Open gap: closed.** The wider route was genuinely open, not merely unasserted: a role
+  with DELETE on `public` could remove `retention_clocks` and then `people`, bypassing the
+  hold and the ladder. **Closed in Part 6** ([AFC-295](/AFC/issues/AFC-295), owned by
+  MediaTech (CTO)): the five unguarded collections now carry BEFORE DELETE (row) guards,
+  all nine carry BEFORE TRUNCATE (statement) guards, and the engine refuses to install on
+  a cluster where any non-superuser LOGIN holds DELETE or TRUNCATE on any of the nine
+  retention-managed collections. The residual is named in Part 6 rather than implied: a
+  superuser, the hard-coded set, and the documented owner-can-disable-the-trigger residual
+  that every trigger in this schema carries.
 
 ## The rule this adds
 
@@ -561,3 +567,131 @@ The predefined-role clause is the first assertion in this design stated as a *ca
 deliberately not claimed as the whole DELETE surface; that claim belongs to a predicate
 over the grants themselves, which the harness's fixture grants currently prevent the suite
 from making.
+
+---
+
+# Part 6 — Fifth pass: the wider route closed (AFC-295)
+
+Part 5 closed the predefined-role route and named the wider one as an open gap. Part 6
+closes it. The gap was measured, not inferred ([AFC-291](/AFC/issues/AFC-291) finding F3):
+a non-superuser LOGIN holding DELETE on a collection — by a custom group role or a direct
+table grant — can `DELETE FROM people` around an active legal hold (`legal_holds.scope_id`
+is polymorphic `text`, not a foreign key to `people`), and can remove `retention_clocks`
+first so the ladder never runs.
+
+## Decision
+
+**Bound the capability, and guard the act. Two layers, because "can this credential
+destroy the row?" and "did it?" are different questions and a compliance control should
+answer both.**
+
+1. **Runtime guards** (`engine/0001_retention_engine.sql` §8a). A `BEFORE DELETE` row
+   trigger on the five collections that carried no guard — `people`,
+   `retention_anchor_sources`, `retention_class_sources`, `retention_clocks`,
+   `retention_policies` — refusing every identity but the engine owner
+   (`current_user <> 'directus_migrator'`, matching
+   `retention_clocks_state_is_engine_owned`; the owner is `NOLOGIN` and bootstrap asserts
+   no `LOGIN` is a member of it, so "the owner may delete" is not a route a credential can
+   take). And a `BEFORE TRUNCATE` statement trigger on **all nine** retention-managed
+   collections, refusing **every** identity including the owner, exactly as
+   `incidents_forbid_truncate` does: no path truncates these collections, a reset is a
+   DELETE the owner may still perform, and TRUNCATE is the one verb a row-level guard
+   cannot see. Same shape as `incidents_no_delete`: permissions are a layer, a trigger is
+   the control.
+2. **A deploy-time capability assertion** (`engine/0001_retention_engine.sql` §8b).
+   `retention.unbounded_delete_logins()` returns every non-superuser `LOGIN` role that
+   holds DELETE or TRUNCATE on any of the nine retention-managed collections, and
+   `retention.assert_no_login_delete_surface()` raises if that is non-empty **or** if any
+   non-superuser `LOGIN` is a member of `directus_migrator` (the owner, whose `current_user`
+   the DELETE guard allows — caught with the INHERIT-agnostic
+   `pg_has_role(..., 'MEMBER')`, because `has_table_privilege` does not report a membership
+   granted `WITH INHERIT FALSE`). The engine calls it at install time. This is the predicate
+   over the grants themselves that Part 5's rule calls for: it catches a custom group role
+   and a direct table grant, which no route enumeration would.
+
+## Why the guards are in the engine and not a migration
+
+A new migration that adds a guard to a table it does not create is a migration whose down
+script disarms a control over a surviving object — the AFC-253 shape the rollback-control
+gate refuses, and one the gate is right to refuse. The engine is behaviour, not schema
+history: it is re-applied on every deploy and has no rollback that could silently remove a
+control. The tables keep the migration that created them.
+
+## Why the deploy assertion is in the engine and not the suite
+
+It must run after the migrations, so the collections exist, and before
+`tests/db/assert.sql`, so the harness's v4 fixture grants (`tests/db/20` on `incidents`,
+`tests/db/63` on `retention_clocks`, `retention_policies` and the rest) are not yet
+present. In the suite the predicate is legitimately non-empty for scaffolding reasons,
+which is exactly why the suite cannot make the clean-tree claim and the engine can. The
+suite (`tests/db/59_retention_delete_guards.sql`) is numbered before 63 so it can assert
+the clean-tree answer *and* manufacture the drift.
+
+## Alternatives considered
+
+| Option | Verdict |
+| --- | --- |
+| **Per-table guards only** | Rejected as the whole answer. It closes the act at runtime but does not bound the *capability*: a credential can still hold DELETE, it is merely refused at the trigger. Part 5's rule is to bound the capability. |
+| **Deploy assertion only** | Rejected as the whole answer. It bounds the deployed state but not a grant made between deploys, and it does nothing about TRUNCATE at runtime. |
+| **A new migration for the guards** | Rejected. Its down script would disarm a control over a surviving table (the AFC-253 shape), and allowlisting it would be exactly the "excuse over fix" the grandfather list forbids. |
+| **Reproduce the predicate in the suite** | Rejected. Two implementations drift; the suite calls the same `retention.assert_no_login_delete_surface()` the engine calls, so the negative control drives the production code. |
+| **Runtime guards + deploy assertion** (**chosen**) | Defence in depth on an NDPA s.40(2) control: the capability is bounded at deploy time, and the act is refused at runtime whatever route delivered the grant. |
+
+## Evidence
+
+- `tests/db/59_retention_delete_guards.sql` — probe controls that the guard function and
+  both triggers exist on the collections and that all nine collections exist; the
+  clean-tree answer (`unbounded_delete_logins()` is `NULL`); **the negative control**: a
+  `LOGIN` granted DELETE and TRUNCATE is reported by the predicate, the deploy assertion
+  (`assert_no_login_delete_surface()`) raises `23001` on it, and the runtime guards refuse
+  the DELETE and the TRUNCATE; a functional DELETE refusal on each of the five collections;
+  the TRUNCATE refusal on all nine, including the four that carried only a DELETE guard and
+  the unconditional owner refusal; the owner exception for DELETE, so the guard is a guard
+  and not a broken table; and the INHERIT-FALSE owner-membership arm.
+- `node scripts/run-db-tests.mjs` → 15 suites / 543 assertions / 0 failing. `pnpm test`
+  → exit 0.
+
+## Independent review
+
+[AFC-298](/AFC/issues/AFC-298) (SecurityEngineer) returned **ship with fixes** and
+reproduced the closure adversarially rather than trusting the suite. Its two should-fix
+findings are applied in this revision:
+
+- **F1** — the runtime TRUNCATE guard covered only the five unguarded collections; the four
+  that carried a DELETE guard and no TRUNCATE guard (`legal_holds`, `retention_principals`,
+  `retention_run_items`, `retention_runs`) were truncatable. Fixed: the TRUNCATE guard now
+  covers all nine, unconditionally.
+- **F2** — `tests/db/63` claimed "a role CAN delete rows directly", which AFC-295 made
+  false, and the new guard was not asserted in the one suite holding real DELETE/TRUNCATE
+  grants. Fixed: the comment is corrected and DELETE (clock and person row) and TRUNCATE
+  refusals are asserted for a fully-granted role.
+
+Its optional observation O1 (an INHERIT-FALSE owner membership escapes the table-privilege
+predicate) is closed by the second arm of §8b and asserted in suite 59. O2 is recorded as a
+residual below.
+
+## Residual, named rather than implied
+
+- **A superuser.** Excluded by `NOT r.rolsuper` in the capability predicate, and the
+  runtime guards refuse it unless it `SET ROLE directus_migrator` deliberately — the same
+  posture `incidents_no_delete` already takes. The cluster owner is trusted by definition.
+- **The owner can disable the trigger.** Every trigger in this schema carries that
+  residual; it is why the owner is `NOLOGIN`, why no `LOGIN` may be a member of it, and why
+  the manifest records the actor. Reproduced in `tests/db/63.5` for the clock-state guard.
+- **The predefined-role set is one role today.** It is named as a set in bootstrap so a
+  server that adds another write role is a one-line edit, not a silent gap.
+- **Both layers enumerate a hard-coded nine** (AFC-298 O2). A table added to
+  `retention_class_sources` — a new erasure target — is covered by neither the guards nor
+  the predicate until the engine's two arrays are edited. This is deliberate (the set is the
+  retention-managed surface, not the config-driven erasure targets), but it is named so a
+  future erasure target is not assumed covered.
+
+## The rule this adds
+
+Part 5 said: bound the capability, not the route. Part 6 is what that costs when it is
+actually paid:
+
+> A capability bound is a deploy-time claim and a runtime guard is a different claim, and
+> a control that answers only one of them will be read as answering both. Bound the
+> capability where the grants are made, guard the act where the rows are destroyed, and
+> make each fail on its own.
