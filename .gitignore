@@ -29,3 +29,18 @@ services/directus/backup/*.sql.gz
 scripts/.dbg*.mjs
 scripts/_dbg.mjs
 scripts/_diag.mjs
+
+# Scratch written into the repo ROOT instead of PAPERCLIP_RUN_SCRATCH_DIR.
+# 130 KB of it was once sitting here untracked (an issue JSON dump, a markdown
+# dump, two PGlite probe scripts) and untracked scratch in the root is one
+# `git add -A` away from a commit. Untracked is not the same as absent.
+# Use PAPERCLIP_RUN_SCRATCH_DIR; it is removed for you at end of run.
+/cto-*-tmp.mjs
+/cto-*-tmp.js
+/cto-verify*.mjs
+/afc*.json
+/afc*.md
+# The shape of the defect, not one instance of it: a scratch script in the
+# repo root. No legitimate tracked file lives at the root with this suffix.
+/*-tmp.mjs
+/*-tmp.js
