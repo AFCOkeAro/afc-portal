@@ -1,8 +1,8 @@
 # AFC Church Portal — CI
 #
-# Two gates today. Both were required to land in the FIRST commit that carried
-# the retention work, not after it: a gate added later is a gate that gets
-# commented out (AFC-168 AC6).
+# Three gate families today. The static gates were required to land in the FIRST
+# commit that carried the retention work, not after it: a gate added later is a
+# gate that gets commented out (AFC-168 AC6).
 #
 # 1. retention-literal gate  -- static. Proves no retention period is hardcoded
 #    outside the config layer. AFC-167 / ADR-159-2 require retention to be
@@ -13,6 +13,11 @@
 #    write it. AFC-166 AC5.
 # 3. database control tests  -- behavioural. Proves the incidents.awareness_at
 #    controls actually hold (AFC-166 / ADR-159-2 D7).
+#
+# And, since AFC-174, the application checks from repo-plan section 4 steps 1-3:
+# lint + format, typecheck, build. Steps 4-7 (unit tests, permission matrix,
+# schema drift, accessibility) are still missing and are listed as a TODO at the
+# bottom of this file rather than being quietly absent.
 #
 # The gate script self-tests on every run. A gate nobody has watched fail is
 # untested, not enforced, so the self-test is part of the pipeline rather than a
@@ -56,6 +61,10 @@ jobs:
   #    is load-bearing in every environment where the working tree is SHARED,
   #    which is how every agent in this company works. Read it as "certifies the
   #    tree it was handed", not as a substitute for review.
+  #
+  #    AFC-174 added lint/typecheck/build below. They are not listed in `needs:*
+  #    here on purpose: that job owns this file next, and it should add the
+  #    edges itself rather than have them appear under its diff.
   # --------------------------------------------------------------------------
   dirty-path-guard:
     name: Compliance-path dirty guard
@@ -128,13 +137,118 @@ jobs:
       - name: Run database control tests
         run: pnpm test:db
 
-      # TODO(CTO): also run this suite against a real postgres:16 service
-      # container. PGlite is PostgreSQL 16 compiled to WebAssembly; the trigger
-      # and privilege semantics are the same, but "same engine, same wasm
-      # runtime" is not the same claim as "same engine, same binary", and this
-      # is a P1 legal-evidence control. Tracked with AFC-166.
+  # TODO(CTO): also run this suite against a real postgres:16 service
+  # container. PGlite is PostgreSQL 16 compiled to WebAssembly; the trigger
+  # and privilege semantics are the same, but "same engine, same wasm
+  # runtime" is not the same claim as "same engine, same binary", and this
+  # is a P1 legal-evidence control. Tracked with AFC-166.
 
-  # TODO(CTO): lint / typecheck / permission-matrix / schema-drift per
-  # repo-plan section 4. Not wired yet because there is no application source
-  # to lint -- apps/web and packages/shared are empty. Do not mark this file
-  # "complete" until steps 1-6 of repo-plan section 4 exist.
+  # --------------------------------------------------------------------------
+  # repo-plan section 4, steps 1-3. Added by AFC-174, the first commit with
+  # application source to lint.
+  #
+  # These three are separate jobs rather than three steps in one job on purpose:
+  # a format failure should not hide a typecheck failure, and a broken build
+  # should be visible without reading a log that also contains lint output for
+  # forty unrelated files. They share an identical install preamble, which is
+  # also identical to db-tests' — if the order of pnpm/action-setup and
+  # setup-node ever changes, it changes in all four.
+  # --------------------------------------------------------------------------
+
+  lint-format:
+    name: Lint and format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # Format before lint, and both before anything that reads the tree: a
+      # formatting disagreement reported by eslint and the same disagreement
+      # reported by prettier are two failures for one cause.
+      - name: Format check
+        run: pnpm format:check
+
+      - name: Lint
+        run: pnpm lint
+
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # packages/shared is checked on its own tsconfig, not through the Nuxt
+      # one. It is also imported by the server routes, so a type error in it is
+      # a type error in the portal; catching it in the small package first gives
+      # a readable message instead of a Nuxt-generated one.
+      - name: Typecheck shared package
+        run: pnpm --filter @afc/shared typecheck
+
+      # `nuxt typecheck` needs vue-tsc, which lives in the app's devDependencies.
+      # Nuxt's postinstall has already generated .nuxt/tsconfig.json by this
+      # point, which is why this cannot be the first command after install.
+      - name: Typecheck web app
+        run: pnpm --filter web typecheck
+
+  build:
+    name: Build (pnpm --filter web build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      # Node's default heap is under what a full Nuxt production build needs on
+      # a two-core runner. Raising it here rather than in a config file, because
+      # a heap flag committed to package.json would change local builds too.
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm --filter web build
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+
+      # A build that emits nothing is not a build. Nitro's server entry is the
+      # artefact the Dockerfile copies, so asserting its existence here is what
+      # makes the build step load-bearing rather than advisory.
+      - name: Assert the build produced a server bundle
+        run: test -f apps/web/.output/server/index.mjs
+
+  # TODO(CTO): the rest of repo-plan section 4.
+  #   step 4  unit tests (composables, shared zod schemas, Flow logic)
+  #   step 5  permission tests against an ephemeral Directus + Postgres
+  #   step 6  schema drift against services/directus/schema/snapshot.yaml
+  #   step 7  accessibility (axe on the public pages)
+  # Step 5 is the one that matters most: until it runs, the capability list in
+  # packages/shared/src/role-matrix.ts is a transcription of the data-model §10
+  # table and nothing has checked it against the Directus policies that are
+  # supposed to implement it. Do not mark this file "complete" until steps 4-7
+  # exist.

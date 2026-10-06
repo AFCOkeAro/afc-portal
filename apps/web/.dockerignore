@@ -1,0 +1,26 @@
+# The build runs from the workspace root (see the Dockerfile header), so the
+# ignore file has to hold for every context path, not just apps/web.
+.git
+.github
+node_modules
+**/node_modules
+**/.nuxt
+**/.output
+**/dist
+**/coverage
+**/*.tsbuildinfo
+
+# Runtime state and secrets must never enter an image layer.
+.env
+.env.*
+!.env.example
+services/directus/uploads/
+services/directus/backup/
+
+# Not needed to build the portal image.
+docs
+tests
+scripts
+**/Dockerfile
+.dockerignore
+README.md

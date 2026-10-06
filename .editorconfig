@@ -1,0 +1,31 @@
+# EditorConfig — https://editorconfig.org
+#
+# One rule here is load-bearing for CI: `end_of_line = lf`. `pnpm format:check`
+# and `eslint` both read the working tree, and a CRLF checkout makes a diff of an
+# unchanged file look like a change.
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+indent_size = 2
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.md]
+# Two trailing spaces is a line break in Markdown and `trim_trailing_whitespace`
+# would eat them.
+trim_trailing_whitespace = false
+
+[*.{yml,yaml}]
+indent_size = 2
+
+[*.sql]
+# The committed migrations and the database control tests are read by psql and by
+# pglite; four-space indentation is what the existing files use.
+indent_size = 4
+
+[Makefile]
+indent_style = tab

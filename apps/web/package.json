@@ -1,0 +1,30 @@
+{
+  "name": "web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "AFC Church Portal — Nuxt 3 SSR frontend.",
+  "scripts": {
+    "dev": "nuxt dev",
+    "build": "nuxt build",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare",
+    "typecheck": "nuxt typecheck",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
+  },
+  "dependencies": {
+    "@afc/shared": "workspace:*",
+    "@nuxt/ui": "3.3.7",
+    "nuxt": "3.21.11"
+  },
+  "devDependencies": {
+    "@nuxt/eslint": "1.17.0",
+    "@tailwindcss/vite": "^4.3.3",
+    "eslint": "^10.12.0",
+    "eslint-config-prettier": "^10.1.8",
+    "tailwindcss": "^4.3.3",
+    "typescript": "5.9.3",
+    "vue-tsc": "^2.2.12"
+  }
+}
