@@ -1,0 +1,66 @@
+# AFC Church Portal — CI
+#
+# Two gates today. Both were required to land in the FIRST commit that carried
+# the retention work, not after it: a gate added later is a gate that gets
+# commented out (AFC-168 AC6).
+#
+# 1. retention-literal gate  -- static. Proves no retention period is hardcoded
+#    outside the config layer. AFC-167 / ADR-159-2 require retention to be
+#    config-driven.
+# 2. database control tests  -- behavioural. Proves the incidents.awareness_at
+#    controls actually hold (AFC-166 / ADR-159-2 D7).
+#
+# The gate script self-tests on every run. A gate nobody has watched fail is
+# untested, not enforced, so the self-test is part of the pipeline rather than a
+# one-off manual check.
+
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  retention-gate:
+    name: Retention literal gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Gate self-test (the gate must be able to fail)
+        run: bash scripts/grep-awareness-write-context.sh --self-test
+
+      - name: Retention literal gate
+        run: bash scripts/grep-awareness-write-context.sh
+
+  db-tests:
+    name: Database control tests (awareness_at)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - uses: pnpm/action-setup@v4
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # PGlite gives a real Postgres engine with no service container, so the
+      # control tests exercise the same trigger and privilege semantics they
+      # will meet in staging.
+      - name: Run database control tests
+        run: pnpm test:db
+
+  # TODO(CTO): lint / typecheck / permission-matrix / schema-drift per
+  # repo-plan section 4. Not wired yet because there is no application source
+  # to lint -- apps/web and packages/shared are empty. Do not mark this file
+  # "complete" until steps 1-6 of repo-plan section 4 exist.

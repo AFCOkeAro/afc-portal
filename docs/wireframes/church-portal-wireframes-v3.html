@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Church Portal — Wireframes v3 (round-4: single-page UI, newcomer care, invitations, campaigns) · AFC-151</title>
+<style>
+  :root{
+    --ink:#1b1b1b; --mut:#6b6b6b; --line:#c9c9c9; --bg:#f4f4f2;
+    --box:#e4e4e1; --box2:#efefec; --accent:#2f6f6f; --accent-soft:#d8e8e8;
+    --white:#fff; --warn:#f0e0c0; --stop:#f0d0d0;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:14px/1.45 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
+  header.top{position:sticky;top:0;z-index:5;background:var(--ink);color:#fff;padding:14px 22px;}
+  header.top h1{margin:0;font-size:16px;letter-spacing:.3px}
+  header.top p{margin:4px 0 0;color:#cfcfcf;font-size:12px}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;padding:12px 22px;border-bottom:1px solid var(--line);
+    background:#fafafa;font-size:12px;color:var(--mut)}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .sw{width:14px;height:14px;border:1px solid var(--line);display:inline-block;border-radius:2px}
+  .wrap{padding:22px;display:grid;gap:26px;grid-template-columns:repeat(auto-fill,minmax(430px,1fr))}
+  .frame{background:var(--white);border:1px solid var(--line);border-radius:10px;overflow:hidden;
+    box-shadow:0 1px 2px rgba(0,0,0,.05);display:flex;flex-direction:column}
+  .frame>figcaption{background:var(--box2);border-bottom:1px solid var(--line);padding:9px 12px;
+    display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+  .frame>figcaption b{font-size:13px}
+  .frame>figcaption code{font-size:11px;color:var(--mut);white-space:nowrap}
+  .screen{padding:14px;display:flex;flex-direction:column;gap:12px;min-height:300px}
+  .screen.wide{grid-column:1/-1}
+  .muted{color:var(--mut)}
+  .tiny{font-size:11px}
+  .bar{height:12px;background:var(--box);border-radius:3px}
+  .bar.s{width:38%} .bar.m{width:62%} .bar.l{width:88%} .bar.xs{width:24%}
+  .box{background:var(--box);border-radius:4px}
+  .card{border:1px solid var(--line);border-radius:6px;padding:10px;background:#fff}
+  .card h4{margin:0 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--mut)}
+  .row{display:flex;gap:10px;align-items:center}
+  .row.between{justify-content:space-between}
+  .grow{flex:1}
+  .field{flex:1;display:flex;flex-direction:column;gap:5px}
+  .field .lab{font-size:11px;color:var(--mut)}
+  .input{height:30px;border:1px solid var(--line);border-radius:4px;background:#fff}
+  .input.area{height:52px}
+  .input.off{background:var(--box2);color:var(--mut)}
+  .btn{display:inline-flex;align-items:center;justify-content:center;height:30px;padding:0 14px;
+    border-radius:4px;font-size:12px;border:1px solid var(--ink);background:var(--ink);color:#fff;white-space:nowrap}
+  .btn.ghost{background:#fff;color:var(--ink)}
+  .btn.accent{background:var(--accent);border-color:var(--accent)}
+  .btn.danger{background:#fff;color:#8c2f2f;border-color:#8c2f2f}
+  .btn.sm{height:24px;padding:0 9px;font-size:11px}
+  .nav{display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line);padding-bottom:9px}
+  .logo{width:26px;height:26px;border-radius:5px;background:var(--ink)}
+  .pill{font-size:10px;padding:2px 8px;border-radius:999px;background:var(--box);color:var(--ink)}
+  .pill.on{background:var(--accent-soft);color:var(--accent);border:1px solid var(--accent)}
+  table{width:100%;border-collapse:collapse;font-size:11px}
+  th,td{text-align:left;padding:6px 7px;border-bottom:1px solid var(--line)}
+  th{color:var(--mut);font-weight:600;background:var(--box2)}
+  .stat{flex:1;border:1px solid var(--line);border-radius:6px;padding:9px;background:#fff}
+  .stat .n{font-size:20px;font-weight:700}
+  .stat .k{font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.4px}
+  .stat.link .n{color:var(--accent);text-decoration:underline}
+  .list{display:flex;flex-direction:column;gap:7px}
+  .item{display:flex;gap:9px;align-items:center;border:1px solid var(--line);border-radius:5px;padding:7px 9px;background:#fff}
+  .avatar{width:30px;height:30px;border-radius:50%;background:var(--box);flex:none}
+  .badge{font-size:10px;padding:2px 7px;border-radius:999px;border:1px solid var(--line);color:var(--mut);background:#fafafa}
+  .badge.g{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
+  .badge.w{background:var(--warn);color:#7a5a10;border-color:#d9c08a}
+  .badge.r{background:var(--stop);color:#8c2f2f;border-color:#d9a0a0}
+  .note{font-size:11px;color:var(--mut);border-left:3px solid var(--accent);padding:4px 9px;background:var(--accent-soft);border-radius:0 4px 4px 0}
+  .note.warn{border-left-color:#b58b2a;background:var(--warn);color:#6d5110}
+  .note.stop{border-left-color:#8c2f2f;background:var(--stop);color:#7a2b2b}
+  .split{display:flex;gap:12px;flex:1;min-height:0}
+
+  /* ---- round-4 additions: single-page profile with sticky anchor tabs ---- */
+  .scrollpane{border:1px solid var(--line);border-radius:6px;background:#fff;overflow-y:auto;max-height:520px}
+  .stickybar{position:sticky;top:0;z-index:3;background:#fff;border-bottom:1px solid var(--line);
+    padding:8px 10px;box-shadow:0 1px 0 rgba(0,0,0,.04)}
+  .stickybar .crumb{font-size:10px;color:var(--mut);margin-bottom:6px}
+  .anchors{display:flex;gap:6px;flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px}
+  .anchors a{font-size:11px;padding:4px 10px;border-radius:999px;color:var(--accent);text-decoration:none;
+    border:1px solid var(--accent);background:#fff;white-space:nowrap}
+  .anchors a.on{background:var(--accent);color:#fff;font-weight:600}
+  .anchors a.off{color:var(--mut);border-color:var(--line);background:var(--box2);text-decoration:line-through}
+  .sect{padding:12px;border-bottom:1px dashed var(--line)}
+  .sect:last-child{border-bottom:0}
+  .sect h5{margin:0 0 4px;font-size:12px;letter-spacing:.3px}
+  .sect h5 .id{font-weight:400;color:var(--mut);font-size:10px;margin-left:6px}
+  .sect p.hint{margin:2px 0 6px;font-size:10px;color:var(--mut)}
+  .jump{display:flex;justify-content:flex-end;padding:8px 10px;border-top:1px solid var(--line)}
+  .skel{height:9px;background:var(--box);border-radius:3px}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:11px}
+  .kv dt{color:var(--mut)}
+  .kv dd{margin:0}
+
+  /* journey / funnel */
+  .funnel{display:flex;gap:6px;align-items:stretch}
+  .fstage{flex:1;border:1px solid var(--line);border-radius:6px;padding:8px;background:#fff;text-align:center}
+  .fstage .n{font-size:19px;font-weight:700}
+  .fstage .k{font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.4px}
+  .fstage.hot{background:var(--accent-soft);border-color:var(--accent)}
+  .farrow{align-self:center;color:var(--mut);font-size:12px}
+
+  /* steps */
+  .steps{display:flex;flex-direction:column;gap:0}
+  .step{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px dashed var(--line)}
+  .step:last-child{border-bottom:0}
+  .step .dotc{width:20px;height:20px;border-radius:50%;background:var(--box);flex:none;display:flex;
+    align-items:center;justify-content:center;font-size:10px;color:var(--mut)}
+  .step.done .dotc{background:var(--accent);color:#fff}
+  .step.now .dotc{background:#fff;border:2px solid var(--accent);color:var(--accent);font-weight:700}
+  .step .t{font-size:11px}
+  .step .m{font-size:10px;color:var(--mut)}
+
+  /* message preview (phone) */
+  .phone{width:250px;border:2px solid var(--ink);border-radius:20px;padding:9px;background:#fff;flex:none}
+  .phone .notch{width:54px;height:5px;background:var(--line);border-radius:3px;margin:2px auto 8px}
+  .bubble{background:var(--accent-soft);border:1px solid var(--accent);border-radius:10px 10px 10px 2px;
+    padding:7px 9px;font-size:11px;margin-bottom:7px}
+  .bubble.wa{background:#e8f5ec;border-color:#7bb98c}
+  .bubble.sms{background:var(--box2);border-color:var(--line)}
+  .bubble .meta{font-size:9px;color:var(--mut);margin-top:4px}
+  .vars{font-size:10px;color:var(--mut);font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  .toggle{display:flex;align-items:center;gap:6px;font-size:11px}
+  .sw2{width:30px;height:17px;border-radius:999px;background:var(--box);position:relative;flex:none}
+  .sw2:after{content:"";position:absolute;top:2px;left:2px;width:13px;height:13px;border-radius:50%;background:#fff}
+  .sw2.on{background:var(--accent)}
+  .sw2.on:after{left:15px}
+  .sw2.off2{background:#d9a0a0}
+  footer{padding:16px 22px;color:var(--mut);font-size:12px;border-top:1px solid var(--line);background:#fafafa}
+  @media print{.anchors,.jump{display:none} .scrollpane{max-height:none}}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>Church Portal (Lagos North Area) — Wireframes v3 · round-4 scope</h1>
+  <p>AFC-151 · planning artifact · low-fidelity · not production UI · grey blocks = layout placeholders · screens 1–2 replace the profile/dashboard tabs from the AFC-147/150 sets</p>
+</header>
+<div class="legend">
+  <span><i class="sw" style="background:var(--box)"></i> content block</span>
+  <span><i class="sw" style="background:var(--accent-soft);border-color:var(--accent)"></i> active / primary / clickable count</span>
+  <span><i class="sw" style="background:#fff"></i> card surface</span>
+  <span><i class="sw" style="background:var(--warn);border-color:#d9c08a"></i> attention / pending / restricted</span>
+  <span><i class="sw" style="background:var(--stop);border-color:#d9a0a0"></i> blocked / no consent</span>
+  <span>Breakpoints: staff desktop + mobile; invitation and check-in capture are mobile-first.</span>
+</div>
+
+<div class="wrap">
+
+<!-- ============ 1. SINGLE-PAGE PERSON PROFILE ============ -->
+<figure class="frame">
+  <figcaption><b>1. Person profile — single page, sticky anchor tabs</b><code>/people/:id#follow-ups</code></figcaption>
+  <div class="screen wide">
+    <div class="nav"><div class="logo"></div><div class="grow"><div class="bar xs"></div></div>
+      <span class="pill on">Ikeja Branch</span><span class="badge">Welfare officer · Ada O.</span></div>
+
+    <div class="scrollpane">
+      <div class="stickybar">
+        <div class="crumb">Ada Obi · member since 2019 · <code>#milestones</code> ← deep link in the URL bar</div>
+        <div class="anchors">
+          <a href="#summary" class="on">Summary</a>
+          <a href="#contact">Contact &amp; consent</a>
+          <a href="#milestones">Milestones</a>
+          <a href="#attendance">Attendance</a>
+          <a href="#journey">Newcomer journey</a>
+          <a href="#welfare">Welfare</a>
+          <a href="#comms">Messages</a>
+          <a href="#celebrations">Celebrations</a>
+          <a href="#docs">Documents</a>
+          <a href="#finance" class="off">Finance (no access)</a>
+        </div>
+      </div>
+
+      <div class="sect" id="summary">
+        <h5>Summary<span class="id">#summary</span></h5>
+        <div class="row">
+          <div class="avatar" style="width:44px;height:44px"></div>
+          <div class="grow"><div class="bar m"></div><div class="bar xs" style="margin-top:5px"></div></div>
+          <div class="stat"><div class="n">6</div><div class="k">Last 6 wks</div></div>
+          <div class="stat"><div class="n">2</div><div class="k">Welfare open</div></div>
+        </div>
+      </div>
+
+      <div class="sect" id="contact">
+        <h5>Contact &amp; consent<span class="id">#contact</span></h5>
+        <p class="hint">Channels and consent shown as toggles; restricted fields masked for this role.</p>
+        <div class="row">
+          <span class="badge">Phone 0801 ••• •234</span>
+          <span class="badge">Email ada••@•••.org</span>
+          <span class="badge g">WhatsApp consent ✓</span>
+          <span class="badge g">SMS consent ✓</span>
+          <span class="badge w">Guardian consent (youth record)</span>
+        </div>
+      </div>
+
+      <div class="sect" id="milestones">
+        <h5>Church history &amp; milestones<span class="id">#milestones</span></h5>
+        <table><tbody>
+          <tr><td>Saved</td><td>12 Aug 2019</td><td>Ikeja</td><td><span class="badge g">recorded</span></td></tr>
+          <tr><td>Water baptism</td><td>2019 (year only)</td><td>Ikeja</td><td><span class="badge">year fallback</span></td></tr>
+          <tr><td>Baptism of the Holy Ghost</td><td>2021-01-17</td><td>Yaba</td><td><span class="badge g">recorded</span></td></tr>
+          <tr><td>Marriage</td><td>2023-06-04</td><td>—</td><td><span class="badge">recorded</span></td></tr>
+        </tbody></table>
+      </div>
+
+      <div class="sect" id="attendance">
+        <h5>Attendance summary<span class="id">#attendance</span></h5>
+        <p class="hint">Collapsed by default with a count; expands in place, exports CSV.</p>
+        <div class="item between"><span class="tiny">Last 12 Sundays · 9 of 12 present</span><span class="btn sm ghost">Show all</span></div>
+      </div>
+
+      <div class="sect" id="journey">
+        <h5>Newcomer journey<span class="id">#journey</span></h5>
+        <p class="hint">Only renders when the person has a visitor history; otherwise absent (not disabled).</p>
+        <div class="funnel">
+          <div class="fstage"><div class="n">5</div><div class="k">Identify</div></div><div class="farrow">›</div>
+          <div class="fstage"><div class="n">5</div><div class="k">Welcome</div></div><div class="farrow">›</div>
+          <div class="fstage hot"><div class="n">4</div><div class="k">Pack</div></div><div class="farrow">›</div>
+          <div class="fstage"><div class="n">2</div><div class="k">Drop-off</div></div><div class="farrow">›</div>
+          <div class="fstage"><div class="n">2</div><div class="k">Follow-up</div></div>
+        </div>
+      </div>
+
+      <div class="sect" id="welfare">
+        <h5>Welfare cases<span class="id">#welfare</span></h5>
+        <div class="list">
+          <div class="item"><span class="badge w">open</span><div class="grow"><div class="bar m"></div></div><span class="tiny">WEL-2026-0142</span></div>
+          <div class="item"><span class="badge">resolved</span><div class="grow"><div class="bar m"></div></div><span class="tiny">WEL-2025-0988</span></div>
+        </div>
+      </div>
+
+      <div class="sect" id="comms">
+        <h5>Messages sent to this person<span class="id">#comms</span></h5>
+        <p class="hint">Same delivery log as the communications module — no separate list.</p>
+        <table><tbody>
+          <tr><td>Service reminder</td><td>WhatsApp</td><td>05 Oct</td><td><span class="badge g">read</span></td></tr>
+          <tr><td>SMS fallback (4h)</td><td>Sms</td><td>28 Sep</td><td><span class="badge g">delivered</span></td></tr>
+          <tr><td>Memory verse</td><td>WhatsApp</td><td>22 Sep</td><td><span class="badge">sent</span></td></tr>
+        </tbody></table>
+      </div>
+
+      <div class="sect" id="celebrations">
+        <h5>Celebrations<span class="id">#celebrations</span></h5>
+        <div class="row"><span class="badge">Birthday 14 Nov</span><span class="badge">Wedding anniversary 04 Jun</span><span class="badge g">greeting queued</span></div>
+      </div>
+
+      <div class="sect" id="docs">
+        <h5>Documents<span class="id">#docs</span></h5>
+        <div class="row"><span class="badge">consent form (scan)</span><span class="badge">membership slip</span><span class="btn sm ghost">Upload</span></div>
+      </div>
+      <div class="sect">
+        <div class="skel" style="width:100%;margin-bottom:6px"></div>
+        <div class="skel" style="width:72%"></div>
+      </div>
+    </div>
+    <div class="jump"><span class="btn sm ghost">Back to top</span><span class="btn sm ghost">Print this section</span><span class="btn sm ghost">Export CSV</span></div>
+    <div class="note">Scroll the box above: the tab strip stays pinned and the active tab follows the section in view. Clicking a tab scrolls and moves focus to that section's heading. Reloading the URL with a hash (#follow-ups) lands on that section — this is what makes one page shareable.</div>
+  </div>
+</figure>
+
+<!-- ============ 2. SINGLE-PAGE BRANCH DASHBOARD ============ -->
+<figure class="frame">
+  <figcaption><b>2. Branch dashboard — single page, sticky anchor tabs</b><code>/branches/:slug#newcomers</code></figcaption>
+  <div class="screen wide">
+    <div class="nav"><div class="logo"></div><div class="grow"><div class="bar xs"></div></div>
+      <span class="pill on">Ikeja Branch</span><span class="badge">Branch admin</span>
+      <span class="btn sm ghost">Print</span></div>
+
+    <div class="scrollpane" style="max-height:460px">
+      <div class="stickybar">
+        <div class="crumb">Ikeja Branch · Sunday 05 Oct · 6 blocks loaded of 9 · lazy per section</div>
+        <div class="anchors">
+          <a href="#today" class="on">Today</a>
+          <a href="#attendance">Attendance</a>
+          <a href="#newcomers">Newcomers</a>
+          <a href="#followups">Follow-ups</a>
+          <a href="#welfare">Welfare</a>
+          <a href="#celebrations">This week</a>
+          <a href="#events">Events</a>
+          <a href="#comms">Messages</a>
+          <a href="#tasks">Tasks</a>
+        </div>
+      </div>
+
+      <div class="sect" id="today">
+        <h5>Today<span class="id">#today</span></h5>
+        <div class="row" style="gap:8px">
+          <div class="stat"><div class="n">3</div><div class="k">Services</div></div>
+          <div class="stat link"><div class="n">7</div><div class="k">Newcomers ▸</div></div>
+          <div class="stat link"><div class="n">4</div><div class="k">Follow-ups due ▸</div></div>
+          <div class="stat link"><div class="n">2</div><div class="k">Welfare open ▸</div></div>
+        </div>
+      </div>
+
+      <div class="sect" id="attendance">
+        <h5>Attendance by category &amp; sex (last Sunday)<span class="id">#attendance</span></h5>
+        <div class="row">
+          <div class="grow card"><h4>Male</h4><div class="bar l"></div></div>
+          <div class="grow card"><h4>Female</h4><div class="bar l"></div></div>
+          <div class="card" style="width:120px"><h4>Total</h4><div class="bar m"></div><span class="tiny muted">1,204</span></div>
+        </div>
+      </div>
+
+      <div class="sect" id="newcomers">
+        <h5>Newcomer funnel<span class="id">#newcomers</span></h5>
+        <div class="funnel">
+          <div class="fstage"><div class="n">18</div><div class="k">Identify</div></div><div class="farrow">›</div>
+          <div class="fstage"><div class="n">16</div><div class="k">Welcome</div></div><div class="farrow">›</div>
+          <div class="fstage hot"><div class="n">14</div><div class="k">Pack</div></div><div class="farrow">›</div>
+          <div class="fstage"><div class="n">9</div><div class="k">Drop-off</div></div><div class="farrow">›</div>
+          <div class="fstage"><div class="n">11</div><div class="k">Follow-up</div></div>
+        </div>
+        <div class="note warn">3 newcomers unassigned to a welfare officer for more than 3 days — assign now.</div>
+      </div>
+
+      <div class="sect" id="followups">
+        <h5>Follow-ups due<span class="id">#follow-ups</span></h5>
+        <table><tbody>
+          <tr><td>Ngozi E.</td><td>Follow-up</td><td>Today</td><td><span class="badge w">overdue 2d</span></td></tr>
+          <tr><td>Tunde A.</td><td>Dropoff</td><td>Today</td><td><span class="badge">visit</span></td></tr>
+          <tr><td>Maryam S.</td><td>Follow-up</td><td>Tomorrow</td><td><span class="badge">call</span></td></tr>
+        </tbody></table>
+      </div>
+
+      <div class="sect" id="welfare">
+        <h5>Welfare (open)<span class="id">#welfare</span></h5>
+        <div class="list">
+          <div class="item between"><span class="tiny">WEL-2026-0142 · food · urgent</span><span class="badge w">assigned</span></div>
+          <div class="item between"><span class="tiny">WEL-2026-0139 · medical · high</span><span class="badge">unassigned</span></div>
+        </div>
+      </div>
+
+      <div class="sect" id="celebrations">
+        <h5>This week<span class="id">#this-week</span></h5>
+        <div class="row"><span class="badge">3 birthdays</span><span class="badge">1 anniversary</span><span class="badge g">greeting run queued Mon 08:00</span></div>
+      </div>
+
+      <div class="sect" id="events">
+        <h5>Events<span class="id">#events</span></h5>
+        <div class="list">
+          <div class="item between"><span class="tiny">Youth Summit · 14 Nov</span><span class="badge g">registrations open</span></div>
+          <div class="item between"><span class="tiny">Bible Study Week · 18–22 Nov</span><span class="badge">42 registered</span></div>
+        </div>
+      </div>
+
+      <div class="sect" id="comms">
+        <h5>Messages this month<span class="id">#messages</span></h5>
+        <div class="row" style="gap:8px">
+          <div class="stat"><div class="n">3,914</div><div class="k">Sent</div></div>
+          <div class="stat"><div class="n">96%</div><div class="k">Delivered</div></div>
+          <div class="stat"><div class="n">41</div><div class="k">Opt-outs</div></div>
+          <div class="stat"><div class="n">₦18.4k</div><div class="k">Est. cost</div></div>
+        </div>
+      </div>
+
+      <div class="sect" id="tasks">
+        <h5>Tasks &amp; meetings<span class="id">#tasks</span></h5>
+        <div class="row"><span class="badge w">Welfare meeting today 17:00</span><span class="badge">Reminders scheduled T-24h / T-1h</span><span class="badge">3 open tasks</span></div>
+      </div>
+    </div>
+    <div class="note">Blocks a branch admin cannot read are not rendered (no empty placeholder). Every number is a drill-down link into the filtered list, as before.</div>
+  </div>
+</figure>
+
+<!-- ============ 3. NEWCOMER BOARD ============ -->
+<figure class="frame">
+  <figcaption><b>3. Newcomer board — journey, owners, workload</b><code>/newcomers</code></figcaption>
+  <div class="screen">
+    <div class="nav"><div class="logo"></div><div class="grow"><div class="bar xs"></div></div>
+      <span class="pill on">Ikeja</span><span class="btn sm accent">+ Add newcomer</span></div>
+
+    <div class="funnel">
+      <div class="fstage"><div class="n">18</div><div class="k">Identify ▸</div></div>
+      <div class="fstage"><div class="n">16</div><div class="k">Welcome ▸</div></div>
+      <div class="fstage hot"><div class="n">14</div><div class="k">Pack ▸</div></div>
+      <div class="fstage"><div class="n">9</div><div class="k">Drop-off ▸</div></div>
+      <div class="fstage"><div class="n">11</div><div class="k">Follow-up ▸</div></div>
+    </div>
+
+    <div class="card">
+      <h4>Officer workload</h4>
+      <table><tbody>
+        <tr><th>Officer</th><th>Open</th><th>Overdue</th><th>Unassigned</th><th></th></tr>
+        <tr><td>Ada O.</td><td>6</td><td>1</td><td>—</td><td><span class="badge g">balanced</span></td></tr>
+        <tr><td>Chidi M.</td><td>9</td><td>4</td><td>—</td><td><span class="badge w">over capacity</span></td></tr>
+        <tr><td>Unassigned</td><td>3</td><td>1</td><td>&gt;3 days</td><td><span class="btn sm ghost">Assign all</span></td></tr>
+      </tbody></table>
+    </div>
+
+    <div class="list">
+      <div class="item"><div class="avatar"></div><div class="grow"><div class="bar m"></div>
+        <div class="tiny muted">Follow-up · assigned Ada O. · due today</div></div><span class="badge w">4h SMS fallback due</span></div>
+      <div class="item"><div class="avatar"></div><div class="grow"><div class="bar m"></div>
+        <div class="tiny muted">Pack · unassigned · 3 days</div></div><span class="badge">needs owner</span></div>
+      <div class="item"><div class="avatar"></div><div class="grow"><div class="bar m"></div>
+        <div class="tiny muted">Dropoff · Chidi M. · visit Sat</div></div><span class="badge g">scheduled</span></div>
+    </div>
+    <div class="note">Mobile-first: the same board collapses to one column and a stage filter chip row on phones.</div>
+  </div>
+</figure>
+
+<!-- ============ 4. NEWCOMER RECORD — WELCOME + CONSENT + SEND ============ -->
+<figure class="frame">
+  <figcaption><b>4. Newcomer record — journey tracker, consent, welcome send</b><code>/newcomers/:id</code></figcaption>
+  <div class="screen">
+    <div class="row between"><div class="grow"><div class="bar m"></div>
+      <div class="tiny muted">First visit 05 Oct · Ikeja · invited by member · source: walk-in</div></div>
+      <span class="pill on">Welcome</span></div>
+
+    <div class="steps">
+      <div class="step done"><div class="dotc">✓</div><div><div class="t">Identify — announcement captured</div><div class="m">05 Oct 08:12 · usher E. Bello</div></div></div>
+      <div class="step now"><div class="dotc">2</div><div><div class="t">Welcome — data collection + consent</div><div class="m">in progress · due today</div></div></div>
+      <div class="step"><div class="dotc">3</div><div><div class="t">Pack — literature, sermon notes, gift bag, malt, biscuits, contact card</div><div class="m">task not created yet</div></div></div>
+      <div class="step"><div class="dotc">4</div><div><div class="t">Drop-off — visit to confirm address</div><div class="m">target 7 days</div></div></div>
+      <div class="step"><div class="dotc">5</div><div><div class="t">Follow-up — memory verses, weekly check-in</div><div class="m">target 60 days</div></div></div>
+    </div>
+
+    <div class="card">
+      <h4>Channel consent</h4>
+      <div class="row between tiny"><span class="toggle"><i class="sw2 on"></i> WhatsApp</span><span class="muted">captured digital · 05 Oct</span></div>
+      <div class="row between tiny" style="margin-top:6px"><span class="toggle"><i class="sw2 on"></i> SMS</span><span class="muted">captured digital · 05 Oct</span></div>
+      <div class="row between tiny" style="margin-top:6px"><span class="toggle"><i class="sw2"></i> Email</span><span class="muted">not captured</span></div>
+      <div class="row between tiny" style="margin-top:6px"><span class="toggle"><i class="sw2 off2"></i> Guardian consent</span><span class="muted">required — record looks under 18</span></div>
+    </div>
+
+    <div class="split">
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="bubble wa"><strong>Welcome to Apostolic Faith Church</strong><br>
+          Hello Ngozi, we were glad to have you this morning. Our next service is Sunday 08:00 at Ikeja Worship Centre, and you can join live: {{live_join_url}}<br>
+          God bless you.
+          <div class="meta">WhatsApp template · visitor_welcome_wa · approved ✓</div></div>
+        <div class="bubble sms">Ngozi, welcome to AFC Ikeja. Sunday service 08:00. Join live: {{live_join_url}}
+          <div class="meta">SMS · visitor_welcome_sms · queued</div></div>
+        <div class="row" style="gap:6px"><span class="btn sm accent">Send WhatsApp</span><span class="btn sm ghost">Send SMS</span></div>
+      </div>
+      <div class="card grow">
+        <h4>Send status</h4>
+        <table><tbody>
+          <tr><td>Welcome WhatsApp</td><td><span class="badge g">delivered</span></td><td>08:41</td></tr>
+          <tr><td>Welcome SMS</td><td><span class="badge g">delivered</span></td><td>08:41</td></tr>
+          <tr><td>4h fallback check</td><td><span class="badge">not needed</span></td><td>—</td></tr>
+        </tbody></table>
+        <div class="note warn">Nothing is sent blind: the rendered text is shown first, and a blocked send always states why (no consent, template not approved, opt-out).</div>
+      </div>
+    </div>
+  </div>
+</figure>
+
+<!-- ============ 5. PACK + DROP-OFF ============ -->
+<figure class="frame">
+  <figcaption><b>5. Welcome pack checklist &amp; drop-off visit</b><code>/newcomers/:id#pack</code></figcaption>
+  <div class="screen">
+    <div class="row between"><span class="pill">Pack</span><span class="badge w">2 required items outstanding</span></div>
+    <div class="card">
+      <h4>Pack contents — Ikeja stock</h4>
+      <table><tbody>
+        <tr><td>Literature</td><td>1</td><td><span class="badge g">issued</span></td><td class="muted">stock 40</td></tr>
+        <tr><td>Sermon notes</td><td>1</td><td><span class="badge g">issued</span></td><td class="muted">stock 12 · reorder at 20</td></tr>
+        <tr><td>Gift bag</td><td>1</td><td><span class="badge g">issued</span></td><td class="muted">stock 25</td></tr>
+        <tr><td>Malt</td><td>2</td><td><span class="badge w">not issued</span></td><td class="muted">stock 60</td></tr>
+        <tr><td>Biscuits</td><td>1</td><td><span class="badge w">not issued</span></td><td class="muted">stock 60</td></tr>
+        <tr><td>Contact card</td><td>1</td><td><span class="badge g">issued</span></td><td class="muted">stock 80</td></tr>
+      </tbody></table>
+      <div class="note stop">The stage cannot be completed until every required item is checked — the screen lists exactly what is missing.</div>
+    </div>
+    <div class="card">
+      <h4>Drop-off — home visit</h4>
+      <div class="row" style="gap:8px">
+        <div class="field"><span class="lab">Scheduled</span><div class="input">Sat 11 Oct, 11:00</div></div>
+        <div class="field"><span class="lab">Officer</span><div class="input">Chidi M.</div></div>
+        <div class="field"><span class="lab">Outcome</span><div class="input">Address confirmed ▾</div></div>
+      </div>
+      <div class="row" style="margin-top:8px;gap:6px">
+        <span class="btn sm accent">Save outcome</span><span class="btn sm ghost">Moved</span>
+        <span class="btn sm ghost">Not home</span><span class="btn sm ghost">Declined</span><span class="btn sm ghost">Wrong number</span>
+      </div>
+      <div class="note">A wrong-number outcome blocks all future sends to that number across every campaign (consent withdrawal), and suggests merging with the duplicate record staff were warned about at intake.</div>
+    </div>
+  </div>
+</figure>
+
+<!-- ============ 6. FOLLOW-UP LOG + TASKS ============ -->
+<figure class="frame">
+  <figcaption><b>6. Follow-up log, next steps &amp; assignment</b><code>/newcomers/:id#follow-ups</code></figcaption>
+  <div class="screen">
+    <div class="split">
+      <div class="grow card">
+        <h4>Contact log</h4>
+        <table><tbody>
+          <tr><td>28 Sep</td><td>WhatsApp</td><td><span class="badge g">reached</span></td><td>asked about Sunday School</td></tr>
+          <tr><td>21 Sep</td><td>Phone</td><td><span class="badge">no_answer</span></td><td>call back after 6pm</td></tr>
+          <tr><td>14 Sep</td><td>Visit</td><td><span class="badge g">address_confirmed</span></td><td>met husband, 2 children</td></tr>
+          <tr><td>07 Sep</td><td>WhatsApp</td><td><span class="badge r">opted_out</span></td><td>STOP received — SMS consent kept</td></tr>
+        </tbody></table>
+      </div>
+      <div class="card" style="width:200px">
+        <h4>Owner</h4>
+        <div class="field"><span class="lab">Welfare officer</span><div class="input">Ada O. ▾</div></div>
+        <div class="field" style="margin-top:8px"><span class="lab">Next step</span><div class="input">Invite to Youth</div></div>
+        <div class="field" style="margin-top:8px"><span class="lab">Due</span><div class="input">08 Oct</div></div>
+        <div class="row" style="margin-top:8px;gap:6px"><span class="btn sm accent">Save</span><span class="btn sm ghost">Reassign</span></div>
+        <div class="note warn">Only Welfare-position holders in this branch are selectable. Reassignment is logged with actor and reason.</div>
+      </div>
+    </div>
+    <div class="card">
+      <h4>Tasks</h4>
+      <table><tbody>
+        <tr><td>Send weekly check-in (campaign)</td><td>Automated</td><td>Sun 09:00</td><td><span class="badge g">scheduled</span></td></tr>
+        <tr><td>Call back about Sunday School</td><td>Ada O.</td><td>09 Oct</td><td><span class="badge">open</span></td></tr>
+        <tr><td>Open welfare case (needs_support)</td><td>—</td><td>—</td><td><span class="badge g">offered</span></td></tr>
+      </tbody></table>
+    </div>
+  </div>
+</figure>
+
+<!-- ============ 7. NEWCOMER REPORTS ============ -->
+<figure class="frame">
+  <figcaption><b>7. Newcomer reports — funnel, follow-up status, conversion</b><code>/reports/newcomers</code></figcaption>
+  <div class="screen wide">
+    <div class="row between"><div class="row" style="gap:6px">
+      <span class="pill on">Period: last 90 days ▾</span><span class="pill">Scope: all branches ▾</span>
+      <span class="pill">Stage: all ▾</span></div>
+      <div class="row" style="gap:6px"><span class="btn sm ghost">Compare period</span><span class="btn sm accent">Export CSV</span></div></div>
+    <div class="split">
+      <div class="grow card">
+        <h4>Funnel (branch → stage)</h4>
+        <table><tbody>
+          <tr><th>Stage</th><th>New</th><th>In stage</th><th>Avg days</th><th>Overdue</th><th>Converted</th></tr>
+          <tr><td>Identify</td><td>64</td><td>18</td><td>0.6</td><td>3</td><td>—</td></tr>
+          <tr><td>Welcome</td><td>61</td><td>16</td><td>1.1</td><td>4</td><td>—</td></tr>
+          <tr><td>Pack</td><td>58</td><td>14</td><td>1.8</td><td>5</td><td>—</td></tr>
+          <tr><td>Drop-off</td><td>47</td><td>9</td><td>6.2</td><td>6</td><td>—</td></tr>
+          <tr><td>Follow-up</td><td>44</td><td>11</td><td>38</td><td>7</td><td>19</td></tr>
+        </tbody></table>
+        <div class="note">Stage-to-stage conversion and time-to-convert are computed from the same read view the dashboard block uses, so the two never disagree.</div>
+      </div>
+      <div class="card" style="width:280px">
+        <h4>Follow-up status</h4>
+        <div class="row" style="gap:8px">
+          <div class="stat"><div class="n">11</div><div class="k">Due today</div></div>
+          <div class="stat"><div class="n">7</div><div class="k">Overdue</div></div>
+        </div>
+        <table style="margin-top:8px"><tbody>
+          <tr><th>Officer</th><th>Open</th><th>Overdue</th><th>No contact 14d+</th></tr>
+          <tr><td>Ada O.</td><td>6</td><td>1</td><td>0</td></tr>
+          <tr><td>Chidi M.</td><td>9</td><td>4</td><td>2</td></tr>
+          <tr><td>Dormant (60d)</td><td>5</td><td>—</td><td>5</td></tr>
+        </tbody></table>
+        <div class="note">A branch admin's view contains only their branch; area admins see every branch. Exports are permission-scoped.</div>
+      </div>
+    </div>
+  </div>
+</figure>
+
+<!-- ============ 8. MEMBER INVITATION FORM ============ -->
+<figure class="frame">
+  <figcaption><b>8. Member event invitation — submit + rendered message</b><code>/events/:id/invite</code></figcaption>
+  <div class="screen wide">
+    <div class="nav"><div class="logo"></div><div class="grow"><div class="bar xs"></div></div>
+      <span class="pill">Member</span><span class="badge">7 of 10 invites used today</span></div>
+    <div class="split">
+      <div class="grow">
+        <div class="card">
+          <h4>Invite someone to an event</h4>
+          <div class="row" style="gap:8px">
+            <div class="field"><span class="lab">Event</span><div class="input">Youth Summit 2026 · 14 Nov ▾</div></div>
+            <div class="field"><span class="lab">Invitee name</span><div class="input">Ada Nwosu</div></div>
+          </div>
+          <div class="row" style="gap:8px;margin-top:8px">
+            <div class="field"><span class="lab">Phone</span><div class="input">+234 801 ••• •234</div></div>
+            <div class="field"><span class="lab">Relationship</span><div class="input">Friend ▾</div></div>
+            <div class="field"><span class="lab">Channel</span><div class="input">WhatsApp ▾</div></div>
+          </div>
+          <div class="row" style="gap:8px;margin-top:8px">
+            <div class="field"><span class="lab">Personal note (optional)</span><div class="input area">Do come — it will be a blessing.</div></div>
+            <div class="field"><span class="lab">Invitee age band</span><div class="input">Adult ▾</div></div>
+          </div>
+          <div class="note warn">Selecting a minor age band requires a guardian's number — the form will ask for it. One message only: no follow-up series is sent to an invitee who has not opted in.</div>
+          <div class="row" style="gap:6px;margin-top:8px"><span class="btn accent">Review and send</span><span class="btn ghost">Cancel</span></div>
+        </div>
+        <div class="card">
+          <h4>Rate limits</h4>
+          <div class="row between tiny"><span>Today: 7 of 10</span><span class="badge g">within limit</span></div>
+          <div class="row between tiny" style="margin-top:5px"><span>This week: 22 of 50</span><span class="badge g">within limit</span></div>
+          <div class="tiny muted" style="margin-top:6px">Above the limit, the request goes to your branch admin for approval instead of sending.</div>
+        </div>
+      </div>
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="tiny muted" style="margin-bottom:6px">Rendered preview — exactly what is sent</div>
+        <div class="bubble wa"><strong>Dear Ada,</strong><br>
+          Bro. Chidi O. is inviting you to <strong>Youth Summit 2026</strong> on <strong>Saturday 14 November 2026, 10:00</strong> at Ikeja Worship Centre.<br>
+          Do come — it will be a blessing.<br>
+          RSVP: {{rsvp_link}}
+          <div class="meta">WhatsApp template · event_invitation · approved ✓</div></div>
+        <div class="vars">invitee_name · inviter_name · event_name · event_datetime · event_location · branch_name · inviter_note · rsvp_link</div>
+        <div class="row" style="gap:6px;margin-top:8px"><span class="btn sm accent">Confirm &amp; send</span><span class="btn sm ghost">Edit</span></div>
+      </div>
+    </div>
+  </div>
+</figure>
+
+<!-- ============ 9. MEMBER INVITATION LIST ============ -->
+<figure class="frame">
+  <figcaption><b>9. My invitations — member view (own records only)</b><code>/me/invitations</code></figcaption>
+  <div class="screen">
+    <div class="nav"><div class="logo"></div><div class="grow"><div class="bar xs"></div></div><span class="pill">Member</span></div>
+    <div class="card">
+      <h4>My invitations</h4>
+      <table><tbody>
+        <tr><th>Event</th><th>Invitee</th><th>Status</th><th>Sent</th></tr>
+        <tr><td>Youth Summit 2026</td><td>Ada N. · 0801 ••• •234</td><td><span class="badge g">delivered</span></td><td>05 Oct</td></tr>
+        <tr><td>Youth Summit 2026</td><td>Bola T. · 0809 ••• •881</td><td><span class="badge">sent</span></td><td>05 Oct</td></tr>
+        <tr><td>Thanksgiving 2026</td><td>Ada N. · 0801 ••• •234</td><td><span class="badge g">registered</span></td><td>28 Sep</td></tr>
+        <tr><td>BSW 2026</td><td>Chidi A. · 0703 ••• •119</td><td><span class="badge r">blocked — opt-out</span></td><td>21 Sep</td></tr>
+      </tbody></table>
+      <div class="note">The member sees status only: no provider ids, no error detail, and the phone is masked. Ask staff to stop an invite; the number is then blocked for good.</div>
+    </div>
+    <div class="row between">
+      <span class="btn ghost">Ask staff to stop an invite</span>
+      <span class="btn ghost">My channel consent</span>
+    </div>
+    <div class="tiny muted">My consent: WhatsApp ✓ · SMS ✓ · Email ✗ — I can change this at any time, and stopping is as easy as starting.</div>
+  </div>
+</figure>
+
+<!-- ============ 10. CAMPAIGN BUILDER ============ -->
+<figure class="frame">
+  <figcaption><b>10. Campaign editor — steps, audience, consent gate</b><code>/campaigns/:id</code></figcaption>
+  <div class="screen wide">
+    <div class="row between"><div class="grow"><div class="bar m"></div>
+      <div class="tiny muted">Newcomer welcome drip · drip · marketing_only · Africa/Lagos</div></div>
+      <span class="pill on">draft</span><span class="btn sm ghost">Preview</span><span class="btn sm accent">Activate</span></div>
+    <div class="split">
+      <div class="grow">
+        <div class="card">
+          <h4>Steps</h4>
+          <div class="steps">
+            <div class="step done"><div class="dotc">1</div><div class="grow">
+              <div class="t">Welcome — WhatsApp template <span class="badge g">approved</span></div>
+              <div class="m">immediate · visitor_welcome_wa · audience: visitors in Welcome · consent: whatsapp</div></div>
+              <span class="btn sm ghost">Edit</span></div>
+            <div class="step done"><div class="dotc">2</div><div class="grow">
+              <div class="t">Welcome — SMS</div>
+              <div class="m">immediate · visitor_welcome_sms · fallback-capable</div></div>
+              <span class="btn sm ghost">Edit</span></div>
+            <div class="step done"><div class="dotc">3</div><div class="grow">
+              <div class="t">Service reminder with live link</div>
+              <div class="m">delay 2 days · service_reminder · {{live_join_url}}</div></div>
+              <span class="btn sm ghost">Edit</span></div>
+            <div class="step done"><div class="dotc">4</div><div class="grow">
+              <div class="t">Weekly check-in question</div>
+              <div class="m">delay 7 days · visitor_weekly_checkin</div></div>
+              <span class="btn sm ghost">Edit</span></div>
+            <div class="step now"><div class="dotc">5</div><div class="grow">
+              <div class="t">Memory verse</div>
+              <div class="m">delay 14 days · memory_verse · rotation weekly</div></div>
+              <span class="btn sm ghost">Edit</span></div>
+            <div class="step"><div class="dotc">6</div><div class="grow">
+              <div class="t">Hand over to Follow-up stage</div>
+              <div class="m">terminal · exits enrolment</div></div>
+              <span class="btn sm ghost">Edit</span></div>
+            <div class="step"><div class="dotc">+</div><div class="grow"><div class="t muted">Add step</div></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="card" style="width:300px">
+        <h4>Audience &amp; consent gate</h4>
+        <div class="field"><span class="lab">Audience</span><div class="input">Visitors in stage “Welcome” ▾</div></div>
+        <div class="field" style="margin-top:8px"><span class="lab">Consent policy</span><div class="input">Marketing only ▾</div></div>
+        <table style="margin-top:8px"><tbody>
+          <tr><th>Resolution</th><th>Count</th></tr>
+          <tr><td>In audience</td><td>16</td></tr>
+          <tr><td>Excluded — no WhatsApp consent</td><td>5</td></tr>
+          <tr><td>Excluded — minor, guardian required</td><td>1</td></tr>
+          <tr><td>Excluded — opted out</td><td>2</td></tr>
+          <tr><td><strong>Will receive</strong></td><td><strong>8</strong></td></tr>
+        </tbody></table>
+        <div class="note warn">Preview uses permission-scoped sample data. Nothing is queued until the campaign is activated; activation above the bulk threshold (200 recipients / naira cap) needs approval.</div>
+        <div class="row" style="gap:6px;margin-top:8px"><span class="btn sm ghost">Send test to me</span><span class="btn sm ghost">Copy step</span></div>
+      </div>
+    </div>
+  </div>
+</figure>
+
+<!-- ============ 11. CAMPAIGN CATALOGUE + KILL SWITCH ============ -->
+<figure class="frame">
+  <figcaption><b>11. Campaign catalogue — the eight families, status and kill switch</b><code>/campaigns</code></figcaption>
+  <div class="screen wide">
+    <div class="row between"><div class="row" style="gap:6px"><span class="pill on">All 9 ▾</span><span class="pill">Scope: my branches ▾</span></div>
+      <span class="btn sm danger">Pause all automation</span></div>
+    <div class="card">
+      <table><tbody>
+        <tr><th>Campaign</th><th>Type</th><th>Trigger</th><th>Channel</th><th>Consent</th><th>Last run</th><th>Result</th><th>Status</th></tr>
+        <tr><td>WhatsApp → SMS fallback</td><td>triggered</td><td>no activity 4h</td><td>SMS</td><td>marketing</td><td>today 09:12</td><td>41 sent · 38 delivered</td><td><span class="badge g">active</span></td></tr>
+        <tr><td>Birthday &amp; anniversary greetings</td><td>scheduled</td><td>daily 08:00</td><td>WA→SMS</td><td>marketing</td><td>today 08:00</td><td>23 sent · 23 delivered</td><td><span class="badge g">active</span></td></tr>
+        <tr><td>New-visitor welcome drip</td><td>drip</td><td>stage = Welcome</td><td>WA→SMS</td><td>marketing</td><td>yesterday</td><td>6 enrolled · 4 completed</td><td><span class="badge g">active</span></td></tr>
+        <tr><td>New-convert drip</td><td>drip</td><td>conversion/milestone</td><td>WA→SMS</td><td>mixed</td><td>2 days ago</td><td>2 enrolled</td><td><span class="badge g">active</span></td></tr>
+        <tr><td>Weekly memory verses</td><td>scheduled</td><td>Mon 08:00</td><td>WhatsApp</td><td>marketing</td><td>29 Sep</td><td>1,842 sent · 96% read</td><td><span class="badge g">active</span></td></tr>
+        <tr><td>Service reminders</td><td>scheduled</td><td>per service type</td><td>WA→SMS</td><td>operational</td><td>today 07:00</td><td>612 sent</td><td><span class="badge g">active</span></td></tr>
+        <tr><td>Meeting reminders</td><td>triggered</td><td>meeting_at set</td><td>email</td><td>operational</td><td>today 17:00</td><td>18 sent</td><td><span class="badge g">active</span></td></tr>
+        <tr><td>Event invitations</td><td>triggered</td><td>invite created</td><td>WA / SMS</td><td>inviter vouched</td><td>today</td><td>7 sent · 5 delivered</td><td><span class="badge g">active</span></td></tr>
+        <tr><td>Youth shout-out announcements</td><td>scheduled</td><td>ad hoc</td><td>WhatsApp</td><td>marketing</td><td>—</td><td>—</td><td><span class="badge w">template pending approval</span></td></tr>
+      </tbody></table>
+    </div>
+    <div class="note stop">"Pause all automation" takes effect within one scheduler tick, holds queued messages instead of deleting them, and is audited with actor, reason and scope. A whole channel can also be disabled with communication_channels.enabled = false — neither needs a deploy.</div>
+  </div>
+</figure>
+
+<!-- ============ 12. CAMPAIGN RUN REPORT ============ -->
+<figure class="frame">
+  <figcaption><b>12. Campaign run — auditable delivery log</b><code>/campaigns/:id/runs/:runId</code></figcaption>
+  <div class="screen wide">
+    <div class="row between"><div class="grow"><div class="bar m"></div>
+      <div class="tiny muted">Weekly memory verses · step 1 · window Mon 29 Sep 08:00–08:15 · campaign v3 · tick run 7d21</div></div>
+      <span class="badge g">completed</span><span class="btn sm ghost">Export CSV</span></div>
+    <div class="row" style="gap:8px">
+      <div class="stat"><div class="n">1,842</div><div class="k">Audience</div></div>
+      <div class="stat"><div class="n">1,796</div><div class="k">Eligible</div></div>
+      <div class="stat"><div class="n">46</div><div class="k">Excluded</div></div>
+      <div class="stat"><div class="n">1,790</div><div class="k">Delivered</div></div>
+      <div class="stat"><div class="n">1,722</div><div class="k">Read</div></div>
+      <div class="stat"><div class="n">6</div><div class="k">Failed</div></div>
+      <div class="stat"><div class="n">₦0</div><div class="k">Est. cost</div></div>
+    </div>
+    <div class="split">
+      <div class="grow card">
+        <h4>Exclusions by reason</h4>
+        <table><tbody>
+          <tr><td>No WhatsApp consent</td><td>31</td><td><span class="tiny muted">excluded — no message sent</span></td></tr>
+          <tr><td>Opted out (STOP)</td><td>9</td><td><span class="tiny muted">consent withdrawn 12 Sep</span></td></tr>
+          <tr><td>Minor without guardian consent</td><td>4</td><td><span class="tiny muted">guardian substituted instead</span></td></tr>
+          <tr><td>Frequency cap (3/week already)</td><td>2</td><td><span class="tiny muted">held to the next window</span></td></tr>
+        </tbody></table>
+        <div class="note">Every excluded recipient is recorded with a reason. There is no path that sends to someone whose consent we do not hold, and no manual override.</div>
+      </div>
+      <div class="card" style="width:300px">
+        <h4>Delivery log (immutable)</h4>
+        <table><tbody>
+          <tr><th>Recipient</th><th>Status</th><th>At</th></tr>
+          <tr><td>0801 ••• •234</td><td><span class="badge g">read</span></td><td>08:03</td></tr>
+          <tr><td>0809 ••• •881</td><td><span class="badge g">delivered</span></td><td>08:03</td></tr>
+          <tr><td>0703 ••• •119</td><td><span class="badge w">queued</span></td><td>08:04</td></tr>
+          <tr><td>0816 ••• •420</td><td><span class="badge r">failed</span></td><td>08:05</td></tr>
+        </tbody></table>
+        <div class="tiny muted" style="margin-top:6px">Full contact values and provider ids are restricted to the sender/approver; branch admins see their scope only; welfare officers see assigned rows, redacted.</div>
+        <div class="row" style="gap:6px;margin-top:8px"><span class="btn sm ghost">Retry failed (once)</span><span class="btn sm ghost">Campaign settings</span></div>
+      </div>
+    </div>
+    <div class="note warn">Run notes carry the assumptions this run made — for example "provider supplied no read receipts; used delivered_at as the activity proxy" — so a complaint about a fallback can be diagnosed rather than guessed.</div>
+  </div>
+</figure>
+
+</div>
+
+<footer>
+  AFC-151 round-4 wireframes · 12 screens · extends the AFC-147 14-screen set and the AFC-150 21-screen expanded set. Screens 1–2 replace the profile/dashboard tabbed pages; screens 3–7 newcomer care; 8–9 member invitations; 10–12 campaigns. Layout intent only — visual design, component library, and a WCAG 2.1 AA accessibility pass follow in implementation (UXDesigner, gated on the design system, AFC-152). Companion docs: <code>prd-addendum-v4</code>, <code>data-model-v4</code>, <code>integrations-addendum</code>, <code>mautic-adr</code>.
+</footer>
+</body>
+</html>

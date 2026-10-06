@@ -1,0 +1,31 @@
+# No trailing slash: pnpm links this as a SYMLINK to the store, and
+# "node_modules/" does not match a symlink. It leaked into the first
+# commit attempt in this workspace.
+node_modules
+.pnpm-store/
+dist/
+.nuxt/
+.output/
+.next/
+.turbo/
+coverage/
+*.tsbuildinfo
+
+# Secrets: never commit. .env.example is the only env file that is tracked.
+.env
+.env.*
+!.env.example
+
+# Local Directus / Postgres runtime state
+services/directus/uploads/
+services/directus/backup/*.dump
+services/directus/backup/*.tar
+services/directus/backup/*.sql.gz
+.pglite/
+
+.DS_Store
+*.log
+# Stale per-run debug copies of scripts/run-db-tests.mjs
+scripts/.dbg*.mjs
+scripts/_dbg.mjs
+scripts/_diag.mjs

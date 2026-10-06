@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Church Portal — Expanded Wireframes v2 (AFC-150)</title>
+<style>
+  :root{
+    --ink:#1b1b1b; --mut:#6b6b6b; --line:#c9c9c9; --bg:#f4f4f2;
+    --box:#e4e4e1; --box2:#efefec; --accent:#2f6f6f; --accent-soft:#d8e8e8;
+    --white:#fff; --warn:#f0e0c0;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:14px/1.45 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
+  header.top{position:sticky;top:0;z-index:5;background:var(--ink);color:#fff;padding:14px 22px;}
+  header.top h1{margin:0;font-size:16px;letter-spacing:.3px}
+  header.top p{margin:4px 0 0;color:#cfcfcf;font-size:12px}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;padding:12px 22px;border-bottom:1px solid var(--line);
+    background:#fafafa;font-size:12px;color:var(--mut)}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .sw{width:14px;height:14px;border:1px solid var(--line);display:inline-block;border-radius:2px}
+  .wrap{padding:22px;display:grid;gap:26px;grid-template-columns:repeat(auto-fill,minmax(430px,1fr))}
+  .frame{background:var(--white);border:1px solid var(--line);border-radius:10px;overflow:hidden;
+    box-shadow:0 1px 2px rgba(0,0,0,.05);display:flex;flex-direction:column}
+  .frame>figcaption{background:var(--box2);border-bottom:1px solid var(--line);padding:9px 12px;
+    display:flex;justify-content:space-between;align-items:baseline}
+  .frame>figcaption b{font-size:13px}
+  .frame>figcaption code{font-size:11px;color:var(--mut)}
+  .screen{padding:14px;display:flex;flex-direction:column;gap:12px;min-height:300px}
+  .screen.wide{grid-column:1/-1}
+  .muted{color:var(--mut)}
+  .tiny{font-size:11px}
+  .bar{height:12px;background:var(--box);border-radius:3px}
+  .bar.s{width:38%} .bar.m{width:62%} .bar.l{width:88%} .bar.xs{width:24%}
+  .box{background:var(--box);border-radius:4px}
+  .card{border:1px solid var(--line);border-radius:6px;padding:10px;background:#fff}
+  .card h4{margin:0 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--mut)}
+  .row{display:flex;gap:10px;align-items:center}
+  .row.between{justify-content:space-between}
+  .grow{flex:1}
+  .field{flex:1;display:flex;flex-direction:column;gap:5px}
+  .field .lab{font-size:11px;color:var(--mut)}
+  .input{height:30px;border:1px solid var(--line);border-radius:4px;background:#fff}
+  .input.area{height:58px}
+  .btn{display:inline-flex;align-items:center;justify-content:center;height:30px;padding:0 14px;
+    border-radius:4px;font-size:12px;border:1px solid var(--ink);background:var(--ink);color:#fff;white-space:nowrap}
+  .btn.ghost{background:#fff;color:var(--ink)}
+  .btn.accent{background:var(--accent);border-color:var(--accent)}
+  .btn.sm{height:24px;padding:0 9px;font-size:11px}
+  .nav{display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line);padding-bottom:9px}
+  .logo{width:26px;height:26px;border-radius:5px;background:var(--ink)}
+  .nav .sp{flex:1}
+  .pill{font-size:10px;padding:2px 8px;border-radius:999px;background:var(--box);color:var(--ink)}
+  .pill.on{background:var(--accent-soft);color:var(--accent);border:1px solid var(--accent)}
+  .tabs{display:flex;gap:6px;border-bottom:1px solid var(--line);padding-bottom:6px;flex-wrap:wrap}
+  .tabs .t{font-size:11px;padding:3px 9px;border-radius:4px 4px 0 0;color:var(--mut)}
+  .tabs .t.on{background:var(--box2);color:var(--ink);font-weight:600;border-bottom:2px solid var(--accent)}
+  table{width:100%;border-collapse:collapse;font-size:11px}
+  th,td{text-align:left;padding:6px 7px;border-bottom:1px solid var(--line)}
+  th{color:var(--mut);font-weight:600;background:var(--box2)}
+  .skel{height:9px;background:var(--box);border-radius:3px}
+  .stat{flex:1;border:1px solid var(--line);border-radius:6px;padding:9px;background:#fff}
+  .stat .n{font-size:20px;font-weight:700}
+  .stat .k{font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.4px}
+  .stat.link .n{color:var(--accent);text-decoration:underline}
+  .list{display:flex;flex-direction:column;gap:7px}
+  .item{display:flex;gap:9px;align-items:center;border:1px solid var(--line);border-radius:5px;padding:7px 9px;background:#fff}
+  .avatar{width:30px;height:30px;border-radius:50%;background:var(--box);flex:none}
+  .badge{font-size:10px;padding:2px 7px;border-radius:999px;border:1px solid var(--line);color:var(--mut);background:#fafafa}
+  .badge.g{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
+  .badge.w{background:var(--warn);color:#7a5a10;border-color:#d9c08a}
+  .sidebar{width:138px;flex:none;display:flex;flex-direction:column;gap:6px}
+  .sidebar .s{height:26px;border-radius:4px;background:var(--box2);display:flex;align-items:center;padding:0 9px;font-size:11px;color:var(--mut)}
+  .sidebar .s.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
+  .split{display:flex;gap:12px;flex:1;min-height:0}
+  .phone{width:230px;margin:0 auto;border:2px solid var(--ink);border-radius:20px;padding:8px;background:#fff}
+  .phone .notch{width:52px;height:5px;background:var(--line);border-radius:3px;margin:2px auto 8px}
+  .note{font-size:11px;color:var(--mut);border-left:3px solid var(--accent);padding:4px 9px;background:var(--accent-soft);border-radius:0 4px 4px 0}
+  .map{height:120px;border:1px solid var(--line);border-radius:6px;background:
+    repeating-linear-gradient(0deg,#e9efe9 0 28px,#eef3ee 28px 29px),
+    repeating-linear-gradient(90deg,#e9efe9 0 28px,#eef3ee 28px 29px);position:relative;overflow:hidden}
+  .pin{position:absolute;width:14px;height:14px;background:var(--accent);border:2px solid #fff;border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 1px 2px rgba(0,0,0,.3)}
+  .chart{display:flex;align-items:flex-end;gap:6px;height:96px;padding-top:6px}
+  .chart .b{flex:1;background:var(--accent-soft);border:1px solid var(--accent);border-radius:3px 3px 0 0}
+  .chart .b.m{background:var(--accent);opacity:.75}
+  .legend-inline{display:flex;gap:14px;font-size:10px;color:var(--mut)}
+  .dot{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:4px}
+  footer{padding:16px 22px;color:var(--mut);font-size:12px;border-top:1px solid var(--line);background:#fafafa}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>Church Portal (Lagos North Area) — Expanded Wireframes v2</h1>
+  <p>AFC-150 · planning artifact · low-fidelity · not production UI · grey blocks = layout placeholders · extends the AFC-147 14-screen set</p>
+</header>
+<div class="legend">
+  <span><i class="sw" style="background:var(--box)"></i> content block</span>
+  <span><i class="sw" style="background:var(--accent-soft);border-color:var(--accent)"></i> active / primary / clickable count</span>
+  <span><i class="sw" style="background:#fff"></i> card surface</span>
+  <span><i class="sw" style="background:var(--warn);border-color:#d9c08a"></i> attention / restricted / pending</span>
+  <span>Breakpoints: staff desktop + mobile; attendance, registration, class marking mobile-first.</span>
+</div>
+
+<div class="wrap">
+
+<!-- 1. AREA DASHBOARD (hierarchy) -->
+<figure class="frame">
+  <figcaption><b>1. Area dashboard — hierarchy at a glance</b><code>/area/:slug</code></figcaption>
+  <div class="screen">
+    <div class="nav"><div class="logo"></div><div class="grow"><div class="bar xs"></div></div><span class="pill on">Lagos North Area</span><span class="badge">Area admin</span></div>
+    <div class="row" style="gap:8px">
+      <div class="stat link"><div class="n">6</div><div class="k">Zones ▸</div></div>
+      <div class="stat link"><div class="n">17</div><div class="k">Branches ▸</div></div>
+      <div class="stat link"><div class="n">84</div><div class="k">BSCs ▸</div></div>
+      <div class="stat link"><div class="n">812</div><div class="k">Last-Sun att. ▸</div></div>
+    </div>
+    <div class="split">
+      <div class="card grow"><h4>Attendance by zone (male/female)</h4>
+        <div class="chart">
+          <div class="b" style="height:72%"></div><div class="b m" style="height:60%;opacity:.4"></div>
+          <div class="b" style="height:58%"></div><div class="b m" style="height:47%;opacity:.4"></div>
+          <div class="b" style="height:84%"></div><div class="b m" style="height:70%;opacity:.4"></div>
+          <div class="b" style="height:44%"></div><div class="b m" style="height:38%;opacity:.4"></div>
+        </div>
+        <div class="row between tiny muted"><span>Z1</span><span>Z2</span><span>Z3</span><span>Z4</span><span>Z5</span><span>Z6</span></div>
+        <div class="legend-inline"><span><i class="dot" style="background:var(--accent-soft)"></i>female</span><span><i class="dot" style="background:var(--accent);opacity:.75"></i>male</span></div>
+      </div>
+      <div class="card grow"><h4>Leadership</h4>
+        <div class="list">
+          <div class="item"><div class="avatar"></div><div class="grow"><div class="bar s"></div></div><span class="badge g">Area Overseer</span></div>
+          <div class="item"><div class="avatar"></div><div class="grow"><div class="bar m"></div></div><span class="badge">Zone Pastor</span></div>
+        </div>
+        <div class="note" style="margin-top:8px">Every count links to the filtered list that produced it (drill-down).</div>
+      </div>
+    </div>
+  </div>
+</figure>
+
+<!-- 2. ZONE PROFILE -->
+<figure class="frame">
+  <figcaption><b>2. Zone profile &amp; branches</b><code>/zones/:id</code></figcaption>
+  <div class="screen">
+    <div class="row"><div class="avatar" style="width:46px;height:46px;border-radius:6px"></div>
+      <div class="grow"><div class="bar m"></div><div class="tiny muted">Zone 3 · Zone Pastor: — · started 2011</div></div>
+      <span class="pill on">Zone 3</span><span class="btn sm ghost">Edit</span></div>
+    <div class="map" style="height:90px"><span class="pin" style="left:38%;top:40%"></span><span class="pin" style="left:60%;top:55%"></span><span class="pin" style="left:22%;top:62%"></span></div>
+    <div class="row" style="gap:8px">
+      <div class="stat link"><div class="n">4</div><div class="k">Branches ▸</div></div>
+      <div class="stat link"><div class="n">17</div><div class="k">BSCs ▸</div></div>
+      <div class="stat link"><div class="n">203</div><div class="k">Youth ▸</div></div>
+    </div>
+    <table>
+      <tr><th>Branch</th><th>Type</th><th>Pastor</th><th>BSCs</th><th>Last-Sun</th><th>Status</th></tr>
+      <tr><td><div class="skel" style="width:60%"></div></td><td>FFC</td><td><div class="skel" style="width:40%"></div></td><td>6</td><td>312</td><td><span class="badge g">active</span></td></tr>
+      <tr><td><div class="skel" style="width:52%"></div></td><td>AFWC</td><td><div class="skel" style="width:40%"></div></td><td>4</td><td>188</td><td><span class="badge g">active</span></td></tr>
+      <tr><td><div class="skel" style="width:66%"></div></td><td>Worship C.</td><td><div class="skel" style="width:40%"></div></td><td>3</td><td>96</td><td><span class="badge w">semi-formed</span></td></tr>
+    </table>
+    <div class="note">Zone admin scope: only this zone's branches, BSCs, and people are returned by the API.</div>
+  </div>
+</figure>
+
+<!-- 3. BRANCH PROFILE -->
+<figure class="frame">
+  <figcaption><b>3. Branch profile (full field set)</b><code>/branches/:slug</code></figcaption>
+  <div class="screen">
+    <div class="row"><div class="avatar" style="width:46px;height:46px;border-radius:6px"></div>
+      <div class="grow"><div class="bar m"></div><div class="tiny muted">Zone 3 · FFC · founded 1994</div></div>
+      <span class="pill on">Ikeja</span><span class="btn sm ghost">Edit</span></div>
+    <div class="tabs"><span class="t on">Overview</span><span class="t">BSCs</span><span class="t">Leadership</span><span class="t">Attendance</span><span class="t">Blessings</span><span class="t">History</span><span class="t">Photos</span></div>
+    <div class="split">
+      <div class="card grow"><h4>Management &amp; workers (clickable)</h4>
+        <div class="list">
+          <div class="item between"><span class="tiny">Teachers</span><span class="badge g">18 ▸</span></div>
+          <div class="item between"><span class="tiny">Ministers</span><span class="badge g">6 ▸</span></div>
+          <div class="item between"><span class="tiny">Altar Workers</span><span class="badge g">12 ▸</span></div>
+          <div class="item between"><span class="tiny">AVS</span><span class="badge g">9 ▸</span></div>
+        </div>
+      </div>
+      <div class="card" style="width:180px"><h4>Weekly headcounts</h4>
+        <table>
+          <tr><td>Sunday School</td><td>142</td></tr>
+          <tr><td>Elementary</td><td>61</td></tr>
+          <tr><td>Devotional</td><td>88</td></tr>
+          <tr><td>Youth Service</td><td>74</td></tr>
+          <tr><td>Revival Service</td><td>120</td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="note">BSC list with leader + average attendance; blessings breakdown; pastoral history with dates; milestones; outdoor/pastor photos.</div>
+  </div>
+</figure>
+
+<!-- 4. BSC PROFILE -->
+<figure class="frame">
+  <figcaption><b>4. Bible Study Centre (BSC)</b><code>/bscs/:id</code></figcaption>
+  <div class="screen">
+    <div class="row between"><div class="bar s"></div><span class="badge g">active</span></div>
+    <div class="split">
+      <div class="card grow"><h4>Details</h4>
+        <table>
+          <tr><th>Parent branch</th><td>Ikeja</td></tr>
+          <tr><th>Leader</th><td><div class="skel" style="width:60%"></div></td></tr>
+          <tr><th>Property</th><td>Warehouse · owner: —</td></tr>
+          <tr><th>Founded</th><td>2008</td></tr>
+          <tr><th>Avg attendance</th><td>42</td></tr>
+        </table>
+      </div>
+      <div class="card grow"><h4>Geo &amp; photo</h4>
+        <div class="map" style="height:80px"><span class="pin" style="left:48%;top:42%"></span></div>
+        <div class="row" style="gap:6px;margin-top:6px"><span class="badge">lat/lng</span><span class="badge">LocCode</span><span class="badge">OSM</span></div>
+      </div>
+    </div>
+    <div class="row" style="gap:8px"><div class="stat link"><div class="n">42</div><div class="k">Avg att. ▸</div></div><div class="stat link"><div class="n">11</div><div class="k">Saved YTD ▸</div></div><div class="stat link"><div class="n">3</div><div class="k">Milestones ▸</div></div></div>
+    <div class="note">Analytics counts link to the actual data (attendance sessions, blessings rows).</div>
+  </div>
+</figure>
+
+<!-- 5. ATTENDANCE BY CATEGORY / SEX -->
+<figure class="frame">
+  <figcaption><b>5. Attendance capture by category &amp; sex (mobile-first)</b><code>/attendance/capture</code></figcaption>
+  <div class="screen">
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="row between" style="margin-bottom:8px"><span class="badge on">Ikeja</span><span class="tiny muted">Revival Service · Sun 05 Oct</span></div>
+      <div class="list">
+        <div class="item between"><span>Children</span><span class="row"><span class="badge">M 14</span><span class="badge">F 17</span><b>31</b></span></div>
+        <div class="item between"><span>Teens</span><span class="row"><span class="badge">M 12</span><span class="badge">F 15</span><b>27</b></span></div>
+        <div class="item between"><span>Adults</span><span class="row"><span class="badge">M 55</span><span class="badge">F 63</span><b>118</b></span></div>
+        <div class="item between"><span>Teachers</span><span class="row"><span class="badge">M 4</span><span class="badge">F 9</span><b>13</b></span></div>
+        <div class="item between"><span>Youth</span><span class="row"><span class="badge">M 20</span><span class="badge">F 26</span><b>46</b></span></div>
+      </div>
+      <div class="row between" style="margin-top:8px"><b>Total 235</b><span class="badge">auto</span></div>
+      <div class="btn accent" style="width:100%;margin-top:9px">Save attendance</div>
+      <div class="tiny muted" style="text-align:center;margin-top:6px">Categories come from the service type. Retry-safe.</div>
+    </div>
+    <div class="note">Male/female inputs per category; the category set depends on the service type (configurable).</div>
+  </div>
+</figure>
+
+<!-- 6. ATTENDANCE REPORT / EXPORT -->
+<figure class="frame">
+  <figcaption><b>6. Attendance report — sort, compare, CSV</b><code>/reports/attendance</code></figcaption>
+  <div class="screen">
+    <div class="row between"><div class="bar s"></div>
+      <div class="row"><span class="badge on">Group: Zone</span><span class="badge">Period: Quarterly</span><span class="badge">Compare: 2025</span><span class="btn accent sm">Export CSV</span></div></div>
+    <table>
+      <tr><th>Zone</th><th>Male</th><th>Female</th><th>Total</th><th>Δ vs 2025</th></tr>
+      <tr><td>Zone 1</td><td>402</td><td>498</td><td>900</td><td><span class="badge g">+6%</span></td></tr>
+      <tr><td>Zone 2</td><td>318</td><td>361</td><td>679</td><td><span class="badge">+1%</span></td></tr>
+      <tr><td>Zone 3</td><td>510</td><td>602</td><td>1112</td><td><span class="badge g">+11%</span></td></tr>
+    </table>
+    <div class="row"><span class="badge">Weekly</span><span class="badge">Monthly</span><span class="badge on">Quarterly</span><span class="badge">Yearly</span><span class="badge">Custom…</span><span class="grow"></span><span class="btn ghost sm">Upload prior year</span></div>
+    <div class="note">Export respects permissions: a branch admin's CSV contains only their branch.</div>
+  </div>
+</figure>
+
+<!-- 7. BLESSINGS -->
+<figure class="frame">
+  <figcaption><b>7. Blessings records</b><code>/reports/blessings</code></figcaption>
+  <div class="screen">
+    <div class="row between"><div class="bar s"></div>
+      <div class="row"><span class="badge on">Group: Branch</span><span class="badge">Period: Yearly</span><span class="btn accent sm">Export CSV</span></div></div>
+    <table>
+      <tr><th>Blessing</th><th>Male</th><th>Female</th><th>Total</th></tr>
+      <tr><td>Salvation</td><td>31</td><td>44</td><td>75</td></tr>
+      <tr><td>Sanctification</td><td>18</td><td>22</td><td>40</td></tr>
+      <tr><td>Holy-Ghost baptism</td><td>12</td><td>19</td><td>31</td></tr>
+      <tr><td>Reanointing</td><td>4</td><td>6</td><td>10</td></tr>
+      <tr><td>Healing</td><td>3</td><td>7</td><td>10</td></tr>
+      <tr><td>Other (—)</td><td>1</td><td>2</td><td>3</td></tr>
+    </table>
+    <div class="row"><span class="btn accent sm">Add blessing record</span><span class="badge">linked to service / program / event</span></div>
+    <div class="note">Same sorting and CSV export as attendance; rolls up to branch/zone blessing breakdowns.</div>
+  </div>
+</figure>
+
+<!-- 8. HOUSEHOLD / FAMILY WITH MAP -->
+<figure class="frame">
+  <figcaption><b>8. Household / family with map pin</b><code>/families/:id</code></figcaption>
+  <div class="screen">
+    <div class="row between"><div><div class="bar s"></div><div class="tiny muted">Okafor family · Ikeja · household head: —</div></div><span class="btn sm ghost">Edit</span></div>
+    <div class="split">
+      <div class="card grow"><h4>Unified household data</h4>
+        <table>
+          <tr><th>Address</th><td><div class="skel" style="width:80%"></div></td></tr>
+          <tr><th>Wedding date</th><td>12 Jun 2004</td></tr>
+          <tr><th>Phone</th><td>•••</td></tr>
+          <tr><th>Sub-location</th><td>Opebi</td></tr>
+        </table>
+        <div class="row" style="gap:6px;margin-top:6px"><span class="badge">lat/lng stored</span><span class="badge">LocCode</span><span class="badge">postcode (optional)</span></div>
+      </div>
+      <div class="card grow"><h4>Map pin</h4>
+        <div class="map" style="height:100px"><span class="pin" style="left:52%;top:46%"></span></div>
+        <div class="btn ghost sm" style="margin-top:6px;width:100%">Recapture pin</div>
+      </div>
+    </div>
+    <div class="card"><h4>Members (individual data differs per person)</h4>
+      <div class="list">
+        <div class="item"><div class="avatar"></div><div class="grow"><div class="bar s"></div></div><span class="badge">Spouse</span><span class="badge g">Member</span></div>
+        <div class="item"><div class="avatar"></div><div class="grow"><div class="bar m"></div></div><span class="badge">Child</span><span class="badge">Student</span></div>
+      </div>
+    </div>
+  </div>
+</figure>
+
+<!-- 9. PERSON PROFILE EXPANDED -->
+<figure class="frame">
+  <figcaption><b>9. Person profile — expanded</b><code>/people/:id</code></figcaption>
+  <div class="screen">
+    <div class="row"><div class="avatar" style="width:52px;height:52px"></div>
+      <div class="grow"><div class="bar m"></div><div class="tiny muted">Ikeja · Member · WCS (media)</div></div>
+      <span class="badge g">photo / gravatar</span><span class="btn sm ghost">Edit</span></div>
+    <div class="tabs"><span class="t on">Profile</span><span class="t">Milestones</span><span class="t">Previous branches</span><span class="t">Attendance</span><span class="t">Youth</span><span class="t">History</span></div>
+    <div class="split">
+      <div class="card grow"><h4>Details</h4>
+        <table>
+          <tr><th>Sex</th><td>—</td></tr>
+          <tr><th>Marital status</th><td>Married · 12 Jun 2004</td></tr>
+          <tr><th>Education</th><td>Undergraduate</td></tr>
+          <tr><th>Occupation</th><td>Entrepreneur</td></tr>
+          <tr><th>Duties</th><td>WCS (since 2021)</td></tr>
+          <tr><th>Status</th><td><span class="badge g">Active</span></td></tr>
+        </table>
+      </div>
+      <div class="card grow"><h4>Spiritual milestones</h4>
+        <div class="list">
+          <div class="item between tiny"><span>Saved</span><b>1998</b></div>
+          <div class="item between tiny"><span>Sanctified</span><b>2003</b></div>
+          <div class="item between tiny"><span>Holy-Ghost baptism</span><b>2003-05-11</b></div>
+          <div class="item between tiny"><span>Water baptism</span><b>1999</b></div>
+        </div>
+        <div class="tiny muted" style="margin-top:6px">Year-only entries marked approximate.</div>
+      </div>
+    </div>
+  </div>
+</figure>
+
+<!-- 10. FINANCIAL RECORD ENTRY -->
+<figure class="frame">
+  <figcaption><b>10. Monthly financial record (per branch)</b><code>/finance/entry</code></figcaption>
+  <div class="screen">
+    <div class="row between"><div class="bar s"></div><span class="badge on">Ikeja · Oct 2026</span></div>
+    <div class="split">
+      <div class="card grow"><h4>Inputs</h4>
+        <div class="row" style="gap:8px;margin-bottom:8px"><div class="field"><span class="lab">Income</span><div class="input"></div></div><div class="field"><span class="lab">WECA contribution</span><div class="input"></div></div></div>
+        <div class="row" style="gap:8px;margin-bottom:8px"><div class="field"><span class="lab">5% savings &amp; projects</span><div class="input"></div></div><div class="field"><span class="lab">Intervention</span><div class="input"></div></div></div>
+        <div class="row" style="gap:8px"><div class="field"><span class="lab">Faith City</span><div class="input"></div></div><div class="field"><span class="lab">Other</span><div class="input"></div></div></div>
+      </div>
+      <div class="card" style="width:180px"><h4>Status</h4>
+        <div class="list"><div class="item tiny">Draft</div><div class="item tiny">Submit → area confirms</div></div>
+        <div class="btn accent sm" style="margin-top:8px;width:100%">Save draft</div>
+      </div>
+    </div>
+    <div class="note">One record per branch per month. Amounts restricted to branch/area/finance roles.</div>
+  </div>
+</figure>
+
+<!-- 11. WECA RETURN (PENDING FORMULA) -->
+<figure class="frame">
+  <figcaption><b>11. WECA return — pending board formula</b><code>/finance/weca-returns</code></figcaption>
+  <div class="screen">
+    <div class="row between"><div class="bar s"></div><span class="badge w">formula pending</span></div>
+    <table>
+      <tr><th>Branch</th><th>Period</th><th>Income</th><th>WECA due</th><th>Status</th></tr>
+      <tr><td>Ikeja</td><td>2026-10</td><td>₦ 2,400,000</td><td><span class="badge w">— pending</span></td><td><span class="badge w">formula_pending</span></td></tr>
+      <tr><td>Yaba</td><td>2026-10</td><td>₦ 1,180,000</td><td><span class="badge w">— pending</span></td><td><span class="badge w">formula_pending</span></td></tr>
+    </table>
+    <div class="card" style="background:var(--warn);border-color:#d9c08a">
+      <div class="tiny"><b>Dependency:</b> the board will share the WECA returns formula. Inputs are captured now; computed fields stay flagged <b>pending</b> and are never guessed. When the formula arrives it is stored as a version; returns recalculate and record the formula version used.</div>
+    </div>
+    <div class="row"><span class="btn ghost sm">Export inputs CSV</span><span class="badge">audited</span></div>
+  </div>
+</figure>
+
+<!-- 12. YOUTH CARE -->
+<figure class="frame">
+  <figcaption><b>12. Youth Care &amp; Empowerment</b><code>/youth</code></figcaption>
+  <div class="screen">
+    <div class="row between"><div class="bar s"></div>
+      <div class="row"><span class="badge on">Zone 3</span><span class="badge">Education: all</span><span class="badge">Employment: all</span></div></div>
+    <div class="row" style="gap:8px">
+      <div class="stat link"><div class="n">203</div><div class="k">Youth ▸</div></div>
+      <div class="stat link"><div class="n">48</div><div class="k">Undergraduate ▸</div></div>
+      <div class="stat link"><div class="n">9</div><div class="k">This week's birthdays ▸</div></div>
+    </div>
+    <div class="split">
+      <div class="card grow"><h4>Directory (shared with church DB)</h4>
+        <table>
+          <tr><th>Name</th><th>Education</th><th>Employment</th><th>Dept</th></tr>
+          <tr><td><div class="skel" style="width:55%"></div></td><td>Undergrad</td><td>Student</td><td>Youth</td></tr>
+          <tr><td><div class="skel" style="width:62%"></div></td><td>Secondary</td><td>Entrepreneur</td><td>Media</td></tr>
+        </table>
+      </div>
+      <div class="card" style="width:180px"><h4>Shout-outs</h4>
+        <div class="list">
+          <div class="item tiny">Admission · <b>—</b></div>
+          <div class="item tiny">Graduation · <b>—</b></div>
+          <div class="item tiny">Scholarship · <b>—</b></div>
+        </div>
+        <div class="btn ghost sm" style="margin-top:8px;width:100%">Queue greeting</div>
+      </div>
+    </div>
+    <div class="note">Same <code>people</code> records as the main church database — no separate youth database.</div>
+  </div>
+</figure>
+
+<!-- 13. CELEBRATIONS / REMINDERS -->
+<figure class="frame">
+  <figcaption><b>13. Celebrations &amp; weekly reminder</b><code>/celebrations</code></figcaption>
+  <div class="screen">
+    <div class="row between"><div class="bar s"></div><span class="badge g">webhook: weekly</span></div>
+    <div class="tabs"><span class="t on">Birthdays</span><span class="t">Anniversaries</span><span class="t">Shout-outs</span></div>
+    <table>
+      <tr><th>Person</th><th>Type</th><th>Date</th><th>Scope</th><th>Greeting</th></tr>
+      <tr><td><div class="skel" style="width:55%"></div></td><td>Birthday</td><td>Oct 08</td><td>Ikeja</td><td><span class="badge g">consent ok</span></td></tr>
+      <tr><td><div class="skel" style="width:48%"></div></td><td>Anniversary</td><td>Oct 10</td><td>Yaba</td><td><span class="badge w">no consent</span></td></tr>
+    </table>
+    <div class="note">Greetings are queued through the consent-gated communications module. The weekly webhook payload contains IDs/names only, no contact values.</div>
+  </div>
+</figure>
+
+<!-- 14. CAMPUS CARE DASHBOARD -->
+<figure class="frame">
+  <figcaption><b>14. Campus Care dashboard</b><code>/campus</code></figcaption>
+  <div class="screen">
+    <div class="row" style="gap:8px">
+      <div class="stat link"><div class="n">312</div><div class="k">Students ▸</div></div>
+      <div class="stat link"><div class="n">86</div><div class="k">AFCF connected ▸</div></div>
+      <div class="stat link"><div class="n">47</div><div class="k">NYSC serving ▸</div></div>
+      <div class="stat link"><div class="n">₦1.2m</div><div class="k">Support YTD ▸</div></div>
+    </div>
+    <div class="split">
+      <div class="card grow"><h4>By level</h4>
+        <div class="chart"><div class="b" style="height:40%"></div><div class="b" style="height:55%"></div><div class="b" style="height:70%"></div><div class="b" style="height:88%"></div><div class="b m" style="height:60%"></div></div>
+        <div class="row between tiny muted"><span>Fresh</span><span>Soph</span><span>Junior</span><span>Senior</span><span>Final</span></div>
+      </div>
+      <div class="card grow"><h4>NYSC tracking (linked AFCMF)</h4>
+        <div class="list">
+          <div class="item between tiny"><span>Waiting call-up</span><b>21</b></div>
+          <div class="item between tiny"><span>Deployed / serving</span><b>47</b></div>
+          <div class="item between tiny"><span>Completed</span><b>18</b></div>
+        </div>
+      </div>
+    </div>
+    <div class="note">Undergraduate year progress, check-ups, AFCF campus-fellowship handshake, and financial-support tracking.</div>
+  </div>
+</figure>
+
+<!-- 15. COACHING TIMETABLE & ATTENDANCE -->
+<figure class="frame">
+  <figcaption><b>15. WAEC/UTME coaching — timetable &amp; class marking</b><code>/campus/coaching/:id</code></figcaption>
+  <div class="screen">
+    <div class="row between"><div><div class="bar s"></div><div class="tiny muted">UTME 2026 · Ikeja centre</div></div><span class="btn accent sm">Add slot</span></div>
+    <table>
+      <tr><th>Subject</th><th>Facilitator</th><th>Day</th><th>Time</th><th>Call status</th></tr>
+      <tr><td>Mathematics</td><td><div class="skel" style="width:55%"></div></td><td>Mon</td><td>16:00</td><td><span class="badge g">confirmed</span></td></tr>
+      <tr><td>English</td><td><div class="skel" style="width:50%"></div></td><td>Wed</td><td>16:00</td><td><span class="badge w">called</span></td></tr>
+      <tr><td>Physics</td><td><div class="skel" style="width:60%"></div></td><td>Fri</td><td>17:00</td><td><span class="badge">registered</span></td></tr>
+    </table>
+    <div class="card"><h4>Class attendance (mobile-first)</h4>
+      <div class="list">
+        <div class="item between"><span class="tiny">— student —</span><span class="row"><span class="badge g">present</span><span class="badge">absent</span></span></div>
+        <div class="item between"><span class="tiny">— student —</span><span class="row"><span class="badge g">present</span><span class="badge">absent</span></span></div>
+      </div>
+    </div>
+    <div class="note">Progress, resources folder, feedback, and exam results are sub-tabs of the programme.</div>
+  </div>
+</figure>
+
+<!-- 16. STUDENT PROGRESS / RESULTS -->
+<figure class="frame">
+  <figcaption><b>16. Campus student — progress &amp; results</b><code>/campus/students/:id</code></figcaption>
+  <div class="screen">
+    <div class="row"><div class="avatar" style="width:44px;height:44px"></div>
+      <div class="grow"><div class="bar m"></div><div class="tiny muted">Unilag · B.Sc Economics · Senior</div></div>
+      <span class="badge g">AFCF connected</span><span class="badge">AFCMF linked</span></div>
+    <div class="tabs"><span class="t on">Progress</span><span class="t">Results</span><span class="t">Support</span><span class="t">NYSC</span><span class="t">Check-ups</span></div>
+    <div class="split">
+      <div class="card grow"><h4>Progress</h4>
+        <table>
+          <tr><th>Assessment</th><th>Score</th><th>Date</th></tr>
+          <tr><td>UTME mock 1</td><td>268</td><td>Feb 12</td></tr>
+          <tr><td>UTME mock 2</td><td>281</td><td>Mar 09</td></tr>
+        </table>
+      </div>
+      <div class="card" style="width:180px"><h4>NYSC</h4>
+        <div class="list"><div class="item tiny">Status: <b>waiting call-up</b></div><div class="item tiny">Next check-up: Oct 20</div></div>
+      </div>
+    </div>
+    <div class="note">Results feed the record; admission/WAEC/UTME results and financial support are tracked per student.</div>
+  </div>
+</figure>
+
+<!-- 17. CALENDAR -->
+<figure class="frame">
+  <figcaption><b>17. Calendar</b><code>/calendar</code></figcaption>
+  <div class="screen">
+    <div class="row between"><div class="bar s"></div><div class="row"><span class="badge on">Month</span><span class="badge">Scope: all</span><span class="badge">Type: all</span></div></div>
+    <table>
+      <tr><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th></tr>
+      <tr><td>1</td><td>2</td><td>3</td><td>4</td><td>5</td><td>6<div class="skel" style="width:80%;height:5px;margin-top:3px"></div></td><td>7<div class="skel" style="width:90%;height:5px;margin-top:3px"></div></td></tr>
+      <tr><td>8<div class="skel" style="width:60%;height:5px;margin-top:3px"></div></td><td>9</td><td>10</td><td>11</td><td>12</td><td>13</td><td>14<div class="skel" style="width:90%;height:5px;margin-top:3px"></div></td></tr>
+    </table>
+    <div class="row" style="gap:8px"><span class="badge">Services</span><span class="badge">Events</span><span class="badge">Programmes</span><span class="badge">Birthdays</span><span class="badge">Coaching</span></div>
+    <div class="note">Unified feed of services, events, programmes, coaching, and celebrations; filterable by scope and type.</div>
+  </div>
+</figure>
+
+<!-- 18. REPORTS HUB -->
+<figure class="frame">
+  <figcaption><b>18. Reports hub</b><code>/reports</code></figcaption>
+  <div class="screen">
+    <div class="row between"><div class="bar s"></div><span class="badge on">Compare with previous years</span></div>
+    <div class="split">
+      <div class="card grow"><h4>Report types</h4>
+        <div class="list">
+          <div class="item between"><span class="tiny">Attendance (category/sex)</span><span class="badge g">CSV ▸</span></div>
+          <div class="item between"><span class="tiny">Blessings</span><span class="badge g">CSV ▸</span></div>
+          <div class="item between"><span class="tiny">Financial / WECA</span><span class="badge g">CSV ▸</span></div>
+          <div class="item between"><span class="tiny">Youth</span><span class="badge g">CSV ▸</span></div>
+          <div class="item between"><span class="tiny">Campus / coaching</span><span class="badge g">CSV ▸</span></div>
+          <div class="item between"><span class="tiny">Events</span><span class="badge g">CSV ▸</span></div>
+        </div>
+      </div>
+      <div class="card" style="width:180px"><h4>Prior-year data</h4>
+        <div class="list"><div class="item tiny">Upload CSV template</div><div class="item tiny">Import batches + errors</div></div>
+        <div class="btn ghost sm" style="margin-top:8px;width:100%">Upload prior year</div>
+      </div>
+    </div>
+  </div>
+</figure>
+
+<!-- 19. LEADERSHIP & APPOINTMENTS -->
+<figure class="frame">
+  <figcaption><b>19. Leadership &amp; appointments</b><code>/leadership</code></figcaption>
+  <div class="screen">
+    <div class="row between"><div class="bar s"></div><span class="btn accent sm">New appointment</span></div>
+    <div class="tabs"><span class="t on">Current</span><span class="t">Pastoral history</span><span class="t">Timelines</span></div>
+    <table>
+      <tr><th>Person</th><th>Position</th><th>Scope</th><th>Since</th><th>Status</th></tr>
+      <tr><td><div class="skel" style="width:55%"></div></td><td>Pastor</td><td>Zone 3 / Ikeja</td><td>2021</td><td><span class="badge g">current</span></td></tr>
+      <tr><td><div class="skel" style="width:50%"></div></td><td>WCS</td><td>Ikeja</td><td>2023</td><td><span class="badge g">current</span></td></tr>
+      <tr><td><div class="skel" style="width:60%"></div></td><td>Youth Head</td><td>Area</td><td>2024</td><td><span class="badge g">current</span></td></tr>
+    </table>
+    <div class="note">One appointments model powers pastoral history, leadership timelines, management teams, and department heads. Youth Head/Outreach are area-only.</div>
+  </div>
+</figure>
+
+<!-- 20. OFFICE: TASKS / MINUTES / TRANSFERS -->
+<figure class="frame">
+  <figcaption><b>20. Office — tasks, minutes, transfers</b><code>/office</code></figcaption>
+  <div class="screen">
+    <div class="tabs"><span class="t on">Tasks</span><span class="t">Minutes</span><span class="t">Transfers</span><span class="t">Marriage matters</span><span class="t">Announcements</span></div>
+    <table>
+      <tr><th>Task</th><th>Assignee</th><th>Due</th><th>Status</th></tr>
+      <tr><td><div class="skel" style="width:70%"></div></td><td><div class="skel" style="width:50%"></div></td><td>Oct 09</td><td><span class="badge g">in progress</span></td></tr>
+      <tr><td><div class="skel" style="width:58%"></div></td><td><div class="skel" style="width:50%"></div></td><td>Oct 02</td><td><span class="badge w">overdue</span></td></tr>
+    </table>
+    <div class="split">
+      <div class="card grow"><h4>Transfer</h4><div class="row" style="gap:8px"><div class="field"><span class="lab">From</span><div class="input"></div></div><div class="field"><span class="lab">To</span><div class="input"></div></div><span class="btn accent sm" style="align-self:flex-end">Approve</span></div></div>
+      <div class="card grow"><h4>Announcement build-up</h4><div class="list"><div class="item tiny">Draft → Schedule → Published</div></div></div>
+    </div>
+    <div class="note">Cross-entity search across people, households, branches, BSCs, events, tasks, and minutes — within scope.</div>
+  </div>
+</figure>
+
+<!-- 21. INTEGRATIONS / ADMIN -->
+<figure class="frame">
+  <figcaption><b>21. Integrations &amp; users admin</b><code>/admin/integrations</code></figcaption>
+  <div class="screen">
+    <div class="row between"><div class="bar s"></div><span class="badge w">super admin only</span></div>
+    <div class="split">
+      <div class="card grow"><h4>Integrations</h4>
+        <div class="list">
+          <div class="item between tiny"><span>Gravatar</span><span class="badge g">on</span></div>
+          <div class="item between tiny"><span>Email (SMTP)</span><span class="badge g">on</span></div>
+          <div class="item between tiny"><span>Telegram</span><span class="badge">configured</span></div>
+          <div class="item between tiny"><span>SMS</span><span class="badge g">on</span></div>
+          <div class="item between tiny"><span>WhatsApp</span><span class="badge w">templates pending</span></div>
+          <div class="item between tiny"><span>Backup</span><span class="badge g">last ok 02:00</span></div>
+          <div class="item between tiny"><span>Birthday webhook</span><span class="badge g">weekly</span></div>
+        </div>
+      </div>
+      <div class="card" style="width:190px"><h4>Users &amp; scopes</h4>
+        <div class="list">
+          <div class="item tiny">Area / Zone / Branch scope</div>
+          <div class="item tiny">Department heads</div>
+          <div class="item tiny">Household access</div>
+          <div class="item tiny">Guest (time-boxed)</div>
+        </div>
+      </div>
+    </div>
+    <div class="note">Secrets are referenced by name only and never shown here. Users Management and scope sync are Flow-driven.</div>
+  </div>
+</figure>
+
+</div>
+
+<footer>
+  AFC-150 expanded low-fidelity wireframes · 21 screens (extends the AFC-147 14-screen set) · layout intent only; visual design, component library, and accessibility pass follow in implementation. Companion docs: <code>prd-expansion</code>, <code>data-model-expansion</code>, <code>integrations-spec</code>, <code>address-evaluation</code>.
+</footer>
+</body>
+</html>

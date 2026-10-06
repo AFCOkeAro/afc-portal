@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Church Portal — Low-Fidelity Wireframes (AFC-147)</title>
+<style>
+  :root{
+    --ink:#1b1b1b; --mut:#6b6b6b; --line:#c9c9c9; --bg:#f4f4f2;
+    --box:#e4e4e1; --box2:#efefec; --accent:#2f6f6f; --accent-soft:#d8e8e8;
+    --white:#fff; --warn:#f0e0c0;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:14px/1.45 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
+  header.top{position:sticky;top:0;z-index:5;background:var(--ink);color:#fff;padding:14px 22px;}
+  header.top h1{margin:0;font-size:16px;letter-spacing:.3px}
+  header.top p{margin:4px 0 0;color:#cfcfcf;font-size:12px}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;padding:12px 22px;border-bottom:1px solid var(--line);
+    background:#fafafa;font-size:12px;color:var(--mut)}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .sw{width:14px;height:14px;border:1px solid var(--line);display:inline-block;border-radius:2px}
+  .wrap{padding:22px;display:grid;gap:26px;grid-template-columns:repeat(auto-fill,minmax(430px,1fr))}
+  .frame{background:var(--white);border:1px solid var(--line);border-radius:10px;overflow:hidden;
+    box-shadow:0 1px 2px rgba(0,0,0,.05);display:flex;flex-direction:column}
+  .frame>figcaption{background:var(--box2);border-bottom:1px solid var(--line);padding:9px 12px;
+    display:flex;justify-content:space-between;align-items:baseline}
+  .frame>figcaption b{font-size:13px}
+  .frame>figcaption code{font-size:11px;color:var(--mut)}
+  .screen{padding:14px;display:flex;flex-direction:column;gap:12px;min-height:300px}
+  .screen.wide{grid-column:1/-1}
+  .muted{color:var(--mut)}
+  .tiny{font-size:11px}
+  .bar{height:12px;background:var(--box);border-radius:3px}
+  .bar.s{width:38%} .bar.m{width:62%} .bar.l{width:88%} .bar.xs{width:24%}
+  .box{background:var(--box);border-radius:4px}
+  .card{border:1px solid var(--line);border-radius:6px;padding:10px;background:#fff}
+  .card h4{margin:0 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--mut)}
+  .row{display:flex;gap:10px;align-items:center}
+  .row.between{justify-content:space-between}
+  .grow{flex:1}
+  .field{flex:1;display:flex;flex-direction:column;gap:5px}
+  .field .lab{font-size:11px;color:var(--mut)}
+  .input{height:30px;border:1px solid var(--line);border-radius:4px;background:#fff}
+  .input.area{height:58px}
+  .btn{display:inline-flex;align-items:center;justify-content:center;height:30px;padding:0 14px;
+    border-radius:4px;font-size:12px;border:1px solid var(--ink);background:var(--ink);color:#fff;white-space:nowrap}
+  .btn.ghost{background:#fff;color:var(--ink)}
+  .btn.accent{background:var(--accent);border-color:var(--accent)}
+  .btn.sm{height:24px;padding:0 9px;font-size:11px}
+  .nav{display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line);padding-bottom:9px}
+  .logo{width:26px;height:26px;border-radius:5px;background:var(--ink)}
+  .nav .sp{flex:1}
+  .pill{font-size:10px;padding:2px 8px;border-radius:999px;background:var(--box);color:var(--ink)}
+  .pill.on{background:var(--accent-soft);color:var(--accent);border:1px solid var(--accent)}
+  .tabs{display:flex;gap:6px;border-bottom:1px solid var(--line);padding-bottom:6px}
+  .tabs .t{font-size:11px;padding:3px 9px;border-radius:4px 4px 0 0;color:var(--mut)}
+  .tabs .t.on{background:var(--box2);color:var(--ink);font-weight:600;border-bottom:2px solid var(--accent)}
+  table{width:100%;border-collapse:collapse;font-size:11px}
+  th,td{text-align:left;padding:6px 7px;border-bottom:1px solid var(--line)}
+  th{color:var(--mut);font-weight:600;background:var(--box2)}
+  .skel{height:9px;background:var(--box);border-radius:3px}
+  .stat{flex:1;border:1px solid var(--line);border-radius:6px;padding:9px;background:#fff}
+  .stat .n{font-size:20px;font-weight:700}
+  .stat .k{font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.4px}
+  .list{display:flex;flex-direction:column;gap:7px}
+  .item{display:flex;gap:9px;align-items:center;border:1px solid var(--line);border-radius:5px;padding:7px 9px;background:#fff}
+  .avatar{width:30px;height:30px;border-radius:50%;background:var(--box);flex:none}
+  .badge{font-size:10px;padding:2px 7px;border-radius:999px;border:1px solid var(--line);color:var(--mut);background:#fafafa}
+  .badge.g{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
+  .badge.w{background:var(--warn);color:#7a5a10;border-color:#d9c08a}
+  .sidebar{width:132px;flex:none;display:flex;flex-direction:column;gap:6px}
+  .sidebar .s{height:26px;border-radius:4px;background:var(--box2);display:flex;align-items:center;padding:0 9px;font-size:11px;color:var(--mut)}
+  .sidebar .s.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
+  .split{display:flex;gap:12px;flex:1;min-height:0}
+  .phone{width:230px;margin:0 auto;border:2px solid var(--ink);border-radius:20px;padding:8px;background:#fff}
+  .phone .notch{width:52px;height:5px;background:var(--line);border-radius:3px;margin:2px auto 8px}
+  .note{font-size:11px;color:var(--mut);border-left:3px solid var(--accent);padding:4px 9px;background:var(--accent-soft);border-radius:0 4px 4px 0}
+  footer{padding:16px 22px;color:var(--mut);font-size:12px;border-top:1px solid var(--line);background:#fafafa}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>Church Portal (Lagos North Area) — Low-Fidelity Wireframes</h1>
+  <p>AFC-147 · planning artifact · not production UI · grey blocks = layout placeholders</p>
+</header>
+<div class="legend">
+  <span><i class="sw" style="background:var(--box)"></i> content block</span>
+  <span><i class="sw" style="background:var(--accent-soft);border-color:var(--accent)"></i> active / primary</span>
+  <span><i class="sw" style="background:#fff"></i> card surface</span>
+  <span><i class="sw" style="background:var(--warn);border-color:#d9c08a"></i> attention / restricted</span>
+  <span>Breakpoints: staff screens desktop + mobile; public registration and attendance are mobile-first.</span>
+</div>
+
+<div class="wrap">
+
+<!-- 1. LOGIN -->
+<figure class="frame">
+  <figcaption><b>1. Login &amp; role landing</b><code>/login</code></figcaption>
+  <div class="screen">
+    <div class="row"><div class="logo"></div><div class="grow"><div class="bar s"></div></div></div>
+    <div style="max-width:250px;margin:18px auto 8px;width:100%">
+      <div class="bar m" style="margin-bottom:12px"></div>
+      <div class="field" style="margin-bottom:8px"><span class="lab">Email</span><div class="input"></div></div>
+      <div class="field" style="margin-bottom:10px"><span class="lab">Password</span><div class="input"></div></div>
+      <div class="row between"><span class="tiny muted">Forgot password?</span><span class="btn accent">Sign in</span></div>
+      <div class="note" style="margin-top:14px">On success: redirect to dashboard for the user's role (area admin, branch admin, or department leader). No account enumeration on failure.</div>
+    </div>
+  </div>
+</figure>
+
+<!-- 2. ROLE LANDING -->
+<figure class="frame">
+  <figcaption><b>2. Role landing / navigation model</b><code>router by staff_role</code></figcaption>
+  <div class="screen">
+    <div class="nav"><div class="logo"></div><div class="grow"><div class="bar xs"></div></div><span class="badge">Area admin</span></div>
+    <div class="split">
+      <div class="sidebar">
+        <div class="s on">Dashboard</div><div class="s">People</div><div class="s">Events</div>
+        <div class="s">Attendance</div><div class="s">Visitors</div><div class="s">Welfare</div><div class="s">Services</div><div class="s">Settings</div>
+      </div>
+      <div class="grow">
+        <div class="card" style="margin-bottom:10px">
+          <h4>Capability-driven navigation</h4>
+          <div class="list">
+            <div class="item"><span class="badge g">branch admin</span><span class="tiny">sees only own branch links</span></div>
+            <div class="item"><span class="badge g">dept leader</span><span class="tiny">youth/teens modules, assigned branches</span></div>
+            <div class="item"><span class="badge">volunteer</span><span class="tiny">Attendance + check-in only</span></div>
+            <div class="item"><span class="badge">public</span><span class="tiny">no login → registration pages only</span></div>
+          </div>
+        </div>
+        <div class="note">Menu is driven by <code>/api/me/permissions</code>, never hard-coded role names — keeps the frontend portable.</div>
+      </div>
+    </div>
+  </div>
+</figure>
+
+<!-- 3. AREA ADMIN DASHBOARD -->
+<figure class="frame">
+  <figcaption><b>3. Area admin dashboard (all branches)</b><code>/dashboard</code></figcaption>
+  <div class="screen">
+    <div class="nav"><div class="logo"></div><div class="grow"><div class="bar xs"></div></div>
+      <span class="pill on">All branches</span><span class="badge">Area admin</span></div>
+    <div class="row" style="gap:8px">
+      <div class="stat"><div class="n">1,240</div><div class="k">Attendance (last Sun)</div></div>
+      <div class="stat"><div class="n">37</div><div class="k">Upcoming events</div></div>
+      <div class="stat"><div class="n">18</div><div class="k">Open follow-ups</div></div>
+      <div class="stat"><div class="n">6</div><div class="k">Open welfare</div></div>
+    </div>
+    <div class="split">
+      <div class="card grow"><h4>Attendance by branch</h4>
+        <div style="display:flex;align-items:flex-end;gap:8px;height:110px;padding-top:6px">
+          <div class="box" style="width:100%;height:70%"></div><div class="box" style="width:100%;height:52%"></div>
+          <div class="box" style="width:100%;height:84%"></div><div class="box" style="width:100%;height:60%"></div>
+          <div class="box" style="width:100%;height:44%"></div><div class="box" style="width:100%;height:76%"></div>
+        </div>
+        <div class="row between tiny muted" style="margin-top:4px"><span>Ikeja</span><span>Yaba</span><span>Surulere</span><span>Gbagada</span><span>Mushin</span><span>Ikorodu</span></div>
+      </div>
+      <div class="card grow"><h4>Follow-up SLA</h4>
+        <div class="list">
+          <div class="item"><b>74%</b><span class="tiny muted">contacted &lt; 7 days</span></div>
+          <div class="item"><b>9</b><span class="tiny muted">overdue follow-ups</span></div>
+          <div class="item"><b>2</b><span class="tiny muted">branches below target</span></div>
+        </div>
+        <div class="note" style="margin-top:8px">Every widget filterable by branch + date range.</div>
+      </div>
+    </div>
+  </div>
+</figure>
+
+<!-- 4. BRANCH ADMIN DASHBOARD -->
+<figure class="frame">
+  <figcaption><b>4. Branch admin dashboard</b><code>/branch/:slug</code></figcaption>
+  <div class="screen">
+    <div class="nav"><div class="logo"></div><div class="grow"><div class="bar xs"></div></div>
+      <span class="pill on">Ikeja</span><span class="badge">Branch admin</span></div>
+    <div class="row" style="gap:8px">
+      <div class="stat"><div class="n">186</div><div class="k">Last service</div></div>
+      <div class="stat"><div class="n">4</div><div class="k">Events</div></div>
+      <div class="stat"><div class="n">5</div><div class="k">New visitors</div></div>
+      <div class="stat"><div class="n">1</div><div class="k">Open welfare</div></div>
+    </div>
+    <div class="split">
+      <div class="card grow"><h4>Today / next</h4>
+        <div class="list">
+          <div class="item"><div class="avatar"></div><div class="grow"><div class="bar m"></div><div class="bar xs"></div></div><span class="badge g">Roster ready</span></div>
+          <div class="item"><div class="avatar"></div><div class="grow"><div class="bar s"></div><div class="bar xs"></div></div><span class="badge w">Consent needed</span></div>
+        </div>
+      </div>
+      <div class="card grow"><h4>Quick actions</h4>
+        <div class="list">
+          <div class="item"><span class="grow tiny">Capture attendance</span><span class="btn sm accent">Go</span></div>
+          <div class="item"><span class="grow tiny">Add visitor</span><span class="btn sm ghost">Go</span></div>
+          <div class="item"><span class="grow tiny">Create event</span><span class="btn sm ghost">Go</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</figure>
+
+<!-- 5. PERSON PROFILE -->
+<figure class="frame">
+  <figcaption><b>5. Person profile</b><code>/people/:id</code></figcaption>
+  <div class="screen">
+    <div class="row">
+      <div class="avatar" style="width:52px;height:52px"></div>
+      <div class="grow"><div class="bar m"></div><div class="bar xs"></div></div>
+      <span class="btn sm ghost">Edit</span>
+    </div>
+    <div class="tabs"><span class="t on">Profile</span><span class="t">Attendance</span><span class="t">Registrations</span><span class="t">Follow-up</span><span class="t">Welfare</span></div>
+    <div class="split">
+      <div class="card grow"><h4>Details</h4>
+        <table>
+          <tr><th>Branch</th><td>Ikeja</td></tr>
+          <tr><th>Membership</th><td>Member</td></tr>
+          <tr><th>Departments</th><td>Youth (leader)</td></tr>
+          <tr><th>Household</th><td>Okafor family</td></tr>
+          <tr><th>Age</th><td>16 · <span class="badge w">minor · consent on file</span></td></tr>
+        </table>
+      </div>
+      <div class="card grow"><h4>Guardian &amp; consent</h4>
+        <div class="list">
+          <div class="item"><span class="grow tiny">Guardian: linked</span><span class="badge g">verified</span></div>
+          <div class="item"><span class="grow tiny">Data consent</span><span class="badge g">signed 2026-01-12</span></div>
+          <div class="item"><span class="grow tiny">Media consent</span><span class="badge w">not granted</span></div>
+        </div>
+        <div class="tiny muted" style="margin-top:8px">Medical / safeguarding fields visible only to permitted roles.</div>
+      </div>
+    </div>
+  </div>
+</figure>
+
+<!-- 6. EVENTS LIST -->
+<figure class="frame">
+  <figcaption><b>6. Events list</b><code>/events</code></figcaption>
+  <div class="screen">
+    <div class="row between"><div class="bar s"></div>
+      <div class="row"><span class="input" style="width:150px"></span><span class="btn accent sm">New event</span></div></div>
+    <div class="tabs"><span class="t on">All</span><span class="t">Published</span><span class="t">Drafts</span><span class="t">Upcoming</span></div>
+    <table>
+      <tr><th>Event</th><th>Type</th><th>Branch</th><th>Date</th><th>Regs</th><th>Status</th></tr>
+      <tr><td><div class="skel" style="width:70%"></div></td><td>Summit</td><td>Area</td><td>Nov 22</td><td>312 / 500</td><td><span class="badge g">Published</span></td></tr>
+      <tr><td><div class="skel" style="width:58%"></div></td><td>Camp</td><td>Area</td><td>Dec 08</td><td>94 / 150</td><td><span class="badge g">Published</span></td></tr>
+      <tr><td><div class="skel" style="width:64%"></div></td><td>Service</td><td>Ikeja</td><td>Oct 12</td><td>—</td><td><span class="badge">Draft</span></td></tr>
+      <tr><td><div class="skel" style="width:52%"></div></td><td>Outreach</td><td>Yaba</td><td>Oct 19</td><td>41 / 100</td><td><span class="badge w">Closing</span></td></tr>
+    </table>
+    <div class="note">Area admin sees all branches and can create area-wide events; branch admin is restricted to own branch.</div>
+  </div>
+</figure>
+
+<!-- 7. EVENT DETAIL -->
+<figure class="frame">
+  <figcaption><b>7. Event detail</b><code>/events/:slug</code></figcaption>
+  <div class="screen">
+    <div class="box" style="height:78px"></div>
+    <div class="row between"><div class="bar m"></div><span class="badge g">Registration open</span></div>
+    <div class="split">
+      <div class="grow">
+        <div class="bar l"></div><div class="bar l"></div><div class="bar m"></div>
+        <div class="row" style="margin-top:10px"><span class="badge">Capacity 500</span><span class="badge">Free</span><span class="badge">Ages 13–19</span></div>
+      </div>
+      <div class="card" style="width:180px">
+        <h4>When &amp; where</h4>
+        <div class="bar s"></div><div class="bar m"></div><div class="bar xs"></div>
+        <div class="btn accent" style="width:100%;margin-top:10px">Register</div>
+        <div class="btn ghost" style="width:100%;margin-top:6px">Add to calendar</div>
+      </div>
+    </div>
+    <div class="card"><h4>Schedule</h4>
+      <div class="list"><div class="item"><span class="tiny">09:00</span><span class="grow bar s"></span></div>
+      <div class="item"><span class="tiny">11:30</span><span class="grow bar m"></span></div>
+      <div class="item"><span class="tiny">14:00</span><span class="grow bar s"></span></div></div>
+    </div>
+  </div>
+</figure>
+
+<!-- 8. PUBLIC REGISTRATION FORM -->
+<figure class="frame">
+  <figcaption><b>8. Public registration form</b><code>/events/:slug/register (public, mobile-first)</code></figcaption>
+  <div class="screen">
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="bar m" style="margin-bottom:4px"></div>
+      <div class="bar xs" style="margin-bottom:10px"></div>
+      <div class="field" style="margin-bottom:7px"><span class="lab">First name *</span><div class="input"></div></div>
+      <div class="field" style="margin-bottom:7px"><span class="lab">Last name *</span><div class="input"></div></div>
+      <div class="field" style="margin-bottom:7px"><span class="lab">Phone *</span><div class="input"></div></div>
+      <div class="field" style="margin-bottom:7px"><span class="lab">Date of birth *</span><div class="input"></div></div>
+      <div class="field" style="margin-bottom:7px"><span class="lab">Branch</span><div class="input"></div></div>
+      <div class="card" style="margin-bottom:8px;background:var(--warn);border-color:#d9c08a">
+        <div class="tiny"><b>Under 18?</b> Guardian name, phone and consent are required.</div>
+        <div class="input" style="margin-top:5px;background:#fff"></div>
+        <div class="row" style="margin-top:5px"><span class="badge">☐ Guardian consent</span></div>
+      </div>
+      <div class="btn accent" style="width:100%">Submit registration</div>
+      <div class="tiny muted" style="text-align:center;margin-top:7px">Confirmation + ticket code shown after submit.</div>
+    </div>
+    <div class="note">Public role is create-only. Capacity checked server-side; waitlist offered when full and enabled. No read access to any data.</div>
+  </div>
+</figure>
+
+<!-- 9. ATTENDANCE CAPTURE -->
+<figure class="frame">
+  <figcaption><b>9. Attendance capture (mobile-first)</b><code>/attendance/capture</code></figcaption>
+  <div class="screen">
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="row between" style="margin-bottom:8px"><span class="badge on">Ikeja</span><span class="tiny muted">Sun 05 Oct</span></div>
+      <div class="bar m" style="margin-bottom:10px"></div>
+      <div class="list">
+        <div class="item between"><span>Adults</span><span class="row"><span class="badge">−</span><b>142</b><span class="badge">+</span></span></div>
+        <div class="item between"><span>Youth</span><span class="row"><span class="badge">−</span><b>38</b><span class="badge">+</span></span></div>
+        <div class="item between"><span>Teens</span><span class="row"><span class="badge">−</span><b>21</b><span class="badge">+</span></span></div>
+        <div class="item between"><span>Children</span><span class="row"><span class="badge">−</span><b>27</b><span class="badge">+</span></span></div>
+        <div class="item between"><span>Visitors</span><span class="row"><span class="badge">−</span><b>9</b><span class="badge">+</span></span></div>
+      </div>
+      <div class="row between" style="margin-top:8px"><b>Total 237</b><span class="badge">auto</span></div>
+      <div class="btn accent" style="width:100%;margin-top:9px">Save attendance</div>
+      <div class="tiny muted" style="text-align:center;margin-top:6px">Retry-safe submit. Records who saved and when.</div>
+    </div>
+    <div class="note">Volunteer scope = own branch only. Event/camp check-in uses name or ticket-code search instead of counters.</div>
+  </div>
+</figure>
+
+<!-- 10. SUNDAY SERVICE ROSTER -->
+<figure class="frame">
+  <figcaption><b>10. Sunday service roster</b><code>/services/:id/roster</code></figcaption>
+  <div class="screen">
+    <div class="row between">
+      <div><div class="bar s"></div><div class="tiny muted">Sun 12 Oct · Theme &amp; preacher</div></div>
+      <span class="btn accent sm">Add role</span>
+    </div>
+    <div class="tabs"><span class="t on">Roster</span><span class="t">Service details</span><span class="t">Attendance</span></div>
+    <table>
+      <tr><th>Role</th><th>Person</th><th>Status</th></tr>
+      <tr><td>Worship leader</td><td><div class="skel" style="width:60%"></div></td><td><span class="badge g">Confirmed</span></td></tr>
+      <tr><td>Preacher</td><td><div class="skel" style="width:48%"></div></td><td><span class="badge g">Confirmed</span></td></tr>
+      <tr><td>Ushering</td><td><div class="skel" style="width:70%"></div></td><td><span class="badge w">Invited</span></td></tr>
+      <tr><td>Media</td><td><div class="skel" style="width:55%"></div></td><td><span class="badge">—</span></td></tr>
+      <tr><td>Children</td><td><div class="skel" style="width:64%"></div></td><td><span class="badge w">Invited</span></td></tr>
+    </table>
+    <div class="note">Roster confirmed → link to the service's attendance session.</div>
+  </div>
+</figure>
+
+<!-- 11. VISITOR INTAKE -->
+<figure class="frame">
+  <figcaption><b>11. Visitor intake</b><code>/visitors/new</code></figcaption>
+  <div class="screen">
+    <div class="row"><div class="bar s"></div><span class="badge">Quick form</span></div>
+    <div class="split">
+      <div class="card grow"><h4>Visitor details</h4>
+        <div class="row" style="gap:8px;margin-bottom:8px">
+          <div class="field"><span class="lab">First name *</span><div class="input"></div></div>
+          <div class="field"><span class="lab">Last name *</span><div class="input"></div></div>
+        </div>
+        <div class="row" style="gap:8px;margin-bottom:8px">
+          <div class="field"><span class="lab">Phone</span><div class="input"></div></div>
+          <div class="field"><span class="lab">Age group</span><div class="input"></div></div>
+        </div>
+        <div class="row" style="gap:8px;margin-bottom:8px">
+          <div class="field"><span class="lab">First visit date</span><div class="input"></div></div>
+          <div class="field"><span class="lab">Service / invited by</span><div class="input"></div></div>
+        </div>
+        <div class="row"><label class="badge">☐ Anonymous / single name</label><span class="grow"></span><span class="btn accent">Save visitor</span></div>
+      </div>
+      <div class="card" style="width:190px"><h4>After saving</h4>
+        <div class="list">
+          <div class="item tiny">Status → <b>new</b></div>
+          <div class="item tiny">Queue sorted by age + date</div>
+          <div class="item tiny">Assign follow-up owner</div>
+        </div>
+        <div class="btn ghost sm" style="margin-top:8px">Link to existing person</div>
+      </div>
+    </div>
+  </div>
+</figure>
+
+<!-- 12. VISITOR FOLLOW-UP QUEUE -->
+<figure class="frame">
+  <figcaption><b>12. Visitor follow-up queue</b><code>/visitors/follow-up</code></figcaption>
+  <div class="screen">
+    <div class="row between"><div class="bar s"></div>
+      <div class="row"><span class="input" style="width:120px"></span><span class="btn ghost sm">Filter</span></div></div>
+    <div class="tabs"><span class="t on">New</span><span class="t">Contacted</span><span class="t">In follow-up</span><span class="t">Overdue</span></div>
+    <table>
+      <tr><th>Visitor</th><th>Age</th><th>Owner</th><th>Next</th><th>Status</th></tr>
+      <tr><td><div class="skel" style="width:62%"></div></td><td>Adult</td><td>—</td><td>Oct 07</td><td><span class="badge w">new</span></td></tr>
+      <tr><td><div class="skel" style="width:55%"></div></td><td>Teen</td><td>—</td><td>Oct 07</td><td><span class="badge w">new</span></td></tr>
+      <tr><td><div class="skel" style="width:70%"></div></td><td>Adult</td><td><div class="skel" style="width:60%"></div></td><td>Oct 09</td><td><span class="badge">contacted</span></td></tr>
+      <tr><td><div class="skel" style="width:50%"></div></td><td>Youth</td><td><div class="skel" style="width:60%"></div></td><td>Oct 02</td><td><span class="badge w">overdue</span></td></tr>
+    </table>
+    <div class="note">SLA target: first contact &lt; 7 days. `connected`/`integrated` leaves the active queue.</div>
+  </div>
+</figure>
+
+<!-- 13. WELFARE CASE VIEW -->
+<figure class="frame">
+  <figcaption><b>13. Welfare case view</b><code>/welfare/:id (restricted)</code></figcaption>
+  <div class="screen">
+    <div class="row between">
+      <div><div class="bar s"></div><div class="tiny muted">WEL-2026-0042 · <span class="badge w">confidential · branch</span></div></div>
+      <span class="row"><span class="badge">priority: high</span><span class="badge g">in progress</span></span>
+    </div>
+    <div class="split">
+      <div class="grow">
+        <div class="card" style="margin-bottom:10px"><h4>Case</h4>
+          <div class="bar l"></div><div class="bar l"></div><div class="bar m"></div></div>
+        <div class="card"><h4>Case trail</h4>
+          <div class="list">
+            <div class="item tiny"><b>Opened</b> · branch admin · Oct 01</div>
+            <div class="item tiny"><b>Assigned</b> · welfare lead · Oct 02</div>
+            <div class="item tiny"><b>Contribution</b> · goods · Oct 04</div>
+          </div>
+        </div>
+      </div>
+      <div class="card" style="width:190px"><h4>Support</h4>
+        <div class="list">
+          <div class="item between tiny"><span>Requested</span><b>₦ 80,000</b></div>
+          <div class="item between tiny"><span>Approved</span><b>₦ 60,000</b></div>
+          <div class="item between tiny"><span>Disbursed</span><b>₦ 60,000</b></div>
+        </div>
+        <div class="btn ghost sm" style="margin-top:8px;width:100%">Add contribution</div>
+        <div class="note" style="margin-top:10px">Readable only by assigned owner, branch admin, and area admin when confidentiality = area.</div>
+      </div>
+    </div>
+  </div>
+</figure>
+
+<!-- 14. YOUTH SUMMIT REGISTRATION -->
+<figure class="frame">
+  <figcaption><b>14. Youth Summit registration (public)</b><code>/summit/register</code></figcaption>
+  <div class="screen">
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="box" style="height:58px;margin-bottom:9px"></div>
+      <div class="bar m" style="margin-bottom:3px"></div>
+      <div class="row" style="gap:6px;margin-bottom:9px"><span class="badge g">Nov 22</span><span class="badge">Ages 13–19</span><span class="badge">Free</span></div>
+      <div class="field" style="margin-bottom:7px"><span class="lab">Name *</span><div class="input"></div></div>
+      <div class="field" style="margin-bottom:7px"><span class="lab">Phone *</span><div class="input"></div></div>
+      <div class="row" style="gap:8px;margin-bottom:7px">
+        <div class="field"><span class="lab">DOB *</span><div class="input"></div></div>
+        <div class="field"><span class="lab">Branch *</span><div class="input"></div></div>
+      </div>
+      <div class="card" style="background:var(--warn);border-color:#d9c08a;margin-bottom:8px">
+        <div class="tiny"><b>Parent / guardian</b></div>
+        <div class="input" style="margin-top:5px;background:#fff"></div>
+        <div class="row" style="margin-top:5px"><span class="badge">☐ Consent to attend</span></div>
+      </div>
+      <div class="field" style="margin-bottom:8px"><span class="lab">Emergency contact</span><div class="input"></div></div>
+      <div class="btn accent" style="width:100%">Register for Youth Summit</div>
+      <div class="tiny muted" style="text-align:center;margin-top:6px">Ticket code + confirmation shown next.</div>
+    </div>
+    <div class="note">Fast-track slice: public form → <code>event_registrations</code> → branch export, shippable before the full portal. Camp reuses this with medical/emergency fields.</div>
+  </div>
+</figure>
+
+</div>
+
+<footer>
+  AFC-147 low-fidelity wireframes · 14 screens · generated for planning review. These are layout intent only; visual design, component library, and accessibility pass follow in implementation. Companion docs: <code>prd</code>, <code>data-model</code>, <code>infra-spec</code>, <code>repo-plan</code>.
+</footer>
+</body>
+</html>
