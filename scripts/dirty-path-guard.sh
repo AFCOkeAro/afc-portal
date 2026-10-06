@@ -800,6 +800,196 @@ JSON
     echo "  self-test ok: non-repository fails closed with exit 2"
   fi
 
+  # 11. THE CLI WIRING REGRESSION. AFC-212.
+  #
+  #     Everything above this line calls guard() and check_commit() DIRECTLY, in
+  #     a throwaway repo, with arguments arranged by the caller. That is the one
+  #     thing it cannot see: whether the `case` dispatcher in front of those
+  #     functions passes them in the order they declare.
+  #
+  #     It did not. check_commit() takes (ROOT, REV); the dispatcher passed
+  #     ($2, $3) into those slots, so the documented form
+  #
+  #         bash scripts/dirty-path-guard.sh --check-commit 84e65f7
+  #
+  #     put "84e65f7" in the ROOT slot. git -C "84e65f7" reads nothing, the
+  #     empty rev list printed "no commits in 'HEAD'", and the guard exited 0
+  #     on a history that really did hold compliance-path commits with no
+  #     reviewer. Assertion 9e fixed the MATCHER; the wiring stayed reversed, so
+  #     the documented command stayed green. Two commits' worth of "fixed"
+  #     (b126d7d, AFC-195) and the gate never once ran through its own CLI.
+  #
+  #     So these three assertions invoke the script as a SUBPROCESS, by path,
+  #     in a repository it can only find the way a real invocation finds it:
+  #     from its own location, since ROOT_DEFAULT is derived from BASH_SOURCE.
+  #     The fixture therefore has to carry the script at <repo>/scripts/, and
+  #     each assertion passes ONE argument, exactly as usage: documents it.
+  #
+  #     Two separate repositories, not two commits in one: `rev-list <sha>`
+  #     walks a commit AND ALL ITS ANCESTORS, so asserting "this sha is clean"
+  #     in a repo whose parent commit is deliberately violating would exit 1
+  #     for the wrong reason. One repository, one commit, one commit's history.
+  #
+  #     Each fixture also gets a NON-compliance commit first, so the commit
+  #     under test is not the repository's ROOT commit. `git diff-tree` prints
+  #     nothing for a root commit unless it is passed --root (see check_commit),
+  #     so a root commit under test would be flagged by nobody and 11a would
+  #     pass for the wrong reason -- the exact shape of a green assertion that
+  #     proves nothing, which is how this defect survived once already.
+  local cli_script="$tmp/cli-script"
+  cp "$0" "$cli_script"
+  chmod +x "$cli_script"
+
+  local bad_repo="$tmp/cli-bad"
+  mkdir -p "$bad_repo/scripts" "$bad_repo/tests/db" "$bad_repo/$CLAIMS_DIR"
+  git -C "$bad_repo" init -q
+  git -C "$bad_repo" config user.email guard@afc.test
+  git -C "$bad_repo" config user.name  "AFC guard self-test"
+  cp "$cli_script" "$bad_repo/scripts/dirty-path-guard.sh"
+  printf '# fixture\n' > "$bad_repo/docs-notes.md"
+  git -C "$bad_repo" add docs-notes.md
+  git -C "$bad_repo" commit -q -m "chore: non-compliance fixture commit"
+  printf 'SELECT 1;\n' > "$bad_repo/tests/db/60_cli_wiring.sql"
+  cat > "$bad_repo/$CLAIMS_DIR/AFC-998.json" <<'JSON'
+{ "issue": "AFC-998", "authorAgentId": "agent-elsewhere",
+  "claimedAt": "2026-10-06T03:00:00Z", "paths": ["tests/db/**"] }
+JSON
+  # Claimed and named, but NO Reviewed-by: trailer. R1 passes on purpose, so a
+  # failure here can only be R2 -- the rule the reversed wiring hid.
+  git -C "$bad_repo" add -A
+  git -C "$bad_repo" commit -q -m "feat(retention): planted compliance-path commit, no reviewer
+
+Issue: AFC-998
+"
+  local bad_rev good_rev cli_out cli_rc
+  bad_rev=$(git -C "$bad_repo" rev-parse HEAD)
+
+  # 11a. The documented form on a commit with no reviewer MUST exit non-zero.
+  cli_out=$(bash "$bad_repo/scripts/dirty-path-guard.sh" --check-commit "$bad_rev" 2>&1)
+  cli_rc=$?
+  if [ "$cli_rc" -eq 0 ]; then
+    echo "SELF-TEST FAIL: --check-commit $bad_rev exited 0 on a commit with no reviewer"
+    echo "    the CLI still does not reach check_commit(); this is AFC-212 again"
+    printf '%s\n' "$cli_out" | sed 's/^/    /'
+    rc=1
+  elif [ "$cli_rc" -ne 1 ]; then
+    # 2 means the guard could not read git state. That is a different failure
+    # and a self-test that accepts it would stop noticing the wiring.
+    echo "SELF-TEST FAIL: --check-commit $bad_rev exited $cli_rc, not 1"
+    echo "    a non-policy failure is not evidence the R2 check ran"
+    printf '%s\n' "$cli_out" | sed 's/^/    /'
+    rc=1
+  elif ! printf '%s' "$cli_out" | grep -q "R2 VIOLATION"; then
+    echo "SELF-TEST FAIL: --check-commit exited $cli_rc without reporting an R2 violation"
+    printf '%s\n' "$cli_out" | sed 's/^/    /'
+    rc=1
+  else
+    echo "  self-test ok: documented --check-commit <REV> reached R2 and refused the commit"
+  fi
+
+  # 11b. A REV the guard cannot resolve MUST NOT exit 0. This is the exact
+  #      false green AFC-212 shipped: an argument in the wrong slot is
+  #      indistinguishable from an argument that means nothing. exit 2.
+  cli_out=$(bash "$bad_repo/scripts/dirty-path-guard.sh" --check-commit not-a-revision 2>&1)
+  cli_rc=$?
+  if [ "$cli_rc" -eq 0 ]; then
+    echo "SELF-TEST FAIL: --check-commit not-a-revision exited 0"
+    echo "    an unresolvable REV must fail closed, never certify"
+    printf '%s\n' "$cli_out" | sed 's/^/    /'
+    rc=1
+  else
+    echo "  self-test ok: unresolvable REV fails closed (exit $cli_rc)"
+  fi
+
+  # 11c. The negative direction. A claimed, reviewed, clean compliance-path
+  #      commit MUST exit 0 through the same CLI. A gate that always refuses is
+  #      not a gate, and refusing everything is what a botched argument order
+  #      looks like from the other side.
+  local good_repo="$tmp/cli-good"
+  mkdir -p "$good_repo/scripts" "$good_repo/tests/db" "$good_repo/$CLAIMS_DIR"
+  git -C "$good_repo" init -q
+  git -C "$good_repo" config user.email guard@afc.test
+  git -C "$good_repo" config user.name  "AFC guard self-test"
+  cp "$cli_script" "$good_repo/scripts/dirty-path-guard.sh"
+  printf '# fixture\n' > "$good_repo/docs-notes.md"
+  git -C "$good_repo" add docs-notes.md
+  git -C "$good_repo" commit -q -m "chore: non-compliance fixture commit"
+  printf 'SELECT 2;\n' > "$good_repo/tests/db/61_cli_clean.sql"
+  cat > "$good_repo/$CLAIMS_DIR/AFC-997.json" <<'JSON'
+{ "issue": "AFC-997", "authorAgentId": "agent-elsewhere",
+  "claimedAt": "2026-10-06T03:00:00Z", "paths": ["tests/db/**"] }
+JSON
+  git -C "$good_repo" add -A
+  git -C "$good_repo" commit -q -m "feat(retention): claimed and reviewed compliance-path commit
+
+Issue: AFC-997
+Reviewed-by: Someone
+"
+  good_rev=$(git -C "$good_repo" rev-parse HEAD)
+  cli_out=$(bash "$good_repo/scripts/dirty-path-guard.sh" --check-commit "$good_rev" 2>&1)
+  cli_rc=$?
+  if [ "$cli_rc" -ne 0 ]; then
+    echo "SELF-TEST FAIL: --check-commit $good_rev exited $cli_rc on a claimed, reviewed commit"
+    echo "    the CLI must accept a clean commit, or it is not a gate"
+    printf '%s\n' "$cli_out" | sed 's/^/    /'
+    rc=1
+  else
+    echo "  self-test ok: documented --check-commit <REV> accepts a clean R2 commit"
+  fi
+
+  # 11d. A ROOT COMMIT MUST BE CHECKED LIKE ANY OTHER. `git diff-tree` prints
+  #      nothing for a repository's first commit unless it is passed --root, so
+  #      without that flag the first commit of any repository is invisible here:
+  #      every path it adds reads as "touched nothing", the loop skips it, and
+  #      the gate certifies the whole thing. This is the same failure as 11a --
+  #      report nothing, exit 0 -- reached through a different door, so it needs
+  #      its own assertion. Live on this repository: the root commit 1f43c9e
+  #      adds ten R2 paths (four migrations, one rollback, five control-suite
+  #      files) and not one of them was ever reported by --check-commit.
+  #
+  #      So: a repository whose ONLY commit is the one under test, and that
+  #      commit adds a compliance-path file with no reviewer. Must exit 1.
+  local root_repo="$tmp/cli-root"
+  mkdir -p "$root_repo/scripts" "$root_repo/tests/db" "$root_repo/$CLAIMS_DIR"
+  git -C "$root_repo" init -q
+  git -C "$root_repo" config user.email guard@afc.test
+  git -C "$root_repo" config user.name  "AFC guard self-test"
+  cp "$cli_script" "$root_repo/scripts/dirty-path-guard.sh"
+  printf 'SELECT 3;\n' > "$root_repo/tests/db/62_cli_root.sql"
+  cat > "$root_repo/$CLAIMS_DIR/AFC-996.json" <<'JSON'
+{ "issue": "AFC-996", "authorAgentId": "agent-elsewhere",
+  "claimedAt": "2026-10-06T03:00:00Z", "paths": ["tests/db/**"] }
+JSON
+  git -C "$root_repo" add -A
+  git -C "$root_repo" commit -q -m "feat(retention): repository's first commit, no reviewer
+
+Issue: AFC-996
+"
+  local root_rev
+  root_rev=$(git -C "$root_repo" rev-list --max-parents=0 HEAD)
+  if [ "$root_rev" != "$(git -C "$root_repo" rev-parse HEAD)" ]; then
+    echo "SELF-TEST FAIL: fixture 11d is not a single-commit repository"
+    echo "    the assertion would be checking the wrong commit"
+    rc=1
+  else
+    cli_out=$(bash "$root_repo/scripts/dirty-path-guard.sh" --check-commit "$root_rev" 2>&1)
+    cli_rc=$?
+    if [ "$cli_rc" -eq 0 ]; then
+      echo "SELF-TEST FAIL: --check-commit on a repository's ROOT commit exited 0"
+      echo "    git diff-tree needs --root, or the first commit is invisible"
+      printf '%s\n' "$cli_out" | sed 's/^/    /'
+      rc=1
+    elif ! printf '%s' "$cli_out" | grep -q '62_cli_root.sql'; then
+      echo "SELF-TEST FAIL: the root commit was refused without naming the path it added"
+      printf '%s\n' "$cli_out" | sed 's/^/    /'
+      rc=1
+    else
+      echo "  self-test ok: repository's root commit is checked, not skipped"
+    fi
+  fi
+
+  return $rc
+
   return $rc
 }
 
@@ -948,13 +1138,71 @@ grandfathered_lookup() {
 check_commit() {
   local root="${1:-$ROOT_DEFAULT}" range="${2:-HEAD}"
   local rc=0
-  local rev subject body
+  local rev subject body revlist
   local -a revs
-  mapfile -t revs < <(git -C "$root" rev-list "$range" 2>/dev/null) || {
-    echo "DIRTY-GUARD FAIL: cannot resolve revision range '$range'."
+
+  # -------------------------------------------------------------------------
+  # AFC-212 -- THE WIRING WAS STILL REVERSED AFTER b126d7d.
+  #
+  # check_commit() declares (ROOT, REV). The dispatcher passed ($2, $3) into
+  # those two slots. usage: documents ONE argument, `--check-commit [REV]`, so
+  # the documented call put the revision where ROOT goes:
+  #
+  #   bash scripts/dirty-path-guard.sh --check-commit 84e65f7
+  #     -> check_commit "84e65f7" "HEAD"
+  #
+  # git -C "84e65f7" is not a repository. Its stderr was discarded, the rev list
+  # came back empty, and the guard printed "no commits in 'HEAD'" and exited 0.
+  # b126d7d fixed glob_match() -- the ENGINE -- and recorded that check_commit()
+  # had flagged zero paths across all 11 commits. The wiring was a separate
+  # defect and it stayed: the documented command certified the whole history
+  # while never looking at one commit.
+  #
+  # MEASURED before this fix, at HEAD 876d1f6:
+  #
+  #   --check-commit 84e65f7      -> "no commits in 'HEAD'"    exit 0
+  #   --check-commit "$PWD" HEAD  -> 13 violations             exit 1
+  #
+  # The count of violations was never zero. It was never being counted.
+  #
+  # Three changes, and each one is load-bearing:
+  #
+  #   1. The dispatcher passes (ROOT, REV) in the order this function declares.
+  #      ROOT comes from this script's own location, as ROOT_DEFAULT always
+  #      intended; $2 is the REV -- one argument, as usage: documents.
+  #   2. A ROOT that is not a repository, and a range git cannot resolve, are
+  #      exit 2. The old code could not tell "the range selected nothing" apart
+  #      from "I read nothing at all", and answered both with exit 0: the only
+  #      state in which the guard had seen nothing was the one state in which
+  #      it reported everything was fine.
+  #   3. diff-tree gains --root, below. A repository's first commit is
+  #      otherwise invisible to this check entirely.
+  #
+  # And the self-test proves all three through the CLI. Every other assertion
+  # in self_test() calls guard()/check_commit() directly, so it cannot see the
+  # dispatcher at all; that is how this survived a fix already reported as
+  # complete. Assertions 11a-11c run the script as a subprocess from inside a
+  # fixture repository, with ONE argument, the way usage: says.
+  # -------------------------------------------------------------------------
+
+  # Fail closed on an unreadable ROOT, and on a range git cannot resolve.
+  if ! git -C "$root" rev-parse --git-dir >/dev/null 2>&1; then
+    echo "DIRTY-GUARD FAIL: '$root' is not inside a git repository."
+    echo "  Refusing to certify a tree the guard cannot read."
     return 2
-  }
-  [ "${#revs[@]}" -gt 0 ] || { echo "no commits in '$range'"; return 0; }
+  fi
+  if ! revlist=$(git -C "$root" rev-list "$range" 2>/dev/null); then
+    echo "DIRTY-GUARD FAIL: cannot resolve revision range '$range' in $root."
+    return 2
+  fi
+  if [ -z "$revlist" ]; then
+    # Reachable only from a range that resolved and selected nothing, e.g.
+    # HEAD..HEAD. A real "nothing to check", and safe to pass now that the
+    # range is known to exist.
+    echo "no commits in '$range'"
+    return 0
+  fi
+  mapfile -t revs <<< "$revlist"
 
   echo "claim check on $(printf '%s ' "${revs[@]}")"
   emit_claims "$root"
@@ -964,7 +1212,7 @@ check_commit() {
     body=$(git -C "$root" log -1 --format=%B "$rev")
 
     local -a touched=()
-    mapfile -t touched < <(git -C "$root" diff-tree --no-commit-id --name-only -r "$rev")
+    mapfile -t touched < <(git -C "$root" diff-tree --root --no-commit-id --name-only -r "$rev")
     local -a flagged=()
     local p
     for p in ${touched+"${touched[@]}"}; do
@@ -1108,7 +1356,7 @@ fi
 
 case "${1:-}" in
   "")                 guard "${2:-$ROOT_DEFAULT}"; exit $? ;;
-  "--check-commit")   check_commit "${2:-$ROOT_DEFAULT}" "${3:-HEAD}"; exit $? ;;
+  "--check-commit")   check_commit "$ROOT_DEFAULT" "${2:-HEAD}"; exit $? ;;
   "--claims")         emit_claims "${2:-$ROOT_DEFAULT}"; exit 0 ;;
   --self-test)        : ;;
   *) echo "usage: $0 [--self-test|--claims|--check-commit [REV]]" >&2; exit 2 ;;
