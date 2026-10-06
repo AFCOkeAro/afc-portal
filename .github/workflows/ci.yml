@@ -37,8 +37,41 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # --------------------------------------------------------------------------
+  # 0. COMPLIANCE-PATH DIRTY GUARD. AFC-175. Runs FIRST, and the other jobs
+  #    declare `needs:` on it, because a dirty compliance path invalidates
+  #    every result downstream of it. Spending four minutes on a build and a
+  #    database suite in order to then fail on "you never committed that" is the
+  #    expensive ordering, not the safe one.
+  #
+  #    WHY THIS IS ITS OWN JOB AND NOT A STEP. The other gates answer "is the
+  #    code in this tree correct". This one answers "is the code in this tree
+  #    attributable" -- which is a different question, needs no dependency
+  #    install, and must not be reachable only after an install can fail. If
+  #    this job cannot run, the answer it exists to give is not available, and
+  #    a green pipeline would then be asserting enforcement on an unknown tree.
+  #
+  #    NOTE ON WHERE IT BITES. On a fresh actions/checkout this job passes by
+  #    construction, because uncommitted work does not travel in a commit. It
+  #    is load-bearing in every environment where the working tree is SHARED,
+  #    which is how every agent in this company works. Read it as "certifies the
+  #    tree it was handed", not as a substitute for review.
+  # --------------------------------------------------------------------------
+  dirty-path-guard:
+    name: Compliance-path dirty guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Dirty-path guard self-test (a guard must be able to fail)
+        run: bash scripts/dirty-path-guard.sh --self-test
+
+      - name: Compliance-path dirty guard
+        run: bash scripts/dirty-path-guard.sh
+
   retention-gate:
     name: Retention literal gate
+    needs: [dirty-path-guard]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -65,6 +98,7 @@ jobs:
 
   db-tests:
     name: Database control tests (awareness_at)
+    needs: [dirty-path-guard]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
