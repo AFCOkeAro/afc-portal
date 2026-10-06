@@ -230,6 +230,74 @@ END
 $$;
 
 -- ---------------------------------------------------------------------
+-- NO LOGIN HOLDS A PREDEFINED ROLE THAT CONFERS BLANKET DELETE. AFC-259.
+--
+-- The four routes in ADR-0004 Part 3 all reach the deletion path THROUGH the
+-- retention engine. This is the route that does not: a LOGIN holding the
+-- predefined role pg_write_all_data can DELETE from a collection directly, with
+-- no membership of retention_worker and no EXECUTE on retention.run. It
+-- therefore bypasses the legal holds, the retention ladder and the
+-- retention_runs manifest -- the NDPA s.40(2) controls -- and every check in
+-- this file and in the engine passes it, because the membership count and the
+-- EXECUTE-surface check look at retention_worker and retention.run, not at the
+-- table privilege.
+--
+-- The route to the DELETE privilege does not change what the credential can
+-- destroy, so it is bounded here with the other routes. Measured, not inferred:
+-- CREATE ROLE ops_login LOGIN; GRANT pg_write_all_data TO ops_login; then
+-- DELETE FROM people removes a row.
+--
+-- SCOPE, STATED BECAUSE A SUBSET IS NOT A BOUND. This clause bounds the
+-- PREDEFINED-ROLE route only. Bootstrap runs before the migrations, so the
+-- collections do not exist yet and has_table_privilege has nothing to ask. The
+-- same predefined-role bound, with the negative control that proves it can fail,
+-- is asserted in tests/db/65_retention_worker_membership.sql 65.3. The wider
+-- DELETE capability (a custom group role or a direct table grant) is NOT
+-- asserted in the suite, because the harness grants DELETE to its own v4 fixture
+-- roles. Its only production guard is that directus_app's DELETE is revoked by
+-- migration 0004 -- a grant-layer control on one identity, not a per-table
+-- guard. Measured by the AFC-291 review: people, retention_clocks and
+-- retention_policies carry no DELETE trigger, so a credential that receives
+-- DELETE by another route can erase them. That route is recorded as an open gap
+-- owned in ADR-0004 Part 5 and tracked in AFC-295, not implied away here.
+--
+-- The predefined set is one role today. It is named as a set so that a server
+-- that adds another write role is a one-line edit here rather than a silently
+-- unbounded gap. pg_read_all_data is read-only and is deliberately not in it.
+-- Guarded on to_regrole so a server predating the role cannot fail the deploy
+-- for a reason that has nothing to do with the boundary.
+DO $$
+DECLARE
+  v_write_roles text[] := ARRAY['pg_write_all_data'];
+  v_bad         text;
+  v_role        text;
+BEGIN
+  FOREACH v_role IN ARRAY v_write_roles LOOP
+    IF to_regrole(v_role) IS NULL THEN
+      CONTINUE;
+    END IF;
+
+    SELECT string_agg(r.rolname, ', ' ORDER BY r.rolname) INTO v_bad
+      FROM pg_roles r
+     WHERE r.rolcanlogin
+       AND NOT r.rolsuper
+       AND pg_has_role(r.oid, v_role, 'MEMBER');
+
+    IF v_bad IS NOT NULL THEN
+      RAISE EXCEPTION
+        'LOGIN role(s) % hold %, the predefined role that grants DELETE on '
+        'every table. That is a credential that erases records while bypassing '
+        'the retention engine -- and therefore the legal holds, the retention '
+        'ladder and the retention_runs manifest. Revoke it: REVOKE % FROM '
+        '<role>. The same bound is asserted in tests/db/65.',
+        v_bad, v_role, v_role
+        USING ERRCODE = 'restrict_violation';
+    END IF;
+  END LOOP;
+END
+$$;
+
+-- ---------------------------------------------------------------------
 -- EXACTLY ONE REACHABLE IDENTITY. ADR-0004.
 --
 -- The grant above is necessary and not sufficient. A capability nobody holds
@@ -303,6 +371,14 @@ BEGIN
   --   GRANT EXECUTE ON FUNCTION retention.run(...) TO someone
   --   GRANT directus_migrator TO someone            (owner membership)
   --   ALTER ROLE directus_migrator LOGIN           (asserted above)
+  --
+  -- And there is a FIFTH route that does not go through retention.run at all:
+  -- a LOGIN holding a predefined write role (pg_write_all_data) can DELETE a
+  -- collection directly. It is bounded in the DO block above (the
+  -- predefined-role route) and, as a capability over every route, in
+  -- tests/db/65_retention_worker_membership.sql 65.3. It is named here because
+  -- a reader who takes this comment as the whole erasure surface would be wrong
+  -- in exactly the way AFC-247 and AFC-259 were raised about.
   --
   -- And it can also over-count: pg_has_role answers pure graph reachability and
   -- ignores inherit_option, so a holder two hops out behind a membership with

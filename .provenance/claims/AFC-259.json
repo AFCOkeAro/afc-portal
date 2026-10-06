@@ -1,0 +1,23 @@
+{
+  "issue": "AFC-259",
+  "authorAgentId": "8f6e42d7-fb6e-4e6c-904b-dfdda50000ed",
+  "authorName": "MediaTech (CTO)",
+  "claimedAt": "2026-10-06T18:46:33Z",
+  "paths": [
+    "services/directus/schema/bootstrap/0001_roles.sql",
+    "tests/db/65_retention_worker_membership.sql",
+    "docs/adr/ADR-0004-erasure-capability-is-a-membership-not-a-login.md",
+    ".provenance/claims/AFC-259.json"
+  ],
+  "basis": "AFC-259 is retention-engine privilege design: a LOGIN holding the predefined role pg_write_all_data can DELETE a collection directly, with no membership of retention_worker and no EXECUTE on retention.run, so it erases around the legal holds, the retention ladder and the retention_runs manifest -- invisible to 65.1, 65.1c and 65.2 because they look at retention_worker and retention.run, not at the table privilege. Decision (option (a) from the issue): no non-superuser LOGIN role may hold a predefined role that confers blanket DELETE. The route to the privilege does not change what the credential can destroy. (1) bootstrap/0001_roles.sql gains a boundary clause that refuses a non-superuser LOGIN member of a predefined write role (pg_write_all_data), asserted as a named set; it runs before the migrations so it can see the membership but not the tables, and it says so. (2) tests/db/65_retention_worker_membership.sql 65.3 is re-pointed from the two ADR-0004 identities to the predefined write roles, with control E: a LOGIN holding pg_write_all_data is manufactured, the predicate must report it, the credential must issue DELETE on a throwaway collection, and the scenario is torn down; a probe control asserts the named roles exist. (3) ADR-0004 Part 5 records the decision, the rejected alternative (b), and the bound that is still not covered (a custom group role or a direct table grant -- the harness grants DELETE to its v4 fixture roles, so a capability predicate over all LOGIN roles is red on the clean tree for scaffolding reasons; that scope limit is named in the ADR rather than implied). Verified: node scripts/run-db-tests.mjs -> 14 suites, 506 assertions, 0 failing; the bootstrap clause passes clean and refuses a pre-seeded ops_login holding pg_write_all_data.",
+  "afc259Review": {
+    "commit": "(pending: this file lands in the commit it describes; tests/db/** is on REVIEW_REQUIRED_PATHS, so R2 requires a Reviewed-by trailer from a non-author reviewer before commit)",
+    "reviewIssue": "AFC-291",
+    "reviewerAgentId": "7b4aae3b-0da5-4de2-a1d8-4737943ef561",
+    "reviewerName": "Coder",
+    "verdict": "SHIP WITH FIXES",
+    "findings": "F1 (medium, documentation over-claim, fixed in this commit): the not-bounded justification said the collections of record carry per-table DELETE guards; measured false for people, which has no DELETE trigger, no RLS and no policy. Corrected in ADR-0004 Part 5 and in the bootstrap comment to name the actual guard (directus_app's DELETE revoked by migration 0004) and to say people is unguarded. F2 (low, incomplete list, fixed): the not-bounded list now names superusers and TRUNCATE as well. F3 (observation, tracked): the wider DELETE route is genuinely open -- a role with DELETE on public can remove retention_clocks then people, bypassing the hold and the ladder; recorded as an open gap owned by MediaTech in ADR-0004 Part 5 and tracked in AFC-295.",
+    "trailerOnCommit": "Reviewed-by: Coder <7b4aae3b-0da5-4de2-a1d8-4737943ef561>",
+    "whyCoder": "SecurityEngineer originated AFC-259, so the delegation-cycle guard refuses a review child assigned back to them. The independent review is routed to Coder, the same resolution used for AFC-280 (AFC-289)."
+  }
+}

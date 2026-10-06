@@ -436,3 +436,128 @@ distrust the results — the reviewer's semantics are ordinary server behaviour 
 "no reason to doubt" is not "measured", and for an NDPA s.40(2) evidence surface the
 distinction is the whole question.
 
+---
+
+# Part 5 — Fourth review: the erasure surface is not only the engine (AFC-259)
+
+The re-verification ([AFC-259](/AFC/issues/AFC-259)) confirmed the Part 3 and Part 4
+fixes and then found the route that does not go through `retention.run` at all.
+
+## What the review found
+
+Part 3 enumerated four routes to `retention.run`. All four reach the deletion path
+*through the engine*, so they pass the holds, the ladder and the manifest. AFC-259 found a
+fifth that does not: **a LOGIN holding the predefined role `pg_write_all_data` can
+`DELETE` a collection directly.** Measured on the pristine fixture (real bootstrap, real
+migrations, real engine, one mutation):
+
+```sql
+CREATE ROLE ops_login LOGIN;
+GRANT pg_write_all_data TO ops_login;
+```
+
+```
+count (retention_worker)      1 [retention_job]
+ops_login DELETE on incidents YES - can erase directly, bypassing the engine
+who can erase via the engine   ops_login:blocked   retention_job:ERASED
+```
+
+and by execution: `DELETE FROM people` as `ops_login` removes the row. It is invisible to
+every check in this design — the membership count (65.1), the `EXECUTE` surface (65.1c)
+and the `directus_app` denial (65.2) — because they look at `retention_worker` and
+`retention.run`, not at the table privilege. It erases around:
+
+- `retention.legal_holds` — an active hold does not stop it;
+- the retention ladder / due-date logic;
+- `retention_runs` — the append-only manifest, so there is no record of the erasure.
+
+## Decision
+
+**No non-superuser LOGIN role may hold a predefined role that confers blanket DELETE on a
+collection. The route to the DELETE privilege does not change what the credential can
+destroy, so it is bounded with the other routes.**
+
+This is option (a) from the issue. Option (b) — "predefined admin roles are out of scope,
+cluster owners are trusted with them" — is rejected: the legal holds are the NDPA s.40(2)
+compliance control, and the whole point of the single-holder invariant is that a
+credential which can erase around them is the risk. A cluster owner who grants
+`pg_write_all_data` to an ordinary login has created a second erase-capable credential,
+and the invariant should say so rather than disclaim it.
+
+## Alternatives considered
+
+| Option | Verdict |
+| --- | --- |
+| **(b) Predefined admin roles out of scope; only fix the label** | Rejected. It leaves the NDPA control's erasure surface unbounded and answers "how many credentials can delete a record?" with "not our department". The label fix alone would be honest but weaker. |
+| **Assert the full capability — DELETE on any public collection by any LOGIN role — as the suite bound** | Not usable as the primary suite assertion. The harness deliberately grants DELETE to the v4 fixture roles (`tests/db/20` on `incidents`, `tests/db/63` on `fixture_medical_notes`) to exercise the guards, so a capability predicate over all LOGIN roles is red on the clean tree for scaffolding reasons. The deploy-time capability is asserted in bootstrap, before those grants exist. |
+| **Hardcode the role name `pg_write_all_data`** | Rejected. The predicate is over a named *set* of predefined write roles, so a server that adds another is a one-line edit and not a silent gap. `pg_read_all_data` is read-only and is not in the set. |
+| **Predefined-role membership, asserted in bootstrap and in suite 65.3** (**chosen**) | Catches the measured route at deploy time and in CI, with a negative control that manufactures the drift and requires the predicate to notice it. |
+
+## What changed
+
+- **bootstrap/0001_roles.sql** — a clause in the boundary block: no non-superuser LOGIN
+  may be a member of a predefined write role. It runs before the migrations, so it can see
+  the role membership but not the tables; it is labelled as the predefined-role route and
+  points at the suite for the capability.
+- **tests/db/65_retention_worker_membership.sql 65.3** — the check is now over the
+  predefined write roles, with **control E**: a LOGIN holding `pg_write_all_data` is
+  manufactured, the predicate is required to report it, the credential is required to
+  issue `DELETE` on a throwaway collection, and the scenario is torn down. A probe control
+  asserts the named roles exist, so the bound cannot pass by matching nothing.
+- The bound is stated as exactly what it is: no non-superuser LOGIN holds a predefined
+  write role. It is not labelled as the whole DELETE surface.
+
+## Consequences
+
+- **Accepted cost.** A cluster that legitimately grants `pg_write_all_data` to an
+  operational login will now fail the bootstrap step, not just the suite. That is
+  intended: this ADR's own logic is that a second erase-capable credential is worse than
+  one, and a named wall beats a silent operational exception.
+- **What is still not bounded, stated rather than implied.** The predefined-role clause
+  bounds one predicate. It does not bound:
+  - **a custom group role that confers DELETE, or a direct table grant** — a different
+    predicate, and not asserted in the suite because the harness's own v4 fixture roles
+    hold exactly such grants;
+  - **a superuser** — excluded by `NOT r.rolsuper`; the cluster owner is trusted with
+    everything by definition;
+  - **TRUNCATE** — a separate privilege that `pg_write_all_data` does not confer and that
+    this clause does not bound either.
+
+  For the first of these, the only production guard is that the single application
+  identity, `directus_app`, has DELETE revoked by migration 0004. **That is a grant-layer
+  control on one identity, not a per-table guard, and the review measured the difference
+  plainly: `people` — the identity anchor and the table this issue's finding uses —
+  carries no DELETE trigger, no RLS and no policy, and `DELETE FROM people` succeeds as a
+  non-superuser LOGIN holding `pg_write_all_data`.** Of the `public` collections,
+  `incidents`, `legal_holds`, `retention_principals`, `retention_run_items` and
+  `retention_runs` carry DELETE triggers; `people`, `retention_anchor_sources`,
+  `retention_class_sources`, `retention_clocks` and `retention_policies` do not. A
+  grant-layer control is not a substitute for a bound, and it is named here rather than
+  implied so a reader does not read 65.3 as bounding the wider route.
+- **Open gap, owned.** The wider route is genuinely open, not merely unasserted: a role
+  with DELETE on `public` can remove `retention_clocks` and then `people`, bypassing the
+  hold and the ladder. Option (a) deliberately bounds the predefined-role route and leaves
+  this one; closing it — by per-table DELETE guards on the personal-data collections, or
+  by a deploy-time assertion over the retention-managed collections — is tracked in
+  [AFC-295](/AFC/issues/AFC-295), owned by MediaTech (CTO). This ADR records it as open
+  rather than closing it with a guard that does not exist.
+
+## The rule this adds
+
+Part 2: an assertion needs a case where the privilege is wrong. Part 3: an assertion's
+message is part of the assertion. Part 4: a reporting mechanism you cannot observe is not
+a reporting mechanism.
+
+Part 5 is about the shape of the question:
+
+> **Bound the capability, not the route.** "How many credentials can delete a record?" is
+> a question about the privilege. Enumerating the known paths to it — the membership, the
+> direct grant, the owner, the entrypoint — will always lag the next path, and a bound that
+> lists routes reads as complete while it is not. When a route is found, the fix is not a
+> sixth entry in the list; it is the predicate that would have caught it.
+
+The predefined-role clause is the first assertion in this design stated as a *capability*
+("can this credential delete?") rather than as one more route to the engine. It is
+deliberately not claimed as the whole DELETE surface; that claim belongs to a predicate
+over the grants themselves, which the harness's fixture grants currently prevent the suite
+from making.

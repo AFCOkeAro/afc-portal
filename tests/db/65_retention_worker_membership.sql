@@ -50,10 +50,27 @@
 --         boundary that holds
 --   65.1c the OTHER THREE routes to live erasure, each separately bounded
 --   65.2  directus_app can neither execute the engine nor reach the role
---   65.3  neither identity carries DELETE on any collection
+--   65.3  NO LOGIN identity carries DELETE on any public collection, with the
+--         negative control that manufactures the drift and requires the
+--         predicate to notice it (AFC-259)
 --   65.4  a non-superuser LOGIN session reaches the worker BY MEMBERSHIP and
 --         drives retention.run through it, by the route production uses
 --   65.5  the two negative controls, so 65.4 is not a superuser override
+--
+-- WHAT AFC-259 CHANGED IN 65.3, AND WHY IT IS NOT A WIDENING FOR ITS OWN SAKE
+--   65.3 used to check two roles: retention_worker and retention_job. That is
+--   the correct scope for "the erasure capability's own identities carry no
+--   DELETE", and it was read as if it bounded the erasure surface. It did not.
+--   A LOGIN holding the predefined role pg_write_all_data can DELETE from a
+--   collection directly, with no membership of retention_worker and no EXECUTE
+--   on retention.run, so 65.1, 65.1c and 65.2 all miss it while it erases
+--   around the holds, the ladder and the manifest. The check now bounds the
+--   predefined-role route -- no non-superuser LOGIN holds a predefined role that
+--   confers blanket DELETE -- and the drift is manufactured as control E. The
+--   same predicate is asserted at deploy time in bootstrap. A capability
+--   predicate over every LOGIN role is not asserted here because the harness
+--   grants DELETE to the v4 fixture roles to exercise the guards; that scope
+--   limit is recorded in ADR-0004 Part 5.
 --
 -- WHAT AFC-215 CHANGED IN HERE, AND WHY IT IS NOT COSMETIC
 --   The independent security review (AFC-215) falsified this suite: it went
@@ -307,59 +324,131 @@ BEGIN
 END $$;
 
 -- ---------------------------------------------------------------------------
--- 65.3  NEITHER IDENTITY CARRIES DELETE.
+-- 65.3  NO LOGIN IDENTITY HOLDS A PREDEFINED ROLE THAT CONFERS BLANKET DELETE.
 --
 -- The worker's design is that erasure happens inside SECURITY DEFINER as the
--- owner, so the role holding the capability needs no DELETE of its own. If
--- either identity ever picks one up, the erasure path has a second route to the
--- data that does not go through the engine -- and therefore does not go through
--- the holds, the ladder, or the manifest.
+-- owner, so the role holding the capability needs no DELETE of its own. If a
+-- LOGIN identity picks one up by another route, the erasure path has a second
+-- way to the data that does not go through the engine -- and therefore does not
+-- go through the holds, the ladder, or the manifest.
 --
--- has_table_privilege, not a read of relacl, for the same reason 64.1 uses
--- has_function_privilege: the ACL is the grant list and the effective privilege
--- is what the database enforces. It also catches a DELETE that arrived through
--- PUBLIC or through a group role, which an ACL text scan would miss.
+-- AFC-259 found the route the old version of this block could not see. It
+-- checked retention_worker and retention_job, which bounds the erasure
+-- capability's OWN identities, and it was read as if it bounded the surface. A
+-- LOGIN holding the predefined role pg_write_all_data -- an ordinary operator
+-- login, granted by a cluster owner -- holds DELETE on every collection and is
+-- invisible to 65.1 (it cannot reach retention_worker), 65.1c (it holds no
+-- EXECUTE on retention.run) and 65.2 (that is about directus_app). Measured on
+-- the pristine fixture: CREATE ROLE ops_login LOGIN; GRANT pg_write_all_data TO
+-- ops_login; then DELETE FROM people removes a row, around the holds, the ladder
+-- and the manifest.
+--
+-- WHY THE PREDICATE IS PREDEFINED-ROLE MEMBERSHIP AND NOT "DELETE ON A TABLE".
+-- The harness deliberately grants DELETE to the v4 fixture roles (tests/db/20
+-- grants it on incidents; tests/db/63 on fixture_medical_notes) to exercise the
+-- guards, so a capability predicate over all LOGIN roles is red on the clean
+-- tree for reasons that are test scaffolding, not the boundary. The production
+-- identity is a single directus_app whose DELETE migration 0004 revokes, so the
+-- deploy-time capability is asserted where it exists before the fixtures --
+-- bootstrap's pg_write_all_data clause -- and this suite asserts the route that
+-- is a credential rather than scaffolding: membership of a predefined write
+-- role. The bound is stated as exactly that, and it is not labelled as the whole
+-- DELETE surface.
+--
+-- pg_has_role(..., 'MEMBER') is recursive, so a LOGIN two hops away through a
+-- group is still counted. The set is one role today and is named as a set so a
+-- server that adds another write role is a one-line edit, not a silent gap.
+-- pg_read_all_data is read-only and is deliberately not in it.
 --
 -- PLACED BEFORE THE IMPERSONATION BLOCKS, DELIBERATELY. See the note in 65.4.
 -- ---------------------------------------------------------------------------
 DO $$
 DECLARE
-  v_deleters text;
+  v_write_roles text[] := ARRAY['pg_write_all_data'];
+  v_holders     text;
+  v_before      text;
+  v_after       text;
 BEGIN
-  SELECT string_agg(c.relname, ', ' ORDER BY c.relname)
-    INTO v_deleters
-    FROM pg_class c
-    JOIN pg_namespace n ON n.oid = c.relnamespace
-   WHERE n.nspname = 'public'
-     AND c.relkind = 'r'
-     AND (has_table_privilege('retention_worker', c.oid, 'DELETE')
-       OR has_table_privilege('retention_job',     c.oid, 'DELETE'));
+  -- Probe control: the named predefined roles exist on this server, so the bound
+  -- below is not a query that silently matches nothing because the role is
+  -- absent. A missing role would otherwise skip the check and read as a pass.
+  SELECT string_agg(w, ', ') INTO v_holders
+    FROM unnest(v_write_roles) AS w
+   WHERE to_regrole(w) IS NULL;
+  PERFORM test_support.assert_equals(coalesce(v_holders, '(none)'), '(none)',
+    'membership', 'probe control: every predefined write role named in this bound exists, so the check below is not skipped for a missing role');
+
+  -- THE BOUND. No non-superuser LOGIN may hold any predefined role that confers
+  -- blanket table write access.
+  SELECT string_agg(r.rolname, ', ' ORDER BY r.rolname) INTO v_holders
+    FROM pg_roles r
+   WHERE r.rolcanlogin
+     AND NOT r.rolsuper
+     AND EXISTS (SELECT 1 FROM unnest(v_write_roles) AS w
+                  WHERE pg_has_role(r.oid, w, 'MEMBER'));
 
   -- No row is the PASSING case, so the aggregate is NULL; coalesce turns "no
   -- row" into the asserted value rather than a NULL that reads as a pass.
-  PERFORM test_support.assert_equals(coalesce(v_deleters, '(none)'), '(none)',
-    'membership', 'neither retention_worker nor retention_job holds DELETE on any collection: erasure happens only inside the engine, as the owner');
+  PERFORM test_support.assert_equals(coalesce(v_holders, '(none)'), '(none)',
+    'membership', 'no non-superuser LOGIN role holds a predefined role that confers blanket DELETE (pg_write_all_data): such a credential erases around the holds, the ladder and the manifest without reaching retention_worker or retention.run, so 65.1, 65.1c and 65.2 cannot see it');
 
-  -- Probe control, so the assertion above is not a query that matches nothing
-  -- for an unrelated reason: there are collection tables, and a role that holds
-  -- a privilege on one is reported by the same predicate.
-  PERFORM test_support.assert_true(
-    (SELECT count(*) > 0 FROM pg_class c
-       JOIN pg_namespace n ON n.oid = c.relnamespace
-      WHERE n.nspname = 'public' AND c.relkind = 'r'),
-    'membership', 'probe control: there are collection tables to check, so the DELETE assertion above is not vacuous');
-
-  -- Probe control, asked of the table OWNER rather than of directus_app: the
-  -- owner holds DELETE on everything, so the same predicate must report rows
-  -- for it. A predicate that reports nothing for any role cannot distinguish
-  -- "no DELETE exists" from "the query matches nothing", and that distinction
-  -- is the assertion.
+  -- Probe control, asked of the table OWNER rather than of a LOGIN role: the
+  -- owner holds DELETE on everything, so has_table_privilege must report it. A
+  -- predicate that reports nothing for any role cannot distinguish "no DELETE
+  -- exists" from "the query matches nothing". This probes the CAPABILITY the
+  -- predefined role confers, which is why the bound above matters.
   PERFORM test_support.assert_true(
     EXISTS (SELECT 1 FROM pg_class c
               JOIN pg_namespace n ON n.oid = c.relnamespace
              WHERE n.nspname = 'public' AND c.relkind = 'r'
                AND has_table_privilege('directus_migrator', c.oid, 'DELETE')),
-    'membership', 'probe control: the same predicate does report a DELETE that exists, so the assertion above is not a query that silently matches nothing');
+    'membership', 'probe control: a role that holds DELETE on a collection is reported by has_table_privilege, so the capability the predefined role confers is real and not a catalog fiction');
+
+  -- NEGATIVE CONTROL E. The bound is a predicate over a role set, and a
+  -- predicate that answers "none" for every input cannot be told apart, from
+  -- inside the suite, from a boundary that holds. So the AFC-259 drift is
+  -- manufactured here -- a LOGIN holding the predefined write role, exactly as
+  -- the issue measured it -- and the same predicate is required to NOTICE it,
+  -- and the capability is required to be REAL, before the scenario is torn down.
+  CREATE ROLE afc65_delete_login LOGIN;
+  GRANT pg_write_all_data TO afc65_delete_login;
+
+  SELECT string_agg(r.rolname, ', ' ORDER BY r.rolname) INTO v_before
+    FROM pg_roles r
+   WHERE r.rolcanlogin
+     AND NOT r.rolsuper
+     AND EXISTS (SELECT 1 FROM unnest(v_write_roles) AS w
+                  WHERE pg_has_role(r.oid, w, 'MEMBER'));
+
+  PERFORM test_support.assert_equals(coalesce(v_before, '(none)'), 'afc65_delete_login',
+    'membership', 'control E: a LOGIN holding pg_write_all_data is reported by the predicate, so "no LOGIN holds it" above is a measurement and not a constant');
+
+  -- The privilege is not merely catalogued: the statement is accepted. A
+  -- throwaway table with no constraints is used rather than an existing
+  -- collection, because a real collection can refuse the DELETE on a foreign key
+  -- (23503) and a refusal for a reason that is not privilege would prove nothing
+  -- either way. pg_write_all_data confers DELETE on tables created after the
+  -- grant, so this measures the credential and not the fixture. The statement
+  -- runs in a discarded subtransaction (probe), so nothing is erased.
+  CREATE TABLE afc65_delete_probe (id integer);
+  PERFORM test_support.assert_not_raises('afc65_delete_login', 'DELETE FROM afc65_delete_probe',
+    'membership', 'control E: and the credential can actually issue DELETE on a collection, so the predicate is not reporting a privilege the engine refuses');
+  DROP TABLE afc65_delete_probe;
+
+  -- Tear down. The suite must leave the cluster as it found it, or the deploy
+  -- assertion starts failing for anything that runs after this.
+  REVOKE pg_write_all_data FROM afc65_delete_login;
+  DROP ROLE afc65_delete_login;
+
+  SELECT string_agg(r.rolname, ', ' ORDER BY r.rolname) INTO v_after
+    FROM pg_roles r
+   WHERE r.rolcanlogin
+     AND NOT r.rolsuper
+     AND EXISTS (SELECT 1 FROM unnest(v_write_roles) AS w
+                  WHERE pg_has_role(r.oid, w, 'MEMBER'));
+
+  PERFORM test_support.assert_equals(coalesce(v_after, '(none)'), '(none)',
+    'membership', 'control E cleanup: the manufactured holder is gone and the bound is back to none');
 END $$;
 
 -- ---------------------------------------------------------------------------
