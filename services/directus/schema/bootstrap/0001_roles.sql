@@ -17,6 +17,14 @@
 -- Idempotent: re-running against a cluster that already has these roles is a
 -- no-op. Nothing here is ever dropped.
 --
+-- ONE EXCEPTION, AND IT IS THE POINT: the retention membership GRANT below
+-- CONVERGES rather than being additive. Re-running it overwrites the existing
+-- row's inherit_option, set_option and admin_option with the values declared
+-- here. That is deliberate -- this file is the declaration of the deployed
+-- capability -- but a mutation that this file calls a no-op anywhere else is a
+-- lie an operator will act on, so the divergence is reported by NOTICE before
+-- it is overwritten, and "nothing here is ever dropped" stays true.
+
 -- No durations appear in this file, so it is safe under the retention-literal
 -- gate; it is scanned, not exempt.
 
@@ -87,7 +95,44 @@ GRANT USAGE ON SCHEMA public TO retention_worker;
 -- must not be able to pass the erasure capability onward. A later GRANT by a
 -- cluster owner is still possible, and the assertion below is what catches that.
 --
--- GRANT membership is additive, so this line is already a no-op on re-run.
+-- REPORT, THEN CONVERGE.
+--
+-- The grant below overwrites the existing row's options. This file is the
+-- declaration of what the deployed capability is, so converging on it is its
+-- job -- refusing here would leave the cluster holding a membership that cannot
+-- confer, which is the defect this whole assertion was added to catch.
+--
+-- But every other drift in this file raises loudly, and this was the one place
+-- in the repository that changed a privilege with nothing in the deploy log,
+-- while four notices above told the operator the roles were "already exists, left
+-- alone". An operator who set INHERIT FALSE on purpose after an incident had it
+-- undone silently. It is still undone -- but now the deploy log says so, and it
+-- says what it overwrote. Measured: this NOTICE fires and the row becomes
+-- inherit=true set=true admin=false.
+DO $$
+DECLARE
+  v_old record;
+BEGIN
+  SELECT inherit_option, set_option, admin_option INTO v_old
+    FROM pg_auth_members
+   WHERE roleid = 'retention_worker'::regrole
+     AND member  = 'retention_job'::regrole;
+
+  IF FOUND AND (v_old.inherit_option IS DISTINCT FROM true
+             OR v_old.set_option    IS DISTINCT FROM true
+             OR v_old.admin_option  IS DISTINCT FROM false) THEN
+    RAISE NOTICE
+      'bootstrap: CONVERGED retention_job -> retention_worker (inherit %->true, '
+      'set %->true, admin %->false). The deployed capability is declared in this '
+      'file; if you set those options deliberately, the GRANT below overwrote '
+      'them.', v_old.inherit_option, v_old.set_option, v_old.admin_option;
+  END IF;
+END
+$$;
+
+-- GRANT membership is additive in WHO it reaches, and CONVERGING in its options:
+-- the options below overwrite an existing row rather than being no-ops on it.
+-- The NOTICE above reports that before it happens.
 GRANT retention_worker TO retention_job WITH INHERIT TRUE, SET TRUE, ADMIN FALSE;
 
 -- The engine schema. Also bootstrap, for the same reason the roles are: the
@@ -125,12 +170,21 @@ BEGIN
       USING ERRCODE = 'restrict_violation';
   END IF;
 
-  -- F3. The capability role must not be able to log in on its own. It is a
+  -- F3. Neither erase-capable role may be able to log in on its own. It is a
   -- separate clause rather than another term in the predicate above, because the
   -- invariant is different in kind: that check is about cluster authority, this
   -- is about identity. ADR-0004 rejected "make retention_worker itself LOGIN" as
   -- the fix, and an ALTER ROLE run by anyone with the authority ships a second
   -- erase-capable login that this file would otherwise pass.
+  --
+  -- directus_migrator is in the same clause because it is the OTHER route to
+  -- live erasure: it is the SECURITY DEFINER owner of retention.run, so it
+  -- erases holding no membership of anything. And unlike the others, making it
+  -- log in is an ordinary debugging step -- an operator hits "permission denied
+  -- for schema public" on a migration and runs ALTER ROLE directus_migrator LOGIN.
+  -- That one line ships a second erase-capable credential past a check that only
+  -- ever looked at retention_worker. Asserting NOLOGIN on retention_worker alone
+  -- would have been a boundary with a hole the shape of the most likely mistake.
   IF EXISTS (SELECT 1 FROM pg_roles
               WHERE rolname = 'retention_worker' AND rolcanlogin) THEN
     RAISE EXCEPTION
@@ -138,6 +192,18 @@ BEGIN
       'capability; they are deliberately separate. A LOGIN here adds a second '
       'credential that can execute live erasure, which is not the single '
       'accountable name the boundary is built on. Run: ALTER ROLE retention_worker NOLOGIN'
+      USING ERRCODE = 'restrict_violation';
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM pg_roles
+              WHERE rolname = 'directus_migrator' AND rolcanlogin) THEN
+    RAISE EXCEPTION
+      'directus_migrator has LOGIN. It is the SECURITY DEFINER owner of every '
+      'engine function, so it erases with no membership of anything -- it is the '
+      'second route to live erasure, not a third copy of the first. Migrations '
+      'SET ROLE to it; they do not connect as it, and diagnosing a migration '
+      'permission failure must not be done by giving it a login. Run: '
+      'ALTER ROLE directus_migrator NOLOGIN'
       USING ERRCODE = 'restrict_violation';
   END IF;
 END
@@ -168,6 +234,7 @@ DECLARE
   v_holders   text;
   v_n         integer;
   v_confer    boolean;
+  v_run_oid   oid;
 BEGIN
   -- TRANSITIVE, AND NOT ONE HOP.
   --
@@ -202,6 +269,66 @@ BEGIN
       'exactly one LOGIN role -- retention_job by default -- and remove every '
       'other membership.',
       v_n, v_holders
+      USING ERRCODE = 'restrict_violation';
+  END IF;
+
+  -- WHAT THIS COUNT IS NOT, STATED HERE RATHER THAN IN A COMMENT SOMEONE SKIPS.
+  --
+  -- The count above bounds REACHABILITY OF retention_worker. It does not bound
+  -- the erasure surface. There are four routes to retention.run and this is one
+  -- of them; the other three are asserted separately, above and below. Measured
+  -- on this engine, each of the following leaves the count at 1, leaves this
+  -- file passing, and leaves a second credential that executes live erasure:
+  --
+  --   GRANT EXECUTE ON FUNCTION retention.run(...) TO someone
+  --   GRANT directus_migrator TO someone            (owner membership)
+  --   ALTER ROLE directus_migrator LOGIN           (asserted above)
+  --
+  -- And it can also over-count: pg_has_role answers pure graph reachability and
+  -- ignores inherit_option, so a holder two hops out behind a membership with
+  -- INHERIT FALSE is counted and cannot erase. Erring toward refusing is the
+  -- safe direction, but "safe direction" is not "correct set", and a count that
+  -- is neither a lower nor an upper bound must not be labelled as one.
+  --
+  -- So: the honest invariant is not "exactly one holder". It is the three
+  -- negative properties asserted here and in the DO block above, each of which
+  -- can be audited on its own.
+
+  -- ROUTE 2 OF 4, THE DIRECT EXECUTE GRANT, IS NOT ASSERTED HERE -- AND THAT
+  -- IS AN ORDERING CONSTRAINT, NOT AN OMISSION.
+  --
+  -- Bootstrap runs BEFORE the migrations and before the engine is installed, so
+  -- at the moment this file executes, retention.run does not exist. There is
+  -- nothing to ask has_function_privilege about. An assertion written here would
+  -- either resolve nothing and pass, or fail every deploy, and both are wrong;
+  -- the one-line version of this that did exactly that was caught by its own
+  -- guard clause while this fix was being written.
+  --
+  -- So the check lives where the surface is created: engine/0001_retention_engine.sql,
+  -- immediately after the grants above create it, where the function exists and
+  -- this is the step that just granted EXECUTE on it. Bootstrap asserts what it
+  -- can see -- reachability of retention_worker, and that the membership confers
+  -- -- and the engine asserts the entrypoint's own EXECUTE surface.
+
+  -- ROUTE 3 OF 4. Membership of the engine owner.
+  --
+  -- directus_migrator is the SECURITY DEFINER owner of retention.run, so anything
+  -- that is a member of it executes the erasure path with the owner's rights and
+  -- no grant of its own.
+  SELECT string_agg(r.rolname, ', ' ORDER BY r.rolname) INTO v_holders
+    FROM pg_roles r
+   WHERE r.rolcanlogin
+     AND NOT r.rolsuper
+     AND pg_has_role(r.oid, 'directus_migrator', 'MEMBER');
+
+  IF v_holders IS NOT NULL THEN
+    RAISE EXCEPTION
+      '% LOGIN role(s) are members of directus_migrator (%), which is the '
+      'SECURITY DEFINER owner of the retention engine. Membership of the owner '
+      'executes live erasure without holding anything itself, so this is a second '
+      'credential the membership count above cannot see. Revoke it: REVOKE '
+      'directus_migrator FROM <role>',
+      array_length(string_to_array(v_holders, ', '), 1), v_holders
       USING ERRCODE = 'restrict_violation';
   END IF;
 

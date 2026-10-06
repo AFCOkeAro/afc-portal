@@ -43,8 +43,12 @@
 --   reporting a green membership that means nothing.
 --
 -- WHAT IS ASSERTED
---   65.1  exactly one LOGIN identity can reach retention_worker, by name, and
---         the predicate that counts them detects a second holder
+--   65.1  exactly one LOGIN identity can reach retention_worker, by name
+--   65.1b THE NEGATIVE CONTROL for 65.1's count: the drift is manufactured and
+--         the count is required to notice it. Not an optional line -- a
+--         predicate that returns 1 for every input cannot be told apart from a
+--         boundary that holds
+--   65.1c the OTHER THREE routes to live erasure, each separately bounded
 --   65.2  directus_app can neither execute the engine nor reach the role
 --   65.3  neither identity carries DELETE on any collection
 --   65.4  a non-superuser LOGIN session reaches the worker BY MEMBERSHIP and
@@ -96,7 +100,7 @@ BEGIN
      AND pg_has_role(r.oid, 'retention_worker', 'MEMBER');
 
   PERFORM test_support.assert_equals(coalesce(v_n, '0'), '1',
-    'membership', 'exactly one LOGIN identity can reach retention_worker, counted through every hop: 0 means the job cannot run, 2 means the erasure surface has no single accountable name');
+    'membership', 'exactly one LOGIN identity can reach retention_worker, counted through every hop: 0 means the job cannot run. Scope note -- this bounds REACHABILITY OF retention_worker, not the erasure surface; 65.1c bounds the other three routes');
 
   PERFORM test_support.assert_equals(coalesce(array_to_string(v_holders, ','), '(none)'), 'retention_job',
     'membership', 'and that one identity is retention_job, named rather than merely counted');
@@ -192,6 +196,79 @@ BEGIN
     '1',
     'membership', 'control C/D cleanup: the manufactured holders are gone and the count is back to exactly one');
 END $$;
+
+-- ---------------------------------------------------------------------------
+-- 65.1c  THE OTHER THREE ROUTES TO LIVE ERASURE.
+--
+-- 65.1 bounds REACHABILITY OF retention_worker. That is not the erasure surface,
+-- and AFC-247 proved by execution that it was being read as if it were: three
+-- mutations each left the count at "1", left bootstrap passing, left this suite
+-- green, and left a second credential that executed live erasure.
+--
+--   ALTER ROLE directus_migrator LOGIN           -- the SECURITY DEFINER owner
+--   GRANT EXECUTE ON FUNCTION retention.run ...  -- a direct grant, no membership
+--   GRANT directus_migrator TO someone          -- owner membership
+--
+-- So the invariant is expressed as the negative properties that make "exactly
+-- one identity can erase" true, each auditable on its own, rather than as one
+-- cleverer predicate. The count in 65.1 stays, relabelled to what it measures.
+-- ---------------------------------------------------------------------------
+DO $$
+DECLARE
+  v_bad text;
+BEGIN
+  -- ROUTE 1. directus_migrator is the SECURITY DEFINER owner of every engine
+  -- function, so it erases holding no membership of anything. It is the second
+  -- route to live erasure, not a third copy of the first -- and unlike the rest,
+  -- giving it a login is an ordinary debugging step: an operator hits "permission
+  -- denied for schema public" on a migration and runs ALTER ROLE
+  -- directus_migrator LOGIN. F3 checked only retention_worker, so that one-liner
+  -- shipped a second erase-capable credential past a green deploy.
+  PERFORM test_support.assert_true(
+    (SELECT rolcanlogin IS FALSE FROM pg_roles WHERE rolname = 'directus_migrator'),
+    'membership', 'directus_migrator is NOLOGIN: it is the SECURITY DEFINER owner and erases with no membership of anything, so a login here is a second erase credential');
+
+  -- ROUTE 2. A direct EXECUTE grant reaches the deletion path with no membership
+  -- at all. has_function_privilege, not proacl, for the reason 64.1 gives: the
+  -- ACL is the grant list and the effective privilege is what is enforced, and
+  -- only the latter catches a grant that arrived through a group role.
+  SELECT string_agg(r.rolname, ', ' ORDER BY r.rolname) INTO v_bad
+    FROM pg_roles r
+   WHERE r.rolcanlogin
+     AND NOT r.rolsuper
+     AND has_function_privilege(r.oid,
+           (SELECT min(p.oid) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+             WHERE n.nspname = 'retention' AND p.proname = 'run' AND p.pronargs = 3),
+           'EXECUTE');
+
+  PERFORM test_support.assert_equals(coalesce(v_bad, '(none)'), 'retention_job',
+    'membership', 'exactly one LOGIN identity holds EXECUTE on retention.run: a direct grant erases with no membership of anything, which the membership count cannot see');
+
+  -- ROUTE 3. Membership of the owner. directus_migrator is the SECURITY DEFINER
+  -- owner, so anything that is a member of it executes the erasure path with the
+  -- owner's rights and no grant of its own.
+  SELECT string_agg(r.rolname, ', ' ORDER BY r.rolname) INTO v_bad
+    FROM pg_roles r
+   WHERE r.rolcanlogin
+     AND NOT r.rolsuper
+     AND pg_has_role(r.oid, 'directus_migrator', 'MEMBER');
+
+  PERFORM test_support.assert_equals(coalesce(v_bad, '(none)'), '(none)',
+    'membership', 'no LOGIN role is a member of directus_migrator: owner membership erases live records with nothing held directly');
+
+  -- PROBE CONTROL on route 2, the assertion most likely to be a query that
+  -- matches nothing for an unrelated reason. Asked of a role that genuinely holds
+  -- it: the table owner. Without this, "exactly retention_job" would also be
+  -- satisfied by a broken predicate.
+  PERFORM test_support.assert_true(
+    has_function_privilege('directus_migrator',
+      (SELECT min(p.oid) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+        WHERE n.nspname = 'retention' AND p.proname = 'run' AND p.pronargs = 3),
+      'EXECUTE'),
+    'membership', 'probe control: the EXECUTE-surface predicate does report a holder that exists, so the assertion above is not a query that silently matches nothing');
+END $$;
+
+-- ---------------------------------------------------------------------------
 
 -- 65.2  THE APPLICATION IDENTITY CANNOT ERASE.
 --

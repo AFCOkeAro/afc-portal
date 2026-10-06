@@ -230,3 +230,134 @@ So the standing rule this amendment adds:
 > Not a probe control that the query matches — a scenario in which it must change
 > its answer. If the suite cannot be made to fail by the defect it exists to
 > catch, it is not a test of that defect.
+
+---
+
+# Part 3 — Second review: the invariant was one route, labelled as four
+
+The re-verification ([AFC-247](/AFC/issues/AFC-247)) confirmed the Part 2 fixes and
+then found the thing underneath them: **the assertion's claim did not match what the
+assertion measured.** Not a bug in a query — a scope error in the invariant, and that
+is a different and more durable class of defect.
+
+## What the review found
+
+Part 2's fix made the membership count transitive, and it is a real improvement. But
+`retention.run` has **four** routes, and the count covered one of them while its own
+error message said it was bounding the erasure surface. Three executed mutations each
+left the count at `1`, left the deploy passing, left the suite green, and left a second
+credential that executed live erasure:
+
+| route | mutation | what the count said |
+| --- | --- | --- |
+| owner identity | `ALTER ROLE directus_migrator LOGIN` | 1 |
+| direct grant | `GRANT EXECUTE ON FUNCTION retention.run(...) TO x` | 1 |
+| owner membership | `GRANT directus_migrator TO x` | 1 |
+
+The first is the one that will actually happen. `directus_migrator` is the
+`SECURITY DEFINER` owner, so it erases holding no membership of anything, and giving it
+a `LOGIN` is an ordinary debugging step — an operator hits `permission denied for schema
+public` on a migration and runs the `ALTER ROLE`. Part 2's F3 clause argued, in its own
+words, that "an `ALTER ROLE` run by anyone with the authority ships a second
+erase-capable login that this file would otherwise pass". It checked
+`retention_worker`. `directus_migrator` is the other one.
+
+The count can also over-count: `pg_has_role` is pure graph reachability and ignores
+`inherit_option`, so a holder two hops out behind a membership with `INHERIT FALSE` is
+counted and cannot erase. Refusing a deploy for that is the safe direction, but "safe
+direction" is not "correct set". The count was **neither a lower nor an upper bound** on
+the erase-capable set while being labelled as one.
+
+For an NDPA s.40(2) evidence control, an assertion that reports a property it does not
+have is evidence right for the wrong reason — which this repository's own comments treat
+as the worst available outcome.
+
+## What changed
+
+The invariant is no longer expressed as one cleverer predicate. It is the **negative
+properties that make "exactly one identity can erase" true**, each separately
+auditable:
+
+1. `retention_worker` is `NOLOGIN`.
+2. `directus_migrator` is `NOLOGIN`.
+3. No `LOGIN` role is a member of `directus_migrator`.
+4. The `retention_job → retention_worker` membership exists, is transitive-reachable,
+   and **confers** the capability (`INHERIT TRUE, SET TRUE, ADMIN FALSE`).
+5. Exactly one `LOGIN` role holds `EXECUTE` on `retention.run`, and it is
+   `retention_job`.
+
+The membership count stays, relabelled to what it measures: *reachability of
+`retention_worker`*, with a pointer to the clauses that bound the surface itself.
+
+**One of these cannot live in bootstrap, and that is a design constraint worth
+recording.** Bootstrap runs before the migrations and before the engine is installed, so
+at the moment it executes `retention.run` does not exist and there is nothing to ask
+`has_function_privilege` about. The version that tried raised on every deploy. So the
+entrypoint's `EXECUTE` surface is asserted in `engine/0001_retention_engine.sql`,
+immediately after the grants that create it — which is also the more honest home, since
+that is the step that just granted `EXECUTE`.
+
+## The repair now reports itself
+
+Part 2 pinned the grant with `WITH INHERIT TRUE, SET TRUE, ADMIN FALSE`, which converges
+rather than being additive: re-running it overwrites the options on an existing row. The
+reviewer's judgement — asked for, because it was not mine to make alone — was **keep the
+repair, make it report**. Bootstrap is the provisioning step; refusing there would leave
+the cluster holding a membership that cannot confer, which is the very defect it exists
+to catch.
+
+So the repair stays, and a `NOTICE` now fires before it, naming the old and new option
+values. Two comments in the file claimed the grant was a no-op on re-run; they were
+wrong and said so, because a comment that reads as reassuring and is not is the same
+defect class as the misleading `SET LOCAL ROLE` comment from the first review.
+
+## Verification
+
+The reviewer's scenarios, re-run, pristine database each, all three layers:
+
+| scenario | bootstrap | engine | suite 65 | ground truth |
+| --- | --- | --- | --- | --- |
+| none | PASS | PASS | PASS | only `retention_job` erases |
+| `ALTER ROLE directus_migrator LOGIN` | **FAIL** | **FAIL** | **FAIL** | two erasers |
+| direct `GRANT EXECUTE ... retention.run` | PASS\* | **FAIL** | **FAIL** | two erasers |
+| `GRANT directus_migrator TO x` | **FAIL** | **FAIL** | **FAIL** | two erasers |
+| `INHERIT/SET FALSE` on the membership | PASS (converged) | PASS | PASS | `retention_job` still erases |
+| `REVOKE USAGE ON SCHEMA retention FROM retention_worker` | PASS | — | **FAIL** | `retention_job` blocked |
+
+\* legitimately: bootstrap runs before the engine exists, so it cannot see this route.
+That is the ordering constraint, not a gap in the assertion.
+
+The last row is the one that justifies the split. With the membership row fully
+conferring and only the schema `USAGE` removed, **neither the deploy assertion nor the
+catalog assertion sees it** — only the execution assertion does, with the exact
+`permission denied for schema retention` symptom. Bootstrap asserts what it can see;
+the suite asserts that the capability is actually usable.
+
+`pnpm test` → 12 suites / 421 assertions / 0 failing.
+
+## Two corrections I made wrong before getting right
+
+Both were found by my own guard clauses refusing to check nothing, which is the only
+reason they were caught at all.
+
+- `has_function_privilege` takes a `regprocedure`, and `retention.run` returns `uuid`, so
+  `'retention.run(text,text,timestamptz)'` does not resolve. Three further attempts also
+  silently matched nothing: `proargtypes` renders as `25 25 1184` with no braces and no
+  names, and `pg_get_function_identity_arguments` renders as `p_actor text, p_mode text,
+  p_now timestamp with time zone`. The resolution is by name and arity with the count
+  asserted, so an ambiguous match is loud rather than quiet.
+- The first version of the EXECUTE clause was placed in bootstrap, where it cannot work.
+  My own `v_run_oid IS NULL` guard turned a silent no-op into a loud failure, which is
+  the only reason it was noticed before shipping.
+
+## The rule this adds to the one in Part 2
+
+Part 2's rule was about negative controls. This one is about labels, and it is the more
+easily repeated:
+
+> An assertion's failure message is part of the assertion. If the message says it bounds
+> X and the predicate bounds a strict subset of X, the control is worse than none: it
+> produces evidence that is right for the wrong reason, and it does so while passing.
+
+A subset is not a bound. When a control covers part of an invariant, say which part, in
+the message, where the operator reads it.

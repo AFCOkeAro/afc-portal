@@ -900,3 +900,80 @@ GRANT USAGE ON SCHEMA retention TO retention_worker, directus_app;
 -- it yet would be.
 GRANT SELECT ON retention_metrics TO directus_app;
 GRANT SELECT ON retention_metrics TO retention_worker;
+
+-- ===========================================================================
+-- THE ENTRYPOINT'S EXECUTE SURFACE IS EXACTLY retention_job. ADR-0004.
+--
+-- WHY HERE AND NOT IN BOOTSTRAP
+--   Bootstrap runs before the migrations and before this file, so
+--   retention.run does not exist when bootstrap executes and there is nothing to
+--   ask has_function_privilege about. This is also the step that grants EXECUTE
+--   on the function one line above, so it is where the surface can be asserted
+--   against the grant this same file made.
+--
+-- WHY IT IS NEEDED AT ALL
+--   The membership count in bootstrap asserts that exactly one LOGIN identity can
+--   REACH retention_worker. That is not the erasure surface. A direct
+--   GRANT EXECUTE ON FUNCTION retention.run TO someone reaches the deletion path
+--   with no membership of anything, and measured on this engine such a grant
+--   leaves the membership count at 1 and leaves bootstrap passing. This is the
+--   second of four routes, and it is the one that is easiest to add by accident.
+--
+-- has_function_privilege, not proacl, for the same reason the checks above use
+-- it: the ACL is the grant list and the effective privilege is what the database
+-- enforces. It also catches an EXECUTE that arrived through a group role or
+-- through PUBLIC, which a proacl read would miss.
+--
+-- The entrypoint is resolved to its OID rather than named, because
+-- has_function_privilege's second argument is a regprocedure and retention.run
+-- RETURNS uuid -- the bare signature 'retention.run(text,text,timestamptz)' is
+-- not resolvable as one.
+DO $$
+DECLARE
+  v_run_oid oid;
+  v_n_run   integer;
+  v_holders text;
+BEGIN
+  -- Resolved by name and arity, and required to be unambiguous, rather than
+  -- matched on rendered argument text. Three text-shaped comparisons were tried
+  -- against this signature and all three silently matched nothing, because
+  -- proargtypes renders as '25 25 1184' with no braces and no names, and
+  -- pg_get_function_identity_arguments renders as 'p_actor text, p_mode text,
+  -- p_now timestamp with time zone'. An ambiguous match is a louder failure than
+  -- a quiet one, so the count is asserted instead: if retention.run is ever
+  -- overloaded, this refuses and a human decides which entrypoint is the one.
+  SELECT count(*), min(p.oid) INTO v_n_run, v_run_oid
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+   WHERE n.nspname = 'retention'
+     AND p.proname = 'run'
+     AND p.pronargs = 3;
+
+  IF v_n_run <> 1 THEN
+    RAISE EXCEPTION
+      'this engine installs exactly one three-argument retention.run, and % were '
+      'found, so the EXECUTE surface cannot be checked unambiguously. A check '
+      'that quietly examines the wrong function is worse than no check. Reconcile '
+      'the engine signatures with this assertion.',
+      v_n_run
+      USING ERRCODE = 'restrict_violation';
+  END IF;
+
+  SELECT string_agg(r.rolname, ', ' ORDER BY r.rolname) INTO v_holders
+    FROM pg_roles r
+   WHERE r.rolcanlogin
+     AND NOT r.rolsuper
+     AND has_function_privilege(r.oid, v_run_oid, 'EXECUTE');
+
+  IF v_holders IS DISTINCT FROM 'retention_job' THEN
+    RAISE EXCEPTION
+      'the LOGIN roles holding EXECUTE on retention.run are (%), and they must be '
+      'exactly retention_job. Anyone else here can execute live erasure without '
+      'holding anything from retention_worker, which the membership count in '
+      'bootstrap cannot see. Run: REVOKE EXECUTE ON FUNCTION '
+      'retention.run(text,text,timestamptz) FROM <role>',
+      coalesce(v_holders, '(none)')
+      USING ERRCODE = 'restrict_violation';
+  END IF;
+END
+$$;
