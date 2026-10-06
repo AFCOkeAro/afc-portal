@@ -11,22 +11,51 @@ readable in a diff rather than generated.
 | `20261006_0001_incidents.sql` | The `incidents` register, plus the role split and the column-level grants. |
 | `20261006_0002_incidents_awareness_at.sql` | The NDPA s.40(2) clock origin: columns, defaults, backfill, the four guard triggers, the ordering constraint, and the clock view. **This is the control.** |
 | `20261006_0003_incidents_awareness_field_policy.sql` | Strips `awareness_at` from every Directus create/update policy, including super admin. Second layer only — see [ADR-0001](/AFC/issues/AFC-166). |
+| `20261006_0004_retention.sql` | The retention and legal-hold substrate: `people` (the retention anchor only), the two source maps, `retention_policies`, `retention_clocks`, `legal_holds`, `retention_runs`, `retention_run_items`, the F1/F2/F3 constraints, and the ownership triggers. **Ships with no policy rows** — the schedule is board-ratified and counsel is confirming it. |
 | `rollback/20261006_0002_incidents_awareness_at.down.sql` | Reversal for 0002. |
+| `rollback/20261006_0004_retention.down.sql` | Reversal for 0004. **Refuses to run while a legal hold is active or any clock is recorded as erased**, because it would destroy exactly the evidence those two things exist to preserve. Verified in all three directions: refused with a hold, refused with an erased clock, clean when neither. |
 
 `0001` and `0002` are separate on purpose: the backfill in `0002` has to cope with
 rows that predate the clock origin, and that is only true if the register existed
 before `awareness_at` did.
 
+## The engine is not a migration
+
+`services/directus/schema/engine/` holds the retention engine, applied after the
+migrations and outside this directory. Two reasons, both load-bearing:
+
+1. The retention-literal gate exempts `migrations/**` so a migration can state
+   the period it was created with, and scans everything else — including
+   `.sql`. Putting the code that computes a due date in the exempt directory
+   would make the gate a green tick over an unenforced rule. **The engine is
+   exempt from nothing and contains no duration.**
+2. The engine is behaviour, not schema history. Every engine fix would otherwise
+   consume a migration number and the history would stop being readable.
+
+`retention_worker` and the `retention` schema are **bootstrap** objects, created
+by `services/directus/schema/bootstrap/0001_roles.sql` — see
+[ADR-0002](/AFC/issues/AFC-173). A migration may GRANT and REVOKE; it may never
+CREATE ROLE.
+
 ## Running them
 
-Migrations run as **`directus_migrator`**, which owns every table.
-Directus connects as **`directus_app`**, which owns nothing.
+Bootstrap runs once as the **cluster owner**. Migrations run as
+**`directus_migrator`**, which owns every table. Directus connects as
+**`directus_app`**, which owns nothing. The retention job runs as
+**`retention_worker`**, which owns nothing and holds no DELETE.
 
 ```
+psql "$CLUSTER_ADMIN_DATABASE_URL" -v ON_ERROR_STOP=1 \
+     -f services/directus/schema/bootstrap/0001_roles.sql
+
 psql "$ADMIN_DATABASE_URL" -v ON_ERROR_STOP=1 \
      -f services/directus/schema/migrations/20261006_0001_incidents.sql \
      -f services/directus/schema/migrations/20261006_0002_incidents_awareness_at.sql \
-     -f services/directus/schema/migrations/20261006_0003_incidents_awareness_field_policy.sql
+     -f services/directus/schema/migrations/20261006_0003_incidents_awareness_field_policy.sql \
+     -f services/directus/schema/migrations/20261006_0004_retention.sql
+
+psql "$ADMIN_DATABASE_URL" -v ON_ERROR_STOP=1 \
+     -f services/directus/schema/engine/0001_retention_engine.sql
 ```
 
 Do not run them as `directus_app`. If the two roles are the same, the guard trigger

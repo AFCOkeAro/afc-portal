@@ -53,6 +53,20 @@ GRANT USAGE, CREATE ON SCHEMA public TO directus_migrator;
 GRANT USAGE ON SCHEMA public TO directus_app;
 GRANT USAGE ON SCHEMA public TO retention_worker;
 
+-- The engine schema. Also bootstrap, for the same reason the roles are: the
+-- engine installs as directus_migrator, which has CREATE on schema public but
+-- not on the database, so the engine cannot create its own schema. Migration
+-- 0004 and the engine both assert this schema exists and fail with a message
+-- naming this file, which is the correct outcome for a deploy that skipped
+-- bootstrap.
+--
+-- PUBLIC is revoked immediately. PostgreSQL grants USAGE on a new schema to
+-- PUBLIC by default, and on the schema that holds the deletion path that default
+-- is not acceptable. REVOKE ALL, not REVOKE USAGE: nothing on this schema should
+-- be reachable by an unlisted role.
+CREATE SCHEMA IF NOT EXISTS retention AUTHORIZATION directus_migrator;
+REVOKE ALL ON SCHEMA retention FROM PUBLIC;
+
 -- Belt and braces: assert the boundary this directory exists to protect. If any
 -- of these three has picked up cluster-level authority, this file fails rather
 -- than proceeding, because every migration runs under one of them.

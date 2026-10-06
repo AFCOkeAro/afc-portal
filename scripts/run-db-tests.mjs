@@ -21,12 +21,18 @@
 // semantics under test -- column-level grants, DISABLE TRIGGER ownership,
 // TRUNCATE bypassing row triggers -- are the same in both.
 
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const MIGRATIONS = join(REPO, 'services/directus/schema/migrations');
+// The engine is NOT a migration. It is behaviour that can be replaced without
+// a schema-history entry, and it is deliberately outside the directory the
+// retention-literal gate exempts -- that separation is what makes the gate
+// meaningful, because the migrations are allowed to state a period and the
+// engine is not.
+const ENGINE = join(REPO, 'services/directus/schema/engine');
 const TESTS = join(REPO, 'tests/db');
 
 const log = (...a) => console.log(...a);
@@ -101,6 +107,14 @@ async function main() {
         IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'directus_app') THEN
           CREATE ROLE directus_app LOGIN;
         END IF;
+        -- Retention worker. Bootstrap role, created here for the same reason as
+        -- the two above: a migration runs as directus_migrator, which does not
+        -- hold CREATEROLE, so a migration cannot create its own executor role.
+        -- Getting this wrong in production is a migration that fails loudly with
+        -- "retention_worker is missing" rather than an engine nobody can run.
+        IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'retention_worker') THEN
+          CREATE ROLE retention_worker NOLOGIN;
+        END IF;
       END
       $bootstrap$;
 
@@ -109,6 +123,13 @@ async function main() {
       -- only: it reads and writes, it does not create objects.
       GRANT USAGE, CREATE ON SCHEMA public TO directus_migrator;
       GRANT USAGE ON SCHEMA public TO directus_app;
+
+      -- The engine schema, owned by the migration role. Bootstrap creates it
+      -- for the same reason it creates roles: a migration runs as
+      -- directus_migrator, which has no CREATE on the database, so the engine
+      -- install could not create its own schema. Owned (not just USAGE'd) so
+      -- the engine can install into it.
+      CREATE SCHEMA IF NOT EXISTS retention AUTHORIZATION directus_migrator;
     `);
 
     // ---------------------------------------------------------------
@@ -127,6 +148,31 @@ async function main() {
         throw e;
       } finally {
         try { await db.exec('RESET ROLE'); } catch { /* connection is going away anyway */ }
+      }
+    }
+
+    // ---------------------------------------------------------------
+    // Retention engine, as the owner role. Same split: the engine is
+    // SECURITY DEFINER and runs with the owner's rights, so the worker
+    // role that calls it needs no DELETE grant of its own.
+    // ---------------------------------------------------------------
+    const engineFiles = existsSync(ENGINE)
+      ? readdirSync(ENGINE).filter((f) => f.endsWith('.sql')).sort()
+      : [];
+    if (engineFiles.length) {
+      log('\nInstalling retention engine as directus_migrator');
+      for (const file of engineFiles) {
+        try {
+          await db.exec('SET ROLE directus_migrator');
+          await db.exec(loadSql(join(ENGINE, file)));
+          log(`  ok   engine/${file}`);
+        } catch (e) {
+          console.error(`\n  FAIL engine/${file} did not apply\n       ${e.message}\n`);
+          process.exitCode = 1;
+          throw e;
+        } finally {
+          try { await db.exec('RESET ROLE'); } catch { /* connection is going away anyway */ }
+        }
       }
     }
 
