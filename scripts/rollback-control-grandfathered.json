@@ -1,0 +1,9 @@
+{
+  "rule": "rollback-must-not-disarm",
+  "appliesTo": "services/directus/schema/migrations/rollback/*.down.sql",
+  "principle": "A down script may drop the controls its OWN up migration created -- that is what a rollback is for. It may not drop a control a different migration owns unless it puts that control back in the same script. That is the AFC-253 shape: reversing the clock migration silently disarmed the NDPA s.40(2) breach register, and every forward-state suite read green.",
+  "whyOwnershipNotLastTouched": "Ownership is the EARLIEST file that creates an object. 20261006_0002 re-asserts the two guard triggers, so 0002.sql does create them, but 0001 owns them. A rule keyed on last-touched would pass the tree with the AFC-253 defect still in it.",
+  "whyThisIsNotABin": "Every entry needs migration, object, a reason of at least 40 characters that says WHY this control may be dropped without being restored, and authorisedBy. An entry with a missing field, a short reason, an unknown field, or no matching drop in the tree makes the gate FAIL. An allowlist that cannot rot is the difference between an exemption and a bin.",
+  "whatTheRealTreeShouldNeed": "Nothing. As of 2026-10-06 the real tree needs zero entries, because rollback/20261006_0002_incidents_awareness_at.down.sql re-asserts the evidence seal after the drop. If you are reading this and adding the first entry, read the AFC-264 fix first: the fix is cheaper than the excuse.",
+  "entries": []
+}

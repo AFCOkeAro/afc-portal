@@ -65,7 +65,7 @@ jobs:
   #    AFC-174 added lint/typecheck/build below. They are not listed in `needs:*
   #    here on purpose: that job owns this file next, and it should add the
   #    edges itself rather than have them appear under its diff.
-  # --------------------------------------------------------------------------
+  #
   #    AFC-210 added --check-commit below. Until it landed, the dirty-tree mode
   #    above was the only half of this guard CI ever ran, and the half that
   #    measures committed history -- R2 itself -- had never executed in a
@@ -146,6 +146,7 @@ jobs:
           bash scripts/awareness-write-context-gate.sh --self-test
           bash scripts/retention-literal-gate.sh --self-test
           bash scripts/migration-privilege-gate.sh --self-test
+          node scripts/migration-rollback-gate.mjs --self-test
 
       - name: Awareness write-context gate
         run: bash scripts/awareness-write-context-gate.sh
@@ -160,6 +161,19 @@ jobs:
       # to directus_app and escalate to full read/write on the app database.
       - name: Migration privilege boundary gate
         run: bash scripts/migration-privilege-gate.sh
+
+      # AFC-266. A migration's down script must not remove a control whose
+      # referent survives it without restoring that control. This is the AFC-253
+      # class: reversing the clock migration disarmed the NDPA s.40(2) breach
+      # register, and every forward-state suite read green because a rollback is
+      # not a state any test asserted.
+      #
+      # Left failing rather than advisory for the same reason as the R2 step
+      # above: a gate whose failure is ignorable trains the team to scroll past
+      # it. It currently reports one real finding in
+      # rollback/20261006_0005_retention_attribution.down.sql.
+      - name: Migration rollback control gate
+        run: node scripts/migration-rollback-gate.mjs
 
   db-tests:
     name: Database control tests (awareness_at)
