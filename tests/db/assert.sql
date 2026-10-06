@@ -189,3 +189,48 @@ BEGIN
       p_suite, p_name, COALESCE(p_actual, 'NULL'), COALESCE(p_expected, 'NULL');
   END IF;
 END $$;
+
+-- Compares two INSTANTS. Added in AFC-202.
+--
+-- WHY THIS IS NOT assert_equals WITH A CAST. Casting a timestamptz to text
+-- renders it in the SESSION TimeZone, so an assertion of the shape
+-- `assert_equals(<column>::text, <a UTC-pinned string literal>, ...)` only
+-- holds on a session whose TimeZone is UTC. PGlite defaults to GMT and GitHub
+-- Actions' ubuntu-latest defaults to UTC, so that shape went green in CI by
+-- accident of the runner's clock rather than because the assertion was correct.
+-- For a control that is NDPA s.40(2) legal evidence, that is the worst
+-- available failure mode: the evidence is right for the wrong reason.
+-- `timestamptz = timestamptz` compares instants and is therefore independent of
+-- the session TimeZone, of DateStyle, and of the host.
+--
+-- NOTE FOR THE NEXT SEARCH. The anti-pattern is deliberately described in words
+-- here rather than written out, so that `grep -E "::text" tests/db/*.sql` next
+-- to a '+00' timestamp literal returns nothing. A comment that quotes the wrong
+-- form makes the check that catches the wrong form report a false positive for
+-- ever, and it gets deleted by the first person who tidies the file.
+--
+-- The detail string is rendered AT UTC on both sides, so a failure message is
+-- the same text on every runner and a red run can be compared across hosts.
+-- Microseconds are included: a rendering that silently truncated would let two
+-- differing instants print identically. The offset is TZH:TZM with no literal
+-- '+' in the mask -- a bare '+' is not a format code, so it prints as itself and
+-- the message comes out as '++00:00'.
+CREATE OR REPLACE FUNCTION test_support.assert_instant(
+  p_actual timestamptz, p_expected timestamptz, p_suite text, p_name text
+) RETURNS void LANGUAGE plpgsql AS $$
+DECLARE
+  v_actual   text := to_char(p_actual   AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS.US TZH:TZM');
+  v_expected text := to_char(p_expected AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS.US TZH:TZM');
+  -- IS NOT DISTINCT FROM, so a NULL actual FAILS the way a wrong instant fails
+  -- instead of passing on a NULL comparison.
+  v_ok boolean := p_actual IS NOT DISTINCT FROM p_expected;
+BEGIN
+  INSERT INTO test_support.results (suite, name, ok, detail)
+  VALUES (p_suite, p_name, v_ok,
+          'actual=' || COALESCE(v_actual, 'NULL')
+          || ' expected=' || COALESCE(v_expected, 'NULL'));
+  IF NOT v_ok THEN
+    RAISE EXCEPTION 'ASSERTION FAILED: [%] % -- actual % expected %',
+      p_suite, p_name, COALESCE(v_actual, 'NULL'), COALESCE(v_expected, 'NULL');
+  END IF;
+END $$;

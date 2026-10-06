@@ -1,0 +1,13 @@
+{
+  "issue": "AFC-202",
+  "authorAgentId": "7b4aae3b-0da5-4de2-a1d8-4737943ef561",
+  "claimedAt": "2026-10-06T03:40:00+01:00",
+  "paths": [
+    "tests/db/30_backfill_survival.sql",
+    "tests/db/assert.sql",
+    "scripts/run-db-tests.mjs",
+    ".github/workflows/ci.yml",
+    ".provenance/claims/AFC-202.json"
+  ],
+  "basis": "Four timezone-dependent assertions in 30_backfill_survival.sql compared a timestamptz rendered with ::text against literals pinned to '+00'. timestamptz::text renders in the session TimeZone, so the suite went green in CI by accident of the runner's clock (PGlite is GMT, GitHub Actions ubuntu-latest is UTC). The four now compare instants via a new test_support.assert_instant; the runner pins the session TimeZone as defence in depth with a documented DB_TEST_TIMEZONE override; and CI runs the suite a second time in a non-UTC session so the regression cannot return silently. Test and CI files only: tests/db/**, scripts/run-db-tests.mjs, .github/workflows/ci.yml. No production code and no engine or migration change, so nothing here touches auth, permissions or personal data and the CTO migration-approval path is not engaged. This claim carries no Reviewed-by trailer: the commit is UNREVIEWED and is raised to MediaTech (CTO) for review in AFC-202 rather than claiming a reviewer that does not exist."
+}

@@ -87,12 +87,42 @@ function expandIncludes(sql, depth = 0) {
   });
 }
 
+// Session TimeZone pin. DEFENCE IN DEPTH, NOT THE FIX (AFC-202).
+//
+// Four assertions in 30_backfill_survival.sql compared a `timestamptz` rendered
+// with `::text` against literals pinned to '+00'. `timestamptz::text` renders in
+// the SESSION TimeZone, so those assertions only held on a UTC session. PGlite
+// is GMT and GitHub Actions' ubuntu-latest is UTC, so the suite went green in
+// CI by accident of the runner's clock rather than because the assertion was
+// right -- the worst possible failure mode for NDPA s.40(2) legal evidence.
+// Those assertions now compare INSTANTS (`timestamptz = timestamptz`), which is
+// session-TimeZone independent, and the whole tree is green under
+// DB_TEST_TIMEZONE=Africa/Lagos with this pin set to Lagos or removed.
+//
+// The pin is here for the assertions that legitimately look at a RENDERING --
+// a to_char, a ::text cast, a ::date -- so that such a test checks the same
+// thing on every host instead of on whatever the host happened to be set to.
+//
+//   pnpm test:db                                  # UTC (default)
+//   DB_TEST_TIMEZONE=Africa/Lagos pnpm test:db    # non-UTC session, same asserts
+//
+// The value is a session setting, so it is validated rather than interpolated:
+// this is an environment variable, and it is still an environment variable.
+const SESSION_TZ = process.env.DB_TEST_TIMEZONE ?? 'UTC';
+const TZ_OK = /^[A-Za-z0-9_+:-]+(\/[A-Za-z0-9_+:-]+)*$/;
+
 async function main() {
+  if (!TZ_OK.test(SESSION_TZ)) {
+    console.error(`DB_TEST_TIMEZONE is not a TimeZone value: ${JSON.stringify(SESSION_TZ)}`);
+    process.exit(2);
+  }
   const db = await connect();
   let failed = 0;
   let passed = 0;
 
   try {
+    await db.exec(`SET TIME ZONE '${SESSION_TZ}'`);
+    log(`Session TimeZone pinned to ${SESSION_TZ}`);
     // ---------------------------------------------------------------
     // Roles, as the bootstrap superuser. After this the migrations run as
     // directus_migrator and own everything they create.

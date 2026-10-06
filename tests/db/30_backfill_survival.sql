@@ -79,24 +79,31 @@ BEGIN
     'backfill', 'pre-existing rows are marked as inferred, never as insert_default');
 
   -- The backfill rule, asserted on the cases whose timestamps disagree.
-  PERFORM test_support.assert_equals(
-    (SELECT awareness_at::text FROM backfill_probe.incidents WHERE ref = 'BF-CREATED-EARLY'),
-    '2026-10-03 11:00:00+00', 'backfill',
+  --
+  -- Each expected value is a `timestamptz` literal compared with `=`, i.e. an
+  -- INSTANT comparison, not a rendering. These four used to be
+  -- `awareness_at::text` against a '+00' string literal, which renders in the
+  -- session TimeZone and therefore only held when the session happened to be
+  -- UTC -- green in CI by accident of the runner's clock (AFC-202). assert_instant
+  -- renders the DETAIL at UTC, so the failure message is stable too.
+  PERFORM test_support.assert_instant(
+    (SELECT awareness_at FROM backfill_probe.incidents WHERE ref = 'BF-CREATED-EARLY'),
+    timestamptz '2026-10-03 11:00+00', 'backfill',
     'backfill takes the earliest of detected / reported / created');
 
-  PERFORM test_support.assert_equals(
-    (SELECT awareness_at::text FROM backfill_probe.incidents WHERE ref = 'BF-DETECTED-ONLY'),
-    '2026-10-01 09:00:00+00', 'backfill',
+  PERFORM test_support.assert_instant(
+    (SELECT awareness_at FROM backfill_probe.incidents WHERE ref = 'BF-DETECTED-ONLY'),
+    timestamptz '2026-10-01 09:00+00', 'backfill',
     'detected_at wins when it is the earliest');
 
-  PERFORM test_support.assert_equals(
-    (SELECT awareness_at::text FROM backfill_probe.incidents WHERE ref = 'BF-NO-TIMESTAMPS'),
-    '2026-10-04 08:00:00+00', 'backfill',
+  PERFORM test_support.assert_instant(
+    (SELECT awareness_at FROM backfill_probe.incidents WHERE ref = 'BF-NO-TIMESTAMPS'),
+    timestamptz '2026-10-04 08:00+00', 'backfill',
     'created_at carries a row that has no detection timestamp');
 
-  PERFORM test_support.assert_equals(
-    (SELECT awareness_at::text FROM backfill_probe.incidents WHERE ref = 'BF-REPORTED-ONLY'),
-    '2026-10-05 08:00:00+00', 'backfill',
+  PERFORM test_support.assert_instant(
+    (SELECT awareness_at FROM backfill_probe.incidents WHERE ref = 'BF-REPORTED-ONLY'),
+    timestamptz '2026-10-05 08:00+00', 'backfill',
     'a row that already has reported_at still resolves to created_at');
 
   -- detected_at is deliberately NOT constrained to be <= awareness_at. Staff

@@ -137,6 +137,26 @@ jobs:
       - name: Run database control tests
         run: pnpm test:db
 
+      # AFC-202. The same tree again in a session that is NOT UTC.
+      #
+      # WHY A SECOND RUN IS THE POINT, NOT THE PIN. The runner pins the session
+      # TimeZone to UTC so a suite asserting on a *rendering* checks the same
+      # thing everywhere. A pin hides exactly the defect AFC-202 was: four
+      # backfill assertions compared a timestamptz rendered with ::text against
+      # literals pinned to '+00', so they held only on a UTC session -- and
+      # ubuntu-latest is UTC, so CI was green by accident of the runner's clock.
+      # For an NDPA s.40(2) legal-evidence control that is the evidence being
+      # right for the wrong reason.
+      #
+      # This step is the regression net for that: it sets the session TimeZone
+      # to Africa/Lagos, so any future assertion that compares a rendering to a
+      # UTC-pinned literal goes red here even though the job above stays green.
+      # The assertions must be correct with this run, not because of the pin.
+      - name: Run database control tests in a non-UTC session
+        run: pnpm test:db
+        env:
+          DB_TEST_TIMEZONE: Africa/Lagos
+
   # TODO(CTO): also run this suite against a real postgres:16 service
   # container. PGlite is PostgreSQL 16 compiled to WebAssembly; the trigger
   # and privilege semantics are the same, but "same engine, same wasm
