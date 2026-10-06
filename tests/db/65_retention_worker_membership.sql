@@ -43,36 +43,60 @@
 --   reporting a green membership that means nothing.
 --
 -- WHAT IS ASSERTED
---   65.1  exactly one LOGIN role is a member of retention_worker, by name
+--   65.1  exactly one LOGIN identity can reach retention_worker, by name, and
+--         the predicate that counts them detects a second holder
 --   65.2  directus_app can neither execute the engine nor reach the role
---   65.3  a non-superuser LOGIN session reaches the worker BY MEMBERSHIP and
---         drives retention.run through it
---   65.4  the two negative controls, so 65.3 is not a superuser override
---   65.5  neither identity carries DELETE on any collection
+--   65.3  neither identity carries DELETE on any collection
+--   65.4  a non-superuser LOGIN session reaches the worker BY MEMBERSHIP and
+--         drives retention.run through it, by the route production uses
+--   65.5  the two negative controls, so 65.4 is not a superuser override
+--
+-- WHAT AFC-215 CHANGED IN HERE, AND WHY IT IS NOT COSMETIC
+--   The independent security review (AFC-215) falsified this suite: it went
+--   green on a cluster where a second credential executed live erasure. Two
+--   shapes were wrong, and both were "the query looks right":
+--
+--     * the holder count read pg_auth_members directly, so it counted ONE HOP.
+--       PostgreSQL membership is transitive, so GRANT retention_job TO ops_admin
+--       -- or a NOLOGIN group in the middle -- added an erase-capable login the
+--       count never saw. It is counted here with pg_has_role(..., 'MEMBER'),
+--       which is recursive.
+--     * a membership ROW was treated as a capability. With WITH INHERIT FALSE,
+--       SET FALSE the row is present and names exactly one identity, so the
+--       count passed while retention_job could not execute anything at all.
+--
+--   Both are asserted below, and 65.1b carries a negative control that
+--   manufactures a second holder and requires the predicate to notice, because
+--   a predicate that returns 1 for every input is indistinguishable, from
+--   inside the suite, from a boundary that holds.
 
 -- ---------------------------------------------------------------------------
--- 65.1  EXACTLY ONE REACHABLE IDENTITY.
+-- 65.1  EXACTLY ONE REACHABLE IDENTITY, COUNTED TRANSITIVELY.
 --
 -- The count is asserted as a number so that zero and two both fail, and the
 -- name is asserted separately so that a count of one cannot be satisfied by the
 -- wrong role. bootstrap/0001_roles.sql refuses the same two counts at deploy
--- time; this is the same claim asserted where it can be traced to a run.
+-- time with the same query, so the fixture and the deploy agree on what
+-- "reachable" means -- which is the property the CEO's evidence question turns
+-- on: how many credentials can delete a record.
 -- ---------------------------------------------------------------------------
 DO $$
 DECLARE
   v_holders text[];
   v_n       text;
 BEGIN
-  SELECT array_agg(m.rolname ORDER BY m.rolname), count(*)::text
+  -- pg_has_role(..., 'MEMBER') is recursive, which is the whole point. It also
+  -- answers true for a superuser against every role, so superusers are excluded:
+  -- the runner is one, and leaving it in would make the expected count 2.
+  SELECT array_agg(r.rolname ORDER BY r.rolname), count(*)::text
     INTO v_holders, v_n
-    FROM pg_auth_members am
-    JOIN pg_roles g ON g.oid = am.roleid
-    JOIN pg_roles m ON m.oid = am.member
-   WHERE g.rolname = 'retention_worker'
-     AND m.rolcanlogin;
+    FROM pg_roles r
+   WHERE r.rolcanlogin
+     AND NOT r.rolsuper
+     AND pg_has_role(r.oid, 'retention_worker', 'MEMBER');
 
   PERFORM test_support.assert_equals(coalesce(v_n, '0'), '1',
-    'membership', 'exactly one LOGIN role can reach retention_worker: 0 means the job cannot run, 2 means the erasure surface has no single accountable name');
+    'membership', 'exactly one LOGIN identity can reach retention_worker, counted through every hop: 0 means the job cannot run, 2 means the erasure surface has no single accountable name');
 
   PERFORM test_support.assert_equals(coalesce(array_to_string(v_holders, ','), '(none)'), 'retention_job',
     'membership', 'and that one identity is retention_job, named rather than merely counted');
@@ -83,6 +107,23 @@ BEGIN
   PERFORM test_support.assert_true(
     (SELECT rolcanlogin IS FALSE FROM pg_roles WHERE rolname = 'retention_worker'),
     'membership', 'retention_worker is still NOLOGIN: the login is the identity, the role is the capability');
+
+  -- A membership that EXISTS is not a capability. inherit_option and
+  -- set_option decide whether retention_job can do anything with it, and both
+  -- false produces a cluster where the job runs and fails on the first row --
+  -- the silent-never-runs failure this whole file exists to catch. admin_option
+  -- decides whether it can pass the capability onward, which is the transitive
+  -- drift arriving from the other direction.
+  PERFORM test_support.assert_true(
+    EXISTS (SELECT 1 FROM pg_auth_members m
+              JOIN pg_roles g   ON g.oid   = m.roleid
+              JOIN pg_roles mem ON mem.oid = m.member
+             WHERE g.rolname   = 'retention_worker'
+               AND mem.rolname = 'retention_job'
+               AND m.inherit_option
+               AND m.set_option
+               AND NOT m.admin_option),
+    'membership', 'the membership CONFEERS the capability: WITH INHERIT TRUE, SET TRUE, ADMIN FALSE, so retention_job can act and cannot pass it on');
 
   -- Positive control on the lookup itself: the same query must find the
   -- membership that this file's fix created. Without it, a typo in the role
@@ -97,6 +138,61 @@ BEGIN
 END $$;
 
 -- ---------------------------------------------------------------------------
+-- 65.1b  NEGATIVE CONTROL FOR THE COUNT ITSELF.
+--
+-- A predicate that answers "one holder" for every input cannot be told apart,
+-- from inside the suite, from a boundary that holds. So the drift is manufactured
+-- here -- a second LOGIN identity, then a NOLOGIN group in the middle, which is
+-- the shape that actually occurs in practice -- and the same predicate is
+-- required to NOTICE both, before the scenario is torn down again.
+--
+-- This is the case AFC-215 proved the previous version missed: with the one-hop
+-- query this block reported 19 of 19 while a second identity executed live
+-- erasure.
+-- ---------------------------------------------------------------------------
+DO $$
+DECLARE
+  v_direct    text;
+  v_viagroup  text;
+BEGIN
+  CREATE ROLE afc65_second_holder LOGIN;
+
+  -- Hop 1: a direct second member.
+  GRANT retention_job TO afc65_second_holder;
+  SELECT count(*)::text INTO v_direct
+    FROM pg_roles r
+   WHERE r.rolcanlogin AND NOT r.rolsuper
+     AND pg_has_role(r.oid, 'retention_worker', 'MEMBER');
+  PERFORM test_support.assert_equals(v_direct, '2',
+    'membership', 'control C: a second direct LOGIN member is counted, so "exactly one" above is a measurement and not a constant');
+
+  -- Hop 2: a NOLOGIN group in the middle. One grant, two roles, and the login
+  -- at the end can still erase -- the case a pg_auth_members join cannot see.
+  CREATE ROLE afc65_group NOLOGIN;
+  GRANT retention_job TO afc65_group;
+  GRANT afc65_group TO afc65_second_holder;
+  SELECT count(*)::text INTO v_viagroup
+    FROM pg_roles r
+   WHERE r.rolcanlogin AND NOT r.rolsuper
+     AND pg_has_role(r.oid, 'retention_worker', 'MEMBER');
+  PERFORM test_support.assert_equals(v_viagroup, '2',
+    'membership', 'control D: a LOGIN identity two hops away, through a NOLOGIN group, is still counted -- membership is transitive');
+
+  -- Tear down. The suite must leave the cluster as it found it, or the deploy
+  -- assertion starts failing for anything that runs after this.
+  REVOKE afc65_group FROM afc65_second_holder;
+  DROP ROLE afc65_group;
+  REVOKE retention_job FROM afc65_second_holder;
+  DROP ROLE afc65_second_holder;
+
+  PERFORM test_support.assert_equals(
+    (SELECT count(*)::text FROM pg_roles r
+      WHERE r.rolcanlogin AND NOT r.rolsuper
+        AND pg_has_role(r.oid, 'retention_worker', 'MEMBER')),
+    '1',
+    'membership', 'control C/D cleanup: the manufactured holders are gone and the count is back to exactly one');
+END $$;
+
 -- 65.2  THE APPLICATION IDENTITY CANNOT ERASE.
 --
 -- Both halves, because either one alone is a way in. A direct EXECUTE grant is
@@ -239,12 +335,28 @@ DECLARE
   v_who      text;
   v_super    text;
   v_as       text := '(never attempted)';
+  v_direct   text := '(not reached)';
   v_run      text := '(not reached)';
   v_recorded integer := -1;
 BEGIN
   SET SESSION AUTHORIZATION retention_job;
   SELECT current_user, (SELECT rolsuper::text FROM pg_roles WHERE rolname = current_user)
     INTO v_who, v_super;
+
+  -- FIRST, THE ROUTE PRODUCTION ACTUALLY USES: no SET ROLE at all.
+  --
+  -- The job connects as retention_job and calls retention.run. It does not
+  -- switch role first, and it cannot -- it has no reason to. The capability
+  -- arrives through inherit_option, which is exactly the option F2 switches
+  -- off. Asserting only the SET ROLE route would leave the route the scheduler
+  -- will actually take unmeasured, which is how a cluster passes every check and
+  -- the job still fails on its first row.
+  BEGIN
+    PERFORM retention.run('test:membership:inherited', 'dry_run');
+    v_direct := 'succeeded';
+  EXCEPTION WHEN OTHERS THEN
+    v_direct := 'raised ' || SQLSTATE || ' ' || SQLERRM;
+  END;
 
   BEGIN
     SET LOCAL ROLE retention_worker;
@@ -254,8 +366,8 @@ BEGIN
   END;
 
   IF v_as = 'retention_worker' THEN
-    -- The point of the whole exercise: with the role obtained the way production
-    -- obtains it, the control actually runs.
+    -- The same capability, reached by switching, for completeness: it is the
+    -- route the negative controls below are about.
     BEGIN
       PERFORM retention.run('test:membership:worker', 'dry_run');
       v_run := 'succeeded';
@@ -278,14 +390,27 @@ BEGIN
   PERFORM test_support.assert_equals(v_super, 'false',
     'membership', 'precondition: that identity is NOT a superuser, so reaching the worker cannot be a superuser override');
 
+  PERFORM test_support.assert_equals(v_direct, 'succeeded',
+    'membership', 'retention_job calls retention.run directly, with no SET ROLE at all: the route the scheduler actually takes');
+
   PERFORM test_support.assert_equals(v_as, 'retention_worker',
-    'membership', 'a non-superuser LOGIN session can SET ROLE retention_worker by membership');
+    'membership', 'and it can also SET ROLE retention_worker by membership');
 
   PERFORM test_support.assert_equals(v_run, 'succeeded',
     'membership', 'and retention.run executes through that membership: the erasure path is reachable, not merely granted');
 
   PERFORM test_support.assert_equals(v_recorded::text, '1',
     'membership', 'and the run is recorded against the worker, so the job is observable from where it runs');
+
+  -- A NOTE ON WHO IS ASSERTING WHAT HERE, because a future reader will reason
+  -- from it. The two precondition assertions are made as retention_job, before
+  -- any SET LOCAL ROLE. Every assertion after the switch is made as
+  -- retention_worker, because SET LOCAL ROLE holds to the end of the transaction
+  -- once it succeeds. Neither depends on the runner's superuser session:
+  -- test_support is USAGE-granted to PUBLIC and its functions keep PUBLIC
+  -- EXECUTE, and the retention_runs read works because retention_worker holds
+  -- SELECT. This was flagged as a misleading comment by AFC-215 and it was
+  -- correct to flag it; the claim is now accurate rather than reassuring.
 END $$;
 
 -- ---------------------------------------------------------------------------

@@ -137,3 +137,96 @@ approver is no longer also the only reviewer.
 > An identity is not a capability. The login is who connects; the role is what it
 > may destroy. Keep them separate, name the holder, and assert in the same step
 > that provisions it that there is exactly one.
+---
+
+# Part 2 — Amendment after independent review
+
+The identity design above was confirmed and left alone. What did not survive was the
+**deploy-time assertion** — the control this ADR exists to add. The independent
+security review ([AFC-215](/AFC/issues/AFC-215)) falsified it by execution, and the
+first version of the assertion reported a property it did not have.
+
+Recorded here rather than in an issue comment because the ADR is the artifact of
+record and the reasoning is what a future reader will reuse.
+
+## What was wrong
+
+Three findings, all blocking, all proven on pristine databases rather than inferred.
+
+**F1 — the holder count read one hop.** It joined `pg_auth_members` directly, so it
+counted direct members. PostgreSQL membership is transitive. `GRANT retention_job TO
+ops_admin` — or a `NOLOGIN` group in the middle, which is how this drift actually
+occurs — produced a second erase-capable login that the count never saw, and the
+deploy **passed**. This is the failure mode ADR-0004's whole argument rests on: the
+question the CEO needs answered is "how many credentials can delete a record?", and
+the assertion answered it one hop at a time.
+
+**F2 — a membership row was treated as a capability.** `WITH INHERIT FALSE, SET FALSE`
+is valid PostgreSQL 16. The `pg_auth_members` row is present and names exactly one
+`LOGIN` identity, so the assertion passed, and `retention_job` then failed with
+`42501 permission denied for schema retention`. A deploy could pass every check and
+leave the control unreachable — the exact silent-never-runs outcome clause 3 was
+written to catch.
+
+**F3 — the capability role was never asserted `NOLOGIN` at deploy time.** The
+cluster-attribute check tested `rolsuper`/`rolcreaterole`/… but not `rolcanlogin`.
+`ALTER ROLE retention_worker LOGIN` passed, shipping two erase-capable logins.
+
+## What changed
+
+- The count is `pg_has_role(r.oid, 'retention_worker', 'MEMBER')` over
+  `rolcanlogin AND NOT rolsuper` — recursive, and excluding superusers because
+  `pg_has_role` answers true for them against everything and the cluster owner runs
+  the file.
+- The grant is pinned: `WITH INHERIT TRUE, SET TRUE, ADMIN FALSE`. Pinning does two
+  jobs. It makes the deployed capability a decision in this file rather than a
+  version-dependent default, and because the pinned `GRANT` re-runs before the
+  assertion, it **repairs** a mutated membership instead of only complaining about
+  one. The assertion on `inherit_option`/`set_option`/`admin_option` is retained
+  underneath, so removing the pin would not silently restore F2.
+- `rolcanlogin` on `retention_worker` raises, as its own clause with its own message,
+  because the invariant is about identity and not about cluster authority.
+- Suite 65 counts transitively too, asserts the membership confers the capability,
+  and manufactures the F1 drift as **negative controls C and D** — a second direct
+  member, and a `NOLOGIN` group in the middle — because a predicate that returns
+  `1` for every input cannot be told apart from a boundary that holds.
+- Suite 65 also now asserts the route production actually takes: `retention_job`
+  calls `retention.run` with **no `SET ROLE` at all**, through inherited
+  privileges. That is the route `inherit_option` governs and the route F2 switches
+  off; the `SET ROLE` route alone would have left the scheduler's actual path
+  unmeasured.
+
+## Verification
+
+The reviewer's five scenarios, re-run against this amendment, pristine database per
+scenario:
+
+| scenario | bootstrap | suite 65 | who can run retention |
+| --- | --- | --- | --- |
+| none | PASSED | PASSED | `retention_job` |
+| second direct member | **FAILED**, names both | **FAILED** | — |
+| `NOLOGIN` group in the middle | **FAILED**, names both | **FAILED** | — |
+| membership with `INHERIT/SET FALSE` | PASSED (**repaired** by the pin) | PASSED | `retention_job`, and it can run |
+| `ALTER ROLE retention_worker LOGIN` | **FAILED** | **FAILED** | — |
+| pin removed **and** membership not conferring | **FAILED** | **FAILED** | `retention_job` → `42501` |
+
+The last row is the one that gives the conferral clause teeth: it only fails when
+the pin that repairs the problem is also gone.
+
+`pnpm test` → 11 suites / 348 assertions / 0 failing. Both gates exit 0.
+
+## The lesson worth more than the fix
+
+Both the assertion and its suite went green on a broken cluster. Neither was
+obviously wrong on reading — the SQL was idiomatic, the names were right, the
+comments explained the intent, and the suite asserted a real membership. What was
+missing was a question of the form *what would this return if the boundary were
+broken?* A count with no negative control is a constant with a query in front of
+it.
+
+So the standing rule this amendment adds:
+
+> An assertion over a privilege catalog needs a case where the privilege is wrong.
+> Not a probe control that the query matches — a scenario in which it must change
+> its answer. If the suite cannot be made to fail by the defect it exists to
+> catch, it is not a test of that defect.

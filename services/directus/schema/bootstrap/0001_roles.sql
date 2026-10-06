@@ -74,8 +74,21 @@ GRANT USAGE ON SCHEMA public TO retention_worker;
 -- data-erasure capability, which is the boundary AFC-193 exists to hold. The
 -- job and the application do not share a trust level.
 --
+-- The grant is PINNED, not left to the server default, because a membership
+-- that exists and a capability that is conferred are two different properties
+-- and only one of them makes the job runnable. WITH INHERIT FALSE or SET FALSE
+-- are both valid PostgreSQL 16, both leave a pg_auth_members row that reads
+-- exactly like a working grant, and both produce a cluster where retention_job
+-- holds membership it cannot use -- a deploy that passes every check and a job
+-- that silently never runs. Named explicitly so the deployed capability is a
+-- decision in this file rather than a version-dependent default.
+--
+-- ADMIN FALSE is stated for the same reason from the other direction: retention_job
+-- must not be able to pass the erasure capability onward. A later GRANT by a
+-- cluster owner is still possible, and the assertion below is what catches that.
+--
 -- GRANT membership is additive, so this line is already a no-op on re-run.
-GRANT retention_worker TO retention_job;
+GRANT retention_worker TO retention_job WITH INHERIT TRUE, SET TRUE, ADMIN FALSE;
 
 -- The engine schema. Also bootstrap, for the same reason the roles are: the
 -- engine installs as directus_migrator, which has CREATE on schema public but
@@ -111,6 +124,22 @@ BEGIN
       v_bad
       USING ERRCODE = 'restrict_violation';
   END IF;
+
+  -- F3. The capability role must not be able to log in on its own. It is a
+  -- separate clause rather than another term in the predicate above, because the
+  -- invariant is different in kind: that check is about cluster authority, this
+  -- is about identity. ADR-0004 rejected "make retention_worker itself LOGIN" as
+  -- the fix, and an ALTER ROLE run by anyone with the authority ships a second
+  -- erase-capable login that this file would otherwise pass.
+  IF EXISTS (SELECT 1 FROM pg_roles
+              WHERE rolname = 'retention_worker' AND rolcanlogin) THEN
+    RAISE EXCEPTION
+      'retention_worker has LOGIN. The login is the identity and the role is the '
+      'capability; they are deliberately separate. A LOGIN here adds a second '
+      'credential that can execute live erasure, which is not the single '
+      'accountable name the boundary is built on. Run: ALTER ROLE retention_worker NOLOGIN'
+      USING ERRCODE = 'restrict_violation';
+  END IF;
 END
 $$;
 
@@ -136,25 +165,71 @@ $$;
 -- reachable and is not a credential anybody can steal.
 DO $$
 DECLARE
-  v_holders text;
-  v_n       integer;
+  v_holders   text;
+  v_n         integer;
+  v_confer    boolean;
 BEGIN
-  SELECT count(*), coalesce(string_agg(member.rolname, ', ' ORDER BY member.rolname), '(none)')
+  -- TRANSITIVE, AND NOT ONE HOP.
+  --
+  -- The first version of this assertion read pg_auth_members directly and so
+  -- counted only DIRECT members. PostgreSQL membership is transitive, so that
+  -- version passed a deploy in which a second, unrelated credential could
+  -- execute live erasure -- proven, not inferred: GRANT retention_job TO
+  -- ops_admin leaves this assertion green and leaves the suite green, and
+  -- ops_admin then runs retention.run. A NOLOGIN group in the middle does the
+  -- same thing, which is how this drift actually happens in practice.
+  --
+  -- pg_has_role(..., 'MEMBER') is recursive, so it counts every LOGIN identity
+  -- that can reach the worker however many hops away it is. Superusers are
+  -- excluded because pg_has_role answers true for them against every role, and
+  -- the cluster owner is running this file -- without the exclusion the clean
+  -- case counts 2 and the assertion would be unsatisfiable.
+  SELECT count(*), coalesce(string_agg(rolname, ', ' ORDER BY rolname), '(none)')
     INTO v_n, v_holders
-    FROM pg_auth_members m
-    JOIN pg_roles granted ON granted.oid = m.roleid
-    JOIN pg_roles member  ON member.oid  = m.member
-   WHERE granted.rolname = 'retention_worker'
-     AND member.rolcanlogin;
+    FROM pg_roles r
+   WHERE r.rolcanlogin
+     AND NOT r.rolsuper
+     AND pg_has_role(r.oid, 'retention_worker', 'MEMBER');
 
   IF v_n <> 1 THEN
     RAISE EXCEPTION
-      'retention_worker has % LOGIN members (%), and it must have exactly one. '
-      'Zero means the retention job cannot run at all and nothing will report it; '
-      'more than one means the credential that can execute live erasure is not a '
-      'single accountable name. Grant it to exactly one LOGIN role -- retention_job '
-      'by default -- and remove every other membership.',
+      'retention_worker is reachable by % LOGIN identities (%), and it must be '
+      'reachable by exactly one. Zero means the retention job cannot run at all '
+      'and nothing will report it; more than one means the credential that can '
+      'execute live erasure is not a single accountable name. Membership is '
+      'transitive, so this count includes identities that reach the worker '
+      'through another role -- check for a group in the middle. Grant it to '
+      'exactly one LOGIN role -- retention_job by default -- and remove every '
+      'other membership.',
       v_n, v_holders
+      USING ERRCODE = 'restrict_violation';
+  END IF;
+
+  -- ...AND THE ONE THAT HOLDS IT CAN ACTUALLY USE IT.
+  --
+  -- A membership row is not a capability. With inherit_option or set_option
+  -- switched off, the row above still exists and still names exactly one LOGIN
+  -- identity, so the count above passes, and retention_job then fails with
+  -- "permission denied for schema retention" the first time the job runs. That
+  -- is the silent-never-runs failure this assertion was added to catch, so the
+  -- options are asserted rather than assumed.
+  SELECT EXISTS (
+           SELECT 1 FROM pg_auth_members m
+             JOIN pg_roles g   ON g.oid   = m.roleid
+             JOIN pg_roles mem ON mem.oid = m.member
+            WHERE g.rolname   = 'retention_worker'
+              AND mem.rolname = 'retention_job'
+              AND m.inherit_option
+              AND m.set_option
+              AND NOT m.admin_option)
+    INTO v_confer;
+
+  IF NOT v_confer THEN
+    RAISE EXCEPTION
+      'retention_job is a member of retention_worker but cannot use it: the '
+      'membership must be WITH INHERIT TRUE, SET TRUE, ADMIN FALSE. A membership '
+      'that does not confer the capability leaves the retention job unable to '
+      'run while every catalog check reads healthy.'
       USING ERRCODE = 'restrict_violation';
   END IF;
 END
