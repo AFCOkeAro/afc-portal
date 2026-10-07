@@ -531,6 +531,45 @@ const GREEN_SUITE = `
                                     'self-test', 'green three');
 `;
 
+// The AFC-299 guard. It runs as a non-superuser LOGIN that is not a member of
+// retention_worker, so the SET LOCAL ROLE inside probe() is refused and the
+// marker branch is the branch under test. The second assertion wraps
+// assert_raises in a handler because the property being asserted is that it
+// RAISES -- a passing assert_raises is exactly the false green the F4 fix
+// (AFC-257) removed, and the shape most likely to return.
+const REFUSED_SWITCH_SUITE = `
+  DO $$
+  DECLARE
+    v_got    text;
+    v_raised boolean := false;
+    v_detail text;
+  BEGIN
+    v_got := test_support.probe('retention_worker', 'SELECT 1');
+    PERFORM test_support.assert_true(
+      split_part(v_got, ' | ', 1) LIKE 'ROLE_SWITCH_REFUSED %',
+      'self-test',
+      'probe() returns ROLE_SWITCH_REFUSED, not a bare SQLSTATE, when the switch is refused',
+      'got: ' || COALESCE(v_got, '(null)'));
+
+    BEGIN
+      PERFORM test_support.assert_raises('retention_worker', 'SELECT 1', '42501',
+        'self-test', 'assert_raises refuses to certify a refused switch as the statement''s outcome');
+    EXCEPTION WHEN OTHERS THEN
+      IF SQLERRM LIKE 'ASSERTION FAILED%' THEN
+        v_raised := true;
+        v_detail := SQLERRM;
+      ELSE
+        RAISE;
+      END IF;
+    END;
+
+    PERFORM test_support.assert_true(v_raised,
+      'self-test',
+      'assert_raises raises on a refused switch -- the false green is gone',
+      'detail: ' || COALESCE(v_detail, '(assert_raises did not raise)'));
+  END $$;
+`;
+
 // A URL that names a database like a real one, because "named like a real one" is the
 // case the safety constraint is about. `not-a-secret` is a placeholder string, not a
 // credential: it is here so the assertion can prove the header never echoes it.
@@ -796,6 +835,80 @@ async function selfTest() {
       exitCodeFor(green.failed, greenLedger.rows) === 0,
       'the exit status is 0 on a fully green run',
     );
+
+    // ---------------------------------------------------------------
+    // The refused-switch marker (AFC-299 / F1).
+    //
+    // The F4 fix (AFC-257, commit 6295956) makes probe() return
+    // 'ROLE_SWITCH_REFUSED <sqlstate> | <message>' when the SET LOCAL ROLE is
+    // refused. Nothing in the suite could observe it: the runner's session is
+    // a superuser, so every SET LOCAL ROLE in all 14 suites is accepted and
+    // the refusal branch is never taken. A revert of probe() left the whole
+    // suite green -- the same reason the bug was invisible in the first place.
+    //
+    // So the self-test becomes the identity the fix is about: a non-superuser
+    // LOGIN that is not a member of retention_worker. The roles are created
+    // here rather than taken from the bootstrap file because the self-test
+    // deliberately installs only tests/db/assert.sql -- the real harness, not
+    // a copy -- and the bootstrap is a deploy step, not a test fixture. They
+    // are created IF MISSING and nothing is ever granted: the fixture is
+    // "an identity that cannot reach the worker", and a pre-existing grant
+    // that could change that is a broken fixture the self-test must report
+    // (by going red), not repair.
+    //
+    // The restore is issued, not asserted. PGlite -- the engine CI runs this
+    // self-test on -- accepts SET SESSION AUTHORIZATION DEFAULT but does not
+    // honour it (measured: current_user is unchanged afterwards, on every
+    // restore spelling), and the connection is closed immediately below, so
+    // nothing downstream can observe the difference. On a real server the
+    // restore returns the session to the identity it connected as.
+    // ---------------------------------------------------------------
+    log('\nSelf-test: the refused-switch marker (AFC-299)');
+    await db.exec(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'retention_worker') THEN
+          CREATE ROLE retention_worker NOLOGIN;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'directus_app') THEN
+          CREATE ROLE directus_app LOGIN;
+        END IF;
+      END $$;
+    `);
+    await db.exec('SET SESSION AUTHORIZATION directus_app');
+    db.drain();
+    const marker = await runSuites(db, [{ file: 'self-test-refused-switch.sql', sql: REFUSED_SWITCH_SUITE }]);
+    const markerLedger = parseLedger(db.drain());
+
+    ok(
+      marker.failed === 0 && marker.passed === 1,
+      'the refused-switch suite passes against the real harness',
+    );
+    ok(
+      markerLedger.rows.length === 3,
+      `the refused-switch suite reports all three assertion outcomes (got ${markerLedger.rows.length})`,
+    );
+    const [probeRow, refusedRow, raisesRow] = markerLedger.rows;
+    ok(
+      probeRow?.ok === true && (probeRow?.detail ?? '').includes('ROLE_SWITCH_REFUSED'),
+      'probe() is reported returning the ROLE_SWITCH_REFUSED marker, not a bare SQLSTATE',
+    );
+    ok(
+      refusedRow?.ok === false && (refusedRow?.detail ?? '').includes('ROLE_SWITCH_REFUSED'),
+      'assert_raises records the refused switch as a FAILING assertion, not a pass',
+    );
+    ok(
+      raisesRow?.ok === true,
+      'the wrapper assertion that assert_raises raised is reported as passing',
+    );
+
+    let restoreFailed = null;
+    try {
+      await db.exec('SET SESSION AUTHORIZATION DEFAULT');
+    } catch (e) {
+      restoreFailed = e;
+    }
+    ok(restoreFailed === null, 'the session identity is restored after the refused-switch assertions');
   } finally {
     await db.close().catch(() => {});
   }

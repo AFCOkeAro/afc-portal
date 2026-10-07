@@ -1,0 +1,22 @@
+{
+  "issue": "AFC-299",
+  "authorAgentId": "7b4aae3b-0da5-4de2-a1d8-4737943ef561",
+  "authorName": "Coder",
+  "claimedAt": "2026-10-06T20:10:00Z",
+  "whatThisFileIs": "An R1 authorship claim for the AFC-299 regression guard that locks probe()'s refused-switch marker into --self-test (the F1 deliverable) and the F2 hardening of assert_raises. Coder is the author. This claim asserts authorship and the paths; R2 is a review by a named non-author reviewer (the CTO reviews Coder compliance-path commits) and is recorded when the verdict lands.",
+  "paths": [
+    "scripts/run-db-tests.mjs",
+    "tests/db/assert.sql",
+    ".provenance/claims/AFC-299.json"
+  ],
+  "basis": "AFC-299 is the F1/F2 follow-up to the independent security review of AFC-257 (review issue AFC-288, verdict SHIP, verified by execution). The F4 fix (commit 6295956) makes test_support.probe() return 'ROLE_SWITCH_REFUSED <sqlstate> | <message>' when the SET LOCAL ROLE is refused, instead of returning the refusal as the statement's sqlstate. The fix is correct but nothing in the suite could observe it: the runner's session is postgres with rolsuper=true, so every SET LOCAL ROLE in all 14 suites is accepted and the refusal branch is never taken. A revert of probe() left node scripts/run-db-tests.mjs green. F1 (this commit) adds a permanent regression assertion to the --self-test path that becomes a non-superuser LOGIN not a member of retention_worker and asserts the marker is present and that assert_raises raises. F2 hardens assert_raises to treat v_got LIKE 'ROLE_SWITCH_REFUSED %' as a fixture failure regardless of the expected string, so the guarantee is type-enforced rather than convention-enforced.",
+  "verificationRecorded": "node scripts/run-db-tests.mjs -> 15 suites / 543 assertions / 0 failing. node scripts/run-db-tests.mjs --self-test -> exit 0, including the new 'Self-test: the refused-switch marker (AFC-299)' section (6 assertions). Revert experiment (scratch copy, probe() restored to the pre-AFC-257 shape from 6295956^): --self-test -> exit 1, red, with the measured evidence 'got: 42501 | permission denied to set role \"retention_worker\"' (bare SQLSTATE, no marker) and five SELF-TEST FAIL lines. The 14 suites' behaviour is unchanged: the marker never appears in them because the runner session is a superuser, so the F2 branch is never taken.",
+  "r2Review": {
+    "reviewIssue": "AFC-299",
+    "reviewerAgentId": "8f6e42d7-fb6e-4e6c-904b-dfdda50000ed",
+    "reviewerName": "MediaTech (CTO)",
+    "status": "pending",
+    "note": "The CTO reviews Coder compliance-path commits. This entry records the intended reviewer; the verdict is recorded as a reviews[] entry in this claim file (or a Reviewed-by: trailer) once the review lands. tests/db/** is on REVIEW_REQUIRED_PATHS, so R2 requires a non-author reviewer before the commit is clear."
+  },
+  "notClaimedPaths": "The shared working tree at the time of this claim also carries changes this claim does NOT cover and this run did not write: docs/adr/ADR-0002-roles-are-bootstrap-not-migrations.md, docs/adr/ADR-0004-erasure-capability-is-a-membership-not-a-login.md, docs/adr/ADR-0007-the-application-role-holds-no-execute-in-the-retention-schema.md, docs/adr/ADR-0008-a-shared-workspace-serializes-commits-at-the-gate.md, docs/wireframes/church-portal-events.html, package.json, services/directus/schema/engine/0001_retention_engine.sql, tests/db/65_retention_worker_membership.sql, scripts/adr-uniqueness-gate.sh, scripts/grep-awareness-write-context.sh, and the other .provenance/claims/AFC-*.json files. They are left exactly where they are and are not staged by the AFC-299 commit."
+}

@@ -23,7 +23,7 @@
 | 2 | [AFC-188](/AFC/issues/AFC-188) — **NDPC registration decision point** | **2026-11-14** | CEO + DPCO | T-14 2026-10-31 · T-1 2026-11-13 |
 | 3 | [AFC-187](/AFC/issues/AFC-187) — **All processor DPAs executed** | **2026-11-30** | CEO (CTO on P1, P8) | T-30 2026-10-31 · T-7 2026-11-23 |
 | 4 | [AFC-191](/AFC/issues/AFC-191) — **Compliance audit commissioned early** | **2026-12-01** | CEO + DPCO | T-30 2026-11-01 · T-7 2026-11-24 |
-| 5 | [AFC-192](/AFC/issues/AFC-192) — **First Compliance Audit Return, if UHL/EHL** | **2027-03-31** | DPCO | T-60 2027-01-30 · T-14 2027-03-17 |
+| 5 | [AFC-192](/AFC/issues/AFC-192) — **Continuing Compliance Audit Return, if EHL** (was "First CAR, if UHL/EHL") | **2027-03-31** | DPCO | T-60 2027-01-30 · T-14 2027-03-17 |
 | 6 | [AFC-189](/AFC/issues/AFC-189) — **Semi-annual internal data protection report #1** | **2027-04-30** | DPO (compiler) | T-60 2027-03-01 · T-14 2027-04-16 |
 | 7 | [AFC-190](/AFC/issues/AFC-190) — **Semi-annual internal data protection report #2** | **2027-10-31** | DPO (compiler) | T-60 2027-09-01 · T-14 2027-10-17 |
 
@@ -80,6 +80,13 @@ Whether it applies to us turns on whether the FBO exemption also removes UHL/EHL
 
 **Update 2026-10-06 — the conflict is resolved *for us*, and we did not have to pay for it.** The board established that AFC began **before 12 June 2023**, so **Art. 10(7) governs directly and the Art. 10(8) 15-month limb never reached us.** The date above does not move. What the answer did *not* settle is whether a return was ever filed for the 31 March 2026 cycle — see gap **C8**, which is now the live item on this section.
 
+**Update 2026-10-07 — C8 closed. The board answered both open questions.**
+
+- **Filing history: AFC has filed a CAR before.** Source: board answer on 2026-10-06 (institutional memory). No receipt or Compliance Audit Returns Certificate exists in our records — the board's answer is the source, and the underlying document has not been produced. **Consequence: [AFC-192](/AFC/issues/AFC-192) is not a first filing. It is a continuing obligation.** The 2027-03-31 deadline stands.
+- **People count: under 5,000.** Source: board answer on 2026-10-06. **This means AFC is NOT Ultra-High Level** (UHL requires >5,000 in-window subjects). The ₦500,000/yr UHL band does not apply.
+- **EHL vs OHL: not yet determined.** The band table shows >5,000 = UHL and >200, <1,000 = Ordinary-High (no CAR). The gap (1,000–5,000) is likely Extra-High Level, but the exact EHL threshold is not confirmed from primary sources in our records. **A more precise count is needed to settle EHL vs OHL.** If the count is under 1,000, AFC is Ordinary-High and **no CAR is required at all** — the ₦500,000 line disappears from the programme. If between 1,000 and 5,000, AFC may be EHL and owe ₦250,000/yr.
+- **The NDPC question remains open.** Whether the FBO exemption removes UHL/EHL status for CAR purposes (Art. 10(14)) is still undetermined. This needs a human with browser access to reach the Commission.
+
 ---
 
 ## 4. Named owners — and the one that does not exist yet
@@ -114,7 +121,7 @@ Whether it applies to us turns on whether the FBO exemption also removes UHL/EHL
 | C5 | **CLOSED 2026-10-06 — AFC's date of establishment is now known.** The board answered "before 12 June 2023". | It was not recorded anywhere in this project. Now supplied by the board via [AFC-160](/AFC/issues/AFC-160). | **None — closed.** Consequence: **GAID Art. 10(7) governs, so CAR is due not later than 31 March each year.** The Art. 10(8) 15-month first-filing limb **no longer applies to us** — it only ever reached controllers established after 12 June 2023. **The 2027-03-31 date in §3.3 does not move; it was already the stricter reading, and the answer removes the alternative rather than changing the date.** See C8 for what the answer did *not* settle. |
 | C6 | **The semi-annual report has no deadline in Art. 13.** Art. 7(e)'s "within six (6) months" is ambiguous. | — | **DPO** — confirm the 2027-04-30 cadence is defensible. |
 | C7 | **The recurrence after report #2 is not scheduled.** | Deliberately not created as a placeholder. | **DPO** — once the cadence is established. |
-| C8 | **We have no CAR filing history, and C5 implies a date that has already passed.** | The board's answer of "before 12 June 2023" puts the Art. 10(7) deadline at **31 March each year**. **31 March 2026 was six months ago.** We do not know whether a CAR was ever filed — no filing history is recorded anywhere in this project, because until 2026-10-06 we did not know which provision governed and so did not know what to look for. **This gap was created by C5 being answered, not by C5 being open.** | **CTO** — read the church's own records for any prior CAR filing and who filed it. **Then ask the NDPC directly** whether an FBO is in CAR scope and what it treats as our filing history. **Neither step is a legal engagement and neither needs the counsel spend the board declined on 2026-10-06.** If a filing was missed, Art. 10(9) adds an administrative penalty of **50% of the filing fee**. First clean filing should land **before 2027-03-31**; Art. 10(13) issues a Compliance Audit Returns Certificate on filing, which Art. 48(2) treats as prima facie good faith. |
+| C8 | **CLOSED 2026-10-07 — the board answered both open questions.** | The board's answer of "before 12 June 2023" put the Art. 10(7) deadline at **31 March each year**. **31 March 2026 was six months ago.** We did not know whether a CAR was ever filed — no filing history was recorded anywhere in this project, because until 2026-10-06 we did not know which provision governed and so did not know what to look for. **This gap was created by C5 being answered, not by C5 being open.** | **None — closed.** The board answered on 2026-10-06: **AFC has filed a CAR before** (source: board answer, institutional memory; no receipt/certificate in our records). **People count is under 5,000** (source: board answer) — **NOT Ultra-High Level**. EHL vs OHL not yet determined (need exact count). The 2027-03-31 deadline stands as a **continuing obligation, not a first filing**. The NDPC question (FBO exemption scope for CAR purposes) remains open and needs a human with browser access. |
 
 ---
 

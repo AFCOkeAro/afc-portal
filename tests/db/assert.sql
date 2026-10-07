@@ -245,6 +245,19 @@ DECLARE
 BEGIN
   v_got := test_support.probe(p_role, p_stmt);
 
+  -- AFC-299 / F2. A refused role switch is a broken FIXTURE, not the
+  -- statement's outcome, and no expected string a caller can legitimately pass
+  -- begins with the marker -- so this fails regardless of p_expected_sqlstate.
+  -- Before this branch the marker was accepted only when the caller passed the
+  -- marker's own split_part prefix as p_expected_sqlstate, which no call site
+  -- did: the guarantee was convention-enforced, not type-enforced.
+  IF v_got LIKE 'ROLE_SWITCH_REFUSED %' THEN
+    PERFORM test_support._record(p_suite, p_name, false,
+      'a refused role switch is a broken fixture, not the statement''s outcome: ' || v_got);
+    RAISE EXCEPTION 'ASSERTION FAILED: [%] % -- a refused role switch is a broken fixture: %',
+      p_suite, p_name, v_got;
+  END IF;
+
   IF v_got IS NULL THEN
     PERFORM test_support._record(p_suite, p_name, false,
       'no error raised, expected ' || p_expected_sqlstate || ' from: ' || p_stmt);
