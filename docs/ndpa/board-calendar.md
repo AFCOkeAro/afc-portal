@@ -63,16 +63,19 @@ AFC is a **Faith-Based Organisation**. Guidance Notice ¶6(b) exempts FBOs from 
 
 **This is the largest recurring cost line in the whole programme and the brief's table does not mention it.**
 
-GAID **Art. 7(c)**: Ultra-High-Level and Extra-High-Level controllers file a Compliance Audit Return through a licensed DPCO. **Up to ₦500,000/year, with a +50% late penalty.**
+GAID **Art. 7(c)**: Ultra-High-Level and Extra-High-Level controllers file a Compliance Audit Return through a licensed DPCO. **Schedule 10 puts the annual filing fee at ₦100,000–₦1,000,000 by band; +50% late penalty (Art. 10(9)).**
 
-Whether it applies to us turns on whether the FBO exemption also removes UHL/EHL status for Art. 10 purposes — **registration status may not touch CAR status at all, and a ~₦500,000/year swing turns on it.** It is question 2 of 8 on [AFC-160](/AFC/issues/AFC-160).
+Whether it applies to us turns on whether the FBO exemption also removes UHL/EHL status for Art. 10 purposes — **registration status may not touch CAR status at all, and a six-figure recurring swing turns on it.** It is question 2 of 8 on [AFC-160](/AFC/issues/AFC-160).
 
-**The number that decides it is ours, not the DPCO's.** Classes are volume-banded on actual in-window subjects:
+**The number that decides it is ours, not the DPCO's.** Classes are volume-banded on actual in-window subjects (Guidance Notice S4 ¶3(1), reproduced in GAID Schedule 7; unchanged in the January 2026 S5 re-publication):
 
-| In-window subjects | Class | CAR |
-| --- | --- | --- |
-| **>5,000** | Ultra-High | **~₦500,000/yr** |
-| **>200, <1,000** | Ordinary-High | **₦10,000/yr, no CAR** |
+| In-window subjects (6 months) | Class | Registration fee (S4 ¶3(1)) | Annual CAR fee (Schedule 10) |
+| --- | --- | --- | --- |
+| **>5,000** | Ultra-High | ₦250,000 | **₦500,000/yr** (band C, below 25,000) |
+| **>1,000 but <5,000** | Extra-High | ₦100,000 | **₦100,000** (band C, below 2,500) · **₦200,000** (band B, 2,500–4,999) |
+| **>200 but <1,000** | Ordinary-High | ₦10,000 | **No CAR at all** (Art. 10(14) reaches UHL and EHL only) |
+
+**Two drafting notes, recorded so they are not rediscovered:** Schedule 10's EHL band B prints as "5,000-2,500" — inverted bounds in the signed instrument; read as 2,500–4,999 and do not rely on it without written clarification (see [AFC-162](/AFC/issues/AFC-162) §Q6). And the bands leave exact boundaries — exactly 1,000, exactly 5,000 — between rows.
 
 **A phased rollout keeping any six-month window under 1,000 is worth real money, and that is a launch-sequencing decision, not a compliance decision.** Children's data alone cannot move the band — each class needs four of seven factors.
 
@@ -83,9 +86,9 @@ Whether it applies to us turns on whether the FBO exemption also removes UHL/EHL
 **Update 2026-10-07 — C8 closed. The board answered both open questions.**
 
 - **Filing history: AFC has filed a CAR before.** Source: board answer on 2026-10-06 (institutional memory). No receipt or Compliance Audit Returns Certificate exists in our records — the board's answer is the source, and the underlying document has not been produced. **Consequence: [AFC-192](/AFC/issues/AFC-192) is not a first filing. It is a continuing obligation.** The 2027-03-31 deadline stands.
-- **People count: under 5,000.** Source: board answer on 2026-10-06. **This means AFC is NOT Ultra-High Level** (UHL requires >5,000 in-window subjects). The ₦500,000/yr UHL band does not apply.
-- **EHL vs OHL: not yet determined.** The band table shows >5,000 = UHL and >200, <1,000 = Ordinary-High (no CAR). The gap (1,000–5,000) is likely Extra-High Level, but the exact EHL threshold is not confirmed from primary sources in our records. **A more precise count is needed to settle EHL vs OHL.** If the count is under 1,000, AFC is Ordinary-High and **no CAR is required at all** — the ₦500,000 line disappears from the programme. If between 1,000 and 5,000, AFC may be EHL and owe ₦250,000/yr.
-- **The NDPC question remains open.** Whether the FBO exemption removes UHL/EHL status for CAR purposes (Art. 10(14)) is still undetermined. This needs a human with browser access to reach the Commission.
+- **People count: under 5,000.** Source: board answer on 2026-10-06. **This means AFC is NOT Ultra-High Level** (UHL requires >5,000 in-window subjects). The ₦500,000/yr UHL band and the ₦250,000 UHL registration fee do not apply.
+- **EHL vs OHL: not yet determined — but the threshold itself is settled.** The exact EHL threshold **is** confirmed from primary sources: **>1,000 but <5,000 in six months** (Guidance Notice S4 ¶3(1)(d); AFC-162 §3.4, quoted against the instrument). What is unknown is **our in-window count inside the under-5,000 answer.** If it is 1,000 or fewer, AFC is Ordinary-High and **no CAR is required at all** — the filing line disappears from the programme entirely. If it is above 1,000, AFC is Extra-High and owes **₦100,000–₦200,000/yr** (Schedule 10 EHL bands C and B) — **not ₦250,000**, which is the EHL *registration* fee, not the CAR fee, and not the ₦250,000 EHL-band-A figure, which requires 10,000+ subjects and is unreachable under 5,000.
+- **The NDPC question remains open, but it now has a route.** Whether the FBO exemption removes UHL/EHL status for CAR purposes (Art. 10(14)) is still undetermined. `ndpc.gov.ng` still returns HTTP 403 to our network, but the Commission's published general contact — **info@ndpc.gov.ng, +234 (0) 916 061 5551** (ndpc.gov.ng/contact, per public search index) — is now on record in the [breach runbook](/AFC/issues/AFC-163#document-breach-runbook) contact list. Sending still needs a human with mail access; the draft question is prepared in `docs/ndpa/ndpc-question.md`.
 
 ---
 
@@ -121,7 +124,7 @@ Whether it applies to us turns on whether the FBO exemption also removes UHL/EHL
 | C5 | **CLOSED 2026-10-06 — AFC's date of establishment is now known.** The board answered "before 12 June 2023". | It was not recorded anywhere in this project. Now supplied by the board via [AFC-160](/AFC/issues/AFC-160). | **None — closed.** Consequence: **GAID Art. 10(7) governs, so CAR is due not later than 31 March each year.** The Art. 10(8) 15-month first-filing limb **no longer applies to us** — it only ever reached controllers established after 12 June 2023. **The 2027-03-31 date in §3.3 does not move; it was already the stricter reading, and the answer removes the alternative rather than changing the date.** See C8 for what the answer did *not* settle. |
 | C6 | **The semi-annual report has no deadline in Art. 13.** Art. 7(e)'s "within six (6) months" is ambiguous. | — | **DPO** — confirm the 2027-04-30 cadence is defensible. |
 | C7 | **The recurrence after report #2 is not scheduled.** | Deliberately not created as a placeholder. | **DPO** — once the cadence is established. |
-| C8 | **CLOSED 2026-10-07 — the board answered both open questions.** | The board's answer of "before 12 June 2023" put the Art. 10(7) deadline at **31 March each year**. **31 March 2026 was six months ago.** We did not know whether a CAR was ever filed — no filing history was recorded anywhere in this project, because until 2026-10-06 we did not know which provision governed and so did not know what to look for. **This gap was created by C5 being answered, not by C5 being open.** | **None — closed.** The board answered on 2026-10-06: **AFC has filed a CAR before** (source: board answer, institutional memory; no receipt/certificate in our records). **People count is under 5,000** (source: board answer) — **NOT Ultra-High Level**. EHL vs OHL not yet determined (need exact count). The 2027-03-31 deadline stands as a **continuing obligation, not a first filing**. The NDPC question (FBO exemption scope for CAR purposes) remains open and needs a human with browser access. |
+| C8 | **CLOSED 2026-10-07 — the board answered both open questions.** | The board's answer of "before 12 June 2023" put the Art. 10(7) deadline at **31 March each year**. **31 March 2026 was six months ago.** We did not know whether a CAR was ever filed — no filing history was recorded anywhere in this project, because until 2026-10-06 we did not know which provision governed and so did not know what to look for. **This gap was created by C5 being answered, not by C5 being open.** | **None — closed.** The board answered on 2026-10-06: **AFC has filed a CAR before** (source: board answer, institutional memory; no receipt/certificate in our records). **People count is under 5,000** (source: board answer) — **NOT Ultra-High Level**; the ₦500,000 UHL CAR band is out of scope. **EHL threshold is confirmed as >1,000 but <5,000 (S4 ¶3(1)(d))** — EHL vs OHL turns on our in-window count, and the remaining fee span is **₦0 (OHL, no CAR) to ₦100,000–₦200,000/yr (EHL Schedule 10)**. The 2027-03-31 deadline stands as a **continuing obligation, not a first filing**. The NDPC question (FBO exemption scope for CAR purposes) remains open: question drafted in `docs/ndpa/ndpc-question.md`, Commission general contact now on record (info@ndpc.gov.ng), **send still needs a human.** |
 
 ---
 

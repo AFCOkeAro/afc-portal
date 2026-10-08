@@ -28,22 +28,25 @@
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
-│  NDPC / NIGERIAN DATA PROTECTION COMMISSION                               │
-│  Notification route: any electronic submission system provided by the      │
-│  Commission (GAID Art. 9(4)); in the absence of one, by email to an       │
-│  address the Commission provides for that purpose.                        │
+│  NDPC / NIGERIAN DATA PROTECTION COMMISSION                              │
+│  Notification route: any electronic submission system provided by the    │
+│  Commission (GAID Art. 9(4)); in the absence of one, by email to an      │
+│  address the Commission provides for that purpose.                       │
 │                                                                          │
-│  ⚠ NEITHER THE PORTAL NOR THE EMAIL ADDRESS IS ON RECORD.                │
-│  Obtain both from the appointed DPCO. Do not send to a guess.             │
+│  ⚠ GENERAL CONTACT ON RECORD; PORTAL AND DESIGNATED BREACH               │
+│    ADDRESS STILL NOT.                                                    │
+│    Email: info@ndpc.gov.ng  ·  Phone: +234 (0) 916 061 5551              │
+│    (ndpc.gov.ng/contact, via public search index, 2026-10-08).           │
+│    Use it only if no designated breach address exists.                   │
 │  ⚠ ndpc.gov.ng returned HTTP 403 to our network on 2026-10-06.           │
-│    Do not assume the site is reachable. Escalate per §2.                   │
+│    Do not assume the site is reachable. Escalate per §2.                 │
 │                                                                          │
 │  DPO contact point: s.32(3)(c) — the DPO IS the Commission's contact.    │
 │  DPO name / email / phone: _______________________  (seat unfilled)      │
-│  Fallback — CEO: _______________________                                    │
-│  External DPCO firm: _______________________                               │
-│  Counsel (safeguarding): _______________________                           │
-│  Hosting / processor contacts: see processor register §1                  │
+│  Fallback — CEO: _______________________                                 │
+│  External DPCO firm: _______________________                             │
+│  Counsel (safeguarding): _______________________                         │
+│  Hosting / processor contacts: see processor register §1                 │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -319,7 +322,7 @@ DECISION LOG ENTRY
 | **Safeguarding Lead** | | | **Involved only where children's data or safeguarding records are affected.** A data subject in a specific incident — must not decide in it (Art. 12(7)). |
 | **Board / responsible user** | | | Told at awareness time, per §2.3 Q3. |
 | **On-call responder** | *no rotation exists* | | **There is no staffed rotation. "On-call" means: whoever is reached first.** See §9. |
-| **NDPC / Commission** | *no address on record* | — | GAID Art. 9(4). **Must be obtained from the DPCO. `ndpc.gov.ng` returned HTTP 403 on 2026-10-06.** |
+| **NDPC / Commission** | *general contact* | `info@ndpc.gov.ng` · +234 (0) 916 061 5551 · 1919 Cadastral Zone C06, Mbora District, Opposite Efab City Estate Life Camp, FCT, Abuja | GAID Art. 9(4) **designated breach address and portal URL still not on record — obtain from the DPCO.** The contact above is the Commission's **general** one (ndpc.gov.ng/contact via public search index, 2026-10-08); use only if no designated route exists. `ndpc.gov.ng` returned HTTP 403 on 2026-10-06, 2026-10-08. |
 | **External DPCO firm** | *not engaged* | — | Combined engagement target signature 2026-10-20 ([AFC-160](/AFC/issues/AFC-160)). |
 | **Counsel** | *not engaged* | — | Same engagement. |
 | **Processors** | — | See [processor register](/AFC/issues/AFC-163#document-processor-register) §1 | **Notify without delay — a processor's own duty runs in parallel with ours and is usually shorter.** |
@@ -359,7 +362,7 @@ That is the whole path, and it is deliberately not dressed up as a rotation. Nam
 | --- | --- | --- | --- |
 | R1 | **The clock is human-read until `awareness_at` is deployed.** | No engineering seat. [AFC-166](/AFC/issues/AFC-166) blocked behind [AFC-165](/AFC/issues/AFC-165). | **CEO** — approve the Coder seat (approval `3d111b56`). |
 | R2 | **No named humans.** | DPCO unfilled; no payroll; no Schedule 3 evidence on file. | **CEO** — complete the combined engagement ([AFC-160](/AFC/issues/AFC-160)); then fill STEP 0 and §8. |
-| R3 | **No Commission contact route.** | Never obtained; `ndpc.gov.ng` returns 403 to our network. | **DPCO** — obtain portal URL and designated email. **Most urgent line in this document.** |
+| R3 | **No designated Commission breach-notification route.** | General contact now on record (`info@ndpc.gov.ng`, 2026-10-08) but Art. 9(4) designates a purpose-built address/portal; `ndpc.gov.ng` returns 403 to our network. | **DPCO** — obtain portal URL and designated breach email; until then the general contact is the fallback, not the route. **Still the most urgent line in this document.** |
 | R4 | **The drill has never been run.** | Scheduled **2026-11-06**, led by the appointed DPCO. **The DPCO is not appointed, so the drill facilitator is not named.** | **CEO** — appoint the DPCO by 2026-10-31; name the facilitator; run the drill. |
 | R5 | **The templates have never been sent to anyone.** | No breach, no send. Templates are unvalidated in the field. | Exercise them at the 2026-11-06 drill. |
 | R6 | **Processor notification contacts are not in this runbook.** | Five vendors undecided. | [Processor register](/AFC/issues/AFC-163#document-processor-register) §1; owners named per row. |
