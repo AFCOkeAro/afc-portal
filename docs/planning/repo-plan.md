@@ -104,7 +104,8 @@ afc-church-portal/
 - **Never commit** `.env`, tokens, keys, or connection strings. `.gitignore` covers `.env*` except `.env.example`.
 - `.env.example` lists variable **names** with placeholder values only (see `infra-spec` §5).
 - CI/CD secrets live in **GitHub Actions Environments** (`staging`, `production`) with required reviewers on production.
-- Prefer short-lived/deploy-scoped credentials; rotate `DIRECTUS_KEY`/`DIRECTUS_SECRET` on a schedule and on any suspected exposure.
+- Prefer short-lived/deploy-scoped credentials. Rotation intervals, triggers, the procedure and the access review live in **[`docs/security/credential-inventory.md`](../security/credential-inventory.md)** — that artefact is the record; this plan points at it and does not duplicate it. `DIRECTUS_KEY`/`DIRECTUS_SECRET`: **180 days**, and immediately on any §2.2 trigger (suspected exposure, unexpected use, restore/clone, provisioning-path trust change). Owner: CTO. Reviewer: SecurityEngineer.
+- **`retention_job`** — the login that can execute live record erasure, not yet provisioned: **90 days**, and immediately on any §2.2 trigger, same owner and reviewer, same inventory row. It is inventoried precisely because it looks like a variable and behaves like a credential.
 - Any credential that must be stored in Paperclip is proposed as a secret via the secret-proposal flow — never pasted into issues, comments, or files.
 - Client-side code uses only `NUXT_PUBLIC_*` values (no secrets); server-side SSR uses a scoped token.
 

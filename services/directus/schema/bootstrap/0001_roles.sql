@@ -12,7 +12,13 @@
 -- would let the migration identity promote itself to directus_app and escalate
 -- to full read/write on the application database -- a green suite over a
 -- fictional privilege boundary. This file is therefore the ONLY place a role is
--- ever created, and it grants no role attribute to anything.
+-- ever created, and it grants no PRIVILEGE attribute to anything -- not
+-- SUPERUSER, CREATEROLE, CREATEDB, REPLICATION or BYPASSRLS; the four are
+-- asserted below rather than granted, so the one place roles are born cannot
+-- also be the place the boundary breaks. The two attributes it does set are
+-- LOGIN (in the creation loop) and the connection limit on retention_job
+-- (AFC-244 decision section 4.2, below). Neither is a privilege: one is an
+-- identity, the other is a concurrency bound on a single session.
 --
 -- Idempotent for ROLE CREATION: re-running against a cluster that already has
 -- these roles creates nothing. Nothing here is ever dropped.
@@ -40,7 +46,8 @@ BEGIN
       ('directus_migrator', 'NOLOGIN'),  -- owns every table; SET ROLE only
       ('directus_app',      'LOGIN'),    -- the one identity Directus uses
       ('retention_worker',  'NOLOGIN'),  -- sole erasure executor; holds no DELETE
-      ('retention_job',     'LOGIN')     -- the one login that may reach the worker
+      ('retention_job',     'LOGIN')     -- the one login that may reach the worker;
+                                         -- rolvaliduntil deliberately NOT set, see 4.1 below
     ) AS t(name, login)
   LOOP
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = v_rec.name) THEN
@@ -52,6 +59,60 @@ BEGIN
   END LOOP;
 END
 $$;
+
+-- ---------------------------------------------------------------------
+-- ONE SESSION AT A TIME FOR THE IDENTITY THAT ERASES.
+-- AFC-244 decision section 4.2, landed by AFC-250. Reviewed by the CTO as the
+-- approver of record for this tree (ADR-0004 Part 2).
+--
+-- `-1` is the server default and it means "no limit stated". That is not the
+-- same claim as "unlimited is correct here" -- it was inherited, and an
+-- inherited value is not a decision. `1` is correct for retention_job on two
+-- independent grounds:
+--
+--   Operationally. It is one scheduler executing one erasure run. The engine's
+--   own guard is pg_try_advisory_lock over one fixed key, and it does stop a
+--   second SESSION from running -- but it is re-entrant within a session, it is
+--   released when a session ends, and it says nothing about who may connect.
+--   Two overlapping erasure passes over the same rows is the case the lock
+--   exists for; a second CONNECTION is a case the lock cannot see at all.
+--   Bounding it here is at the server rather than in the engine, so no caller,
+--   no SET ROLE and no missed upgrade path can route around it.
+--
+--   Forensically. "Was anyone else logged in as this credential?" is otherwise
+--   an unanswerable question after the fact, and an access review cannot
+--   answer what no record holds. With the limit set, the unexpected second
+--   session does not happen -- it fails as `too many connections already`,
+--   which is a named, loud failure rather than a silence.
+--
+-- NOT SET ON THE OTHER THREE, AND THE REASON IS NOT LAZINESS.
+--   directus_app is the one identity that legitimately pools connections: it is
+--   the application tier, and rolconnlimit is not a mechanism for rationing the
+--   application tier. retention_worker and directus_migrator are NOLOGIN, so a
+--   limit on them would be a bound on a session that cannot exist. The
+--   assertion below therefore bounds the ONE role this ruling covers and
+--   deliberately does not pin the other three to their current default: a
+--   default is not a decision, and pinning someone else's default would turn a
+--   legitimate operational change on the application tier into a failed deploy.
+--
+-- AND THE ATTRIBUTE THIS FILE DELIBERATELY DOES NOT SET: rolvaliduntil.
+--   It stays NULL on retention_job and on every machine identity in this
+--   system, and that is a ruling rather than an omission (AFC-244 decision
+--   section 4.1). An expiry is a clock that stops the erasure job on a day
+--   nobody is watching; the only evidence is a stale retention_last_run_at,
+--   which is the silent-never-runs outcome this whole tree exists to prevent,
+--   and the stale-job alarm is documented on the metrics view without a paged
+--   route behind it. Rotation is enforced where there is an owner who can be
+--   paged -- docs/security/credential-inventory.md -- not where there is a
+--   clock. A reader who does not see `rolvaliduntil` here should read this
+--   comment, not the absent line: adding it would undo the ruling.
+--
+-- An attribute set and not asserted is a value that drifts silently, which is
+-- the defect class ADR-0004 Part 2 was written about. So this converges on
+-- every deploy and is asserted in the belt-and-braces block below. Still no
+-- durations in this file, so the retention-literal gate stays green: the
+-- intervals live in the inventory, never here.
+ALTER ROLE retention_job WITH CONNECTION LIMIT 1;
 
 -- The application role reads and writes and creates nothing. PostgreSQL 15+
 -- already gives PUBLIC no CREATE on the public schema; the migrator is granted
@@ -175,6 +236,7 @@ REVOKE ALL ON SCHEMA retention FROM PUBLIC;
 DO $$
 DECLARE
   v_bad text;
+  v_connlimit integer;
 BEGIN
   SELECT string_agg(rolname, ', ') INTO v_bad
     FROM pg_roles
@@ -224,6 +286,38 @@ BEGIN
       'SET ROLE to it; they do not connect as it, and diagnosing a migration '
       'permission failure must not be done by giving it a login. Run: '
       'ALTER ROLE directus_migrator NOLOGIN'
+      USING ERRCODE = 'restrict_violation';
+  END IF;
+
+  -- SECTION 4.2, THE VALUE ASSERTED RATHER THAN ASSUMED. AFC-250.
+  --
+  -- The connection limit is set at the top of this file and asserted here,
+  -- because an attribute that is set and not asserted is a value that drifts
+  -- silently -- the same defect class as the two LOGIN checks above it, and the
+  -- same one ADR-0004 Part 2 was written about. The drift is worth a wall: a
+  -- widened limit on this role is either an overlapping erasure pass over rows
+  -- whose mutual exclusion is asserted rather than proven, or a session nobody
+  -- expects, and neither should be able to arrive without a deploy failing.
+  --
+  -- Only retention_job is asserted, and that is deliberate. The other three
+  -- keep the server default on purpose (see the ALTER ROLE above): directus_app
+  -- pools connections as the application tier, and the two NOLOGIN roles cannot
+  -- open one at all. Pinning their defaults here would convert a legitimate
+  -- operational change into a failed deploy, and asserting a default is not the
+  -- same as deciding it.
+  SELECT rolconnlimit INTO v_connlimit
+    FROM pg_roles
+   WHERE rolname = 'retention_job';
+
+  IF v_connlimit IS DISTINCT FROM 1 THEN
+    RAISE EXCEPTION
+      'retention_job has rolconnlimit %, and it must be 1: one scheduler, one '
+      'erasure pass, and an unexpected second session must fail loudly instead '
+      'of being invisible. This value is decided policy (AFC-244 decision '
+      'section 4.2), not a server default, so drift here is an unreviewed '
+      'change to the erasure boundary. Run: '
+      'ALTER ROLE retention_job WITH CONNECTION LIMIT 1',
+      v_connlimit
       USING ERRCODE = 'restrict_violation';
   END IF;
 END
