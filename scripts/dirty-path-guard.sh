@@ -20,6 +20,11 @@
 #   exit 1 -> at least one compliance-path path is modified, staged, or
 #             untracked. Prints the offending path and the exact
 #             `git status --porcelain` line that proved it.
+#             exit 1 is ALSO the answer when a path on NEVER_EXIST_PATHS is
+#             present in the tree at all, or when a commit leaves one present
+#             in its tree. That refusal names the path and not a status line,
+#             because existence -- not dirt -- is the evidence, and a clean
+#             tree containing a path that must not exist is still a refusal.
 #   exit 2 -> the guard could not read git state at all. That is a failure, not
 #             a pass. A guard that cannot see the tree does not get to say the
 #             tree is fine.
@@ -36,6 +41,32 @@
 #   is mid-flight in those directories and this guard must not be a reason a
 #   legitimate concurrent change cannot exist. The guard is scoped to the
 #   compliance path and says so.
+#
+# THREE LISTS, THREE RULES  (AFC-274)
+#   This file now holds three separate path lists and they are three different
+#   rules, not three scopes of one rule. The header already warned that
+#   conflating the first two under- or over-scopes them; the third one has the
+#   same trap and a sharper failure mode.
+#
+#     GUARDED_PATHS          dirty here is unshippable.
+#     REVIEW_REQUIRED_PATHS  clean here still needs a named reviewer.
+#     NEVER_EXIST_PATHS      this path is not a thing that exists.
+#
+#   The third is a DENYLIST OF NON-ASSETS. A claim cannot cover it, a reviewer
+#   cannot approve it into being, and the R2 grandfather list cannot exempt
+#   it -- there is nothing to review, because the requirement is that the file
+#   is not there. Merge it into GUARDED_PATHS and it silently degrades to "un-
+#   tracked is bad", which is exactly the route AFC-274 exists to close; merge
+#   it into REVIEW_REQUIRED_PATHS and a claim plus a reviewer would launder a
+#   file that must never exist at all. Kept separate on purpose, with its own
+#   matcher (never_exist()), checked in BOTH modes.
+#
+#   WHY IT IS A THIRD RULE AND NOT A BUG IN THE OTHER TWO. GUARDED_PATHS
+#   catches a forbidden path only while it is untracked, staged or modified.
+#   The dangerous shape is `git add` then `git commit`: the tree goes clean,
+#   dirty-path-guard says nothing, and a second, weaker copy of a compliance
+#   gate ships under a commit message. That is a refusal the dirty half can
+#   never make, because by then there is no dirt to report.
 #
 # TWO MODES
 #   (default, no args)   guard()      -- is the WORKING TREE clean on the
@@ -159,9 +190,9 @@ GUARDED_PATHS=(
 # This is NOT the same list as GUARDED_PATHS. bootstrap/ is on the compliance
 # path for dirty-state purposes but is not in R2, and R2 names
 # scripts/retention-literal-gate.sh and scripts/r2-grandfathered.json
-# specifically rather than all of scripts/. Two lists, two different rules;
-# conflating them would either under-scope R2 or over-scope the dirty guard.
-# Kept separate on purpose.
+# specifically rather than all of scripts/. Three lists, three different rules;
+# conflating any two would either under-scope one or over-scope the other.
+# Kept separate on purpose -- see the header's THREE LISTS section.
 #
 # scripts/r2-grandfathered.json was added by AFC-233. Before that, the dirty
 # guard covered the file (it is under scripts/) but R2 did not: the exemption
@@ -173,6 +204,30 @@ REVIEW_REQUIRED_PATHS=(
   "tests/db/**"
   "scripts/retention-literal-gate.sh"
   "scripts/r2-grandfathered.json"
+)
+
+# THE THIRD LIST: paths that must never exist. Not a scope, not a review
+# requirement -- a denylist of non-assets (see the header's THREE LISTS
+# section). Exact string match on purpose: these are named files, and a glob
+# here would turn one refused file into a refused subtree, which is the
+# over-scope half of the same trap.
+#
+# scripts/grep-awareness-write-context.sh -- the SUPERSEDED 183-line
+#   predecessor of scripts/retention-literal-gate.sh, which is 288 lines and
+#   the live control. It carries a header reading "AFC retention-literal gate",
+#   so in a diff it presents AS the gate rather than as a dead copy, but its
+#   file filter is `-name '*.ts' -o -name '*.js' -o -name '*.vue'` and it never
+#   opens a .sql file: it would have scanned no SQL and MISSED THE RETENTION
+#   ENGINE ENTIRELY, which is the one thing the live gate exists to scan. No
+#   reference to it exists under .github/ or scripts/, so nothing ever invoked
+#   it -- it was pure hazard, not a weaker control, just a control-shaped file.
+#   It sat UNTRACKED in a shared tree with no per-issue isolation and it
+#   REGENERATED after the CTO deleted it, which is why deletion alone was never
+#   the fix. A second, weaker copy of a compliance gate living in the tree is a
+#   control nobody is reviewing that looks like one. Refused on sight, in both
+#   modes, so it cannot come back through `git add` + `git commit`. AFC-274.
+NEVER_EXIST_PATHS=(
+  "scripts/grep-awareness-write-context.sh"
 )
 
 CLAIMS_DIR=".provenance/claims"
@@ -246,6 +301,20 @@ review_required() {
   return 1
 }
 
+# Is $1 (repo-relative) a path this repository must never contain?
+#
+# Deliberately NOT glob_match(): NEVER_EXIST_PATHS holds named non-assets, and
+# a pattern engine here would let one entry refuse a whole directory. Exact
+# string equality, so the list means exactly the files it names and nothing
+# else. This is the third rule -- see the header.
+never_exist() {
+  local path="$1" p
+  for p in "${NEVER_EXIST_PATHS[@]}"; do
+    [ "$path" = "$p" ] && return 0
+  done
+  return 1
+}
+
 ROOT_DEFAULT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # Is $1 (repo-relative) under a guarded prefix?
@@ -293,7 +362,21 @@ guard() {
     return 2
   fi
 
-  if [ -z "$status" ]; then
+  # THE THIRD RULE, dirty-tree side. AFC-274.
+  #
+  # Collected before the "clean" early-return below, because a tree that is
+  # clean and still holds a path that must never exist is precisely the state
+  # the other two lists cannot report on: once the forbidden file is COMMITTED
+  # there is no dirt left, `git status` says nothing, and every branch under
+  # this one answers "clean". Checked with -e rather than git status, because
+  # the rule is about the FILE -- tracked or not, modified or not.
+  local -a never_present=()
+  local np
+  for np in "${NEVER_EXIST_PATHS[@]}"; do
+    [ -e "$root/$np" ] && never_present+=("$np")
+  done
+
+  if [ -z "$status" ] && [ "${#never_present[@]}" -eq 0 ]; then
     echo "dirty-path guard: compliance path is clean (${#GUARDED_PATHS[@]} guarded paths)"
     return 0
   fi
@@ -329,7 +412,31 @@ guard() {
     fi
   done <<< "$status"
 
-  if [ "$rc" -eq 1 ]; then
+  if [ "${#never_present[@]}" -gt 0 ]; then
+    echo "DIRTY-GUARD FAIL: a path that must never exist is present in the tree:"
+    for np in "${never_present[@]}"; do
+      echo "    $np"
+    done
+    cat <<'MSG'
+  This is the THIRD rule (NEVER_EXIST_PATHS), not a dirt report and not an R2
+  review requirement. No claim, no reviewer and no grandfather entry can clear
+  it: the requirement is that the file is not there. Evidence is existence
+  itself, so no git status line is quoted here -- a tree that is clean
+  everywhere else still fails this, and so does one where it is also untracked.
+
+  It is a superseded duplicate of scripts/retention-literal-gate.sh that scans
+  no SQL, so it presents as the gate while missing the retention engine
+  entirely. Delete it. Re-adding it, by any route, is refused (AFC-274).
+MSG
+    [ "$rc" -eq 0 ] && rc=1
+  fi
+
+  # The dirt prose only when there really is dirt. A tree whose ONLY problem is
+  # a forbidden-but-committed file must not be told it has "unattributed
+  # changes ... modified, staged, or untracked" -- that sentence is false of it,
+  # and gate output that disagrees with the fact it is reporting is output
+  # nobody trusts.
+  if [ "$rc" -eq 1 ] && [ -n "$status" ]; then
     cat <<'MSG'
 
 FAIL: the compliance path has unattributed changes.
@@ -1592,6 +1699,181 @@ Issue: AFC-996
     echo "                modes (exit $surplus_rc, exit $root_surplus_rc), and counts what it ignored"
   fi
 
+  # 12. THE THIRD RULE -- A PATH THAT MUST NEVER EXIST. AFC-274.
+  #
+  #      The residual this issue exists to close, so the assertions are shaped
+  #      around the ROUTE, not around the file:
+  #
+  #        untracked  already caught by GUARDED_PATHS (assertions 2, 3 and 4).
+  #                   Re-asserting that would prove nothing new -- the issue is
+  #                   titled "uncommittable, not just untracked" for exactly
+  #                   that reason.
+  #        COMMITTED  the route. `git add` + `git commit`: the tree goes clean,
+  #                   the dirty half has nothing to report, and
+  #                   review_required() is silent too, because the forbidden
+  #                   path is not on R2 -- nothing on it is meant to exist, so
+  #                   there is nothing to review. Before this change that shape
+  #                   returned 0. That empty `flagged` array plus the `continue`
+  #                   after it was the whole hole.
+  #
+  #      12a  the matcher, both directions, and the premise that R2 does not
+  #           cover this path (if it did, the denylist would be redundant and
+  #           the failure below could be attributed to the wrong rule).
+  #      12b  the commit route, refused, path named, and refused BY THE THIRD
+  #           RULE -- proved by the absence of any R1/R2 verdict in the output.
+  #      12c  the negative control: a commit touching a DIFFERENT scripts/ path
+  #           with the same empty trailers still passes, so "refuse every
+  #           scripts/ commit" cannot satisfy 12b.
+  #      12d  the dirty-tree side, on a tree whose `git status` is EMPTY.
+
+  # 12a. Matcher both ways, and the premise.
+  if ! never_exist "scripts/grep-awareness-write-context.sh"; then
+    echo "SELF-TEST FAIL: never_exist did not match the seeded forbidden path"
+    rc=1
+  elif never_exist "scripts/retention-literal-gate.sh"; then
+    echo "SELF-TEST FAIL: never_exist flagged the LIVE gate; this is a denylist of named files"
+    rc=1
+  elif never_exist "services/directus/schema/engine/0001_retention_engine.sql"; then
+    echo "SELF-TEST FAIL: never_exist flagged a path outside the denylist"
+    rc=1
+  elif review_required "scripts/grep-awareness-write-context.sh"; then
+    echo "SELF-TEST FAIL: the forbidden path is on R2; the third rule must not be"
+    echo "    implemented by widening REVIEW_REQUIRED_PATHS. A path that must not"
+    echo "    exist is not a path that can be reviewed into existing."
+    rc=1
+  else
+    echo "  self-test ok: never_exist matches the forbidden path only, and R2 still does not cover it"
+  fi
+
+  # 12b. THE COMMIT ROUTE. One file, no trailers, no claim -- and still
+  #      refused. Before AFC-274 this exact commit exited 0.
+  printf '# superseded gate copy\n' > "$repo/scripts/grep-awareness-write-context.sh"
+  git -C "$repo" add scripts/grep-awareness-write-context.sh
+  git -C "$repo" commit -q -m "chore(gates): a second copy of the retention-literal gate"
+  local deny_out deny_p never_rc_p
+  deny_p=$(git -C "$repo" diff-tree --root --no-commit-id --name-only -r HEAD)
+  deny_out=$(check_commit "$repo" "HEAD^..HEAD" 2>&1)
+  never_rc_p=$?
+  if [ "$(printf '%s\n' "$deny_p" | grep -c .)" -ne 1 ] \
+     || [ "$deny_p" != "scripts/grep-awareness-write-context.sh" ]; then
+    echo "SELF-TEST FAIL: fixture 12b touched '$deny_p', not the forbidden path alone"
+    echo "    every verdict below would be about the wrong commit"
+    rc=1
+  elif [ "$never_rc_p" -eq 0 ]; then
+    echo "SELF-TEST FAIL: --check-commit accepted a commit that ADDS a forbidden path"
+    echo "    the tree was clean and R2 does not cover the path, so the run exited 0"
+    echo "    -- this is the staged-and-committed route AFC-274 exists to close"
+    printf '%s\n' "$deny_out" | sed 's/^/    /'
+    rc=1
+  elif [ "$never_rc_p" -ne 1 ]; then
+    echo "SELF-TEST FAIL: a forbidden path exited $never_rc_p, not 1"
+    echo "    exit 1 is 'the gate ran and found a violation'. exit 2 means the gate"
+    echo "    could not read git state, which is not what happened here."
+    printf '%s\n' "$deny_out" | sed 's/^/    /'
+    rc=1
+  elif ! printf '%s' "$deny_out" | grep -q 'scripts/grep-awareness-write-context.sh'; then
+    echo "SELF-TEST FAIL: the refusal did not name the forbidden path"
+    printf '%s\n' "$deny_out" | sed 's/^/    /'
+    rc=1
+  elif printf '%s' "$deny_out" | grep -q 'VIOLATION\|no registered claim or no named reviewer'; then
+    # The path is not on R2 and the commit touches nothing else, so neither R1
+    # nor R2 can be what refused it. If either shows up, the refusal is coming
+    # from the wrong rule and 12b would be green for a reason that does not
+    # survive the denylist being removed.
+    echo "SELF-TEST FAIL: the forbidden path was refused as R1/R2, not by the third rule"
+    printf '%s\n' "$deny_out" | sed 's/^/    /'
+    rc=1
+  elif ! printf '%s' "$deny_out" | grep -q 'must never exist'; then
+    echo "SELF-TEST FAIL: the refusal did not say which rule fired"
+    printf '%s\n' "$deny_out" | sed 's/^/    /'
+    rc=1
+  else
+    echo "  self-test ok: a commit ADDING the forbidden path is refused by the third rule"
+    echo "                (exit $never_rc_p, path named, no R1/R2 verdict, tree was clean)"
+  fi
+
+  # 12c. THE NEGATIVE CONTROL. Same repo, same empty trailers, a DIFFERENT
+  #      script. If this fails, 12b's pass is a refusal of everything under
+  #      scripts/ rather than of a named non-asset -- the over-scope half of
+  #      the exact trap the header warns about.
+  printf 'echo benign\n' > "$repo/scripts/benign_helper.sh"
+  git -C "$repo" add scripts/benign_helper.sh
+  git -C "$repo" commit -q -m "chore(scripts): an ordinary script, no trailers"
+  local benign_out benign_rc_p
+  benign_out=$(check_commit "$repo" "HEAD^..HEAD" 2>&1)
+  benign_rc_p=$?
+  if [ "$benign_rc_p" -ne 0 ]; then
+    echo "SELF-TEST FAIL: an ordinary scripts/ commit exited $benign_rc_p"
+    echo "    the denylist is refusing paths it does not name, which over-scopes it"
+    printf '%s\n' "$benign_out" | sed 's/^/    /'
+    rc=1
+  else
+    echo "  self-test ok: a scripts/ commit naming no forbidden path still passes"
+  fi
+
+  # 12d. THE DIRTY-TREE SIDE, on a CLEAN tree. The forbidden file is now
+  #      committed and `git status` is empty, so the only thing that can make
+  #      guard() refuse is the existence rule itself -- and it must pass again
+  #      once the file is gone, or 12d would be satisfied by any refusal at all.
+  local dirty_now guard_out_d guard_rc_d
+  dirty_now=$(git -C "$repo" status --porcelain --untracked-files=all)
+  if [ -n "$dirty_now" ]; then
+    echo "SELF-TEST FAIL: fixture 12d is not clean, so a refusal would prove nothing"
+    printf '%s\n' "$dirty_now" | sed 's/^/    /'
+    rc=1
+  else
+    guard_out_d=$(guard "$repo" 2>&1)
+    guard_rc_d=$?
+    if [ "$guard_rc_d" -eq 0 ]; then
+      echo "SELF-TEST FAIL: guard certified a CLEAN tree that still contains a forbidden path"
+      echo "    this is the state neither GUARDED_PATHS nor R2 can report on"
+      rc=1
+    elif ! printf '%s' "$guard_out_d" | grep -q 'scripts/grep-awareness-write-context.sh'; then
+      echo "SELF-TEST FAIL: guard refused without naming the forbidden path"
+      printf '%s\n' "$guard_out_d" | sed 's/^/    /'
+      rc=1
+    elif printf '%s' "$guard_out_d" | grep -q 'unattributed changes'; then
+      # Nothing is dirty. Telling the reader there is would be gate output
+      # disagreeing with the fact it is reporting.
+      echo "SELF-TEST FAIL: guard blamed dirt for a clean tree whose only fault is a"
+      echo "    path that must never exist"
+      printf '%s\n' "$guard_out_d" | sed 's/^/    /'
+      rc=1
+    else
+      git -C "$repo" rm -q scripts/grep-awareness-write-context.sh
+      git -C "$repo" commit -q -m "chore(gates): drop the superseded gate copy"
+      guard_out_d=$(guard "$repo" 2>&1)
+      guard_rc_d=$?
+      if [ "$guard_rc_d" -ne 0 ]; then
+        echo "SELF-TEST FAIL: guard still refused AFTER the forbidden path was removed"
+        echo "    a refusal that survives its own cause is not about the cause"
+        printf '%s\n' "$guard_out_d" | sed 's/^/    /'
+        rc=1
+      else
+        echo "  self-test ok: a clean tree holding a forbidden path is refused, and passes"
+        echo "                again once the path is gone (exit 1, then exit 0)"
+      fi
+
+      # 12e. THE REMEDY MUST NOT BE REFUSED. `git diff-tree --name-only` reports
+      #      a DELETION as a touched path, so "refuse any commit touching the
+      #      list" would refuse the one commit that clears the state -- and a
+      #      gate that punishes the fix is a gate that gets worked around. The
+      #      question is whether the path exists in the commit's tree.
+      local remedy_out remedy_rc
+      remedy_out=$(check_commit "$repo" "HEAD^..HEAD" 2>&1)
+      remedy_rc=$?
+      if [ "$remedy_rc" -ne 0 ]; then
+        echo "SELF-TEST FAIL: the commit that DELETES the forbidden path was refused"
+        echo "    touching the list includes deleting it, and refusing the deletion"
+        echo "    refuses the only remedy there is"
+        printf '%s\n' "$remedy_out" | sed 's/^/    /'
+        rc=1
+      else
+        echo "  self-test ok: the commit that deletes the forbidden path is not refused"
+      fi
+    fi
+  fi
+
   return $rc
 }
 
@@ -2097,6 +2379,13 @@ audit_callers() {
 check_commit() {
   local root="${1:-$ROOT_DEFAULT}" range="${2:-HEAD}"
   local rc=0
+  # The THIRD rule's own accumulator (NEVER_EXIST_PATHS, AFC-274), deliberately
+  # separate from rc. rc carries R1 and R2. Keeping the two apart is what lets
+  # the closing block print the refusal that actually happened: a denylist-only
+  # failure must not print "a compliance-path commit has no registered claim or
+  # no named reviewer", because both of those may be perfectly true of it. The
+  # rule that fired has to be the rule the output names.
+  local deny_rc=0
   local rev subject body revlist
   local -a revs
 
@@ -2173,13 +2462,62 @@ check_commit() {
     local -a touched=()
     mapfile -t touched < <(git -C "$root" diff-tree --root --no-commit-id --name-only -r "$rev")
     local -a flagged=()
+    local -a forbidden=()
     local p
     for p in ${touched+"${touched[@]}"}; do
+      # Both rules, both lists, one pass. They are independent: a path can be
+      # on one, the other, or neither (nothing on NEVER_EXIST_PATHS is
+      # review-required, because nothing on it is meant to exist to be
+      # reviewed).
+      #
+      # `git diff-tree --name-only` says a path was TOUCHED, and touching
+      # includes DELETING it. The rule is "must never exist", so a commit that
+      # leaves the path absent is the remedy, not the violation -- refusing it
+      # would refuse the only action that clears the state. So the question is
+      # asked of the commit's own TREE: does this path exist in it? An add and
+      # a modify both answer yes; a delete answers no. Stated here rather than
+      # inferred from a status letter, because --name-status on a rename would
+      # hand back two paths and this list names exactly one.
+      if never_exist "$p"; then
+        if git -C "$root" cat-file -e "$rev:$p" 2>/dev/null; then
+          forbidden+=("$p")
+        fi
+      fi
       review_required "$p" && flagged+=("$p")
     done
-    [ "${#flagged[@]}" -eq 0 ] && continue
+
+    # THE THIRD RULE, and it is checked BEFORE the R2 `continue`, never after.
+    #
+    # This is the whole residual AFC-274 exists to close. A forbidden path is
+    # not on REVIEW_REQUIRED_PATHS -- so a commit that adds ONLY
+    # scripts/grep-awareness-write-context.sh produced an empty `flagged`, hit
+    # the `continue` below, and returned 0. `git add` then `git commit` was the
+    # route: the working tree goes clean, the dirty half has nothing to report,
+    # and a superseded copy of the retention-literal gate shipped with a green
+    # exit. Measured, not argued: staged-and-committed, the guard passed.
+    if [ "${#forbidden[@]}" -eq 0 ] && [ "${#flagged[@]}" -eq 0 ]; then
+      continue
+    fi
 
     echo "COMMIT ${rev:0:12} $subject"
+
+    if [ "${#forbidden[@]}" -gt 0 ]; then
+      echo "  REFUSED: adds a path this repository must never contain:"
+      for p in "${forbidden[@]}"; do echo "    $p"; done
+      cat <<'MSG'
+    This is the THIRD rule (NEVER_EXIST_PATHS), not R1 and not R2. There is no
+    claim to file, no reviewer to name and no grandfather entry to add, because
+    the requirement is that the path does not exist -- so nothing about this
+    commit can make it acceptable. Drop the file from the commit and delete it
+    from the tree. It is a superseded duplicate of
+    scripts/retention-literal-gate.sh that scans no SQL, so it presents as the
+    gate while missing the retention engine entirely (AFC-274).
+MSG
+      deny_rc=1
+    fi
+
+    [ "${#flagged[@]}" -eq 0 ] && continue
+
     echo "  touches the R2 compliance path:"
     for p in "${flagged[@]}"; do echo "    $p"; done
 
@@ -2330,7 +2668,42 @@ check_commit() {
     fi
   done
 
-  if [ "$rc" -ne 0 ]; then
+  # Two accumulators, one exit code. prov_rc reads R1/R2 BEFORE the denylist
+  # contributes anything, so the prose below prints exactly when R1 or R2
+  # fired -- and not merely because a denylist refusal made rc non-zero. A
+  # denylist-only failure that ended with "a compliance-path commit has no
+  # registered claim or no named reviewer" would be gate output disagreeing
+  # with the fact it is reporting, which is the defect class this file keeps
+  # having to fix. R1/R2 wins when both fire: an unreadable claim file is
+  # exit 2 and must not be downgraded to 1 by an unrelated forbidden path.
+  local prov_rc="$rc"
+  if [ "$deny_rc" -ne 0 ] && [ "$rc" -eq 0 ]; then
+    rc="$deny_rc"
+  fi
+
+  if [ "$deny_rc" -ne 0 ]; then
+    cat <<'MSG'
+
+FAIL: this range adds a path that must never exist.
+
+NEVER_EXIST_PATHS -- the THIRD rule, kept separate from GUARDED_PATHS ("dirty
+here is unshippable") and from REVIEW_REQUIRED_PATHS ("clean here still needs a
+named reviewer"). This one means "this path is not a thing that exists".
+
+There is no remedy section here, on purpose: no claim, no `Reviewed-by:`
+trailer, no reviews[] entry and no grandfather entry clears it, because nothing
+about the commit changes the fact that the file must not be there. Remove it
+from the commit and delete it from the tree.
+
+It is a superseded duplicate of scripts/retention-literal-gate.sh that scans no
+SQL -- its file filter never opens a .sql file, so it would miss the retention
+engine entirely while presenting AS the gate in a diff. It regenerated once
+after being deleted, which is why the refusal lives here and not in a deletion
+(AFC-274).
+MSG
+  fi
+
+  if [ "$prov_rc" -ne 0 ]; then
     cat <<'MSG'
 
 FAIL: a compliance-path commit has no registered claim or no named reviewer.
