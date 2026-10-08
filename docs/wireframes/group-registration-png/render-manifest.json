@@ -1,0 +1,12 @@
+{
+  "note": "Checklist for scripts/render-group-registration-png.mjs. The script exits non-zero unless renders produced equals this entry count and every rendered width matches its own clip. All six frames are full-width staff surfaces captured as whole sections at 1440 — the group-registration flow is a desk admin task (dense review table, payment columns). Responsive stacking intent is documented in the issue spec document, not rendered here.",
+  "html": "docs/wireframes/church-portal-group-registration.html",
+  "screens": [
+    { "id": "S0", "surface": "Entry point — event detail, admin actions", "route": "/events/:slug" },
+    { "id": "S1", "surface": "Step 1 — pick branch + source (saved group / ad-hoc) + empty selection", "route": "/events/:id/register-group" },
+    { "id": "S2", "surface": "Step 2 — per-member review: eligibility, consent, payment, capacity, duplicate, override", "route": "/events/:id/register-group" },
+    { "id": "S3", "surface": "Step 3 — one submit, per-member result: partial success, waitlist, consent, duplicate, excluded", "route": "/events/:id/register-group" },
+    { "id": "S4", "surface": "Group registration record — header, per-member payment, audit", "route": "/events/:id/group-registrations/GR-2026-0147" },
+    { "id": "S5", "surface": "Branch-scope enforcement — filtered picker, 403 rejection, area-admin contrast", "route": "no route — system behaviour" }
+  ]
+}

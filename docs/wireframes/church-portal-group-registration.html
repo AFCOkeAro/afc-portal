@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Church Portal — Group registration wireframes (US-G1–US-G5) · AFC-317</title>
+<meta name="description" content="Layout-intent wireframes for the admin group-registration flow: pick branch, saved group or ad-hoc members, per-member review, one submit, per-member result (AFC-317). Self-contained; opens offline.">
+<style>
+  /* AFC-151 wireframe palette — same tokens as church-portal-wireframes-v3.html and
+     church-portal-checkin-badge-kiosk.html (AFC-307). Layout intent only: no hi-fi
+     tokens, no visual design, no implementation code. AFC-317 is not hi-fi-green-lit. */
+  :root{
+    --ink:#1b1b1b; --mut:#6b6b6b; --line:#c9c9c9; --bg:#f4f4f2;
+    --box:#e4e4e1; --box2:#efefec; --accent:#2f6f6f; --accent-soft:#d8e8e8;
+    --white:#fff; --warn:#f0e0c0; --stop:#f0d0d0;
+    --warn-ink:#7a5c10; --warn-line:#d9c08a;
+    --stop-ink:#8c2f2f; --stop-line:#d9a0a0;
+    --ok-ink:#1f5c3a; --ok-line:#9dc7ae; --ok-bg:#dcebe2;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:14px/1.45 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
+  header.top{position:sticky;top:0;z-index:5;background:var(--ink);color:#fff;padding:14px 22px}
+  header.top h1{margin:0;font-size:16px;letter-spacing:.3px}
+  header.top p{margin:4px 0 0;color:#cfcfcf;font-size:12px}
+  h2.sect-title{margin:0 0 4px;font-size:15px;letter-spacing:.2px}
+  p.sect-lede{margin:0 0 12px;color:var(--mut);font-size:12.5px;max-width:90ch}
+
+  .legend{display:flex;gap:16px;flex-wrap:wrap;padding:12px 22px;border-bottom:1px solid var(--line);
+    background:#fafafa;font-size:12px;color:var(--mut);align-items:center}
+  .legend b{color:var(--ink);font-weight:600}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .sw{width:14px;height:14px;border:1px solid var(--line);display:inline-block;border-radius:2px;flex:none}
+  .sw.w{background:var(--warn);border-color:var(--warn-line)}
+  .sw.r{background:var(--stop);border-color:var(--stop-line)}
+  .sw.g{background:var(--ok-bg);border-color:var(--ok-line)}
+  .sw.t{background:var(--accent-soft);border-color:var(--accent)}
+  .sw.d{background:var(--box2);border:1px dashed var(--mut)}
+
+  .index{padding:18px 22px 6px;background:#fff;border-bottom:1px solid var(--line)}
+  .index ul{list-style:none;margin:0;padding:0;display:grid;gap:8px;
+    grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+  .index a{display:flex;gap:9px;align-items:baseline;text-decoration:none;color:var(--ink);
+    border:1px solid var(--line);border-radius:6px;padding:8px 10px;background:#fff}
+  .index a:hover{background:var(--accent-soft);border-color:var(--accent)}
+  .index .num{font-weight:700;color:var(--accent);font-size:12px;flex:none;width:30px}
+  .index .nm{font-size:12.5px;font-weight:600;display:block}
+  .index .rt{font-size:11px;color:var(--mut);font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+
+  .wrap{padding:22px;display:flex;flex-direction:column;gap:26px}
+  .frame{background:var(--white);border:1px solid var(--line);border-radius:10px;overflow:hidden;
+    box-shadow:0 1px 2px rgba(0,0,0,.05);display:flex;flex-direction:column}
+  .frame>figcaption{background:var(--box2);border-bottom:1px solid var(--line);padding:9px 12px;
+    display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+  .frame>figcaption b{font-size:13px}
+  .frame>figcaption code{font-size:11px;color:var(--mut);white-space:nowrap}
+  .screen{padding:16px;display:flex;flex-direction:column;gap:12px;background:#fff}
+  .muted{color:var(--mut)}
+  .tiny{font-size:11px}
+  .bar{height:12px;background:var(--box);border-radius:3px}
+  .bar.s{width:38%} .bar.m{width:62%} .bar.l{width:88%} .bar.xs{width:24%}
+  .box{background:var(--box);border-radius:4px}
+  .card{border:1px solid var(--line);border-radius:6px;padding:10px;background:#fff}
+  .card h4{margin:0 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--mut)}
+  .row{display:flex;gap:10px;align-items:center}
+  .row.between{justify-content:space-between}
+  .row.top{align-items:flex-start}
+  .row.wrapg{flex-wrap:wrap}
+  .grow{flex:1}
+  .field{flex:1;display:flex;flex-direction:column;gap:5px;min-width:0}
+  .field .lab{font-size:11px;color:var(--mut)}
+  .input{height:30px;border:1px solid var(--line);border-radius:4px;background:#fff;
+    font-size:11.5px;display:flex;align-items:center;padding:0 8px;overflow:hidden;white-space:nowrap}
+  .input.off{background:var(--box2);color:var(--mut)}
+  .input.big{height:40px;font-size:13px}
+  .btn{display:inline-flex;align-items:center;justify-content:center;height:30px;padding:0 14px;
+    border-radius:4px;font-size:12px;border:1px solid var(--ink);background:var(--ink);color:#fff;white-space:nowrap}
+  .btn.ghost{background:#fff;color:var(--ink)}
+  .btn.accent{background:var(--accent);border-color:var(--accent)}
+  .btn.danger{background:#fff;color:var(--stop-ink);border-color:var(--stop-line)}
+  .btn.sm{height:24px;padding:0 9px;font-size:11px}
+  .btn.xl{height:44px;font-size:13px;border-radius:6px}
+  .btn[disabled],.btn.off{background:var(--box2);color:var(--mut);border-color:var(--line)}
+  .nav{display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line);padding-bottom:9px}
+  .logo{width:26px;height:26px;border-radius:5px;background:var(--ink);flex:none}
+  .pill{font-size:10px;padding:2px 8px;border-radius:999px;background:var(--box);color:var(--ink);white-space:nowrap}
+  .pill.on{background:var(--accent-soft);color:var(--accent);border:1px solid var(--accent)}
+  .pill.w{background:var(--warn);color:var(--warn-ink);border:1px solid var(--warn-line)}
+  .pill.r{background:var(--stop);color:var(--stop-ink);border:1px solid var(--stop-line)}
+  .pill.ok{background:var(--ok-bg);color:var(--ok-ink);border:1px solid var(--ok-line)}
+  .pill.dash{border-style:dashed;border-color:var(--mut);color:var(--mut);background:#fff}
+
+  table{width:100%;border-collapse:collapse;font-size:11px}
+  th,td{text-align:left;padding:6px 7px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--mut);font-weight:600;background:var(--box2);white-space:nowrap}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+  code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10.5px}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+
+  .note{font-size:11.5px;color:var(--mut);border-left:3px solid var(--accent);padding:6px 9px;
+    background:var(--accent-soft);border-radius:0 4px 4px 0}
+  .note.warn{border-left-color:var(--warn-line);background:var(--warn);color:var(--warn-ink)}
+  .note.stop{border-left-color:var(--stop-line);background:var(--stop);color:var(--stop-ink)}
+  .note.plain{background:var(--box2);border-left-color:var(--mut);color:var(--mut)}
+
+  /* ---- group registration set ---- */
+  .steps{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .steps .st{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--mut)}
+  .steps .dot{width:20px;height:20px;border-radius:50%;border:1px solid var(--line);background:#fff;
+    display:inline-flex;align-items:center;justify-content:center;font-size:10px;color:var(--mut)}
+  .steps .st.on{color:var(--ink);font-weight:600}
+  .steps .st.on .dot{background:var(--ink);border-color:var(--ink);color:#fff}
+  .steps .sep{width:26px;height:1px;background:var(--line)}
+
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+  .seg .seg-b{height:30px;padding:0 14px;display:inline-flex;align-items:center;font-size:12px;
+    background:#fff;color:var(--mut);border-right:1px solid var(--line);white-space:nowrap}
+  .seg .seg-b:last-child{border-right:0}
+  .seg .seg-b.on{background:var(--ink);color:#fff;font-weight:600}
+
+  .srcgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .srcpanel{border:1px solid var(--line);border-radius:6px;background:#fff;overflow:hidden}
+  .srcpanel>h5{margin:0;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--mut);
+    background:var(--box2);border-bottom:1px solid var(--line);padding:7px 10px;font-weight:600}
+  .srcpanel .in{padding:9px;display:flex;flex-direction:column;gap:7px}
+
+  .pick{display:flex;gap:9px;align-items:flex-start;border:1px solid var(--line);border-radius:5px;
+    padding:7px 9px;background:#fff}
+  .pick.sel{border-color:var(--accent);background:var(--accent-soft)}
+  .pick .boxcheck{flex:none;width:15px;height:15px;border:1.5px solid var(--mut);border-radius:3px;
+    margin-top:1px;display:inline-flex;align-items:center;justify-content:center;background:#fff}
+  .pick.sel .boxcheck{background:var(--accent);border-color:var(--accent);color:#fff;font-size:10px}
+  .pick .radio{flex:none;width:15px;height:15px;border:1.5px solid var(--mut);border-radius:50%;margin-top:1px;background:#fff}
+  .pick.sel .radio{border:5px solid var(--accent)}
+  .pick .who{min-width:0;flex:1}
+  .pick .who b{font-size:12px;font-weight:600}
+  .pick .who .meta{font-size:10.5px;color:var(--mut);display:block}
+
+  .emptybox{border:1px dashed var(--mut);border-radius:6px;padding:12px;background:#fbfbfa;
+    display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+  .emptybox .t{font-size:12px;font-weight:600}
+  .emptybox .d{font-size:11px;color:var(--mut)}
+
+  .banner{border:1px solid var(--warn-line);background:var(--warn);color:var(--warn-ink);
+    border-radius:6px;padding:9px 11px;font-size:12px;display:flex;gap:10px;align-items:center}
+  .banner b{font-weight:700}
+
+  .rollup{display:flex;gap:0;border:1px solid var(--line);border-radius:6px;background:var(--box2);overflow:hidden}
+  .rollup .cell{flex:1;padding:8px 11px;border-right:1px solid var(--line)}
+  .rollup .cell:last-child{border-right:0}
+  .rollup .k{font-size:9.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--mut)}
+  .rollup .v{font-size:13px;font-weight:700;margin-top:1px}
+  .rollup .v small{font-weight:400;color:var(--mut);font-size:10.5px}
+
+  .ovr{background:#fbfbfa;border:1px dashed var(--warn-line);border-radius:5px;padding:7px 9px;
+    display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .ovr .tag{font-size:10px;font-weight:700;color:var(--warn-ink);text-transform:uppercase;letter-spacing:.4px}
+
+  .resrow{display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-radius:5px;
+    padding:8px 10px;background:#fff}
+  .resrow .who{flex:1;min-width:0}
+  .resrow .who b{font-size:12px;font-weight:600}
+  .resrow .who .meta{font-size:10.5px;color:var(--mut)}
+  .resrow .stchip{flex:none}
+
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:11.5px}
+  .kv dt{color:var(--mut)}
+  .kv dd{margin:0}
+
+  .scopegrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .scopepanel{border:1px solid var(--line);border-radius:6px;background:#fff;overflow:hidden}
+  .scopepanel>h5{margin:0;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--mut);
+    background:var(--box2);border-bottom:1px solid var(--line);padding:7px 10px;font-weight:600}
+  .scopepanel .in{padding:10px;display:flex;flex-direction:column;gap:8px}
+
+  .stat-strip{display:flex;gap:8px;flex-wrap:wrap}
+  .stat{flex:1;border:1px solid var(--line);border-radius:6px;padding:8px 10px;background:#fff;min-width:110px}
+  .stat .n{font-size:18px;font-weight:700;line-height:1.15}
+  .stat .k{font-size:9.5px;color:var(--mut);text-transform:uppercase;letter-spacing:.4px}
+  .stat.w{border-color:var(--warn-line);background:var(--warn)}
+  .stat.w .n{color:var(--warn-ink)}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <h1>Church Portal — Group registration (admin flow) — wireframes</h1>
+  <p>AFC-317 · Layout intent only, AFC-151 v3 wireframe palette · AFC-148 prd-addendum §C (US-G1–US-G5) · Synthetic data — no real members</p>
+</header>
+
+<div class="legend" aria-label="How to read these wireframes">
+  <b>How to read</b>
+  <span><i class="sw t"></i> interactive / selected</span>
+  <span><i class="sw w"></i> warning — needs attention, not an error</span>
+  <span><i class="sw r"></i> blocked — hard denial or policy stop</span>
+  <span><i class="sw g"></i> success — done</span>
+  <span><i class="sw d"></i> empty / disabled state</span>
+  <span>All names, phones, amounts and times are synthetic. Colours are the wireframe convention (amber = pending, rose = blocked), not the hi-fi status tokens.</span>
+</div>
+
+<nav class="index" aria-label="Screens in this set">
+  <ul>
+    <li><a href="#S0"><span class="num">S0</span><span><span class="nm">Entry point — event detail, admin actions</span><br><span class="rt">/events/:slug · where “Register a group” lives</span></span></a></li>
+    <li><a href="#S1"><span class="num">S1</span><span><span class="nm">Step 1 — pick branch + source (group or people)</span><br><span class="rt">/events/:id/register-group · US-G1 AC1 · US-G5 AC1</span></span></a></li>
+    <li><a href="#S2"><span class="num">S2</span><span><span class="nm">Step 2 — review members: eligibility, consent, payment</span><br><span class="rt">/events/:id/register-group · US-G2 · US-G3 · capacity</span></span></a></li>
+    <li><a href="#S3"><span class="num">S3</span><span><span class="nm">Step 3 — one submit, per-member result</span><br><span class="rt">/events/:id/register-group · US-G1 AC2–AC4 · partial success</span></span></a></li>
+    <li><a href="#S4"><span class="num">S4</span><span><span class="nm">Group registration record (header + audit)</span><br><span class="rt">/events/:id/group-registrations/:id · US-G3 · US-G2 AC2</span></span></a></li>
+    <li><a href="#S5"><span class="num">S5</span><span><span class="nm">Branch-scope enforcement (own-branch only)</span><br><span class="rt">no route — system behaviour · US-G5 AC1–AC3</span></span></a></li>
+  </ul>
+</nav>
+
+<div class="wrap">
+
+<!-- ================= S0 — entry point ================= -->
+<figure class="frame" id="S0">
+  <figcaption><b>S0 · Entry point — event detail, admin actions</b><code>/events/:slug · desktop 1440</code></figcaption>
+  <div class="screen">
+    <div class="nav">
+      <span class="logo" aria-hidden="true"></span>
+      <b>Church Portal</b>
+      <span class="pill">Events</span>
+      <span class="grow"></span>
+      <span class="pill on">Branch admin · Ikeja</span>
+    </div>
+
+    <div class="card">
+      <div class="row between top">
+        <div class="grow">
+          <h4 style="font-size:15px;color:var(--ink);text-transform:none;letter-spacing:0">Lagos North Youth Summit 2026</h4>
+          <p class="muted" style="margin:2px 0 0;font-size:11.5px">Saturday 14 November 2026 · 09:00–16:00 · Covenant Grove, Ikeja · Age 16–35 · ₦15,000 per person</p>
+        </div>
+        <span class="pill w">3 seats left · waitlist on</span>
+      </div>
+      <div class="stat-strip" style="margin-top:10px">
+        <div class="stat"><div class="n">120</div><div class="k">Capacity</div></div>
+        <div class="stat"><div class="n">117</div><div class="k">Registered</div></div>
+        <div class="stat w"><div class="n">3</div><div class="k">Seats left</div></div>
+        <div class="stat"><div class="n">₦1.76m</div><div class="k">Expected</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h4>Admin actions — staff only</h4>
+      <div class="row wrapg">
+        <button class="btn accent xl" type="button">Register a group</button>
+        <button class="btn ghost" type="button">Open public form</button>
+        <button class="btn ghost" type="button">Check-in desk</button>
+        <button class="btn ghost" type="button">Group registrations</button>
+        <button class="btn ghost" type="button">Event report</button>
+      </div>
+      <p class="note" style="margin:10px 0 0">“Register a group” renders only for roles with <b>create</b> on <code>event_group_registrations</code> — area admin, branch admin, department leader. A volunteer never sees the action. The public cannot create or read group registrations (staff-only, data-model-addendum §5).</p>
+    </div>
+
+    <div class="row between top card">
+      <div class="grow">
+        <h4>What the public sees</h4>
+        <p class="muted tiny" style="margin:0">The public event page (E4) and form (E5) are one-person-per-form. Group registration is the staff path — it does not replace the public form, it unblocks a branch registering its own people in one action (US-G1).</p>
+      </div>
+      <button class="btn xl" type="button" style="flex:none">Register</button>
+    </div>
+  </div>
+</figure>
+
+<!-- ================= S1 — step 1: who ================= -->
+<figure class="frame" id="S1">
+  <figcaption><b>S1 · Step 1 of 3 — who is registering: branch + source</b><code>/events/:id/register-group · US-G1 AC1 · US-G5 AC1</code></figcaption>
+  <div class="screen">
+    <div class="steps" aria-label="Progress">
+      <span class="st on"><span class="dot">1</span>Who</span><span class="sep"></span>
+      <span class="st"><span class="dot">2</span>Review</span><span class="sep"></span>
+      <span class="st"><span class="dot">3</span>Result</span>
+      <span class="grow"></span>
+      <span class="muted tiny">Lagos North Youth Summit 2026 · 3 seats left · min group size 3</span>
+    </div>
+
+    <div class="card">
+      <h4>Branch</h4>
+      <div class="row">
+        <span class="pill on" style="flex:none">Ikeja Branch</span>
+        <span class="muted tiny grow">Branch admin — your scope is your own branch. Only Ikeja people are listed and selectable below.</span>
+      </div>
+      <p class="note plain" style="margin:8px 0 0">Area admin — the same step shows a branch dropdown (Ikeja / Yaba / Ojota / …) because area admins keep cross-branch access (US-G5 AC3). Department leaders see their assigned branches only. The selector is capability-driven; it never offers a branch the role cannot register.</p>
+    </div>
+
+    <div class="seg" role="group" aria-label="Source of people">
+      <span class="seg-b on">Saved group</span>
+      <span class="seg-b">Ad-hoc people</span>
+    </div>
+
+    <div class="srcgrid">
+      <div class="srcpanel">
+        <h5>Pick a saved group</h5>
+        <div class="in">
+          <label class="pick sel"><span class="radio" aria-hidden="true"></span><span class="who"><b>Ikeja Teens — Bus 1</b><span class="meta">7 members · small group · Ikeja</span></span></label>
+          <label class="pick"><span class="radio" aria-hidden="true"></span><span class="who"><b>Choir — Ikeja</b><span class="meta">24 members · ministry · Ikeja</span></span></label>
+          <label class="pick"><span class="radio" aria-hidden="true"></span><span class="who"><b>Bus 2 — Covenant Grove</b><span class="meta">8 members · other · Ikeja</span></span></label>
+          <p class="tiny muted" style="margin:0">A saved group pre-fills the selection with its current <code>group_members</code>. Min group size for this event is 3 — satisfied by every group above.</p>
+        </div>
+      </div>
+      <div class="srcpanel">
+        <h5>Or search and tick people — ad-hoc</h5>
+        <div class="in">
+          <div class="input">Search by name or phone…</div>
+          <label class="pick sel"><span class="boxcheck" aria-hidden="true">✓</span><span class="who"><b>Adaeze Okonkwo</b> · 17 <span class="pill w" style="margin-left:6px">guardian consent pending</span><span class="meta">Ikeja · member</span></span></label>
+          <label class="pick sel"><span class="boxcheck" aria-hidden="true">✓</span><span class="who"><b>Tobi Adeyemi</b> · 24<span class="meta">Ikeja · member</span></span></label>
+          <label class="pick sel"><span class="boxcheck" aria-hidden="true">✓</span><span class="who"><b>Kelechi Nwosu</b> · 15 <span class="pill w" style="margin-left:6px">under age minimum</span><span class="meta">Ikeja · member</span></span></label>
+          <label class="pick sel"><span class="boxcheck" aria-hidden="true">✓</span><span class="who"><b>Mercy Balogun</b> · 31 <span class="pill" style="margin-left:6px">already registered</span><span class="meta">Ikeja · member</span></span></label>
+          <label class="pick sel"><span class="boxcheck" aria-hidden="true">✓</span><span class="who"><b>Funmi Adekunle</b> · 35<span class="meta">Ikeja · member</span></span></label>
+          <label class="pick sel"><span class="boxcheck" aria-hidden="true">✓</span><span class="who"><b>Segun Kuti</b> · 27<span class="meta">Ikeja · member</span></span></label>
+          <label class="pick sel"><span class="boxcheck" aria-hidden="true">✓</span><span class="who"><b>Chidi Eze</b> · 42<span class="meta">Ikeja · member</span></span></label>
+        </div>
+      </div>
+    </div>
+
+    <div class="row between card">
+      <div class="grow">
+        <b style="font-size:13px">7 selected</b>
+        <span class="muted tiny"> · ₦105,000 expected · saved as “Ikeja Teens — Bus 1”</span>
+      </div>
+      <div class="row">
+        <button class="btn ghost" type="button">← Back to event</button>
+        <button class="btn accent xl" type="button">Review 7 people →</button>
+      </div>
+    </div>
+
+    <div class="emptybox">
+      <span class="t">Empty selection — nothing chosen yet</span>
+      <span class="d">With no group picked and no people ticked, <b>Review stays disabled</b> and says why: “Select at least one person to continue.” An empty selection cannot be submitted — there is no header to create.</span>
+      <button class="btn off" type="button" disabled>Review 0 people — disabled</button>
+    </div>
+  </div>
+</figure>
+
+<!-- ================= S2 — step 2: review ================= -->
+<figure class="frame" id="S2">
+  <figcaption><b>S2 · Step 2 of 3 — review each member before the one submit</b><code>/events/:id/register-group · US-G2 AC1–AC3 · US-G3 · capacity / waitlist</code></figcaption>
+  <div class="screen">
+    <div class="steps" aria-label="Progress">
+      <span class="st"><span class="dot">1</span>Who</span><span class="sep"></span>
+      <span class="st on"><span class="dot">2</span>Review</span><span class="sep"></span>
+      <span class="st"><span class="dot">3</span>Result</span>
+    </div>
+
+    <div class="banner">
+      <b>Capacity check — 3 seats left.</b>
+      <span class="grow">Four members still need a seat. Selection order decides: the first three fill the event, the rest join the waitlist (waitlist is on for this event, so they are held, not rejected).</span>
+    </div>
+
+    <div class="card" style="padding:0;overflow:hidden">
+      <table>
+        <thead>
+          <tr><th>Member</th><th class="num">Age</th><th>Eligibility</th><th>Consent</th><th class="num">Payment (expected)</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><b>Tobi Adeyemi</b><div class="muted tiny">Ikeja · member</div></td>
+            <td class="num">24</td>
+            <td><span class="pill ok">Eligible</span></td>
+            <td>not required</td>
+            <td class="num">₦15,000</td>
+          </tr>
+          <tr>
+            <td><b>Funmi Adekunle</b><div class="muted tiny">Ikeja · member</div></td>
+            <td class="num">35</td>
+            <td><span class="pill ok">Eligible</span></td>
+            <td>not required</td>
+            <td class="num">₦15,000</td>
+          </tr>
+          <tr>
+            <td><b>Segun Kuti</b><div class="muted tiny">Ikeja · member</div></td>
+            <td class="num">27</td>
+            <td><span class="pill ok">Eligible</span></td>
+            <td>not required</td>
+            <td class="num">₦15,000</td>
+          </tr>
+          <tr>
+            <td><b>Adaeze Okonkwo</b><div class="muted tiny">Ikeja · member</div></td>
+            <td class="num">17</td>
+            <td><span class="pill w">Minor — guardian consent not recorded</span></td>
+            <td><span class="pill w">pending_consent</span></td>
+            <td class="num">₦15,000</td>
+          </tr>
+          <tr style="background:#fbfbfa">
+            <td><b>Kelechi Nwosu</b><div class="muted tiny">Ikeja · member</div></td>
+            <td class="num">15</td>
+            <td><span class="pill w">Under age minimum 16 — excluded by default</span></td>
+            <td>—</td>
+            <td class="num">₦15,000</td>
+          </tr>
+          <tr style="background:#fbfbfa">
+            <td colspan="5">
+              <div class="ovr">
+                <span class="tag">Area-admin override — US-G2 AC3</span>
+                <span class="input grow" style="max-width:360px">Recorded reason — e.g. turning 16 on 2 Nov</span>
+                <button class="btn sm" type="button">Allow with reason</button>
+                <span class="muted tiny">Branch admins do not see this control — the override is area-admin only and the reason is stored.</span>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td><b>Mercy Balogun</b><div class="muted tiny">Ikeja · registered 09:41</div></td>
+            <td class="num">31</td>
+            <td><span class="pill">Already registered — will be skipped</span></td>
+            <td>consented</td>
+            <td class="num">₦15,000 <span class="muted">(PAY-0019)</span></td>
+          </tr>
+          <tr>
+            <td><b>Chidi Eze</b><div class="muted tiny">Ikeja · member</div></td>
+            <td class="num">42</td>
+            <td><span class="pill">Eligible — waitlisted if seats run out</span></td>
+            <td>not required</td>
+            <td class="num">₦15,000</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="rollup">
+      <div class="cell"><div class="k">Selected</div><div class="v">7</div></div>
+      <div class="cell"><div class="k">To register</div><div class="v">4 <small>incl. 1 pending consent</small></div></div>
+      <div class="cell"><div class="k">Excluded / skipped</div><div class="v">2</div></div>
+      <div class="cell"><div class="k">Waitlisted</div><div class="v">1</div></div>
+      <div class="cell"><div class="k">Roll-up (header)</div><div class="v">₦105,000 <small>expected</small></div></div>
+      <div class="cell"><div class="k">Paid so far</div><div class="v">₦20,000</div></div>
+    </div>
+    <p class="note plain" style="margin:0">The roll-up is a sum for the header only — payment stays per member and is never merged (US-G3 AC2). Re-running this registration is safe: Mercy is skipped again, never duplicated (US-G1 AC4, idempotent).</p>
+
+    <div class="row between card">
+      <button class="btn ghost" type="button">← Back — change selection</button>
+      <button class="btn accent xl" type="button">Register 7 people in one action →</button>
+    </div>
+  </div>
+</figure>
+
+<!-- ================= S3 — step 3: result ================= -->
+<figure class="frame" id="S3">
+  <figcaption><b>S3 · Step 3 of 3 — one submit, per-member result</b><code>/events/:id/register-group · US-G1 AC2–AC3 · partial success</code></figcaption>
+  <div class="screen">
+    <div class="steps" aria-label="Progress">
+      <span class="st"><span class="dot">1</span>Who</span><span class="sep"></span>
+      <span class="st"><span class="dot">2</span>Review</span><span class="sep"></span>
+      <span class="st on"><span class="dot">3</span>Result</span>
+    </div>
+
+    <div class="card">
+      <div class="row between top">
+        <div class="grow">
+          <h4 style="font-size:14px;color:var(--ink);text-transform:none;letter-spacing:0">Group registration created — GR-2026-0147</h4>
+          <p class="muted tiny" style="margin:2px 0 0">“Ikeja Teens — Bus 1” · Ikeja Branch · one header, one registration per member · <span class="mono">event_group_registrations</span> + 4 × <span class="mono">event_registrations</span></p>
+        </div>
+        <span class="pill w" style="flex:none">partially_confirmed</span>
+      </div>
+      <div class="stat-strip" style="margin-top:10px">
+        <div class="stat"><div class="n">4</div><div class="k">Registered</div></div>
+        <div class="stat"><div class="n">1</div><div class="k">Pending consent</div></div>
+        <div class="stat"><div class="n">1</div><div class="k">Waitlisted</div></div>
+        <div class="stat"><div class="n">1</div><div class="k">Skipped — duplicate</div></div>
+        <div class="stat"><div class="n">1</div><div class="k">Excluded — under age</div></div>
+      </div>
+    </div>
+
+    <div class="card" style="padding:0;overflow:hidden;display:flex;flex-direction:column;gap:0">
+      <div class="resrow" style="border-radius:0;border-left:0;border-right:0;border-top:0">
+        <span class="who"><b>Tobi Adeyemi</b> <span class="pill ok stchip">Registered ✓</span><div class="meta">seat 1 of 3 · claim code sent by SMS</div></span>
+        <button class="btn sm ghost" type="button">View</button>
+      </div>
+      <div class="resrow" style="border-radius:0;border-left:0;border-right:0;border-top:0">
+        <span class="who"><b>Funmi Adekunle</b> <span class="pill ok stchip">Registered ✓</span><div class="meta">seat 2 of 3 · unpaid — payment remains open</div></span>
+        <button class="btn sm ghost" type="button">Record ₦15,000</button>
+      </div>
+      <div class="resrow" style="border-radius:0;border-left:0;border-right:0;border-top:0">
+        <span class="who"><b>Segun Kuti</b> <span class="pill ok stchip">Registered ✓</span><div class="meta">seat 3 — the event is now full</div></span>
+        <button class="btn sm ghost" type="button">View</button>
+      </div>
+      <div class="resrow" style="border-radius:0;border-left:0;border-right:0;border-top:0">
+        <span class="who"><b>Adaeze Okonkwo</b> <span class="pill w stchip">Registered · pending consent</span><div class="meta">created as <code>pending_consent</code> — <b>cannot be marked attended</b> until guardian consent arrives (US-G2 AC2)</div></span>
+        <button class="btn sm" type="button">Send consent request</button>
+      </div>
+      <div class="resrow" style="border-radius:0;border-left:0;border-right:0;border-top:0">
+        <span class="who"><b>Chidi Eze</b> <span class="pill stchip">Waitlisted · position 1</span><div class="meta">held, not rejected — a freed seat promotes him first</div></span>
+        <button class="btn sm ghost" type="button">View waitlist</button>
+      </div>
+      <div class="resrow" style="border-radius:0;border-left:0;border-right:0;border-top:0">
+        <span class="who"><b>Mercy Balogun</b> <span class="pill stchip">Skipped — already registered</span><div class="meta">no duplicate created — she keeps her original registration and PAY-0019</div></span>
+        <button class="btn sm ghost off" type="button">No action</button>
+      </div>
+      <div class="resrow" style="border-radius:0;border-left:0;border-right:0;border-top:0;border-bottom:0">
+        <span class="who"><b>Kelechi Nwosu</b> <span class="pill w stchip">Excluded — under age minimum</span><div class="meta">nothing created — only an area admin can override, with a recorded reason</div></span>
+        <button class="btn sm ghost off" type="button">No action</button>
+      </div>
+    </div>
+
+    <p class="note" style="margin:0"><b>Partial success is the designed outcome, not an error.</b> The header reports per-member results with reasons and the successful members stay registered (§C.6). Re-registering this group later skips everyone already registered — idempotency, no duplicates (US-G1 AC4).</p>
+
+    <div class="row between card">
+      <button class="btn ghost" type="button">← Back to event</button>
+      <div class="row">
+        <button class="btn ghost" type="button">Register another group</button>
+        <button class="btn accent xl" type="button">View group registration →</button>
+      </div>
+    </div>
+  </div>
+</figure>
+
+<!-- ================= S4 — group registration record ================= -->
+<figure class="frame" id="S4">
+  <figcaption><b>S4 · The group registration record — header, per-member payment, audit</b><code>/events/:id/group-registrations/GR-2026-0147 · US-G3 AC1–AC3 · US-G2 AC2</code></figcaption>
+  <div class="screen">
+    <div class="card">
+      <div class="row between top">
+        <div class="grow">
+          <h4 style="font-size:14px;color:var(--ink);text-transform:none;letter-spacing:0">GR-2026-0147 · Ikeja Teens — Bus 1</h4>
+          <p class="muted tiny" style="margin:2px 0 0">Ikeja Branch · group <span class="mono">groups/ikeja-teens</span> · event Lagos North Youth Summit 2026</p>
+        </div>
+        <span class="pill w" style="flex:none">partially_confirmed</span>
+      </div>
+      <div class="kv" style="margin-top:8px">
+        <dt>Created by</dt><dd>Ade O. — Branch admin · 14 Nov 2026, 09:41 (<code>created_by</code>)</dd>
+        <dt>Registered by</dt><dd>same admin on every member record (<code>registered_by</code>) — audit per row</dd>
+      </div>
+    </div>
+
+    <div class="stat-strip">
+      <div class="stat"><div class="n">7</div><div class="k">Selected</div></div>
+      <div class="stat"><div class="n">4</div><div class="k">Registered</div></div>
+      <div class="stat"><div class="n">1</div><div class="k">Waitlisted</div></div>
+      <div class="stat"><div class="n">2</div><div class="k">Skipped / excluded</div></div>
+      <div class="stat w"><div class="n">₦20,000</div><div class="k">Paid of ₦105,000</div></div>
+    </div>
+
+    <div class="card" style="padding:0;overflow:hidden">
+      <table>
+        <thead>
+          <tr><th>Member</th><th>Result</th><th>Consent</th><th class="num">Expected</th><th class="num">Paid</th><th>Payment status</th><th>Reference</th><th></th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><b>Tobi Adeyemi</b></td><td><span class="pill ok">Registered</span></td><td>not required</td>
+            <td class="num">₦15,000</td><td class="num">₦15,000</td><td>Paid</td><td class="mono">PAY-0031</td>
+            <td class="num"><button class="btn sm ghost" type="button">Record payment</button></td>
+          </tr>
+          <tr>
+            <td><b>Funmi Adekunle</b></td><td><span class="pill ok">Registered</span></td><td>not required</td>
+            <td class="num">₦15,000</td><td class="num">₦0</td><td>Unpaid</td><td class="mono">—</td>
+            <td class="num"><button class="btn sm" type="button">Record ₦15,000</button></td>
+          </tr>
+          <tr>
+            <td><b>Segun Kuti</b></td><td><span class="pill ok">Registered</span></td><td>not required</td>
+            <td class="num">₦15,000</td><td class="num">₦5,000</td><td><span class="pill w">Partly paid</span></td><td class="mono">PAY-0032</td>
+            <td class="num"><button class="btn sm" type="button">Record ₦10,000</button></td>
+          </tr>
+          <tr style="background:#fbfbfa">
+            <td><b>Adaeze Okonkwo</b></td><td><span class="pill w">Pending consent</span></td><td>guardian pending</td>
+            <td class="num">₦15,000</td><td class="num">₦0</td><td>Unpaid</td><td class="mono">—</td>
+            <td class="num"><button class="btn sm" type="button">Send consent request</button></td>
+          </tr>
+          <tr style="background:#fbfbfa">
+            <td colspan="8" class="tiny muted">Her consent request messages the <b>guardian</b>, never the minor. Until consent arrives she <b>cannot be marked attended</b> at check-in (US-G2 AC2).</td>
+          </tr>
+          <tr>
+            <td><b>Chidi Eze</b></td><td><span class="pill">Waitlisted · 1</span></td><td>not required</td>
+            <td class="num">₦15,000</td><td class="num">₦0</td><td>—</td><td class="mono">—</td>
+            <td class="num"><button class="btn sm ghost" type="button">Confirm seat</button></td>
+          </tr>
+          <tr>
+            <td><b>Mercy Balogun</b></td><td><span class="pill">Skipped — duplicate</span></td><td>—</td>
+            <td class="num">—</td><td class="num">—</td><td>—</td><td class="mono">PAY-0019 (original)</td>
+            <td class="num"><button class="btn sm ghost off" type="button">No action</button></td>
+          </tr>
+          <tr>
+            <td><b>Kelechi Nwosu</b></td><td><span class="pill w">Excluded — under age min</span></td><td>—</td>
+            <td class="num">—</td><td class="num">—</td><td>—</td><td class="mono">—</td>
+            <td class="num"><button class="btn sm ghost off" type="button">No action</button></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="note plain" style="margin:0">“Record payment” on a row updates <b>only that member’s</b> registration — expected, paid, status and reference (US-G3 AC3). The header’s ₦105,000 / ₦20,000 is a roll-up for reading; per-member rows are authoritative and never merged (US-G3 AC2).</p>
+  </div>
+</figure>
+
+<!-- ================= S5 — scope enforcement ================= -->
+<figure class="frame" id="S5">
+  <figcaption><b>S5 · Branch-scope enforcement — the three layers</b><code>no route — system behaviour · US-G5 AC1–AC3 (“US-G4” in AFC-317’s numbering)</code></figcaption>
+  <div class="screen">
+    <div class="scopegrid">
+      <div class="scopepanel">
+        <h5>Layer 1 — the picker never offers them</h5>
+        <div class="in">
+          <div class="input">“Emeka” — a person from Yaba Branch</div>
+          <div class="emptybox" style="min-height:74px">
+            <span class="t">No people from other branches are listed or searchable</span>
+            <span class="d">Branch admin · Ikeja — your scope is your own branch. Only own-branch people are selectable (US-G5 AC1).</span>
+          </div>
+          <p class="tiny muted" style="margin:0">A section a user cannot use is not rendered — the picker is scoped by the same policy the server enforces, so the UI and the API never disagree.</p>
+        </div>
+      </div>
+      <div class="scopepanel">
+        <h5>Layer 2 — a crafted request is still refused</h5>
+        <div class="in">
+          <div class="card" style="border-color:var(--stop-line);background:var(--stop)">
+            <div class="row between top">
+              <b style="color:var(--stop-ink);font-size:12.5px">403 — request rejected</b>
+              <span class="pill r">nothing registered</span>
+            </div>
+            <p style="margin:6px 0 0;font-size:11.5px;color:var(--stop-ink)">2 of the selected people belong to Yaba Branch — outside your scope. No header was created; no member records were written.</p>
+          </div>
+          <p class="tiny muted" style="margin:0">Server-side policy, not UI hiding. The crafted cross-branch request is rejected and filtered (US-G5 AC2) — the <code>403</code> path exists because layer 1 alone would be a suggestion, not a control.</p>
+        </div>
+      </div>
+    </div>
+    <div class="note plain" style="margin:0"><b>Layer 3 — area admins keep cross-branch access (US-G5 AC3).</b> The same action succeeds for them: step 1 offers a branch dropdown, the picker lists that branch’s people, and the header records the registering branch. Department leaders are scoped to their assigned departments and branches.</div>
+  </div>
+</figure>
+
+</div>
+</body>
+</html>
