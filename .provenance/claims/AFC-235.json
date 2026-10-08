@@ -1,0 +1,32 @@
+{
+  "issue": "AFC-235",
+  "authorAgentId": "8f6e42d7-fb6e-4e6c-904b-dfdda50000ed",
+  "authorName": "MediaTech (CTO)",
+  "claimedAt": "2026-10-08T23:00:00Z",
+  "whatThisFileIs": "An R1 authorship claim for the AFC-235 hardening of scripts/dirty-path-guard.sh (Item 1 of 3 under AFC-234): .github/workflows/ added to GUARDED_PATHS and .github/workflows/ci.yml added to REVIEW_REQUIRED_PATHS, with four new self-test assertions (1b, 1c, 9l, 11d2). The CTO is the author. R2 is recorded as a self-review disclosure (see r2Review and the commit's Reviewed-by trailer); it is a recorded degradation, not independent review.",
+  "paths": [
+    "scripts/dirty-path-guard.sh",
+    ".provenance/claims/AFC-235.json"
+  ],
+  "basis": "Item 1 of 3 raised by the SecurityEngineer against scripts/dirty-path-guard.sh (parent AFC-234). Authorisation-boundary lens: neither GUARDED_PATHS nor REVIEW_REQUIRED_PATHS named .github/ at all, so the single commit that removes or neuters the dirty-path guard job in CI could ship with no claim and no reviewer -- the guard's own wiring mechanism shippable unreviewed by that same mechanism (Demonstration A: dirty ci.yml reported 'compliance path is clean (3 guarded paths)', exit 0; Demonstration B: fb35bb7 touched only ci.yml and --check-commit reported nothing about it). The claim registry already treated ci.yml as claimable (AFC-202, AFC-203), so the registry and the guard disagreed; the guard is now in line with the registry. Only ci.yml is on R2, not the whole workflows/ directory (a sibling workflow for an unrelated job is not a change to the enforcement mechanism); the DIRTY side names the whole workflows/ directory, because unreviewed dirt there is unshippable all the same. Two lists, two different rules, per the file's own header. The FAIL prose naming the guarded directories was updated to include .github/workflows/.",
+  "verificationRecorded": "MEASURED on the working tree and on scratch copies. --self-test: 49 ok / 0 FAIL / exit 0, including the four new assertions: 1b (modified tracked ci.yml rejected, path and status line named), 1c (dirt under .github/ outside workflows/ accepted), 9l (review_required matches ci.yml and rejects workflows/nightly.yml and .github/ci.yml), 11d2 (a claimed-but-unreviewed ci.yml-only fixture commit exits 1 through the subprocess path with the R2 violation and the path named). Mutation runs, each against a scratch copy with exactly one list entry removed: removing '.github/workflows/' from GUARDED_PATHS makes --self-test exit 1 with exactly one FAIL -- 'SELF-TEST FAIL: guard accepted a modified .github/workflows/ci.yml' (kills 1b); removing '.github/workflows/ci.yml' from REVIEW_REQUIRED_PATHS makes --self-test exit 1 with exactly two FAILs -- 'review_required did not match .github/workflows/ci.yml' (kills 9l) and '--check-commit <sha> exited 0 on an unreviewed ci.yml commit' (kills 11d2). The unmutated control stays 49 ok / 0 FAIL / exit 0. Live-tree Demonstration A now fails as required: with .github/workflows/ci.yml modified-and-uncommitted the guard prints 'DIRTY-GUARD VIOLATION [ M] .github/workflows/ci.yml' with the status line. Demonstration B now fails as required: --check-commit 'fb35bb7^..fb35bb7' reports an R2 VIOLATION (fb35bb7 touches only ci.yml; its AFC-220 claim does not cover the path). merge-in-gate.sh --self-test exits 0 (it drives the same guard). scripts/dirty-path-guard.sh itself is not on REVIEW_REQUIRED_PATHS so this commit's R2 position is unchanged by its own edit; the commit carries a Reviewed-by disclosure trailer (see r2Review).",
+  "r2Review": {
+    "reviewIssue": "AFC-235",
+    "reviewerAgentId": "8f6e42d7-fb6e-4e6c-904b-dfdda50000ed",
+    "reviewerName": "MediaTech (CTO)",
+    "status": "approved-with-degradation",
+    "note": "CTO self-review, recorded as a degradation, not independent review. There is no independent security reviewer on this team -- the board declined that seat on cost -- so this compliance-path-adjacent change (the guard script itself, which R2 does not name) is reviewed by its own author. The mechanical R2 record is the commit's Reviewed-by disclosure trailer. When AFC-237 (reviewer independence) lands, self-review will no longer clear even mechanically; until then this is the established convention (see 9f55a05)."
+  },
+  "reviews": [
+    {
+      "commit": "PENDING_AT_COMMIT_TIME",
+      "reviewIssue": "AFC-235",
+      "reviewerAgentId": "8f6e42d7-fb6e-4e6c-904b-dfdda50000ed",
+      "reviewerName": "MediaTech (CTO)",
+      "verdict": "approve",
+      "findings": "Item 1 complete: both lists extended, FAIL prose updated, 4 self-test assertions green, mutation mapping measured (1b/9l/11d2 killed by the corresponding single-entry removals), live-tree Demonstration A fails as required, merge-in-gate self-test green",
+      "trailerPresentOnCommit": true
+    }
+  ],
+  "notClaimedPaths": "The shared working tree carries changes this claim does NOT cover and this run did not write. (1) Another agent's uncommitted AFC-313 work inside scripts/dirty-path-guard.sh itself: the R2 header-comment rewrite, the services/directus/schema/bootstrap/** REVIEW_REQUIRED_PATHS entry, the 9e bootstrap matcher assertions and the 9o bidirectional bootstrap fixtures. That work was present as working-tree dirt when this run began; this run's edits were separated from it hunk by hunk, this commit carries only the AFC-235 hunks, and the AFC-313 hunks were restored to the working tree byte-identical afterwards (verified by diff against a pre-separation backup). (2) M .github/workflows/ci.yml (another agent's in-flight work, left dirty and now correctly flagged by the guard), M docs/adr/ADR-0002-roles-are-bootstrap-not-migrations.md, M docs/planning/repo-plan.md, M package.json, untracked scripts/adr-uniqueness-gate.sh, M services/directus/schema/engine/0001_retention_engine.sql, M services/directus/schema/migrations/README.md, M tests/db/65_retention_worker_membership.sql, and the other .provenance/claims/AFC-*.json files. None of them are staged by the AFC-235 commit; only the two paths listed above are committed, by explicit path."
+}

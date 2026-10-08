@@ -184,6 +184,7 @@ GUARDED_PATHS=(
   "scripts/"
   "services/directus/schema/"
   "tests/"
+  ".github/workflows/"
 )
 
 # R2 of the provenance rule: the paths where a commit needs a named reviewer.
@@ -198,12 +199,27 @@ GUARDED_PATHS=(
 # guard covered the file (it is under scripts/) but R2 did not: the exemption
 # list could be edited and extended with no review record, which is the one
 # file where an unreviewed edit silences review itself.
+#
+# .github/workflows/ci.yml was added by AFC-235. Before that, neither list
+# named .github/ at all: the dirty query never asked about it and R2 never
+# applied to it, so the one commit that removes or neuters the dirty-path
+# guard job in CI -- the mechanism by which this guard is enforced -- could
+# ship with no claim and no reviewer. The claim registry already treated
+# ci.yml as claimable (AFC-202, AFC-203), so the registry and the guard
+# disagreed about whether the file is governed; the guard is now in line
+# with the registry. Only ci.yml is on R2, not .github/workflows/ as a
+# whole: a workflow added for an unrelated job is not a change to the
+# enforcement mechanism, and demanding a reviewer for it would be the
+# over-scope half of the trap. The DIRTY side names the whole workflows/
+# directory, because an unreviewed edit to any workflow file is unshippable
+# dirt all the same -- two lists, two different rules.
 REVIEW_REQUIRED_PATHS=(
   "services/directus/schema/engine/**"
   "services/directus/schema/migrations/**"
   "tests/db/**"
   "scripts/retention-literal-gate.sh"
   "scripts/r2-grandfathered.json"
+  ".github/workflows/ci.yml"
 )
 
 # THE THIRD LIST: paths that must never exist. Not a scope, not a review
@@ -441,7 +457,8 @@ MSG
 
 FAIL: the compliance path has unattributed changes.
 
-One or more files under scripts/, services/directus/schema/ or tests/ are
+One or more files under scripts/, services/directus/schema/, tests/ or
+.github/workflows/ are
 modified, staged, or untracked. On the compliance path that means unreviewed
 control code that is one `git add -A` from shipping under someone else's
 commit message.
@@ -473,7 +490,7 @@ self_test() {
   local repo="$tmp/repo"
   mkdir -p "$repo/scripts" "$repo/services/directus/schema/engine" \
            "$repo/services/directus/schema/migrations" "$repo/tests/db" \
-           "$repo/apps/web" "$repo/docs"
+           "$repo/apps/web" "$repo/docs" "$repo/.github/workflows"
   git -C "$repo" init -q
   git -C "$repo" config user.email guard@afc.test
   git -C "$repo" config user.name  "AFC guard self-test"
@@ -482,6 +499,7 @@ self_test() {
   printf 'SELECT 2;\n'        > "$repo/tests/db/assert.sql"
   printf 'print("x")\n'      > "$repo/apps/web/app.vue"
   printf '# notes\n'         > "$repo/docs/notes.md"
+  printf 'name: ci\non: push\njobs:\n  guard:\n    steps:\n      - run: echo guard\n' > "$repo/.github/workflows/ci.yml"
   git -C "$repo" add -A
   git -C "$repo" commit -q -m "clean tree"
 
@@ -515,6 +533,43 @@ self_test() {
     echo "  self-test ok: modified tracked file rejected, path and status line named"
   fi
   git -C "$repo" checkout -q -- scripts/gate.sh
+
+  # 1b. A modified .github/workflows/ci.yml MUST be rejected, with the path
+  #     and the status line named. AFC-235: the guard's own CI wiring was
+  #     outside GUARDED_PATHS, so the one commit that switches the guard off
+  #     in CI was clean by definition. Tracked and modified, like assertion 1,
+  #     because the dangerous shape is an edit to the live file, not a new one.
+  printf '      - run: echo weakened\n' >> "$repo/.github/workflows/ci.yml"
+  out=$(guard "$repo" 2>&1)
+  if [ $? -eq 0 ]; then
+    echo "SELF-TEST FAIL: guard accepted a modified .github/workflows/ci.yml"
+    rc=1
+  elif ! printf '%s' "$out" | grep -q '.github/workflows/ci.yml'; then
+    echo "SELF-TEST FAIL: guard failed without naming .github/workflows/ci.yml"
+    echo "$out" | sed 's/^/    /'
+    rc=1
+  elif ! printf '%s' "$out" | grep -qE '^ +M \.github/workflows/ci\.yml$'; then
+    echo "SELF-TEST FAIL: guard failed without echoing the ci.yml status line"
+    echo "$out" | sed 's/^/    /'
+    rc=1
+  else
+    echo "  self-test ok: modified ci.yml rejected, path and status line named"
+  fi
+  git -C "$repo" checkout -q -- .github/workflows/ci.yml
+
+  # 1c. Dirt elsewhere under .github/ MUST be accepted. The DIRTY side names
+  #     the workflows/ directory, not all of .github/: a guard that refuses an
+  #     unrelated community-health file blocks legitimate concurrent work,
+  #     which is how a guard gets disabled.
+  mkdir -p "$repo/.github/ISSUE_TEMPLATE"
+  printf '# bug report\n' > "$repo/.github/ISSUE_TEMPLATE/bug.md"
+  if guard "$repo" >/dev/null 2>&1; then
+    echo "  self-test ok: dirt under .github/ outside workflows/ accepted"
+  else
+    echo "SELF-TEST FAIL: guard rejected dirt under .github/ outside workflows/"
+    rc=1
+  fi
+  rm -rf "$repo/.github/ISSUE_TEMPLATE"
 
   # 2. An untracked file under the engine MUST be rejected. This is the exact
   #    shape of the AFC-175 quarantine: a new engine directory is collapsed to
@@ -730,6 +785,27 @@ Reviewed-by: Someone
   else
     echo "SELF-TEST FAIL: review_required did not match tests/db/60_retention_due_date.sql"
     rc=1
+  fi
+
+  # 9l. AFC-235: the CI wiring is on R2, exactly one file of it. ci.yml is
+  #     the file whose edit can switch the guard off in CI, so it needs a
+  #     named reviewer; a sibling workflow for an unrelated job does not, and
+  #     neither does a ci.yml anywhere else. The R2 list names the file, not
+  #     the directory -- the mirror of 9e's tests/db/** boundary, in the other
+  #     direction: there the rule is a subtree and the discriminator is a
+  #     file outside it, here the rule is a file and the discriminators are
+  #     the directory around it.
+  if ! review_required ".github/workflows/ci.yml"; then
+    echo "SELF-TEST FAIL: review_required did not match .github/workflows/ci.yml; AFC-235 added it to R2"
+    rc=1
+  elif review_required ".github/workflows/nightly.yml"; then
+    echo "SELF-TEST FAIL: review_required flagged .github/workflows/nightly.yml; R2 names ci.yml, not workflows/"
+    rc=1
+  elif review_required ".github/ci.yml"; then
+    echo "SELF-TEST FAIL: review_required flagged .github/ci.yml; R2 names workflows/ci.yml, not .github/"
+    rc=1
+  else
+    echo "  self-test ok: ci.yml matched; R2 file boundary respected"
   fi
 
 # ---------------------------------------------------------------------------
@@ -1358,6 +1434,54 @@ Issue: AFC-996
     else
       echo "  self-test ok: repository's root commit is checked, not skipped"
     fi
+  fi
+
+  # 11d2. AFC-235, through the subprocess path. A commit touching ONLY
+  #       .github/workflows/ci.yml, claimed but with no reviewer, MUST exit 1
+  #       and name the R2 violation. Before AFC-235 the guard reported nothing
+  #       about such a commit at all (Demonstration B: fb35bb7 emitted nine
+  #       COMMIT blocks and not one of them was fb35bb7). One repository, one
+  #       non-compliance commit plus the commit under test, so a refusal can
+  #       only be about this commit; claimed so R1 passes on purpose and a
+  #       failure here can only be R2.
+  local ci_repo="$tmp/cli-ci"
+  mkdir -p "$ci_repo/scripts" "$ci_repo/.github/workflows" "$ci_repo/$CLAIMS_DIR"
+  git -C "$ci_repo" init -q
+  git -C "$ci_repo" config user.email guard@afc.test
+  git -C "$ci_repo" config user.name  "AFC guard self-test"
+  cp "$cli_script" "$ci_repo/scripts/dirty-path-guard.sh"
+  printf '# fixture\n' > "$ci_repo/docs-notes.md"
+  git -C "$ci_repo" add docs-notes.md
+  git -C "$ci_repo" commit -q -m "chore: non-compliance fixture commit"
+  printf 'name: ci\non: push\njobs:\n  guard:\n    steps:\n      - run: echo weakened\n' > "$ci_repo/.github/workflows/ci.yml"
+  cat > "$ci_repo/$CLAIMS_DIR/AFC-995.json" <<'JSON'
+{ "issue": "AFC-995", "authorAgentId": "agent-elsewhere",
+  "claimedAt": "2026-10-06T03:00:00Z", "paths": [".github/workflows/ci.yml"] }
+JSON
+  git -C "$ci_repo" add -A
+  git -C "$ci_repo" commit -q -m "ci: weaken the guard job, no reviewer
+
+Issue: AFC-995
+"
+  local ci_rev ci_out ci_rc
+  ci_rev=$(git -C "$ci_repo" rev-parse HEAD)
+  ci_out=$(bash "$ci_repo/scripts/dirty-path-guard.sh" --check-commit "$ci_rev" 2>&1)
+  ci_rc=$?
+  if [ "$ci_rc" -eq 0 ]; then
+    echo "SELF-TEST FAIL: --check-commit $ci_rev exited 0 on an unreviewed ci.yml commit"
+    echo "    the guard's own wiring is still ungoverned; this is Demonstration B again"
+    printf '%s\n' "$ci_out" | sed 's/^/    /'
+    rc=1
+  elif ! printf '%s' "$ci_out" | grep -q "R2 VIOLATION"; then
+    echo "SELF-TEST FAIL: --check-commit exited $ci_rc without reporting an R2 violation"
+    printf '%s' "$ci_out" | sed 's/^/    /'
+    rc=1
+  elif ! printf '%s' "$ci_out" | grep -q '.github/workflows/ci.yml'; then
+    echo "SELF-TEST FAIL: the ci.yml commit was refused without naming .github/workflows/ci.yml"
+    printf '%s' "$ci_out" | sed 's/^/    /'
+    rc=1
+  else
+    echo "  self-test ok: unreviewed ci.yml commit refused through the subprocess path"
   fi
 
   # 11e. THE CALLER ARITY CONTRACT. 11a-11d drove the CLI and found that the
