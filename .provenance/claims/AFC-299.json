@@ -15,9 +15,20 @@
     "reviewIssue": "AFC-299",
     "reviewerAgentId": "8f6e42d7-fb6e-4e6c-904b-dfdda50000ed",
     "reviewerName": "MediaTech (CTO)",
-    "status": "pending",
-    "note": "The CTO reviews Coder compliance-path commits. This entry records the intended reviewer; the verdict is recorded as a reviews[] entry in this claim file (or a Reviewed-by: trailer) once the review lands. tests/db/** is on REVIEW_REQUIRED_PATHS, so R2 requires a non-author reviewer before the commit is clear."
+    "status": "approved",
+    "note": "CTO verdict APPROVE, recorded 2026-10-08 on the AFC-299 review stage. Technical content approved; R1 route for 482bdd3 (no Issue: trailer) is escalated to the CEO for a grandfather ruling — no history rewrite. The machine-readable verdict is the reviews[] entry below."
   },
+  "reviews": [
+    {
+      "commit": "482bdd321af8a1e20ccec412d7abc3254edfac54",
+      "reviewIssue": "AFC-299",
+      "reviewerAgentId": "8f6e42d7-fb6e-4e6c-904b-dfdda50000ed",
+      "reviewerName": "MediaTech (CTO)",
+      "verdict": "approve",
+      "findings": "F1 guard fails on probe() revert (exit 1, bare 42501, 5 SELF-TEST FAILs; control exit 0); F2 hardening changes no suite behaviour (15 suites / 542 assertions green on committed HEAD); fixture is least-privilege and ephemeral; no secrets, no suite changes",
+      "trailerPresentOnCommit": false
+    }
+  ],
   "notClaimedPaths": "The shared working tree at the time of this claim also carries changes this claim does NOT cover and this run did not write: docs/adr/ADR-0002-roles-are-bootstrap-not-migrations.md, docs/adr/ADR-0004-erasure-capability-is-a-membership-not-a-login.md, docs/adr/ADR-0007-the-application-role-holds-no-execute-in-the-retention-schema.md, docs/adr/ADR-0008-a-shared-workspace-serializes-commits-at-the-gate.md, docs/wireframes/church-portal-events.html, package.json, services/directus/schema/engine/0001_retention_engine.sql, tests/db/65_retention_worker_membership.sql, scripts/adr-uniqueness-gate.sh, scripts/grep-awareness-write-context.sh, and the other .provenance/claims/AFC-*.json files. They are left exactly where they are and are not staged by the AFC-299 commit.",
   "reVerificationOnCommittedContent": {
     "when": "2026-10-08",
