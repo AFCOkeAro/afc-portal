@@ -1,0 +1,19 @@
+{
+  "note": "Checklist for scripts/render-checkin-badge-kiosk-png.mjs. The script exits non-zero unless renders produced equals this entry count and every rendered width matches its own clip. PNG widths are not recorded here because they are not the contract; the clip width in the render report is. Device widths: S1, S2, S4, S5 are staff surfaces captured as whole sections at 1440. The eight kiosk states on S3 are mobile-first surfaces drawn 1:1 at 390 and captured individually.",
+  "html": "docs/wireframes/church-portal-checkin-badge-kiosk.html",
+  "screens": [
+    { "id": "S1", "kind": "section", "surface": "Single badge print — roster row + badge artefact", "route": "/events/:id/checkin" },
+    { "id": "S2", "kind": "section", "surface": "Batch badge print — selection, pre-print count, output", "route": "/events/:id/badges" },
+    { "id": "S3", "kind": "section", "surface": "Kiosk self check-in — all eight states", "route": "/events/:id/checkin/kiosk" },
+    { "id": "S3", "kind": "kiosk", "index": 1, "surface": "Kiosk 1 — idle / attract state", "route": "/events/:id/checkin/kiosk" },
+    { "id": "S3", "kind": "kiosk", "index": 2, "surface": "Kiosk 2 — code entry + scan prompt", "route": "/events/:id/checkin/kiosk" },
+    { "id": "S3", "kind": "kiosk", "index": 3, "surface": "Kiosk 3 — success, name / status / time", "route": "/events/:id/checkin/kiosk" },
+    { "id": "S3", "kind": "kiosk", "index": 4, "surface": "Kiosk 4 — already checked in at 09:41 (notice, not error)", "route": "/events/:id/checkin/kiosk" },
+    { "id": "S3", "kind": "kiosk", "index": 5, "surface": "Kiosk 5 — blocked, consent not recorded (rose)", "route": "/events/:id/checkin/kiosk" },
+    { "id": "S3", "kind": "kiosk", "index": 6, "surface": "Kiosk 6 — a child is routed to the welcome desk (rose)", "route": "/events/:id/checkin/kiosk" },
+    { "id": "S3", "kind": "kiosk", "index": 7, "surface": "Kiosk 7 — void badge, usherer's desk fallback (rose)", "route": "/events/:id/checkin/kiosk" },
+    { "id": "S3", "kind": "kiosk", "index": 8, "surface": "Kiosk 8 — device not enrolled, refused before lookup (amber)", "route": "/events/:id/checkin/kiosk" },
+    { "id": "S4", "kind": "section", "surface": "Device registry — enroll / retire", "route": "/events/:id/devices" },
+    { "id": "S5", "kind": "section", "surface": "Check-in-method report — how they came in", "route": "/reports/events/:id" }
+  ]
+}

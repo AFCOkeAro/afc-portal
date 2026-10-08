@@ -1,0 +1,258 @@
+{
+  "source_of_truth": "docs/wireframes/church-portal-checkin-badge-kiosk.html",
+  "manifest": "docs/wireframes/checkin-badge-kiosk-png/render-manifest.json",
+  "out_dir": "docs/wireframes/checkin-badge-kiosk-png",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "device_scale_factor": 1,
+  "capture_width": 1440,
+  "kiosk_width": 390,
+  "layout_width": 1440,
+  "chrome": "/home/paperclip/.cache/ms-playwright/chromium_headless_shell-1243/chrome-headless-shell-linux64/chrome-headless-shell",
+  "generated_by": "scripts/render-checkin-badge-kiosk-png.mjs",
+  "regenerable": true,
+  "manifest_entries": 13,
+  "renders_produced": 13,
+  "not_rendered": 0,
+  "width_mismatch": [],
+  "console": [],
+  "font_status": "loaded",
+  "results": [
+    {
+      "id": "S1",
+      "kind": "section",
+      "index": null,
+      "file": "S1.png",
+      "rule": "figure.frame at 1440",
+      "rendered": true,
+      "clip": {
+        "x": 0,
+        "y": 302,
+        "width": 1440,
+        "height": 1385
+      },
+      "png_width": 1440,
+      "png_height": 1385,
+      "bytes": 335200,
+      "width_matches_expectation": true
+    },
+    {
+      "id": "S2",
+      "kind": "section",
+      "index": null,
+      "file": "S2.png",
+      "rule": "figure.frame at 1440",
+      "rendered": true,
+      "clip": {
+        "x": 0,
+        "y": 1741,
+        "width": 1440,
+        "height": 1103
+      },
+      "png_width": 1440,
+      "png_height": 1103,
+      "bytes": 245951,
+      "width_matches_expectation": true
+    },
+    {
+      "id": "S3",
+      "kind": "section",
+      "index": null,
+      "file": "S3.png",
+      "rule": "figure.frame at 1440",
+      "rendered": true,
+      "clip": {
+        "x": 0,
+        "y": 2898,
+        "width": 1440,
+        "height": 1878
+      },
+      "png_width": 1440,
+      "png_height": 1878,
+      "bytes": 309406,
+      "width_matches_expectation": true
+    },
+    {
+      "id": "S3",
+      "kind": "kiosk",
+      "index": 1,
+      "file": "S3@390-1.png",
+      "rule": ".kiosk at its natural width",
+      "rendered": true,
+      "clip": {
+        "x": 77,
+        "y": 3045,
+        "width": 390,
+        "height": 430
+      },
+      "png_width": 390,
+      "png_height": 430,
+      "bytes": 21662,
+      "width_matches_expectation": true
+    },
+    {
+      "id": "S3",
+      "kind": "kiosk",
+      "index": 2,
+      "file": "S3@390-2.png",
+      "rule": ".kiosk at its natural width",
+      "rendered": true,
+      "clip": {
+        "x": 489,
+        "y": 3045,
+        "width": 390,
+        "height": 430
+      },
+      "png_width": 390,
+      "png_height": 430,
+      "bytes": 16028,
+      "width_matches_expectation": true
+    },
+    {
+      "id": "S3",
+      "kind": "kiosk",
+      "index": 3,
+      "file": "S3@390-3.png",
+      "rule": ".kiosk at its natural width",
+      "rendered": true,
+      "clip": {
+        "x": 901,
+        "y": 3045,
+        "width": 390,
+        "height": 430
+      },
+      "png_width": 390,
+      "png_height": 430,
+      "bytes": 19863,
+      "width_matches_expectation": true
+    },
+    {
+      "id": "S3",
+      "kind": "kiosk",
+      "index": 4,
+      "file": "S3@390-4.png",
+      "rule": ".kiosk at its natural width",
+      "rendered": true,
+      "clip": {
+        "x": 77,
+        "y": 3529,
+        "width": 390,
+        "height": 430
+      },
+      "png_width": 390,
+      "png_height": 430,
+      "bytes": 20150,
+      "width_matches_expectation": true
+    },
+    {
+      "id": "S3",
+      "kind": "kiosk",
+      "index": 5,
+      "file": "S3@390-5.png",
+      "rule": ".kiosk at its natural width",
+      "rendered": true,
+      "clip": {
+        "x": 489,
+        "y": 3529,
+        "width": 390,
+        "height": 430
+      },
+      "png_width": 390,
+      "png_height": 430,
+      "bytes": 20979,
+      "width_matches_expectation": true
+    },
+    {
+      "id": "S3",
+      "kind": "kiosk",
+      "index": 6,
+      "file": "S3@390-6.png",
+      "rule": ".kiosk at its natural width",
+      "rendered": true,
+      "clip": {
+        "x": 901,
+        "y": 3529,
+        "width": 390,
+        "height": 430
+      },
+      "png_width": 390,
+      "png_height": 430,
+      "bytes": 20550,
+      "width_matches_expectation": true
+    },
+    {
+      "id": "S3",
+      "kind": "kiosk",
+      "index": 7,
+      "file": "S3@390-7.png",
+      "rule": ".kiosk at its natural width",
+      "rendered": true,
+      "clip": {
+        "x": 77,
+        "y": 4012,
+        "width": 390,
+        "height": 430
+      },
+      "png_width": 390,
+      "png_height": 430,
+      "bytes": 20788,
+      "width_matches_expectation": true
+    },
+    {
+      "id": "S3",
+      "kind": "kiosk",
+      "index": 8,
+      "file": "S3@390-8.png",
+      "rule": ".kiosk at its natural width",
+      "rendered": true,
+      "clip": {
+        "x": 489,
+        "y": 3997,
+        "width": 390,
+        "height": 430
+      },
+      "png_width": 390,
+      "png_height": 430,
+      "bytes": 24512,
+      "width_matches_expectation": true
+    },
+    {
+      "id": "S4",
+      "kind": "section",
+      "index": null,
+      "file": "S4.png",
+      "rule": "figure.frame at 1440",
+      "rendered": true,
+      "clip": {
+        "x": 0,
+        "y": 4830,
+        "width": 1440,
+        "height": 1241
+      },
+      "png_width": 1440,
+      "png_height": 1241,
+      "bytes": 291957,
+      "width_matches_expectation": true
+    },
+    {
+      "id": "S5",
+      "kind": "section",
+      "index": null,
+      "file": "S5.png",
+      "rule": "figure.frame at 1440",
+      "rendered": true,
+      "clip": {
+        "x": 0,
+        "y": 6125,
+        "width": 1440,
+        "height": 991
+      },
+      "png_width": 1440,
+      "png_height": 991,
+      "bytes": 264217,
+      "width_matches_expectation": true
+    }
+  ]
+}
