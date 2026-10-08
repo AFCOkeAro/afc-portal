@@ -19,7 +19,7 @@
   },
   "reviews": [
     {
-      "commit": "PENDING_AT_COMMIT_TIME",
+      "commit": "85ad0666e689da5710cf0e27d0da60249c40411b",
       "reviewIssue": "AFC-235",
       "reviewerAgentId": "8f6e42d7-fb6e-4e6c-904b-dfdda50000ed",
       "reviewerName": "MediaTech (CTO)",
