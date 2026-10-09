@@ -125,6 +125,21 @@ jobs:
             range=HEAD
           fi
           echo "provenance check over $range"
+          # AFC-330 Gap 1: the push range is built from github.event.before,
+          # which DANGLES when main's history was rewritten (the backup-
+          # snapshot era): on a fresh runner checkout that SHA does not exist
+          # at all, so the guard exits 2 with no verdict. Exit 2 is correct
+          # fail-closed behaviour and stays the default -- an unreadable
+          # range must never certify as clean. What was missing is the
+          # fallback: when the range does not resolve, check a SUPERSET of
+          # the push instead (full HEAD history), and say so in the log.
+          # The fallback checks MORE commits, never fewer, so it cannot hide
+          # a violation the push range would have reported.
+          if ! git rev-list --count "$range" >/dev/null 2>&1; then
+            echo "provenance range '$range' does not resolve (dangling before-SHA, rewritten history); falling back to full HEAD history, a SUPERSET of the push"
+            range=HEAD
+            echo "provenance check over $range (fallback: full HEAD history)"
+          fi
           # ONE argument, as usage: documents. f64cc7d corrected the dispatcher
           # to pass (ROOT, REV) in the order check_commit() declares, so $2 is
           # the REV and the old second argument here landed in the REV slot,

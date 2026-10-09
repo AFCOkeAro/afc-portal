@@ -1,0 +1,22 @@
+{
+  "issue": "AFC-330",
+  "authorAgentId": "7b4aae3b-0da5-4de2-a1d8-4737943ef561",
+  "authorName": "Coder",
+  "claimedAt": "2026-10-09T00:00:00Z",
+  "whatThisFileIs": "An R1 authorship claim for the AFC-330 superset fallback in .github/workflows/ci.yml (Gap 1 under AFC-172): when the provenance range built from github.event.before does not resolve (dangling before-SHA after the backup-snapshot history rewrite), the step falls back to full HEAD history and says so in the log, instead of exiting 2 with no verdict.",
+  "paths": [
+    ".github/workflows/ci.yml",
+    ".provenance/claims/AFC-330.json"
+  ],
+  "basis": "Gap 1 runner failure #2 on AFC-172: run 37861662613, job Compliance-path dirty guard, step Compliance-path commit provenance exited 2 with `cannot resolve revision range '11a66384a579685c1c1a3119e2676a93c03e2598..HEAD'` because the before-SHA is dangling on a fresh runner checkout (verified locally: the object exists in the shared workspace but merge-base --is-ancestor against 21a3092 fails, so it is reachable from no ref on main). Exit 2 is correct fail-closed behaviour; the defect is the missing fallback in the CI wiring, not in scripts/dirty-path-guard.sh, which is untouched by this change. The fallback checks MORE commits (full HEAD history), never fewer, so it cannot hide a violation the push range would have reported.",
+  "verificationRecorded": "MEASURED in a clean worktree at origin/main 21a3092. scripts/dirty-path-guard.sh --self-test: 49 ok / 0 FAIL / exit 0. Old behaviour reproduced with a nonexistent SHA: --check-commit <dangling>..HEAD exits 2 with no verdict. New step logic with the same dangling range: prints the fallback lines and exits 1 with 31 named COMMIT blocks (honest red, as the issue's known follow-on predicts). A resolvable range (HEAD~3..HEAD) takes no fallback. The step still passes exactly ONE positional argument to --check-commit, so the CHECK_COMMIT_MAX_ARGS=1 dispatcher contract and self-test assertion 11e are unaffected (11e green in the self-test run).",
+  "r2Review": {
+    "reviewIssue": null,
+    "reviewerAgentId": null,
+    "reviewerName": null,
+    "status": "pending-cto-review-on-landing",
+    "note": "This commit touches .github/workflows/ci.yml, which is on REVIEW_REQUIRED_PATHS, so R2 requires a named reviewer. There is no independent security reviewer on this team (board declined the seat on cost); the CTO reviews on landing per the issue constraints. Until that review is recorded (Reviewed-by trailer on a rewrite, or a reviews[] entry in this claim naming the landed sha), --check-commit over any range containing this commit is honestly red on R2 for this commit, which is the gate working, not failing."
+  },
+  "reviews": [],
+  "notClaimedPaths": "This run worked in a fresh worktree at origin/main and committed only the two paths listed above, by explicit path. The shared workspace carries other agents' uncommitted work (AFC-313 bootstrap hunks in scripts/dirty-path-guard.sh, AFC-251 role-credential gate hunks in ci.yml, and other files listed in git status there); none of it was staged, committed, or modified by this run."
+}
