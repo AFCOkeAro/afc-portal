@@ -14,9 +14,19 @@
   "r2Review": {
     "reviewerAgentId": "8f6e42d7-fb6e-4e6c-904b-dfdda50000ed",
     "reviewerName": "MediaTech (CTO)",
-    "status": "pending",
-    "note": "The CTO reviews Coder compliance-path commits. This entry records the intended reviewer; the review is requested on AFC-320. The verdict will be recorded here as a reviews[] entry naming the landed commit sha, and the commit itself will carry the Reviewed-by: MediaTech (CTO) trailer. tests/db/** is on REVIEW_REQUIRED_PATHS, so R2 requires this non-author review before the commit is clear; no trailer is written before the review actually happens."
+    "status": "approved-with-degradation",
+    "note": "APPROVED on AFC-322 (2026-10-09) by the CTO as non-author R2 reviewer of Coder's commit 308e910. Verdict recorded below as a reviews[] entry naming the reviewed sha; per the dirty-path guard (R2 has two acceptable forms: Reviewed-by trailer OR claim entry), the entry clears R2 in place with trailerPresentOnCommit:false -- rewriting 308e910 to add a trailer would rehash descendants including other agents' commits cited as evidence, refused on the same grounds as the r2-grandfathered rationale. Standing degradation, stated in the verdict: there is no independent security reviewer on this team (board declined the seat on cost), so a CTO review of this compliance-path change is a recorded degradation, not independent review."
   },
   "notClaimedPaths": "The shared working tree at the time of this claim also carries changes this claim does NOT cover and this run did not write: .github/workflows/ci.yml, docs/adr/ADR-0002-roles-are-bootstrap-not-migrations.md, docs/planning/repo-plan.md, docs/security/credential-inventory.md, package.json, scripts/dirty-path-guard.sh, services/directus/schema/engine/0001_retention_engine.sql, services/directus/schema/migrations/README.md, tests/db/65_retention_worker_membership.sql, the other .provenance/claims/AFC-*.json files (AFC-205, AFC-240, AFC-263, AFC-272, AFC-313), docs/adr/ADR-0007-*.md, docs/adr/ADR-0008-*.md, docs/security/credential-surface-scan.md, docs/wireframes/church-portal-events.html, scripts/adr-uniqueness-gate.sh, scripts/credential-surface-scan.mjs, scripts/grep-awareness-write-context.sh, scripts/role-credential-gate.sh, services/directus/schema/migrations/20261006_0006_retention_target_denylist.sql and its rollback, and tests/db/68_retention_target_denylist.sql. They are left exactly where they are and are not staged by the AFC-320 commit.",
-  "reviews": []
+  "reviews": [
+    {
+      "commit": "308e910e9817b100a64afb7138d6341801dc419a",
+      "reviewIssue": "AFC-322",
+      "reviewerAgentId": "8f6e42d7-fb6e-4e6c-904b-dfdda50000ed",
+      "reviewerName": "MediaTech (CTO)",
+      "verdict": "approve",
+      "findings": "All four R2 checks pass, verified on this tree 2026-10-09. (1) Scope: git show --stat 308e910 touches exactly 2 new files, tests/db/69_retention_evidence_run.sql + .provenance/claims/AFC-320.json; no engine, bootstrap, migration, harness, or gate change. (2) Harness green: node scripts/run-db-tests.mjs -> 17 suites passed, 0 failed, 590 assertions, 0 failing (suite 69 [evidence] contributes its 24); retention-literal-gate.sh exit 0. (3) Technique: the live call is retention.run('scheduler:retention-nightly','live') as retention_job via SET SESSION AUTHORIZATION with session-identity + non-superuser preconditions asserted and harness identity restored before read-back (suite-67 convention, RESET avoided per PGlite 0.2.17 note); held-clock negative control present -- same run erases the due fixture (1->0, manifest deleted) and spares the held fixture (manifest skipped/held, clock 'held'); D3 person-row survival asserted; attribution asserted as session actor with scheduler string as label only. (4) Synthetic fixtures only: bodies are labels, DOBs generic 50-year offsets, no real personal data. Testing-strategy lens: the held control is what makes this evidence rather than a self-fulfilling erasure. Security lens: least-privilege impersonation (SESSION AUTHORIZATION, never SET ROLE from superuser) is asserted, not trusted. STANDING DEGRADATION: there is no independent security reviewer on this team (board declined the seat on cost); this CTO review of a compliance-path commit is a recorded degradation, not independent review.",
+      "trailerPresentOnCommit": false
+    }
+  ]
 }
