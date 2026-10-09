@@ -283,6 +283,21 @@ R2_VERDICT_APPROVE="approve"
 R2_VERDICT_CONDITIONAL="ship with fixes"
 R2_VERDICT_REFUSED="do not ship"
 
+# R2 reviewer-independence identities (AFC-340, item 3 of AFC-237; CEO decision).
+# Rule 1: on any REVIEW_REQUIRED_PATHS commit, reviewerAgentId == authorAgentId
+#   is a violation. Compared as exact strings after trimming.
+# Rule 2: on services/directus/schema/engine/** commits the reviewer must be
+#   outside the authoring chain entirely. Permitted reviewers are the
+#   SecurityEngineer seat and the CEO Operations seat; the CTO and the Coder
+#   are the authoring chain and may never review the irreversible path.
+# The only exception path is the grandfathered_lookup list below, whose
+# entries must each carry a reason naming the CEO ruling as approving party.
+R2_AUTHORING_CTO="8f6e42d7-fb6e-4e6c-904b-dfdda50000ed"
+R2_AUTHORING_CODER="7b4aae3b-0da5-4de2-a1d8-4737943ef561"
+R2_REVIEWER_SECURITY="a131248c-4ad3-4854-9a45-bd120a5d6c8e"
+R2_REVIEWER_OPERATIONS="fd46f39e-3c0e-4f82-b318-23c7eb4a2e32"
+R2_ENGINE_GLOB="services/directus/schema/engine/**"
+
 # ---------------------------------------------------------------------------
 # Caller arity contract.
 # ---------------------------------------------------------------------------
@@ -347,6 +362,64 @@ review_required() {
     glob_match "$p" "$path" && return 0
   done
   return 1
+}
+
+# Is $1 (repo-relative) on the irreversible engine path? Rule 2 is scoped to
+# exactly this glob; every other compliance path keeps behaving as today.
+is_engine_path() {
+  glob_match "$R2_ENGINE_GLOB" "$1"
+}
+
+# Is $1 (a reviewer string: trailer text or reviewerAgentId) a permitted
+# reviewer for the engine path? Allowlist, fail closed: anything that does not
+# name the SecurityEngineer seat or the CEO Operations seat -- by agent UUID
+# or by seat name -- is refused on engine commits. The CTO and the Coder are
+# the authoring chain, so they fail here by construction rather than by a
+# separate denylist that could drift out of sync with this list.
+is_engine_permitted_reviewer() {
+  local r="$1"
+  case "$r" in
+    *"$R2_REVIEWER_SECURITY"*|*"SecurityEngineer"*) return 0 ;;
+    *"$R2_REVIEWER_OPERATIONS"*|*"Operations"*|*"CEO"*) return 0 ;;
+  esac
+  return 1
+}
+
+# Print the trimmed authorAgentId recorded in claim file $1 (empty when the
+# file records none or cannot be read; callers treat empty as "no author").
+claim_file_author() {
+  node -e '
+    const fs = require("fs");
+    let d;
+    try { d = JSON.parse(fs.readFileSync(process.argv[1], "utf8")); }
+    catch { process.exit(0); }
+    const a = (typeof d.authorAgentId === "string") ? d.authorAgentId.trim() : "";
+    process.stdout.write(a);
+  ' "$1" 2>/dev/null
+}
+
+# Print the trimmed authorAgentId of the registered claim whose `issue` field
+# is $2 under $1 (empty when no such claim exists). This is the commit's own
+# author when the commit names that issue in its `Issue:` trailer.
+claim_author_for_issue() {
+  local root="$1" issue="$2" f a
+  [ -n "$issue" ] || return 0
+  [ -d "$root/$CLAIMS_DIR" ] || return 0
+  for f in "$root/$CLAIMS_DIR"/*.json; do
+    [ -e "$f" ] || continue
+    a=$(node -e '
+      const fs = require("fs");
+      let d;
+      try { d = JSON.parse(fs.readFileSync(process.argv[1], "utf8")); }
+      catch { process.exit(1); }
+      if (typeof d.issue !== "string" || d.issue.trim() !== process.argv[2]) process.exit(1);
+      const a = (typeof d.authorAgentId === "string") ? d.authorAgentId.trim() : "";
+      process.stdout.write(a);
+    ' "$f" "$issue" 2>/dev/null) || continue
+    # Empty author attributes nobody; only a recorded author can match.
+    if [ -n "$a" ]; then printf '%s' "$a"; return 0; fi
+  done
+  return 0
 }
 
 # Is $1 (repo-relative) a path this repository must never contain?
@@ -1332,6 +1405,219 @@ Reviewed-by: SecurityEngineer
         "$repo/tests/db/73_bootstrap_control.sql"
   git -C "$repo" add -A
   git -C "$repo" commit -q -m "chore(provenance): drop the AFC-313 bootstrap fixtures"
+
+  # 9q. REVIEWER INDEPENDENCE, Rules 1+2. AFC-340 (AFC-237 item 3 of 3).
+  #
+  #     The R2 check required commit, reviewIssue, reviewerAgentId and verdict
+  #     but never compared reviewerAgentId to authorAgentId, and the fixtures
+  #     used two distinct literals -- so the suite passed whether or not such
+  #     a comparison existed. A self-test that cannot tell its control is
+  #     missing is not a test of the control.
+  #
+  #     Rule 1 (scoped): on any REVIEW_REQUIRED_PATHS commit, a reviews[]
+  #     entry whose reviewerAgentId equals authorAgentId is a VIOLATION naming
+  #     both ids and the rule. Non-compliance paths behave exactly as today.
+  #     Rule 2 (the irreversible path): on services/directus/schema/engine/**
+  #     commits the reviewer must be outside the authoring chain entirely --
+  #     the SecurityEngineer seat or the CEO Operations seat, by UUID or by
+  #     seat name. The CTO and the Coder may never review engine commits.
+  #     The only exception path is the grandfathered_lookup list, whose
+  #     entries must each carry a reason naming the CEO ruling; no new escape
+  #     hatch is introduced here.
+  #
+  #     Each fixture below is scoped to its own commit's HEAD^..HEAD (9o
+  #     style), so a green can only be about the commit under test. The Rule 1
+  #     fixture (9q-a) is the load-bearing assertion for the equality check:
+  #     delete the comparison and it goes red. The Rule 2 fixtures (9q-c/d)
+  #     are load-bearing for the engine allowlist the same way.
+  local CTO_ID="8f6e42d7-fb6e-4e6c-904b-dfdda50000ed"
+  local CODER_ID="7b4aae3b-0da5-4de2-a1d8-4737943ef561"
+  local SECENG_ID="a131248c-4ad3-4854-9a45-bd120a5d6c8e"
+
+  # 9q-a. Rule 1: self-review on a compliance path is a violation, and the
+  #      refusal names both ids and the rule.
+  printf 'SELECT 940;\n' > "$repo/tests/db/80_rule1_self.sql"
+  git -C "$repo" add -A
+  git -C "$repo" commit -q -m "feat(retention): the commit the Rule-1 fixture reads
+
+Issue: AFC-940
+"
+  local rev940 r9q_out r9q_rc
+  rev940=$(git -C "$repo" rev-parse HEAD)
+  cat > "$repo/.provenance/claims/AFC-940.json" <<JSON
+{ "issue": "AFC-940", "authorAgentId": "agent-author",
+  "claimedAt": "2026-10-09T00:00:00Z", "paths": ["tests/db/**"],
+  "reviews": [{ "commit": "$rev940", "reviewIssue": "AFC-939",
+    "reviewerAgentId": "agent-author", "verdict": "approve", "findings": "" }] }
+JSON
+  git -C "$repo" add -A
+  git -C "$repo" commit -q -m "chore(provenance): self-review fixture (reviewer equals author)"
+  r9q_out=$(check_commit "$repo" "$rev940^..$rev940" 2>&1); r9q_rc=$?
+  if [ "$r9q_rc" -eq 0 ]; then
+    echo "SELF-TEST FAIL: a reviews[] entry whose reviewerAgentId equals its authorAgentId was accepted (Rule 1, AFC-340)"
+    echo "$r9q_out" | sed 's/^/    /'
+    rc=1
+  elif ! printf '%s' "$r9q_out" | grep -q 'Rule 1'; then
+    echo "SELF-TEST FAIL: self-review refused without naming Rule 1 (AFC-340)"
+    echo "$r9q_out" | sed 's/^/    /'
+    rc=1
+  elif ! printf '%s' "$r9q_out" | grep -q 'agent-author'; then
+    echo "SELF-TEST FAIL: self-review refusal did not name the matching ids (AFC-340)"
+    echo "$r9q_out" | sed 's/^/    /'
+    rc=1
+  elif printf '%s' "$r9q_out" | grep -q 'ok  R2 review record'; then
+    echo "SELF-TEST FAIL: self-review printed an ok line alongside the violation (AFC-340)"
+    echo "$r9q_out" | sed 's/^/    /'
+    rc=1
+  else
+    echo "  self-test ok: reviewerAgentId equal to authorAgentId is a Rule-1 violation naming both ids"
+  fi
+
+  # 9q-b. Rule 1 is SCOPED: the same self-review shape on a
+  #      non-compliance-path commit is not a violation.
+  printf '# 941\n' > "$repo/docs/notes-941.md"
+  git -C "$repo" add -A
+  git -C "$repo" commit -q -m "docs: the commit the Rule-1 scope fixture reads
+
+Issue: AFC-941
+"
+  local rev941
+  rev941=$(git -C "$repo" rev-parse HEAD)
+  cat > "$repo/.provenance/claims/AFC-941.json" <<JSON
+{ "issue": "AFC-941", "authorAgentId": "agent-author",
+  "claimedAt": "2026-10-09T00:00:00Z", "paths": ["docs/**"],
+  "reviews": [{ "commit": "$rev941", "reviewIssue": "AFC-939",
+    "reviewerAgentId": "agent-author", "verdict": "approve", "findings": "" }] }
+JSON
+  git -C "$repo" add -A
+  git -C "$repo" commit -q -m "chore(provenance): same self-review shape, non-compliance path"
+  r9q_out=$(check_commit "$repo" "$rev941^..$rev941" 2>&1); r9q_rc=$?
+  if [ "$r9q_rc" -ne 0 ]; then
+    echo "SELF-TEST FAIL: the same self-review shape on a non-compliance path was refused; Rule 1 is scoped to REVIEW_REQUIRED_PATHS (AFC-340)"
+    echo "$r9q_out" | sed 's/^/    /'
+    rc=1
+  else
+    echo "  self-test ok: self-review shape on a non-compliance path is not a violation"
+  fi
+
+  # 9q-c. Rule 2, reviews[] form: an engine commit reviewed by the CTO or the
+  #      Coder is a violation; reviewed by the SecurityEngineer it is clean.
+  #      The author is a neutral third party throughout, so Rule 1 cannot
+  #      fire -- every red below is Rule 2 and only Rule 2.
+  printf 'SELECT 942;\n' > "$repo/services/directus/schema/engine/0099_indep_probe.sql"
+  git -C "$repo" add -A
+  git -C "$repo" commit -q -m "feat(retention): the commit the Rule-2 fixture reads
+
+Issue: AFC-942
+"
+  local rev942
+  rev942=$(git -C "$repo" rev-parse HEAD)
+  write_indep_942() {
+    cat > "$repo/.provenance/claims/AFC-942.json" <<JSON
+{ "issue": "AFC-942", "authorAgentId": "agent-author",
+  "claimedAt": "2026-10-09T00:00:00Z", "paths": ["services/directus/schema/engine/**"],
+  "reviews": [{ "commit": "$rev942", "reviewIssue": "AFC-939",
+    "reviewerAgentId": "$1", "verdict": "approve", "findings": "" }] }
+JSON
+    git -C "$repo" add -A
+    git -C "$repo" commit -q -m "chore(provenance): Rule-2 fixture, reviewer $2"
+  }
+  write_indep_942 "$CTO_ID" "CTO"
+  r9q_out=$(check_commit "$repo" "$rev942^..$rev942" 2>&1); r9q_rc=$?
+  if [ "$r9q_rc" -eq 0 ]; then
+    echo "SELF-TEST FAIL: an engine commit reviewed by the CTO was accepted (Rule 2, AFC-340)"
+    echo "$r9q_out" | sed 's/^/    /'
+    rc=1
+  elif ! printf '%s' "$r9q_out" | grep -q 'Rule 2'; then
+    echo "SELF-TEST FAIL: CTO-reviewed engine commit refused without naming Rule 2 (AFC-340)"
+    echo "$r9q_out" | sed 's/^/    /'
+    rc=1
+  else
+    echo "  self-test ok: an engine commit reviewed by the CTO is a Rule-2 violation"
+  fi
+  write_indep_942 "$CODER_ID" "Coder"
+  r9q_out=$(check_commit "$repo" "$rev942^..$rev942" 2>&1); r9q_rc=$?
+  if [ "$r9q_rc" -eq 0 ]; then
+    echo "SELF-TEST FAIL: an engine commit reviewed by the Coder was accepted (Rule 2, AFC-340)"
+    echo "$r9q_out" | sed 's/^/    /'
+    rc=1
+  elif ! printf '%s' "$r9q_out" | grep -q 'Rule 2'; then
+    echo "SELF-TEST FAIL: Coder-reviewed engine commit refused without naming Rule 2 (AFC-340)"
+    echo "$r9q_out" | sed 's/^/    /'
+    rc=1
+  else
+    echo "  self-test ok: an engine commit reviewed by the Coder is a Rule-2 violation"
+  fi
+  write_indep_942 "$SECENG_ID" "SecurityEngineer"
+  r9q_out=$(check_commit "$repo" "$rev942^..$rev942" 2>&1); r9q_rc=$?
+  if [ "$r9q_rc" -ne 0 ]; then
+    echo "SELF-TEST FAIL: an engine commit reviewed by the SecurityEngineer was refused (Rule 2, AFC-340)"
+    echo "$r9q_out" | sed 's/^/    /'
+    rc=1
+  elif printf '%s' "$r9q_out" | grep -q 'VIOLATION'; then
+    echo "SELF-TEST FAIL: SecurityEngineer-reviewed engine commit passed with a VIOLATION line (AFC-340)"
+    echo "$r9q_out" | sed 's/^/    /'
+    rc=1
+  else
+    echo "  self-test ok: an engine commit reviewed by the SecurityEngineer is clean"
+  fi
+
+  # 9q-d. Rule 2, trailer form, both directions: an engine commit whose
+  #      Reviewed-by names the authoring chain is refused; the same path
+  #      reviewed by the SecurityEngineer passes. R1 is satisfied on purpose
+  #      (Issue trailer plus a covering claim with a named author), so a
+  #      refusal here can only be Rule 2.
+  cat > "$repo/.provenance/claims/AFC-943.json" <<'JSON'
+{ "issue": "AFC-943", "authorAgentId": "agent-author",
+  "claimedAt": "2026-10-09T00:00:00Z", "paths": ["services/directus/schema/engine/**"] }
+JSON
+  printf 'SELECT 943;\n' > "$repo/services/directus/schema/engine/0098_trailer_probe.sql"
+  git -C "$repo" add -A
+  git -C "$repo" commit -q -m "feat(retention): engine commit reviewed from inside the chain
+
+Issue: AFC-943
+Reviewed-by: $CTO_ID
+"
+  local rev943
+  rev943=$(git -C "$repo" rev-parse HEAD)
+  r9q_out=$(check_commit "$repo" "$rev943^..$rev943" 2>&1); r9q_rc=$?
+  if [ "$r9q_rc" -eq 0 ]; then
+    echo "SELF-TEST FAIL: an engine commit with a Reviewed-by trailer naming the CTO was accepted (Rule 2, AFC-340)"
+    echo "$r9q_out" | sed 's/^/    /'
+    rc=1
+  elif ! printf '%s' "$r9q_out" | grep -q 'Rule 2'; then
+    echo "SELF-TEST FAIL: CTO-trailer engine commit refused without naming Rule 2 (AFC-340)"
+    echo "$r9q_out" | sed 's/^/    /'
+    rc=1
+  else
+    echo "  self-test ok: an engine commit trailered by the CTO is a Rule-2 violation"
+  fi
+  printf 'SELECT 944;\n' > "$repo/services/directus/schema/engine/0097_trailer_clean.sql"
+  git -C "$repo" add -A
+  git -C "$repo" commit -q -m "feat(retention): engine commit reviewed outside the chain
+
+Issue: AFC-943
+Reviewed-by: SecurityEngineer
+"
+  local rev944
+  rev944=$(git -C "$repo" rev-parse HEAD)
+  r9q_out=$(check_commit "$repo" "$rev944^..$rev944" 2>&1); r9q_rc=$?
+  if [ "$r9q_rc" -ne 0 ]; then
+    echo "SELF-TEST FAIL: an engine commit trailered by the SecurityEngineer was refused (Rule 2, AFC-340)"
+    echo "$r9q_out" | sed 's/^/    /'
+    rc=1
+  else
+    echo "  self-test ok: an engine commit trailered by the SecurityEngineer is clean"
+  fi
+
+  rm -f "$repo/tests/db/80_rule1_self.sql" "$repo/docs/notes-941.md" \
+        "$repo/services/directus/schema/engine/0099_indep_probe.sql" \
+        "$repo/services/directus/schema/engine/0098_trailer_probe.sql" \
+        "$repo/services/directus/schema/engine/0097_trailer_clean.sql" \
+        "$repo/.provenance/claims/AFC-940.json" "$repo/.provenance/claims/AFC-941.json" \
+        "$repo/.provenance/claims/AFC-942.json" "$repo/.provenance/claims/AFC-943.json"
+  git -C "$repo" add -A
+  git -C "$repo" commit -q -m "chore(provenance): drop the Rule-1/Rule-2 independence fixtures"
 
   # 9l. R1 MUST MEAN "THIS COMMIT IS ATTRIBUTABLE", NOT "SOME CLAIM MENTIONS THIS
   #     PATH". AFC-269, raised from the independent R2 review of d54b9fa.
@@ -2932,12 +3218,69 @@ MSG
     reviewer=$(printf '%s
 ' "$body" | sed -n 's/^Reviewed-by:[[:space:]]*//p' | head -1)
     if [ -n "$reviewer" ]; then
-      echo "  ok  Reviewed-by: $reviewer (trailer)"
+      # Rule 2 on the trailer path: a `Reviewed-by:` trailer names a reviewer,
+      # so an engine commit whose trailer names the authoring chain (the CTO
+      # or the Coder, by id or by seat name) -- or anyone else outside the
+      # two permitted seats -- is a violation, not a pass.
+      local _engine_hit=""
+      local _fp
+      for _fp in "${flagged[@]}"; do
+        if is_engine_path "$_fp"; then _engine_hit="$_fp"; break; fi
+      done
+      if [ -n "$_engine_hit" ] && ! is_engine_permitted_reviewer "$reviewer"; then
+        echo "  R2 VIOLATION (Rule 2, engine reviewer independence): reviewer '$reviewer'"
+        echo "    is not outside the authoring chain for engine commit ${rev:0:12}."
+        echo "    Permitted reviewers are the SecurityEngineer seat and the CEO"
+        echo "    Operations seat; neither the CTO nor the Coder may review"
+        echo "    $R2_ENGINE_GLOB (touched: $_engine_hit)."
+        rc=1
+      else
+        echo "  ok  Reviewed-by: $reviewer (trailer)"
+      fi
     else
       record=$(review_record "$root" "$rev")
       rr_rc=$?
       case "$rr_rc" in
         0)
+          # AFC-340 (AFC-237 item 3): reviewer independence, Rules 1+2. A
+          # complete record whose reviewer IS the author is not a review --
+          # it is the registry approving itself -- and an engine commit
+          # reviewed from inside the authoring chain is refused on the
+          # irreversible path. Both are VIOLATIONS, and a violated record
+          # confers nothing: the verdict below is not classified, because a
+          # non-independent review has no verdict worth reading.
+          local _r2_reviewer _r2_claimfile _r2_host_author _r2_issue _r2_issue_author _r2_dead
+          _r2_dead=0
+          _r2_reviewer=$(cut -d'|' -f2 <<<"$record")
+          _r2_claimfile=$(cut -d'|' -f4 <<<"$record")
+          _r2_host_author=$(claim_file_author "$_r2_claimfile")
+          _r2_issue=$(printf '%s
+' "$body" | sed -n 's/^Issue:[[:space:]]*//p' | head -1)
+          _r2_issue_author=$(claim_author_for_issue "$root" "$_r2_issue")
+          if { [ -n "$_r2_host_author" ] && [ "$_r2_reviewer" = "$_r2_host_author" ]; } \
+            || { [ -n "$_r2_issue_author" ] && [ "$_r2_reviewer" = "$_r2_issue_author" ]; }; then
+            echo "  R2 VIOLATION (Rule 1, reviewer independence): reviewerAgentId '$_r2_reviewer'"
+            echo "    equals authorAgentId for ${rev:0:12} (claim author: '${_r2_host_author:-none recorded}')."
+            echo "    A review of one's own change is not a review. Name a reviewer"
+            echo "    who is not the author."
+            rc=1
+            _r2_dead=1
+          fi
+          local _r2_engine_hit=""
+          local _r2_fp
+          for _r2_fp in "${flagged[@]}"; do
+            if is_engine_path "$_r2_fp"; then _r2_engine_hit="$_r2_fp"; break; fi
+          done
+          if [ -n "$_r2_engine_hit" ] && ! is_engine_permitted_reviewer "$_r2_reviewer"; then
+            echo "  R2 VIOLATION (Rule 2, engine reviewer independence): reviewer '$_r2_reviewer'"
+            echo "    is not outside the authoring chain for engine commit ${rev:0:12}."
+            echo "    Permitted reviewers are the SecurityEngineer seat and the CEO"
+            echo "    Operations seat; neither the CTO nor the Coder may review"
+            echo "    $R2_ENGINE_GLOB (touched: $_r2_engine_hit)."
+            rc=1
+            _r2_dead=1
+          fi
+          if [ "$_r2_dead" -eq 0 ]; then
           # AFC-236: classify the verdict's VALUE, not just its presence. The
           # old code printed ok for any non-empty string, so a recorded
           # "do not ship" exited 0 with an ok line -- the gate certifying a
@@ -2984,7 +3327,8 @@ MSG
             echo "        recorded in:  $(cut -d'|' -f4 <<<"$record")"
             rc=1
           fi
-          ;;
+          fi # _r2_dead: a non-independent record confers no verdict to classify
+           ;;
         3)
           echo "  R2 VIOLATION: the claim registry carries a reviews[] entry for"
           echo "    this commit, but it is INCOMPLETE."
@@ -3162,6 +3506,11 @@ CI the second reviewer for every control a machine can decide.
     `Reviewed-by:` trailer, OR as a `reviews[]` entry in a claim file that
     names this sha together with a reviewIssue, a reviewerAgentId and a
     verdict. An entry missing any one of those four is a violation, not a skip.
+    The reviewer must be independent of the author (Rule 1: reviewerAgentId
+    equal to authorAgentId is a violation on any compliance-path commit), and
+    an engine-path commit must be reviewed outside the authoring chain
+    entirely (Rule 2: only the SecurityEngineer seat or the CEO Operations
+    seat; never the CTO or the Coder).
 
 Commits exempt from R2 are named in scripts/r2-grandfathered.json with their
 reason, and print their exemption every time they are seen. There are three,
