@@ -113,18 +113,18 @@ would be critical if it recurred on a stable tree.
   green in both the UTC session and the `Africa/Lagos` session (as reported on
   [AFC-363](/AFC/issues/AFC-363)). PGlite green is the fast local gate; it is
   not the §0.10.5 discharge.
-- **`db-tests-postgres` (Gap 2 of [AFC-172](/AFC/issues/AFC-172), this change).**
-  `.github/workflows/ci.yml` now carries a `db-tests-postgres` job: a
+- **`db-tests-postgres` (Gap 2 of [AFC-172](/AFC/issues/AFC-172), closed).**
+  `.github/workflows/ci.yml` carries a `db-tests-postgres` job: a
   `postgres:16` service container, a fail-closed readiness wait, then the
   identical suite via `PG_URL` — ledger `--self-test`, default run,
   `Africa/Lagos` run — downstream of `dirty-path-guard`, beside (not instead
-  of) the PGlite job. First CI verdict: PENDING at the time of this commit.
-  This change is committed locally and lands through CTO review; the resulting
-  Actions run URL is pasted as a comment on [AFC-172](/AFC/issues/AFC-172) on
-  landing, and the job's verdict (green, or red with a diagnosis — never
-  silenced) is recorded here in a follow-up.
-- §0.10.5 stays open until a green `db-tests-postgres` run with a trustworthy
-  ledger is recorded in this section.
+  of) the PGlite job. First CI verdict: GREEN — Actions run `37942898778`
+  (first run of commit `a17db05` on `main`): all 8 jobs success, including
+  `db-tests-postgres` on the real `postgres:16` binary. Run URL pasted as a
+  comment on [AFC-172](/AFC/issues/AFC-172).
+- §0.10.5 is discharged by run `37942898778`: a green `db-tests-postgres` run
+  with a trustworthy ledger (the ledger `--self-test` step precedes the suite
+  in the same job).
 
 ## Alternatives considered
 
