@@ -188,12 +188,32 @@ GUARDED_PATHS=(
 )
 
 # R2 of the provenance rule: the paths where a commit needs a named reviewer.
-# This is NOT the same list as GUARDED_PATHS. bootstrap/ is on the compliance
-# path for dirty-state purposes but is not in R2, and R2 names
-# scripts/retention-literal-gate.sh and scripts/r2-grandfathered.json
-# specifically rather than all of scripts/. Three lists, three different rules;
-# conflating any two would either under-scope one or over-scope the other.
-# Kept separate on purpose -- see the header's THREE LISTS section.
+# This is NOT the same list as GUARDED_PATHS. R2 names scripts/retention-
+# literal-gate.sh and scripts/r2-grandfathered.json specifically rather than
+# all of scripts/. Three lists, three different rules; conflating any two would
+# either under-scope one or over-scope the other. Kept separate on purpose --
+# see the header's THREE LISTS section.
+#
+# services/directus/schema/bootstrap/** was added by AFC-313. It is the only
+# place on the deploy path that creates a role (ADR-0002: roles are bootstrap,
+# never migrations). The erase-capable credential -- retention_job, the only
+# identity that can erase a person's data -- is created by 0001_roles.sql.
+# (DIRECTUS_KEY and DIRECTUS_SECRET are provisioned via the Actions
+# environment, not from bootstrap; throwaway test roles under tests/db/**
+# were already on R2.) Before AFC-313 a comment in the
+# engine needed a second reader and a privilege-boundary edit in bootstrap did
+# not, which is the exact inversion this list exists to prevent: the file most
+# likely to be edited by whoever is mid-task, and the one where a quiet GRANT
+# is least visible, was the only role-bearing path that could land with no
+# review record at all.
+#
+# NOT-ALLOWLISTED, ON PURPOSE. Nothing under bootstrap/ is exempt. The whole
+# directory is on R2, README.md included, because the README documents the
+# privilege split the SQL creates and an edit to either is the same class of
+# change. There is deliberately no `bootstrap/<x> is fine` line: if a construct
+# ever needs an exemption, the exemption is an R2 edit to this list that names
+# the construct precisely. The guard's escape hatches are themselves guarded --
+# the convention 9f55a05 (AFC-233) established for scripts/r2-grandfathered.json.
 #
 # scripts/r2-grandfathered.json was added by AFC-233. Before that, the dirty
 # guard covered the file (it is under scripts/) but R2 did not: the exemption
@@ -216,6 +236,7 @@ GUARDED_PATHS=(
 REVIEW_REQUIRED_PATHS=(
   "services/directus/schema/engine/**"
   "services/directus/schema/migrations/**"
+  "services/directus/schema/bootstrap/**"
   "tests/db/**"
   "scripts/retention-literal-gate.sh"
   "scripts/r2-grandfathered.json"
@@ -250,6 +271,17 @@ CLAIMS_DIR=".provenance/claims"
 
 # The R2 grandfather list. Lives under scripts/ on purpose -- see the header.
 GRANDFATHERED_FILE="scripts/r2-grandfathered.json"
+
+# R2 verdict vocabulary (AFC-236, CEO decision 2026-10-06). Declared ONCE, here:
+# the only recognised review verdicts, and the classifier in check_commit()
+# compares against these three variables rather than repeating the strings.
+# An absent verdict stays a violation through the completeness check in
+# review_record(); anything non-empty that matches none of these is a
+# fail-closed VIOLATION, never an ok. The `Reviewed-by:` trailer path carries
+# no verdict and is untouched by this vocabulary.
+R2_VERDICT_APPROVE="approve"
+R2_VERDICT_CONDITIONAL="ship with fixes"
+R2_VERDICT_REFUSED="do not ship"
 
 # ---------------------------------------------------------------------------
 # Caller arity contract.
@@ -774,6 +806,19 @@ Reviewed-by: Someone
       # file could be edited with no review record.
       echo "SELF-TEST FAIL: review_required did not match scripts/r2-grandfathered.json; AFC-233 added it to R2"
       rc=1
+    elif ! review_required "services/directus/schema/bootstrap/0001_roles.sql"; then
+      # AFC-313: bootstrap is the only place in the repository that creates a
+      # role, so it is on R2. Before AFC-313 the dirty guard covered it (it is
+      # under services/directus/schema/) but R2 did not, so the privilege
+      # boundary itself could be committed with no review record.
+      echo "SELF-TEST FAIL: review_required did not match services/directus/schema/bootstrap/0001_roles.sql; AFC-313 added it to R2"
+      rc=1
+    elif review_required "services/directus/schema/bootstrap-notes/x.sql"; then
+      # ...and the boundary is the DIRECTORY, not the string 'bootstrap'. A
+      # pattern loose enough to flag a sibling prefix would demand a reviewer
+      # for paths that create no role, which is the over-scope half of the trap.
+      echo "SELF-TEST FAIL: review_required flagged services/directus/schema/bootstrap-notes/x.sql; R2 names bootstrap/**, not the bootstrap prefix"
+      rc=1
     elif ! review_required "services/directus/schema/migrations/rollback/x.down.sql"; then
       # ...and '**' must still cross a '/', or a rollback script written during
       # an incident is unreviewable, which is the exact moment review matters.
@@ -1064,6 +1109,75 @@ JSON
   else
     echo "  self-test ok: complete grandfather entry (reason + ruling) honoured"
   fi
+
+  # 9o. BOOTSTRAP IS ON R2, AND THE CONTROL IS BIDIRECTIONAL. AFC-313.
+  #
+  #     services/directus/schema/bootstrap/ is the only place in the repository
+  #     that creates a role (ADR-0002). Before AFC-313 the dirty guard covered
+  #     it (it is under services/directus/schema/) but R2 did not, so the grant
+  #     that makes retention_job able to erase a person's data could be
+  #     committed with no review record -- while a comment in the engine could
+  #     not. This is the inversion AFC-313 exists to close.
+  #
+  #     Both directions, because one alone proves nothing. An unreviewed
+  #     bootstrap commit MUST be refused; the same path with a claim and a named
+  #     reviewer MUST pass, so a matcher that refuses everything cannot make the
+  #     first assertion green (the same blind-check failure 9c and 9n catch).
+  mkdir -p "$repo/services/directus/schema/bootstrap"
+  printf 'CREATE ROLE retention_job LOGIN;\n' > "$repo/services/directus/schema/bootstrap/0001_roles.sql"
+  printf 'SELECT 7;\n' > "$repo/tests/db/73_bootstrap_control.sql"
+  cat > "$repo/.provenance/claims/AFC-313.json" <<'JSON'
+{ "issue": "AFC-313", "authorAgentId": "agent-bootstrap",
+  "claimedAt": "2026-10-08T22:40:00Z",
+  "paths": ["services/directus/schema/bootstrap/**", "tests/db/**"] }
+JSON
+  git -C "$repo" add -A
+  git -C "$repo" commit -q -m "feat(schema): an unreviewed bootstrap edit
+
+Issue: AFC-313
+"
+  local boot_out boot_rc
+  boot_out=$(check_commit "$repo" "HEAD^..HEAD" 2>&1); boot_rc=$?
+  if [ "$boot_rc" -eq 0 ]; then
+    echo "SELF-TEST FAIL: check_commit accepted an UNREVIEWED bootstrap commit; AFC-313 put bootstrap on R2"
+    echo "$boot_out" | sed 's/^/    /'
+    rc=1
+  elif ! printf '%s' "$boot_out" | grep -q 'bootstrap/0001_roles.sql'; then
+    echo "SELF-TEST FAIL: the unreviewed bootstrap refusal did not name the bootstrap path"
+    echo "$boot_out" | sed 's/^/    /'
+    rc=1
+  else
+    echo "  self-test ok: an unreviewed bootstrap commit is refused by R2 and names the path"
+  fi
+
+  # ...and the SAME path with a named reviewer MUST pass. This is the direction
+  # that proves the refusal above is about the missing reviewer, not about
+  # bootstrap/ being refused wholesale.
+  printf 'ALTER ROLE retention_job WITH CONNECTION LIMIT 1;\n' >> "$repo/services/directus/schema/bootstrap/0001_roles.sql"
+  git -C "$repo" add -A
+  git -C "$repo" commit -q -m "feat(schema): the same bootstrap edit, now reviewed
+
+Issue: AFC-313
+Reviewed-by: SecurityEngineer
+"
+  boot_out=$(check_commit "$repo" "HEAD^..HEAD" 2>&1); boot_rc=$?
+  if [ "$boot_rc" -ne 0 ]; then
+    echo "SELF-TEST FAIL: check_commit refused a claimed, reviewed bootstrap commit"
+    echo "$boot_out" | sed 's/^/    /'
+    rc=1
+  elif ! printf '%s' "$boot_out" | grep -q 'ok  Reviewed-by: SecurityEngineer'; then
+    echo "SELF-TEST FAIL: the reviewed bootstrap commit passed without naming the reviewer"
+    echo "$boot_out" | sed 's/^/    /'
+    rc=1
+  else
+    echo "  self-test ok: the same bootstrap commit passes once a reviewer is named"
+  fi
+
+  rm -f "$repo/.provenance/claims/AFC-313.json" \
+        "$repo/services/directus/schema/bootstrap/0001_roles.sql" \
+        "$repo/tests/db/73_bootstrap_control.sql"
+  git -C "$repo" add -A
+  git -C "$repo" commit -q -m "chore(provenance): drop the AFC-313 bootstrap fixtures"
 
   # 9l. R1 MUST MEAN "THIS COMMIT IS ATTRIBUTABLE", NOT "SOME CLAIM MENTIONS THIS
   #     PATH". AFC-269, raised from the independent R2 review of d54b9fa.
@@ -2150,7 +2264,7 @@ claims_covering() {
 # failure the registry exists to prevent. So a partial entry is a VIOLATION
 # (exit 3), not a skip and not a pass.
 #
-# Prints "issue|reviewer|verdict|claimFile" on success.
+# Prints "issue|reviewer|verdict|claimFile|findings" on success.
 #   0  complete review record found
 #   1  no reviews[] entry for this sha at all
 #   2  an entry exists but names a different sha
@@ -2197,7 +2311,15 @@ review_record() {
         process.stderr.write(`${process.argv[1]}: reviews[] entry for ${best.commit || sha} is missing ${miss.join(", ")}\n`);
         process.exit(3);
       }
-      process.stdout.write([best.reviewIssue, best.reviewerAgentId, best.verdict, process.argv[1]].join("|"));
+      // Findings travel as the fifth field so check_commit() can classify the
+      // verdict (AFC-236) without re-reading the registry. A string stays a
+      // string; an array is joined; anything else is empty. The first four
+      // fields keep their positions, so existing cut -f1..-f4 readers agree.
+      let findings = "";
+      if (typeof best.findings === "string") findings = best.findings;
+      else if (Array.isArray(best.findings)) findings = best.findings.map(String).join(", ");
+      findings = findings.replace(/\|/g, "/").trim();
+      process.stdout.write([best.reviewIssue, best.reviewerAgentId, best.verdict, process.argv[1], findings].join("|"));
     ' "$f" "$sha"
     local rc=$?
     case "$rc" in
@@ -2662,11 +2784,52 @@ MSG
       rr_rc=$?
       case "$rr_rc" in
         0)
-          echo "  ok  R2 review record (claim registry, no trailer needed):"
-          echo "        review issue: $(cut -d'|' -f1 <<<"$record")"
-          echo "        reviewer:     $(cut -d'|' -f2 <<<"$record")"
-          echo "        verdict:      $(cut -d'|' -f3 <<<"$record")"
-          echo "        recorded in:  $(cut -d'|' -f4 <<<"$record")"
+          # AFC-236: classify the verdict's VALUE, not just its presence. The
+          # old code printed ok for any non-empty string, so a recorded
+          # "do not ship" exited 0 with an ok line -- the gate certifying a
+          # refused commit as compliant. Three classes, CEO decision
+          # 2026-10-06: approve passes, "ship with fixes" passes as an honest
+          # conditional approval that must never block, "do not ship" refuses,
+          # and anything unrecognised fails closed as a data problem, not an
+          # opinion. Compared against R2_VERDICT_* declared once at the top;
+          # no literal verdict string lives in this branch. The `Reviewed-by:`
+          # trailer path above carries no verdict and is left as-is, and an
+          # absent verdict is still a violation via the completeness check in
+          # review_record(). This gate refuses a refusal, not a defect: only
+          # the approve class prints ok.
+          local r2_verdict r2_findings r2_open
+          r2_verdict=$(cut -d'|' -f3 <<<"$record")
+          r2_findings=$(cut -d'|' -f5 <<<"$record")
+          # N counts comma-separated findings segments; the registry's findings
+          # formats vary ("F1", "F1-F6", prose), so segments are the only
+          # deterministic count short of inventing a parser. Empty means none.
+          if [ -z "$r2_findings" ]; then r2_open=0;
+          else r2_open=$(awk -F',' '{print NF}' <<<"$r2_findings"); fi
+          if [ "$r2_verdict" = "$R2_VERDICT_APPROVE" ]; then
+            echo "  ok  R2 review record (attribution only):"
+            echo "        review issue: $(cut -d'|' -f1 <<<"$record")"
+            echo "        reviewer:     $(cut -d'|' -f2 <<<"$record")"
+            echo "        verdict:      $(cut -d'|' -f3 <<<"$record")"
+            echo "        recorded in:  $(cut -d'|' -f4 <<<"$record")"
+          elif [ "$r2_verdict" = "$R2_VERDICT_CONDITIONAL" ]; then
+            echo "  CONDITIONS  R2 review record: verdict \"$R2_VERDICT_CONDITIONAL\"; $r2_open findings open"
+            echo "        review issue: $(cut -d'|' -f1 <<<"$record")"
+            echo "        reviewer:     $(cut -d'|' -f2 <<<"$record")"
+            echo "        findings:     ${r2_findings:-none recorded}"
+            echo "        recorded in:  $(cut -d'|' -f4 <<<"$record")"
+          elif [ "$r2_verdict" = "$R2_VERDICT_REFUSED" ]; then
+            echo "  REFUSED  R2 review record: verdict \"$R2_VERDICT_REFUSED\" on ${rev:0:12}"
+            echo "        review issue: $(cut -d'|' -f1 <<<"$record")"
+            echo "        reviewer:     $(cut -d'|' -f2 <<<"$record")"
+            echo "        recorded in:  $(cut -d'|' -f4 <<<"$record")"
+            rc=1
+          else
+            echo "  VIOLATION  R2 review record: verdict \"$r2_verdict\" is not a recognised verdict for ${rev:0:12}"
+            echo "        review issue: $(cut -d'|' -f1 <<<"$record")"
+            echo "        reviewer:     $(cut -d'|' -f2 <<<"$record")"
+            echo "        recorded in:  $(cut -d'|' -f4 <<<"$record")"
+            rc=1
+          fi
           ;;
         3)
           echo "  R2 VIOLATION: the claim registry carries a reviews[] entry for"
