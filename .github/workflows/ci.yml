@@ -265,11 +265,100 @@ jobs:
         env:
           DB_TEST_TIMEZONE: Africa/Lagos
 
-  # TODO(CTO): also run this suite against a real postgres:16 service
-  # container. PGlite is PostgreSQL 16 compiled to WebAssembly; the trigger
-  # and privilege semantics are the same, but "same engine, same wasm
-  # runtime" is not the same claim as "same engine, same binary", and this
-  # is a P1 legal-evidence control. Tracked with AFC-166.
+  # AFC-363 (Gap 2 of AFC-172). The identical suite against a real
+  # postgres:16 service container, via PG_URL. PGlite (above) stays as the
+  # fast local gate; this job is the "same engine, same binary" evidence for
+  # a P1 legal-evidence control under NDPA s.40(2). The runner creates and
+  # drops its own scratch database on the service (AFC-204), so pointing it
+  # at the container is safe by construction -- it never touches the database
+  # PG_URL names.
+  db-tests-postgres:
+    name: Database control tests on postgres:16 (service container)
+    needs: [dirty-path-guard]
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          # Throwaway credential for an ephemeral CI container, as in the
+          # GitHub service-container examples. Nothing outside this job can
+          # reach this database, and nothing in it survives the job.
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    # Job-level, so every step below -- self-test, default run, non-UTC run --
+    # speaks to the service. The non-UTC step adds DB_TEST_TIMEZONE beside
+    # this, exactly as its PGlite sibling does.
+    env:
+      PG_URL: postgresql://postgres:postgres@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@v4
+
+      # Identical preamble to db-tests and to the lint/typecheck/build jobs:
+      # pnpm/action-setup FIRST, because setup-node's `cache: pnpm` resolves
+      # pnpm from PATH. If the order ever changes, it changes in all five.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # Steps can start before the service is accepting connections, so wait
+      # for readiness here -- after Install, because the wait uses the
+      # installed `pg` driver and needs nothing else on the runner.
+      # Fail-closed: a service that never becomes ready fails the job, it
+      # never skips the suite.
+      - name: Wait for the postgres service
+        run: |
+          node <<'NODE_EOF'
+          const { Client } = require('pg');
+          const url = process.env.PG_URL;
+          const deadline = Date.now() + 90000;
+          (async () => {
+            for (;;) {
+              const client = new Client({ connectionString: url });
+              try {
+                await client.connect();
+                await client.query('select 1');
+                await client.end();
+                console.log('postgres service is ready');
+                return;
+              } catch (e) {
+                try { await client.end(); } catch (_) { /* already closed */ }
+                if (Date.now() > deadline) {
+                  console.error('postgres service never became ready: ' + e.message);
+                  process.exit(1);
+                }
+                await new Promise((r) => setTimeout(r, 2000));
+              }
+            }
+          })();
+          NODE_EOF
+
+      # AFC-203, against the container: the instrument must be able to fail
+      # here too, for the same reason it must in the PGlite job.
+      - name: Assertion ledger self-test (the instrument must be able to fail)
+        run: node scripts/run-db-tests.mjs --self-test
+
+      - name: Run database control tests
+        run: pnpm test:db
+
+      # AFC-202, against the container: the same tree again in a session that
+      # is NOT UTC, for the same reason as in the PGlite job.
+      - name: Run database control tests in a non-UTC session
+        run: pnpm test:db
+        env:
+          DB_TEST_TIMEZONE: Africa/Lagos
 
   # --------------------------------------------------------------------------
   # Design-system static gates. AFC-199.
@@ -309,8 +398,8 @@ jobs:
   # a format failure should not hide a typecheck failure, and a broken build
   # should be visible without reading a log that also contains lint output for
   # forty unrelated files. They share an identical install preamble, which is
-  # also identical to db-tests' — if the order of pnpm/action-setup and
-  # setup-node ever changes, it changes in all four.
+  # also identical to db-tests' and db-tests-postgres' — if the order of
+  # pnpm/action-setup and setup-node ever changes, it changes in all five.
   # --------------------------------------------------------------------------
 
   lint-format:

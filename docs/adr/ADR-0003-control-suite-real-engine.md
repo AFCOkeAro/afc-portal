@@ -106,6 +106,26 @@ would be critical if it recurred on a stable tree.
 - §0.10.5 is not discharged by this ADR. It is discharged by a green run of the
   `postgres:16` job with a trustworthy ledger, recorded here.
 
+## Evidence
+
+- **PGlite (Gap 1 of [AFC-172](/AFC/issues/AFC-172), closed).** First fully green
+  run on `main`: Actions run `37939177470` — all 7 jobs success, DB suites 17/17
+  green in both the UTC session and the `Africa/Lagos` session (as reported on
+  [AFC-363](/AFC/issues/AFC-363)). PGlite green is the fast local gate; it is
+  not the §0.10.5 discharge.
+- **`db-tests-postgres` (Gap 2 of [AFC-172](/AFC/issues/AFC-172), this change).**
+  `.github/workflows/ci.yml` now carries a `db-tests-postgres` job: a
+  `postgres:16` service container, a fail-closed readiness wait, then the
+  identical suite via `PG_URL` — ledger `--self-test`, default run,
+  `Africa/Lagos` run — downstream of `dirty-path-guard`, beside (not instead
+  of) the PGlite job. First CI verdict: PENDING at the time of this commit.
+  This change is committed locally and lands through CTO review; the resulting
+  Actions run URL is pasted as a comment on [AFC-172](/AFC/issues/AFC-172) on
+  landing, and the job's verdict (green, or red with a diagnosis — never
+  silenced) is recorded here in a follow-up.
+- §0.10.5 stays open until a green `db-tests-postgres` run with a trustworthy
+  ledger is recorded in this section.
+
 ## Alternatives considered
 
 - **Ship the container job now, red.** Rejected as sequencing, not principle: it would
