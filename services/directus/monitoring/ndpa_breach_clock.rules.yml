@@ -12,10 +12,11 @@
 #                   so the alert lands while there is still time to act.
 #    0h remaining — the breach was not notified in time. This is not a warning,
 #                   it is a reportable incident in its own right.
-#   origin missing — should be impossible after the migration. A non-zero count
-#                   is a broken migration, not a data condition, so it pages the
-#                   same on-call path rather than waiting for a breach to hide
-#                   behind it.
+#   schema probe — the readiness check. 1 when the clock columns exist, 0
+#                   when the migration is missing or regressed. A 0 pages the
+#                   same on-call path, because without the columns no deadline
+#                   can be computed at all. (AFC-255 Finding 2: the two
+#                   per-row NULL canaries this replaces could never fire.)
 #
 # Routing: both the 60h and the 0h alerts must reach the on-call path in the
 # 72-hour runbook owned by AFC-163. This file does not own the runbook; it names
@@ -26,40 +27,30 @@ groups:
   - name: ndpa-breach-clock
     interval: 5m
     rules:
-      - alert: NdpaBreachClockOriginMissing
-        expr: ndpa_breach_clock_origin_missing > 0
+      - alert: NdpaSchemaAwarenessAtMissing
+        expr: ndpa_schema_awareness_at_present == 0
         for: 1m
         labels:
           severity: page
           control: ndpa-s40-2
         annotations:
           summary: >-
-            An incident has no clock origin — the NDPA s.40(2) clock cannot be
-            evidenced for {{ $labels.ref }}.
+            The NDPA s.40(2) clock columns are absent on this database — the
+            migration is not applied or the schema has regressed.
           description: >-
-            incidents.awareness_at is NOT NULL by constraint, so this means the
-            migration is not applied on this database, or the row came from
-            somewhere outside it. Until it is fixed, no 72-hour deadline can be
-            computed for this incident. Treat as a broken migration, not as a
+            ndpa_schema_awareness_at_present is 0, meaning incidents is missing
+            awareness_at, awareness_at_source, or the table itself. The probe
+            uses to_regclass so it emits 0 instead of erroring, which is what
+            makes this alert reachable: the two alerts it replaces
+            (NdpaBreachClockOriginMissing / NdpaBreachProvenanceMissing)
+            queried `WHERE awareness_at IS NULL`, a condition the NOT NULL
+            constraint makes unreachable, and errored without emitting a
+            series when the migration was missing — an absent series never
+            fires (AFC-255 Finding 2). Until this is fixed, no 72-hour
+            deadline can be computed. Treat as a broken migration, not as a
             data question.
           runbook: AFC-163 72-hour notification runbook
           runbook_url: /AFC/issues/AFC-163
-
-      - alert: NdpaBreachProvenanceMissing
-        expr: ndpa_breach_provenance_missing > 0
-        for: 1m
-        labels:
-          severity: page
-          control: ndpa-s40-2
-        annotations:
-          summary: >-
-            An incident has a clock origin with no provenance — NDPC will ask
-            whether it is real or inferred, and we cannot answer.
-          description: >-
-            awareness_at_source records how the clock origin was established:
-            insert_default (server-set at insert) or
-            backfill:earliest_of_detected_reported_created (inferred by the
-            migration on pre-existing rows). A NULL means that record is gone.
 
       - alert: NdpaBreachClockWarning
         # 60 hours remaining = 12 hours consumed of the 72.

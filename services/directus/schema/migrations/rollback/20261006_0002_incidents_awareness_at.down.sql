@@ -13,6 +13,7 @@
 --   incidents_no_caller_clock             trigger
 --   incidents_guard_awareness()           function
 --   incidents_forbid_caller_set_awareness()  function
+--   incidents_file(...)                    function (AFC-255 entry point)
 --   incidents_reported_after_awareness    CHECK constraint
 --   incidents_breach_clock                view
 --   incidents.awareness_at                column
@@ -65,6 +66,7 @@ DROP TRIGGER IF EXISTS incidents_no_caller_clock ON incidents;
 
 DROP FUNCTION IF EXISTS incidents_guard_awareness();
 DROP FUNCTION IF EXISTS incidents_forbid_caller_set_awareness();
+DROP FUNCTION IF EXISTS incidents_file(text, text, text, text, uuid, timestamptz, timestamptz, text, timestamptz, timestamptz, timestamptz);
 
 ALTER TABLE incidents
   DROP CONSTRAINT IF EXISTS incidents_reported_after_awareness;

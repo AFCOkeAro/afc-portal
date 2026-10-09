@@ -187,9 +187,21 @@ BEGIN
     (SELECT count(*) FROM incidents WHERE awareness_at_source IS NULL) = 0,
     'clock', 'no incident is missing its provenance');
 
+  -- AFC-255 Finding 2: the per-row view canaries below always read false
+  -- (both columns are NOT NULL) and no alert reads them any more. The
+  -- reachable probe is the schema-presence check the exporter runs; assert
+  -- the same statement here so the suite pins what the alert fires on.
+  PERFORM test_support.assert_equals(
+    (SELECT (CASE WHEN to_regclass('public.incidents') IS NULL THEN 0
+       WHEN (SELECT count(*) FROM pg_attribute
+              WHERE attrelid = to_regclass('public.incidents')
+                AND attname IN ('awareness_at', 'awareness_at_source')) = 2 THEN 1
+       ELSE 0 END)::text),
+    '1', 'clock', 'the schema probe reports both clock columns present');
+
   PERFORM test_support.assert_true(
     (SELECT count(*) FROM incidents_breach_clock WHERE clock_origin_missing) = 0,
-    'clock', 'the view reports zero clock-origin gaps');
+    'clock', 'the deprecated per-row canary still reads zero (kept, unwired)');
 
   PERFORM test_support.as_role('directus_app',
     $q$UPDATE incidents SET status = 'reported' WHERE ref = 'CLOCK-LIVE'$q$);

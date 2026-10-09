@@ -38,19 +38,23 @@ SELECT
   severity                                AS severity
 FROM incidents_breach_clock;
 
--- metric: ndpa_breach_clock_origin_missing
--- Must stay at 0. Alerting on > 0 catches a migration that was not applied or a
--- row that arrived from outside it.
-SELECT count(*)::bigint AS value
-FROM incidents
-WHERE awareness_at IS NULL;
-
--- metric: ndpa_breach_provenance_missing
--- Must stay at 0. NDPC asks whether a recorded clock origin is real or inferred;
--- a NULL provenance cannot answer that question.
-SELECT count(*)::bigint AS value
-FROM incidents
-WHERE awareness_at IS NULL OR awareness_at_source IS NULL;
+-- metric: ndpa_schema_awareness_at_present
+-- Reachable readiness probe (AFC-255 Finding 2). 1 when both clock columns
+-- exist on incidents, 0 otherwise. Uses to_regclass so it never errors -- on
+-- a database where 0002 never applied, or where the table itself is absent,
+-- this emits 0 instead of erroring, which is exactly what the alert below
+-- needs: an absent series never fires, a 0 does.
+-- Replaces ndpa_breach_clock_origin_missing / ndpa_breach_provenance_missing,
+-- which queried `FROM incidents WHERE awareness_at IS NULL` -- a condition
+-- the NOT NULL constraint plus the BEFORE INSERT guard make unreachable, and
+-- which errors (emitting nothing) when the migration is missing.
+SELECT (
+  CASE WHEN to_regclass('public.incidents') IS NULL THEN 0
+       WHEN (SELECT count(*) FROM pg_attribute
+              WHERE attrelid = to_regclass('public.incidents')
+                AND attname IN ('awareness_at', 'awareness_at_source')) = 2 THEN 1
+       ELSE 0 END
+)::bigint AS value;
 
 -- metric: ndpa_breach_open_count
 -- Not part of the deadline, but the first thing a responder wants on the

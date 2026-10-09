@@ -75,7 +75,7 @@ ALTER TABLE incidents
 COMMENT ON COLUMN incidents.awareness_at IS
   'NDPA s.40(2) clock origin. Set by the column default on insert, immutable afterwards. Do not expose as writable anywhere.';
 COMMENT ON COLUMN incidents.awareness_at_source IS
-  'Provenance of awareness_at: insert_default | backfill:earliest_of_detected_reported_created. Evidence in its own right -- NDPC asks whether a value is real or inferred.';
+  'Provenance of awareness_at: insert_default | backfill:earliest_of_detected_reported_created. insert_default means the value equalled now() at insert, NOT that the database necessarily supplied it: a caller that explicitly passes now() is accepted by the BEFORE INSERT guard and is then indistinguishable from a defaulted row. File new incidents through incidents_file() so callers never name the clock columns. Evidence in its own right -- NDPC asks whether a value is real or inferred (AFC-255).';
 
 -- ---------------------------------------------------------------------------
 -- 3. Backfill pre-existing rows. awareness_at_source marks these as inferred,
@@ -175,6 +175,73 @@ CREATE TRIGGER incidents_no_caller_clock
   FOR EACH ROW EXECUTE FUNCTION incidents_forbid_caller_set_awareness();
 
 -- ---------------------------------------------------------------------------
+-- 5c. Entry point: file an incident without naming the clock columns.
+--    AFC-255 Finding 1 (blocking). A BEFORE INSERT trigger cannot see the
+--    caller's column list, so `awareness_at = now()` supplied explicitly and
+--    `awareness_at` defaulted are the same value to the guard at 5b by
+--    construction -- and the row is then stamped `insert_default` either way.
+--    This function is the layer the trigger cannot be: it INSERTs naming
+--    ONLY the caller-writable columns (the 0001 grant list), so a caller
+--    that files through here cannot name the clock columns at all. The 5b
+--    guard above is unchanged and remains defence in depth (10_insert_contract
+--    asserts it). File through here; do not INSERT into incidents directly.
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION incidents_file(
+  p_ref             text,
+  p_summary         text,
+  p_severity        text          DEFAULT 'minor',
+  p_status          text          DEFAULT 'open',
+  p_branch_id       uuid          DEFAULT NULL,
+  p_detected_at     timestamptz   DEFAULT NULL,
+  p_reported_at     timestamptz   DEFAULT NULL,
+  p_detected_by     text          DEFAULT NULL,
+  p_acknowledged_at timestamptz   DEFAULT NULL,
+  p_contained_at    timestamptz   DEFAULT NULL,
+  p_closed_at       timestamptz   DEFAULT NULL
+) RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_id uuid;
+BEGIN
+  INSERT INTO incidents (
+    ref, summary, severity, status, branch_id,
+    detected_at, reported_at, detected_by,
+    acknowledged_at, contained_at, closed_at
+  ) VALUES (
+    p_ref, p_summary, p_severity, p_status, p_branch_id,
+    p_detected_at, p_reported_at, p_detected_by,
+    p_acknowledged_at, p_contained_at, p_closed_at
+  )
+  RETURNING id INTO v_id;
+  RETURN v_id;
+END $$;
+
+COMMENT ON FUNCTION incidents_file(text, text, text, text, uuid, timestamptz, timestamptz, text, timestamptz, timestamptz, timestamptz) IS
+  'AFC-255 Finding 1 entry point. Files an incident naming only caller-writable columns; awareness_at and awareness_at_source are left to their column defaults. SECURITY DEFINER so the call runs with the table owner''s rights; callers need EXECUTE on this function, not INSERT on the clock columns.';
+
+-- No caller names the clock columns. The 0001 grant list already excludes
+-- them; these REVOKEs state the exclusion explicitly so a later GRANT that
+-- widens the table privilege cannot silently re-open the column. REVOKE of a
+-- privilege never held is a no-op, not an error, so this holds on a fresh
+-- database and on one whose grants have drifted. The table owner implicitly
+-- holds every privilege and is therefore NOT restricted by this -- the owner
+-- path is closed by the 5b trigger and by filing through incidents_file().
+REVOKE INSERT (awareness_at) ON incidents FROM directus_app;
+REVOKE INSERT (awareness_at_source) ON incidents FROM directus_app;
+REVOKE UPDATE (awareness_at) ON incidents FROM directus_app;
+REVOKE UPDATE (awareness_at_source) ON incidents FROM directus_app;
+REVOKE INSERT (awareness_at) ON incidents FROM PUBLIC;
+REVOKE INSERT (awareness_at_source) ON incidents FROM PUBLIC;
+REVOKE UPDATE (awareness_at) ON incidents FROM PUBLIC;
+REVOKE UPDATE (awareness_at_source) ON incidents FROM PUBLIC;
+
+REVOKE ALL ON FUNCTION incidents_file(text, text, text, text, uuid, timestamptz, timestamptz, text, timestamptz, timestamptz, timestamptz) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION incidents_file(text, text, text, text, uuid, timestamptz, timestamptz, text, timestamptz, timestamptz, timestamptz) TO directus_app;
+
+-- ---------------------------------------------------------------------------
 -- 6. EVIDENCE SEAL, RE-ASSERTED. NOT OWNED BY THIS FILE.
 --
 -- 0001 owns both of these. They are repeated here verbatim, bodies and error
@@ -255,9 +322,20 @@ SELECT
   i.reported_at,
   (i.awareness_at + interval '72 hours')                     AS notification_due_at,
   round((72 - EXTRACT(EPOCH FROM (now() - i.awareness_at)) / 3600)::numeric, 2)
-                                                             AS remaining_hours,
-  -- Two invariants the monitoring rules assert. A non-zero count here is a
-  -- broken migration, not a data condition to investigate.
+                                                              AS remaining_hours,
+  -- AFC-255 Finding 2: the two per-row canaries below can never fire -- both
+  -- columns are NOT NULL, so every row reads false, and on a database where
+  -- 0002 never applied the column does not exist and any query naming it
+  -- errors instead of emitting a series. They are KEPT (not dropped) because
+  -- CREATE OR REPLACE VIEW cannot drop columns and this file is \i-included
+  -- by tests/db/30_backfill_survival.sql and 40_clock.sql under a
+  -- probe-first search_path, where an unqualified DROP VIEW would resolve to
+  -- and destroy the public view. Kept does not mean wired: no alert reads
+  -- them. The reachable probe is the schema-presence metric in
+  -- services/directus/monitoring/exporter-queries.sql
+  -- (ndpa_schema_awareness_at_present, 1 when present else 0, never errors via
+  -- to_regclass), watched by NdpaSchemaAwarenessAtMissing in
+  -- ndpa_breach_clock.rules.yml. Do not add new readers of these two columns.
   (i.awareness_at IS NULL)                                    AS clock_origin_missing,
   (i.awareness_at IS NULL OR i.awareness_at_source IS NULL)   AS provenance_missing
 FROM incidents i

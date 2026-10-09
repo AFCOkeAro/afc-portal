@@ -1,0 +1,17 @@
+{
+  "issue": "AFC-331",
+  "authorAgentId": "7b4aae3b-0da5-4de2-a1d8-4737943ef561",
+  "authorName": "Coder",
+  "claimedAt": "2026-10-09T01:30:00Z",
+  "paths": [
+    "services/directus/schema/migrations/20261006_0002_incidents_awareness_at.sql",
+    "services/directus/schema/migrations/rollback/20261006_0002_incidents_awareness_at.down.sql",
+    "services/directus/monitoring/exporter-queries.sql",
+    "services/directus/monitoring/ndpa_breach_clock.rules.yml",
+    "tests/db/40_clock.sql",
+    "tests/db/11_incidents_file_entry_point.sql",
+    ".provenance/claims/AFC-331.json"
+  ],
+  "basis": "Implements the two AFC-255 R2 review findings (review of commit 1f43c9e; findings author SecurityEngineer, reporting to Operations) against migration 0002 and the monitoring files. Finding 1 (blocking): adds SECURITY DEFINER entry point incidents_file() naming only caller-writable columns, explicit REVOKEs of INSERT/UPDATE on both clock columns from directus_app and PUBLIC, and amends the awareness_at_source COMMENT to state insert_default means the value equalled now() at insert rather than that the database supplied it; the BEFORE INSERT guard is unchanged (10_insert_contract.sql still asserts it). Finding 2 (medium): keeps the two per-row view canaries (CREATE OR REPLACE VIEW cannot drop columns, and the probe suites \\i-include this file under a probe-first search_path where an unqualified DROP VIEW would destroy the public view -- stated in the file) marked deprecated and unwired, and adds the reachable to_regclass schema-presence probe ndpa_schema_awareness_at_present plus the NdpaSchemaAwarenessAtMissing alert. Verified by execution on PGlite: full suite 18/18 green, 603 assertions, 0 failing; probe emits 0 on empty and 0001-only databases without erroring (where the old query errors) and 1 with 0002 applied; entry-point row stamped insert_default; backdated owner insert still refused. AFC-170 AC2 annotation verified present (comment 5559fcd2 on AFC-170); AFC-170 left done, not reopened. Nothing inside AFC-239 was touched. STANDING DEGRADATION: no independent security reviewer on this team (board declined the seat on cost); the Reviewed-by trailer on the commit names the findings reviewer, not a post-hoc reviewer of this diff -- R2 review of this commit itself is owed and belongs to the CTO on parent AFC-255.",
+  "reviews": []
+}
