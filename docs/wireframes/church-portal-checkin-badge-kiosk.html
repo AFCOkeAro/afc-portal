@@ -1,0 +1,1246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Church Portal — Badge printing, kiosk self check-in &amp; check-in report wireframes · AFC-307</title>
+<meta name="description" content="Layout-intent wireframes for badge printing, kiosk self check-in, the device registry and the check-in-method report (AFC-307). Self-contained; opens offline.">
+<style>
+  /* AFC-151 wireframe palette. Same tokens as church-portal-wireframes-v3.html.
+     Layout intent only — no hi-fi tokens, no visual design, no implementation code. */
+  :root{
+    --ink:#1b1b1b; --mut:#6b6b6b; --line:#c9c9c9; --bg:#f4f4f2;
+    --box:#e4e4e1; --box2:#efefec; --accent:#2f6f6f; --accent-soft:#d8e8e8;
+    --white:#fff; --warn:#f0e0c0; --stop:#f0d0d0;
+    --warn-ink:#7a5c10; --warn-line:#d9c08a;
+    --stop-ink:#8c2f2f; --stop-line:#d9a0a0;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:14px/1.45 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
+  header.top{position:sticky;top:0;z-index:5;background:var(--ink);color:#fff;padding:14px 22px}
+  header.top h1{margin:0;font-size:16px;letter-spacing:.3px}
+  header.top p{margin:4px 0 0;color:#cfcfcf;font-size:12px}
+  h2.sect-title{margin:0 0 4px;font-size:15px;letter-spacing:.2px}
+  p.sect-lede{margin:0 0 12px;color:var(--mut);font-size:12.5px;max-width:82ch}
+
+  /* legend — the encoding, stated once so a reviewer can audit the file against it */
+  .legend{display:flex;gap:16px;flex-wrap:wrap;padding:12px 22px;border-bottom:1px solid var(--line);
+    background:#fafafa;font-size:12px;color:var(--mut);align-items:center}
+  .legend b{color:var(--ink);font-weight:600}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .sw{width:14px;height:14px;border:1px solid var(--line);display:inline-block;border-radius:2px;flex:none}
+  .sw.w{background:var(--warn);border-color:var(--warn-line)}
+  .sw.r{background:var(--stop);border-color:var(--stop-line)}
+  .sw.g{background:var(--accent-soft);border-color:var(--accent)}
+  .sw.d{background:var(--box2);border:1px dashed var(--mut)}
+
+  /* index */
+  .index{padding:18px 22px 6px;background:#fff;border-bottom:1px solid var(--line)}
+  .index ul{list-style:none;margin:0;padding:0;display:grid;gap:8px;
+    grid-template-columns:repeat(auto-fit,minmax(250px,1fr))}
+  .index a{display:flex;gap:9px;align-items:baseline;text-decoration:none;color:var(--ink);
+    border:1px solid var(--line);border-radius:6px;padding:8px 10px;background:#fff}
+  .index a:hover{background:var(--accent-soft);border-color:var(--accent)}
+  .index a[aria-current="page"]{border-color:var(--accent);background:var(--accent-soft)}
+  .index .num{font-weight:700;color:var(--accent);font-size:12px;flex:none;width:26px}
+  .index .nm{font-size:12.5px;font-weight:600;display:block}
+  .index .rt{font-size:11px;color:var(--mut);font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+
+  .wrap{padding:22px;display:grid;gap:26px;grid-template-columns:repeat(auto-fill,minmax(430px,1fr))}
+  .frame{background:var(--white);border:1px solid var(--line);border-radius:10px;overflow:hidden;
+    box-shadow:0 1px 2px rgba(0,0,0,.05);display:flex;flex-direction:column}
+  .frame>figcaption{background:var(--box2);border-bottom:1px solid var(--line);padding:9px 12px;
+    display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+  .frame>figcaption b{font-size:13px}
+  .frame>figcaption code{font-size:11px;color:var(--mut);white-space:nowrap}
+  .screen{padding:14px;display:flex;flex-direction:column;gap:12px;min-height:300px}
+  /* Every surface here is full-width. Without this rule the five frames tile
+     3-per-row in the auto-fill grid, each stretched to its row-mate's height,
+     so S1/S2/S3 land on the same offset and the renders overwrite each other. */
+  .frame.wide{grid-column:1/-1}
+  .muted{color:var(--mut)}
+  .tiny{font-size:11px}
+  .bar{height:12px;background:var(--box);border-radius:3px}
+  .bar.s{width:38%} .bar.m{width:62%} .bar.l{width:88%} .bar.xs{width:24%}
+  .box{background:var(--box);border-radius:4px}
+  .card{border:1px solid var(--line);border-radius:6px;padding:10px;background:#fff}
+  .card h4{margin:0 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--mut)}
+  .row{display:flex;gap:10px;align-items:center}
+  .row.between{justify-content:space-between}
+  .row.top{align-items:flex-start}
+  .row.wrapg{flex-wrap:wrap}
+  .grow{flex:1}
+  .field{flex:1;display:flex;flex-direction:column;gap:5px;min-width:0}
+  .field .lab{font-size:11px;color:var(--mut)}
+  .input{height:30px;border:1px solid var(--line);border-radius:4px;background:#fff;
+    font-size:11.5px;display:flex;align-items:center;padding:0 8px;overflow:hidden;white-space:nowrap}
+  .input.off{background:var(--box2);color:var(--mut)}
+  .input.big{height:40px;font-size:13px}
+  .input.dash{color:var(--mut)}
+  .btn{display:inline-flex;align-items:center;justify-content:center;height:30px;padding:0 14px;
+    border-radius:4px;font-size:12px;border:1px solid var(--ink);background:var(--ink);color:#fff;
+    white-space:nowrap}
+  .btn.ghost{background:#fff;color:var(--ink)}
+  .btn.accent{background:var(--accent);border-color:var(--accent)}
+  .btn.danger{background:#fff;color:var(--stop-ink);border-color:var(--stop-line)}
+  .btn.sm{height:24px;padding:0 9px;font-size:11px}
+  .btn.xl{height:44px;font-size:13px;border-radius:6px}
+  .btn[disabled],.btn.off{background:var(--box2);color:var(--mut);border-color:var(--line)}
+  .nav{display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line);padding-bottom:9px}
+  .logo{width:26px;height:26px;border-radius:5px;background:var(--ink);flex:none}
+  .pill{font-size:10px;padding:2px 8px;border-radius:999px;background:var(--box);color:var(--ink);white-space:nowrap}
+  .pill.on{background:var(--accent-soft);color:var(--accent);border:1px solid var(--accent)}
+  .pill.w{background:var(--warn);color:var(--warn-ink);border:1px solid var(--warn-line)}
+  .pill.r{background:var(--stop);color:var(--stop-ink);border:1px solid var(--stop-line)}
+  .pill.dash{border-style:dashed;border-color:var(--mut);color:var(--mut);background:#fff}
+
+  table{width:100%;border-collapse:collapse;font-size:11px}
+  th,td{text-align:left;padding:6px 7px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--mut);font-weight:600;background:var(--box2);white-space:nowrap}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+  tr.expand td{background:var(--stop);border-bottom:1px solid var(--stop-line)}
+  tr.expand:hover td{background:#ebc9c9}
+  code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10.5px}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+
+  /* clickable analytics counts — teal + underline + glyph, never colour alone */
+  .stat{flex:1;border:1px solid var(--line);border-radius:6px;padding:9px;background:#fff;min-width:0}
+  .stat .n{font-size:20px;font-weight:700;line-height:1.15}
+  .stat .k{font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.4px}
+  .stat.link .n{color:var(--accent);text-decoration:underline}
+  .countlink{color:var(--accent);text-decoration:underline;cursor:pointer;white-space:nowrap}
+  .countlink:hover{text-decoration-thickness:2px}
+
+  /* state notes: label + glyph + colour, so the state survives greyscale */
+  .note{font-size:11.5px;color:var(--mut);border-left:3px solid var(--accent);padding:6px 9px;
+    background:var(--accent-soft);border-radius:0 4px 4px 0}
+  .note.warn{border-left-color:var(--warn-line);background:var(--warn);color:var(--warn-ink)}
+  .note.stop{border-left-color:var(--stop-line);background:var(--stop);color:var(--stop-ink)}
+  .note.plain{background:var(--box2);border-left-color:var(--mut);color:var(--mut)}
+  .note b{font-weight:600}
+  .note .glyph{font-weight:700;margin-right:5px}
+
+  .badge{font-size:10px;padding:2px 7px;border-radius:999px;border:1px solid var(--line);
+    color:var(--mut);background:#fafafa;white-space:nowrap;display:inline-block}
+  .badge.g{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
+  .badge.w{background:var(--warn);color:var(--warn-ink);border-color:var(--warn-line)}
+  .badge.r{background:var(--stop);color:var(--stop-ink);border-color:var(--stop-line)}
+  .badge.dash{border-style:dashed;background:#fff;color:var(--mut)}
+
+  /* deferred capability — dashed, never silently absent */
+  .later{border:1px dashed var(--mut);border-radius:6px;padding:9px 11px;background:var(--box2);
+    display:flex;flex-direction:column;gap:5px}
+  .later .lh{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+  .later .lt{font-size:12px;font-weight:600}
+  .later .tag{font-size:9.5px;text-transform:uppercase;letter-spacing:.5px;border:1px dashed var(--mut);
+    border-radius:3px;padding:1px 6px;color:var(--mut);background:#fff;white-space:nowrap}
+  .later p{margin:0;font-size:11px;color:var(--mut)}
+
+  /* the printable badge artefact */
+  .print{border:1px solid var(--ink);border-radius:8px;background:#fff;padding:12px;
+    display:flex;gap:14px;align-items:center;max-width:420px}
+  .print .p-evt{margin:0;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--mut)}
+  .print .p-name{margin:3px 0 2px;font-size:19px;font-weight:700;line-height:1.15}
+  .print .p-cat{margin:0;font-size:11px;color:var(--mut)}
+  .print .p-meta{margin:5px 0 0;font-size:10.5px;color:var(--mut)}
+  .print .p-right{margin-left:auto;text-align:center;flex:none}
+  .print .p-code{margin:4px 0 0;font-size:11.5px;font-weight:600}
+  .lanyard{display:inline-block;margin-top:6px;font-size:9.5px;text-transform:uppercase;
+    letter-spacing:.5px;border:1px dashed var(--warn-line);background:var(--warn);color:var(--warn-ink);
+    border-radius:3px;padding:2px 6px}
+  /* decorative code block — never a faked scannable QR */
+  .codeblock{width:84px;height:84px;border:1px solid var(--ink);flex:none;
+    background:repeating-linear-gradient(90deg,var(--ink) 0 5px,var(--box) 5px 10px),
+               repeating-linear-gradient(0deg,rgba(255,255,255,0) 0 5px,var(--ink) 5px 10px)}
+  .cb-cap{font-size:9px;color:var(--mut);margin-top:4px;line-height:1.4;max-width:150px}
+
+  /* kiosk device — 1:1 at 390, mobile-first */
+  /* A row of identical kiosks on one baseline. 3 explicit columns, never
+     auto-fit: at 1440 auto-fit leaves kiosks 4 and 8 stranded alone on their
+     own rows with a 900px hole beside them. */
+  .kiosk-row{display:grid;grid-template-columns:repeat(3,390px);gap:18px 22px;align-items:start;justify-content:start}
+  /* All eight kiosks are the same physical device, so they are the same size.
+     A row of devices at eight different heights reads as eight different
+     screens, which is exactly the wrong impression for a locked-down surface. */
+  .kiosk{width:390px;height:430px;border:2px solid var(--ink);border-radius:14px;background:#fff;
+    overflow:hidden;flex:none;display:flex;flex-direction:column}
+  .kiosk__bar{background:var(--ink);color:#fff;padding:8px 12px;font-size:10.5px;
+    display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .kiosk__bar .ev{color:#cfcfcf;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .kiosk__body{padding:14px;display:flex;flex-direction:column;gap:12px;flex:1}
+  .kiosk__foot{background:var(--box2);border-top:1px solid var(--line);padding:7px 12px;
+    font-size:9.5px;color:var(--mut);display:flex;justify-content:space-between;gap:8px}
+  .kiosk h5{margin:0;font-size:16px;line-height:1.25}
+  .kiosk__prompt{text-align:center;padding:26px 10px;border:1px dashed var(--line);border-radius:8px;
+    background:var(--box2)}
+  .kiosk__prompt .big{font-size:22px;font-weight:700;line-height:1.2;margin:0 0 4px}
+  .kiosk__code{font-size:26px;font-weight:700;letter-spacing:2px;text-align:center}
+  .kiosk__name{font-size:17px;font-weight:600}
+  .kiosk .state{border-radius:6px;padding:11px;border:1px solid var(--line)}
+  .kiosk .state h6{margin:0 0 4px;font-size:13px;line-height:1.25}
+  .kiosk .state p{margin:4px 0 0;font-size:11.5px;line-height:1.5}
+  .kiosk .state.ok{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+  .kiosk .state.ok p{color:#24595a}
+  .kiosk .state.warn{background:var(--warn);border-color:var(--warn-line);color:var(--warn-ink)}
+  .kiosk .state.stop{background:var(--stop);border-color:var(--stop-line);color:var(--stop-ink)}
+  .kiosk .state p strong{font-weight:700}
+  .kcap{font-size:10.5px;color:var(--mut);margin:0 0 5px;max-width:390px}
+  .kcap b{color:var(--ink)}
+
+  /* align-items:start matters. With the default stretch, a two-column split
+     lets the shorter column's card grow to its neighbour's height, leaving a
+     large blank rectangle under its content — the exact "cramped and stray"
+     failure the visual bar rejects. */
+  .split{display:flex;gap:12px;flex:1;min-height:0;flex-wrap:wrap;align-items:start}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:11px}
+  .kv dt{color:var(--mut)}
+  .kv dd{margin:0}
+  .list{display:flex;flex-direction:column;gap:7px}
+  .item{display:flex;gap:9px;align-items:center;border:1px solid var(--line);border-radius:5px;
+    padding:7px 9px;background:#fff}
+  .item.between{justify-content:space-between}
+  .chk{display:flex;gap:7px;align-items:flex-start;font-size:11px;color:var(--mut);
+    border:1px dashed var(--line);border-radius:5px;padding:6px 8px;background:#fff}
+  .box-1{width:13px;height:13px;border:1px solid var(--mut);border-radius:2px;background:#fff;
+    flex:none;margin-top:1px;position:relative}
+  .box-1.on{background:var(--accent);border-color:var(--accent)}
+  .box-1.on:after{content:"✓";position:absolute;inset:0;color:#fff;font-size:10px;
+    display:flex;align-items:center;justify-content:center}
+  .box-1.dash{border-style:dashed}
+
+  /* print sheet preview for the batch output */
+  .sheet{border:1px solid var(--ink);border-radius:6px;background:#fff;padding:9px;
+    display:grid;grid-template-columns:repeat(2,1fr);gap:7px}
+  .sheet .sl{border:1px dashed var(--line);border-radius:4px;padding:6px;min-height:74px;
+    display:flex;flex-direction:column;gap:3px}
+  .sheet .sl .n{font-size:10.5px;font-weight:700;line-height:1.2}
+  .sheet .sl .m{font-size:9px;color:var(--mut);line-height:1.3}
+  .sheet .sl .blank{border:1px dashed var(--line);border-radius:4px;flex:1;
+    display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--mut)}
+
+  .sumline{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;
+    border:2px solid var(--accent);background:var(--accent-soft);border-radius:6px;padding:10px 12px}
+  .sumline .big{font-size:28px;font-weight:700;line-height:1;color:var(--accent)}
+  .sumline .lbl{font-size:11px;color:var(--accent)}
+  .sumline .why{font-size:10.5px;color:#24595a;margin-left:auto;text-align:right;
+    border-left:1px solid var(--accent);padding-left:12px;line-height:1.5}
+
+  /* Two panels side by side inside a wide frame, each with its own heading, so
+     a reviewer can tell them apart without counting borders. */
+  .pair{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:14px;align-items:start}
+  .pair>*{min-width:0}
+
+  .states{border-top:1px dashed var(--line);padding-top:11px;display:flex;flex-direction:column;gap:9px}
+  .states>.h{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--mut);margin:0}
+  .state{border:1px solid var(--line);border-left-width:3px;border-radius:5px;padding:8px 10px;background:#fff}
+  .state.ok{border-left-color:var(--accent);background:var(--accent-soft)}
+  .state.warn{border-left-color:var(--warn-line);background:var(--warn)}
+  .state.stop{border-left-color:var(--stop-line);background:var(--stop)}
+  .state h6{margin:0 0 3px;font-size:11.5px}
+  .state p{margin:3px 0 0;font-size:11px;line-height:1.5}
+  .state p.q{font-size:10.5px;color:var(--mut)}
+  .state.stop p{color:var(--stop-ink)}
+  .state.warn p{color:var(--warn-ink)}
+  .state.ok p{color:#24595a}
+
+  .why{font-size:10.5px;color:var(--mut);line-height:1.55}
+  .why b{color:var(--ink)}
+  .why ul{margin:4px 0 0;padding-left:16px;list-style:disc}
+  .why li{margin-bottom:3px}
+  footer{padding:16px 22px;color:var(--mut);font-size:12px;border-top:1px solid var(--line);background:#fafafa}
+  /* This file is reviewed on a desktop, but it should still open on a phone
+     without a sideways scroll. Same intent as the AFC-151 v3 set, one step
+     further: the auto-fill minimum drops so the frame fits the viewport. */
+  @media (max-width:560px){
+    .wrap{grid-template-columns:minmax(0,1fr);padding:12px}
+    .screen{padding:10px}
+    .index ul{grid-template-columns:minmax(0,1fr)}
+    /* The kiosk devices stay 390: they are 1:1 device frames, and shrinking
+       them would misrepresent the surface. Their row scrolls locally instead. */
+    .kiosk-row{grid-template-columns:390px;overflow-x:auto}
+    .print{flex-wrap:wrap}
+    /* Wide data stays wide — a 7-column device registry squeezed into 390px
+       is unreadable, and unreadable is not "responsive". It scrolls in place
+       inside its own card so the page itself does not. */
+    .card>table,.card{overflow-x:auto}
+    .row{flex-wrap:wrap}
+    .row .btn,.row .pill{flex:none}
+  }
+  @media print{header.top,.legend,.index{display:none} .wrap{display:block} .frame{break-inside:avoid;margin-bottom:12px}}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <h1>Church Portal (Lagos North Area) — Badge printing, kiosk self check-in &amp; check-in-method report</h1>
+  <p>AFC-307 · planning artefact · <b>layout intent only</b> · low-fidelity wireframe palette from AFC-151
+     <code>wireframes-v3</code> · not production UI · this does not open the hi-fi design gate and adds no token ·
+     spec frozen on <a href="/AFC/issues/AFC-304" style="color:#cfcfcf">AFC-304</a></p>
+</header>
+
+<div class="legend">
+  <b>How to read this file</b>
+  <span><i class="sw r"></i> <b>rose</b> = blocked / no consent / refused — never a silent failure</span>
+  <span><i class="sw w"></i> <b>amber</b> = restricted, pending, or refused before lookup</span>
+  <span><i class="sw g"></i> <b>teal underlined</b> = clickable count, drills into the rows behind it</span>
+  <span><i class="sw d"></i> <b>dashed</b> = deferred capability, marked <code>Later — decision required</code></span>
+  <span><i class="sw" style="background:var(--box)"></i> grey block = layout placeholder</span>
+  <span>Kiosk and public surfaces are mobile-first and drawn 1:1 at 390.</span>
+</div>
+
+<nav class="index" aria-label="Screen index">
+  <ul>
+    <li><a href="#S1"><span class="num">S1</span><span><span class="nm">Single badge print — roster row + the badge artefact</span>
+      <span class="rt">/events/:id/checkin</span></span></a></li>
+    <li><a href="#S2"><span class="num">S2</span><span><span class="nm">Batch badge print — selection, pre-print count, output</span>
+      <span class="rt">/events/:id/badges</span></span></a></li>
+    <li><a href="#S3"><span class="num">S3</span><span><span class="nm">Kiosk self check-in — locked-down self-service</span>
+      <span class="rt">/events/:id/checkin/kiosk</span></span></a></li>
+    <li><a href="#S4"><span class="num">S4</span><span><span class="nm">Device registry — enroll / retire a kiosk or scanner</span>
+      <span class="rt">/events/:id/devices</span></span></a></li>
+    <li><a href="#S5"><span class="num">S5</span><span><span class="nm">Check-in-method report — how they came in</span>
+      <span class="rt">/reports/events/:id</span></span></a></li>
+  </ul>
+</nav>
+
+<div class="wrap">
+
+<!-- ==========================================================================
+     S1 · SINGLE BADGE PRINT — roster row action + the badge artefact
+     ========================================================================== -->
+<figure class="frame wide" id="S1" style="scroll-margin-top:80px">
+  <figcaption>
+    <b>S1. Single badge print — roster row action, plus the badge the portal renders</b>
+    <code>/events/:id/checkin</code>
+  </figcaption>
+  <div class="screen wide">
+
+    <div class="nav">
+      <div class="logo"></div>
+      <div class="grow"><div class="bar xs"></div>
+        <div class="tiny muted">Lagos North Youth Summit 2026 · Sat 14 Nov 2026 · Ikeja Worship Centre</div></div>
+      <span class="pill on">Ikeja Branch</span>
+      <span class="badge">Branch admin</span>
+    </div>
+
+    <nav class="anchors" aria-label="Event sections" style="display:flex;gap:6px;overflow-x:auto;padding-bottom:2px">
+      <a class="pill on" href="#S1" aria-current="true">Roster &amp; check-in</a>
+      <a class="pill" href="#S2">Badges</a>
+      <a class="pill" href="#S4">Devices</a>
+      <a class="pill" href="#S5">Report</a>
+    </nav>
+
+    <!-- counts: every number is a drill-down -->
+    <div class="row wrapg" style="gap:8px">
+      <div class="stat link" style="flex:1 1 130px"><div class="n">268</div><div class="k">Registered ▸</div></div>
+      <div class="stat link" style="flex:1 1 130px"><div class="n">231</div><div class="k">Confirmed ▸</div></div>
+      <div class="stat link" style="flex:1 1 130px"><div class="n">214</div><div class="k">Checked in ▸</div></div>
+      <div class="stat link" style="flex:1 1 130px"><div class="n">142</div><div class="k">Badge not printed ▸</div></div>
+      <div class="stat link" style="flex:1 1 130px"><div class="n">7</div><div class="k">Badge void ▸</div></div>
+      <div class="stat link" style="flex:1 1 130px"><div class="n">3</div><div class="k">Blocked — consent ▸</div></div>
+    </div>
+
+    <div class="card" style="padding:0;overflow:hidden">
+      <div class="row between" style="padding:8px 10px;border-bottom:1px solid var(--line);background:var(--box2)">
+        <div class="row" style="gap:6px;flex-wrap:wrap">
+          <span class="pill on">All 268 ▾</span>
+          <span class="pill">Not checked in 17 ▾</span>
+          <span class="pill">Badge not printed 142 ▾</span>
+        </div>
+        <div class="row" style="gap:6px">
+          <span class="input" style="width:196px;height:24px;font-size:10.5px">Search name or ticket code</span>
+          <span class="btn sm ghost">Export CSV</span>
+          <span class="btn sm accent" aria-current="true">Print badges</span>
+        </div>
+      </div>
+      <table>
+        <thead><tr>
+          <th>Registrant</th><th>Category</th><th>Ticket code</th><th>Check-in</th><th>Badge</th><th>Row actions</th>
+        </tr></thead>
+        <tbody>
+          <tr>
+            <td><b>Chisom Okonkwo</b></td>
+            <td>Teen (13–17)</td>
+            <td><code>AFT-26-0417</code></td>
+            <td><span class="badge g">✓ Checked in 09:41</span><div class="tiny muted">kiosk · Kiosk — north door</div></td>
+            <td><span class="badge w">Not printed</span></td>
+            <td><span class="btn sm">Print badge</span> <span class="btn sm ghost">Void</span></td>
+          </tr>
+          <tr>
+            <td><b>Adaobi Nwosu</b></td>
+            <td>Adult</td>
+            <td><code>AFT-26-0418</code></td>
+            <td><span class="badge g">✓ Checked in 09:52</span><div class="tiny muted">QR scan · station</div></td>
+            <td><span class="badge g">Printed 08:31</span></td>
+            <td><span class="btn sm ghost">Reprint</span> <span class="btn sm ghost">Void</span></td>
+          </tr>
+          <tr>
+            <td><b>Temitope Akinola</b></td>
+            <td>Youth (18–24)</td>
+            <td><code>AFT-26-0421</code></td>
+            <td><span class="badge dash">Not checked in</span></td>
+            <td><span class="badge w">Not printed</span></td>
+            <td><span class="btn sm">Print badge</span></td>
+          </tr>
+          <tr>
+            <td><b>Blessing Eze</b></td>
+            <td>Teen (13–17)</td>
+            <td><code>AFT-26-0422</code></td>
+            <td><span class="badge r">✕ Blocked — consent not recorded</span>
+                <div class="tiny muted">Requires guardian consent · C17 · G3</div></td>
+            <td><span class="badge w">Not printed</span></td>
+            <td><span class="btn sm">Print badge</span></td>
+          </tr>
+          <tr class="expand">
+            <td colspan="6">
+              <div class="pair">
+                <div>
+                  <div class="note stop"><span class="glyph">✕</span><b>Blocked — consent not recorded.</b>
+                    Nothing was written: no check-in time, no attendance row, no status change. There is no
+                    override on this screen and none behind it — a kiosk is not a way round the gate either.</div>
+                  <div class="tiny muted" style="margin-top:6px">
+                    The block is a state, not an error message. The roster keeps the row visible so the
+                    welcome desk can see who still needs help, rather than dropping the person silently.</div>
+                </div>
+                <div>
+                  <div class="card" style="padding:8px">
+                    <h4>Branch-admin action</h4>
+                    <div class="field"><span class="lab">Who acts</span>
+                      <div class="input">Branch admin, own branch <span class="muted tiny">· logged</span></div></div>
+                    <div class="row" style="gap:6px;margin-top:7px;flex-wrap:wrap">
+                      <span class="btn sm accent">Record guardian consent</span>
+                      <span class="btn sm ghost">Open registration</span>
+                    </div>
+                    <div class="tiny muted" style="margin-top:6px">Recording consent is a new record with a new
+                      timestamp. The blocked row updates only after that record exists — and the check-in is
+                      still the staff member's to perform.</div>
+                  </div>
+                </div>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td><b>Kemi Adeyemi</b></td>
+            <td>Adult</td>
+            <td><code>AFT-26-0424</code></td>
+            <td><span class="badge g">✓ Checked in 09:38</span><div class="tiny muted">kiosk · Kiosk — hall B</div></td>
+            <td><span class="badge r">✕ Void · lost</span><div class="tiny muted">voided 09:44 · reason: lost</div></td>
+            <td><span class="btn sm">Reprint</span> <span class="btn sm ghost">Un-void</span></td>
+          </tr>
+          <tr>
+            <td><b>Daniel Okafor</b></td>
+            <td>Adult</td>
+            <td><code>AFT-26-0427</code></td>
+            <td><span class="badge g">✓ Checked in 09:12</span><div class="tiny muted">Name search · station</div></td>
+            <td><span class="badge g">Printed 08:20</span></td>
+            <td><span class="btn sm ghost">Reprint</span> <span class="btn sm ghost">Void</span></td>
+          </tr>
+          <tr>
+            <td><b>Deborah Musa</b></td>
+            <td>Teen (13–17)</td>
+            <td><code>AFT-26-0430</code></td>
+            <td><span class="badge g">✓ Checked in 09:44</span><div class="tiny muted">kiosk · Kiosk — north door</div></td>
+            <td><span class="badge w">Not printed</span></td>
+            <td><span class="btn sm">Print badge</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- duplicate attempt on the staff path — a notice, not an error -->
+    <div class="state ok">
+      <h6><span class="countlink">✓</span> Second attempt on Chisom Okonkwo — already checked in at 09:41</h6>
+      <p>Kept the first check-in: <b>kiosk · Kiosk — north door · 09:41</b>. This attempt wrote nothing —
+        not the time, not the method, not the device, not the staff member. The second attempt is not an
+        error and nothing on the row turns red; it is the same single check-in, seen twice.</p>
+      <p class="q">Provenance is first-write-wins, because the loser of a race is evidence of how the door was
+        actually used. Scrolling back: the row still reads <b>09:41 · kiosk</b>.</p>
+    </div>
+
+    <!-- the badge artefact -->
+    <div class="row top wrapg" style="gap:14px;align-items:flex-start">
+      <div>
+        <div class="tiny muted" style="margin-bottom:6px"><b>Print preview</b> · the artefact the portal renders for
+          one registrant · nothing else is read from the record</div>
+        <div class="print">
+          <div>
+            <p class="p-evt">Lagos North Youth Summit 2026</p>
+            <p class="p-name">Chisom Okonkwo</p>
+            <p class="p-cat">Teen (13–17)</p>
+            <p class="p-meta">Sat 14 Nov 2026 · Ikeja Worship Centre · Lagos North Area</p>
+            <span class="lanyard">Lanyard marker · no photo pass</span>
+          </div>
+          <div class="p-right">
+            <div class="codeblock" role="img" aria-label="Code block, shown as a placeholder in this wireframe"></div>
+            <p class="p-code mono">AFT-26-0417</p>
+            <p class="cb-cap">Decorative here. In the product it encodes the ticket code and nothing else.</p>
+          </div>
+        </div>
+      </div>
+      <div style="flex:1 1 260px;min-width:0">
+        <div class="print" style="max-width:none">
+          <div>
+            <p class="p-evt">Lagos North Youth Summit 2026</p>
+            <p class="p-name">Adaobi Nwosu</p>
+            <p class="p-cat">Adult</p>
+            <p class="p-meta">Sat 14 Nov 2026 · Ikeja Worship Centre · Lagos North Area</p>
+            <span class="tiny muted">No lanyard marker — media consent is on record, so no marker is printed.</span>
+          </div>
+          <div class="p-right">
+            <div class="codeblock" role="img" aria-label="Code block, shown as a placeholder in this wireframe"></div>
+            <p class="p-code mono">AFT-26-0418</p>
+          </div>
+        </div>
+        <div class="note plain" style="margin-top:9px"><span class="glyph">◆</span>
+          <b>The badge carries five things:</b> registrant name, age-group category, event title, event date,
+          and the ticket code as text plus one code block. The lanyard marker appears only where media
+          consent is absent. The field list is enforced by a projection schema test, not by review of a
+          template — a printed page cannot be un-printed.</div>
+      </div>
+    </div>
+
+    <div class="row wrapg" style="gap:12px;align-items:stretch">
+      <div class="later" style="flex:1 1 280px">
+        <div class="lh"><span class="lt">Badge print destination</span><span class="tag">Later — decision required</span></div>
+        <p>Whether badges physically leave this screen through a printer at the branch, a shared sheet, or a
+          bureau is an operational decision nobody has made. The artefact and its print layout are decided and
+          shown above; only the destination is open. No hardware class, vendor or protocol is named here, and
+          none may be inferred.</p>
+      </div>
+      <div class="later" style="flex:1 1 280px">
+        <div class="lh"><span class="lt">Guardian view of a minor's check-in row</span><span class="tag">Later — decision required</span></div>
+        <p>A guardian cannot see a minor's check-in row in a member login. There is no verified
+          guardian-to-person link to join on, so any widening would be an unauthorised disclosure of a minor's
+          whereabouts. Shown so the absence reads as a decision, not an oversight.</p>
+      </div>
+    </div>
+
+    <div class="why">
+      <b>Design decisions on this screen, and the lenses behind them</b>
+      <ul>
+        <li><b>Row action, not a modal.</b> One badge is one row's action (Hick's Law — a single obvious choice
+          beats a dialog with options). The print preview sits below the table so the roster keeps its position.</li>
+        <li><b>The consent block is a visible rose state with an owner's action beside it</b> (Norman's feedback;
+          Progressive Disclosure — the fix is next to the block, not three clicks away). Nobody has to guess why a
+          person is not checked in, and there is no silent pass.</li>
+        <li><b>The duplicate check-in is a notice, not an error</b> (Postel's Law; G11). Idempotency that looks
+          like a failure teaches staff to keep clicking, which is how duplicate rows appear in the first place.</li>
+        <li><b>Badge states are three named chips</b> — not printed (amber), printed (teal), void (rose). Colour never
+          carries the state alone: each chip has its word.</li>
+        <li><b>The lanyard marker is on the artefact, not in a data panel</b> (Recognition over Recall). A marker
+          that only exists in the portal is a marker the usherer never sees.</li>
+        <li><b>The code block is deliberately not a working pattern.</b> A faked QR in a mockup reads as a working
+          scanner. It is labelled decorative at the size a reviewer will actually notice.</li>
+      </ul>
+    </div>
+  </div>
+</figure>
+
+<!-- ==========================================================================
+     S2 · BATCH BADGE PRINT
+     ========================================================================== -->
+<figure class="frame wide" id="S2" style="scroll-margin-top:80px">
+  <figcaption>
+    <b>S2. Batch badge print — selection, pre-print count, print-ready output</b>
+    <code>/events/:id/badges</code>
+  </figcaption>
+  <div class="screen wide">
+
+    <div class="nav">
+      <div class="logo"></div>
+      <div class="grow"><div class="bar xs"></div>
+        <div class="tiny muted">Print badges · Lagos North Youth Summit 2026 · Ikeja Branch</div></div>
+      <span class="pill on">231 confirmed</span>
+      <span class="badge">Branch admin</span>
+    </div>
+
+    <!-- US-K2 AC1: filter and resulting count shown BEFORE printing -->
+    <div class="split">
+      <div class="grow card" style="min-width:0;flex:1 1 640px">
+        <h4>1 · Who gets a badge</h4>
+        <div class="list">
+          <div class="item">
+            <span class="box-1 on"></span>
+            <div class="grow"><b>Not yet printed</b><div class="tiny muted">Registration status confirmed, badge
+              has never been printed</div></div>
+            <b class="mono">142</b>
+          </div>
+          <div class="item">
+            <span class="box-1"></span>
+            <div class="grow"><b>All confirmed</b><div class="tiny muted">Every confirmed registrant,
+              printed or not</div></div>
+            <b class="mono">231</b>
+          </div>
+          <div class="item">
+            <span class="box-1"></span>
+            <div class="grow"><b>One session</b><div class="tiny muted">Main Hall · 10:15 — the Word on purpose</div></div>
+            <b class="mono">188</b>
+          </div>
+        </div>
+
+        <h4 style="margin-top:12px">2 · Excluded from this batch by default</h4>
+        <div class="list">
+          <div class="chk"><span class="box-1 dash"></span><div>
+            <b>Cancelled registrations — 15</b><div class="tiny">Left out by default. Including them is an
+            explicit, visible choice, and it is logged with whoever made it.</div></div></div>
+          <div class="chk"><span class="box-1 dash"></span><div>
+            <b>Waitlisted registrations — 22</b><div class="tiny">Left out by default for the same reason: a
+            badge handed to someone who has not been given a place says something false at the door.</div></div></div>
+        </div>
+        <div class="tiny muted" style="margin-top:7px">268 registered = 231 confirmed + 22 waitlisted + 15 cancelled.
+          The default batch is the 142 confirmed registrants whose badge has never been printed.</div>
+      </div>
+
+      <div style="flex:1 1 340px;min-width:300px">
+        <div class="card" style="background:var(--accent-soft);border-color:var(--accent)">
+          <h4 style="color:var(--accent)">3 · Before you print</h4>
+          <div class="sumline" style="border:0;background:transparent;padding:0">
+            <span class="big">142</span>
+            <span class="lbl">badges will print<br>for this batch</span>
+            <span class="why">231 confirmed<br>82 printed · 7 void<br>142 never printed</span>
+          </div>
+          <div class="note" style="margin-top:9px"><span class="glyph">◆</span>
+            This number is shown before anything is printed, and it is the number of badges you will get —
+            not an estimate. If the count and the sheet disagree, the run is stopped rather than half-completed.</div>
+          <div class="row" style="gap:6px;margin-top:9px;flex-wrap:wrap">
+            <span class="btn accent xl">Print 142 badges</span>
+            <span class="btn ghost">Change selection</span>
+          </div>
+          <div class="tiny muted" style="margin-top:8px">Each printed badge sets its own badge state, its own print
+            time, its own actor, and its own audit row. 142 badges means 142 audit rows.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- print-ready output -->
+    <div class="card">
+      <h4>4 · Print-ready output — the portal's own rendering</h4>
+      <div class="split">
+        <div class="sheet" style="flex:1 1 340px">
+          <div class="sl"><div class="n">Chisom Okonkwo</div><div class="m">Teen (13–17) · AFT-26-0417</div>
+            <div class="m" style="color:var(--warn-ink)">lanyard marker</div><div class="blank"></div></div>
+          <div class="sl"><div class="n">Deborah Musa</div><div class="m">Teen (13–17) · AFT-26-0430</div>
+            <div class="blank"></div></div>
+          <div class="sl"><div class="n">Temitope Akinola</div><div class="m">Youth (18–24) · AFT-26-0421</div>
+            <div class="blank"></div></div>
+          <div class="sl"><div class="n">Grace Uche</div><div class="m">Adult · AFT-26-0431</div>
+            <div class="blank"></div></div>
+        </div>
+        <div style="flex:1 1 260px;min-width:0">
+          <div class="kv">
+            <dt>Badges on this sheet</dt><dd class="mono">4 of 142</dd>
+            <dt>Remaining sheets</dt><dd class="mono">34</dd>
+            <dt>Order</dt><dd>Category, then family name — an usherer can hand these out alphabetically</dd>
+            <dt>Reading level</dt><dd>Plain, one badge = one person, no abbreviation</dd>
+          </div>
+          <div class="note plain" style="margin-top:9px"><span class="glyph">◆</span>
+            The portal generates this sheet from the same roster projection the table above reads, under the same
+            scope rule. A branch you cannot read returns nothing at all — never a partial page of somebody
+            else's congregation.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- partial run -->
+    <div class="state warn">
+      <h6><span class="glyph">!</span> Partly completed run — 139 of 142 printed</h6>
+      <p>Three rows did not produce a badge. Nothing was half-written: each registration ends this run with one
+        settled badge state, and the print count reflects impressions actually issued.</p>
+      <div class="row wrapg" style="gap:8px;margin-top:7px">
+        <span class="btn sm">Re-run these 3</span>
+        <span class="btn sm ghost">Download the 139 that printed</span>
+      </div>
+      <p class="q">Re-running completes the three. It does not create a second badge for anyone — there is one
+        badge state per registration, so a re-run cannot fork it. Nobody is billed per batch, so there is no
+        print-job ledger to reconcile against.</p>
+    </div>
+
+    <div class="later">
+      <div class="lh"><span class="lt">Badge print destination — printer class, sheet stock, or a bureau</span>
+        <span class="tag">Later — decision required</span></div>
+      <p>Declared open on <a href="/AFC/issues/AFC-304" style="color:var(--accent)">AFC-304</a> (L3) and repeated
+        on S1, because a batch is where the operational question actually bites: 142 badges on one desk is a
+        different problem from one badge in a volunteer's hand. The layout, the count and the audit trail are
+        decided. Nothing about the physical destination is decided, and no hardware, vendor or protocol is
+        named in this file.</p>
+    </div>
+
+    <div class="why">
+      <b>Design decisions on this screen</b>
+      <ul>
+        <li><b>Selection, then count, then print — in that order, always.</b> The pre-print count is the
+          second step, not a confirmation dialog after the fact (Choice Overload: three filters and a confirm
+          would be four decisions for one action).</li>
+        <li><b>Excluded rows are listed with their count, not hidden.</b> 22 waitlisted and 15 cancelled are on
+          screen with unchecked boxes. An exclusion nobody can see is an exclusion nobody can question
+          (Information Scent; the reporting team reads this screen on Monday morning).</li>
+        <li><b>"Print 142 badges" repeats the count in the verb</b> (Recognition over Recall). The button is not
+          a generic "Print" — if the count is wrong, the button is where a reviewer looks first.</li>
+        <li><b>The partial-run state is amber and offers a scoped re-run</b> (Forgiveness). Nothing is
+          discarded and nothing is silently completed behind the user's back.</li>
+        <li><b>No printer is drawn</b>, and none is named. The decision to defer destination is displayed on the
+          screen where the question arises, per the board's rule that absence must not read as nobody's decision.</li>
+      </ul>
+    </div>
+  </div>
+</figure>
+
+<!-- ==========================================================================
+     S3 · KIOSK SELF CHECK-IN — mobile-first, 1:1 at 390
+     ========================================================================== -->
+<figure class="frame wide" id="S3" style="scroll-margin-top:80px">
+  <figcaption>
+    <b>S3. Kiosk self check-in — locked-down self-service surface and every refusal state</b>
+    <code>/events/:id/checkin/kiosk</code>
+  </figcaption>
+  <div class="screen wide">
+
+    <div class="note plain" style="margin-bottom:2px">
+      <span class="glyph">◆</span><b>What this surface is:</b> the registrant presents their own code and checks
+      <i>themselves</i> in. No staff login is present on the device. It writes exactly the record the usherer's
+      list writes, through the same handler — the difference is who presents the credential, never which
+      guards run.
+    </div>
+
+    <div class="kiosk-row">
+
+      <!-- idle / attract -->
+      <div>
+        <p class="kcap"><b>Kiosk 1 of 8</b> · idle / attract state · what an attendee sees from four metres</p>
+        <div class="kiosk">
+          <div class="kiosk__bar"><span class="ev">Lagos North Youth Summit 2026</span><span>Kiosk — north door</span></div>
+          <div class="kiosk__body" style="justify-content:center;align-items:center;text-align:center;gap:16px">
+            <div class="kiosk__prompt">
+              <p class="big">Check yourself in</p>
+              <p class="tiny muted" style="margin:0 0 10px">Scan the code on your badge, or type it below</p>
+              <div class="codeblock" style="width:74px;height:74px;margin:0 auto" role="img"
+                   aria-label="Scan prompt, decorative in this wireframe"></div>
+              <p class="tiny muted" style="margin:8px 0 0">Nothing to do until you scan or type your code</p>
+            </div>
+            <span class="input big dash" style="width:100%;justify-content:center">Scan or type your code</span>
+          </div>
+          <div class="kiosk__foot"><span>No staff login on this device</span><span>Self check-in is on for this event</span></div>
+        </div>
+      </div>
+
+      <!-- code entered -->
+      <div>
+        <p class="kcap"><b>Kiosk 2 of 8</b> · code entry + scan prompt · nothing is submitted until the code is complete</p>
+        <div class="kiosk">
+          <div class="kiosk__bar"><span class="ev">Lagos North Youth Summit 2026</span><span>Kiosk — north door</span></div>
+          <div class="kiosk__body" style="justify-content:center;gap:14px">
+            <p class="kiosk__code mono">AFT-26-0417</p>
+            <div class="tiny muted" style="text-align:center">Ticket code recognised as this event's format</div>
+            <span class="btn accent xl" style="width:100%">Check me in</span>
+            <span class="btn ghost" style="width:100%">Clear</span>
+          </div>
+          <div class="kiosk__foot"><span>Rate-limited per device and per address</span><span>1 attempt</span></div>
+        </div>
+      </div>
+
+      <!-- success -->
+      <div>
+        <p class="kcap"><b>Kiosk 3 of 8</b> · success · name, status, time — the whole response, nothing more</p>
+        <div class="kiosk">
+          <div class="kiosk__bar"><span class="ev">Lagos North Youth Summit 2026</span><span>Kiosk — north door</span></div>
+          <div class="kiosk__body" style="justify-content:center;gap:12px">
+            <div class="state ok">
+              <h6><span class="glyph">✓</span> You are checked in</h6>
+              <p><strong>Chisom Okonkwo</strong></p>
+              <p>Checked in at <strong>09:41</strong> · status <strong>attended</strong></p>
+            </div>
+            <div class="tiny muted" style="text-align:center">This screen clears itself in a few seconds.<br>
+              Please keep your badge and take your seat.</div>
+          </div>
+          <div class="kiosk__foot"><span>Checked in via this kiosk</span><span>Done</span></div>
+        </div>
+      </div>
+
+      <!-- duplicate: success / notice -->
+      <div>
+        <p class="kcap"><b>Kiosk 4 of 8</b> · already checked in · a notice, not an error (G11, US-K3 AC3)</p>
+        <div class="kiosk">
+          <div class="kiosk__bar"><span class="ev">Lagos North Youth Summit 2026</span><span>Kiosk — north door</span></div>
+          <div class="kiosk__body" style="justify-content:center;gap:12px">
+            <div class="state ok">
+              <h6><span class="glyph">✓</span> Already checked in at 09:41</h6>
+              <p><strong>Chisom Okonkwo</strong></p>
+              <p>You are checked in. You do not need to do anything else.</p>
+            </div>
+            <div class="tiny muted" style="text-align:center">Nothing was changed the second time.<br>
+              This is one check-in, seen twice.</div>
+          </div>
+          <div class="kiosk__foot"><span>Original check-in kept</span><span>Done</span></div>
+        </div>
+      </div>
+
+      <!-- consent block -->
+      <div>
+        <p class="kcap"><b>Kiosk 5 of 8</b> · rose — blocked, consent not recorded · no detail, no override</p>
+        <div class="kiosk">
+          <div class="kiosk__bar"><span class="ev">Lagos North Youth Summit 2026</span><span>Kiosk — north door</span></div>
+          <div class="kiosk__body" style="justify-content:center;gap:12px">
+            <div class="state stop">
+              <h6><span class="glyph">✕</span> Blocked — consent not recorded</h6>
+              <p><strong>Blessing Eze</strong></p>
+              <p>Please go to the <strong>welcome desk</strong>. A team member will help you there.</p>
+            </div>
+            <div class="tiny muted" style="text-align:center">Nothing was recorded, and nothing will be recorded
+              from this screen.</div>
+          </div>
+          <div class="kiosk__foot"><span>Refused before any detail was returned</span><span>Done</span></div>
+        </div>
+      </div>
+
+      <!-- child -->
+      <div>
+        <p class="kcap"><b>Kiosk 6 of 8</b> · rose — a child is routed to the welcome desk, never handled here</p>
+        <div class="kiosk">
+          <div class="kiosk__bar"><span class="ev">Lagos North Youth Summit 2026</span><span>Kiosk — north door</span></div>
+          <div class="kiosk__body" style="justify-content:center;gap:12px">
+            <div class="state stop">
+              <h6><span class="glyph">✕</span> This code is for a child</h6>
+              <p><strong>Please go to the welcome desk.</strong></p>
+              <p>A child's sign-in is completed there, by a person.</p>
+            </div>
+            <div class="tiny muted" style="text-align:center">This kiosk does not collect or release a minor,
+              so it will not record one.</div>
+          </div>
+          <div class="kiosk__foot"><span>Supervised sign-in happens at a staffed desk</span><span>Done</span></div>
+        </div>
+      </div>
+
+      <!-- void badge -->
+      <div>
+        <p class="kcap"><b>Kiosk 7 of 8</b> · rose — this badge was voided · the usherer's desk still works</p>
+        <div class="kiosk">
+          <div class="kiosk__bar"><span class="ev">Lagos North Youth Summit 2026</span><span>Kiosk — north door</span></div>
+          <div class="kiosk__body" style="justify-content:center;gap:12px">
+            <div class="state stop">
+              <h6><span class="glyph">✕</span> This badge is no longer valid</h6>
+              <p><strong>Please go to the usherer's desk.</strong></p>
+              <p>They can find you and check you in by name. Your place is not lost.</p>
+            </div>
+            <div class="tiny muted" style="text-align:center">The badge is a convenience. The registration is
+              the identity.</div>
+          </div>
+          <div class="kiosk__foot"><span>Ask for the usherer's desk</span><span>Done</span></div>
+        </div>
+      </div>
+
+      <!-- device refused -->
+      <div>
+        <p class="kcap"><b>Kiosk 8 of 8</b> · amber — this device is refused before any lookup happens</p>
+        <div class="kiosk">
+          <div class="kiosk__bar"><span class="ev">Lagos North Youth Summit 2026</span><span>Kiosk — hall B</span></div>
+          <div class="kiosk__body" style="justify-content:center;gap:12px">
+            <div class="state warn">
+              <h6><span class="glyph">!</span> This kiosk cannot check anyone in today</h6>
+              <p>Please go to the <strong>usherer's desk</strong>. An usherer can check you in by name.</p>
+              <p style="opacity:.85">This kiosk is not enrolled for this event.</p>
+            </div>
+            <div class="tiny muted" style="text-align:center">No code is read and no attendee is looked up at a
+              kiosk that is not enrolled. Staff see the reason on S4.</div>
+          </div>
+          <div class="kiosk__foot"><span>Refused before lookup</span><span>Ask an usherer</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="later">
+      <div class="lh"><span class="lt">Offline check-in with later sync</span><span class="tag">Later — decision required</span></div>
+      <p>A kiosk that buffers check-ins and syncs them later needs a conflict-resolution model that does not
+        exist yet, and the rule that one person has exactly one check-in is the rule that model would have to
+        protect. It is deferred rather than half-built: a half-built offline path is how two check-in times
+        get written for one person.</p>
+    </div>
+
+    <div class="why">
+      <b>Design decisions on this screen</b>
+      <ul>
+        <li><b>There is no name search on this surface, and its absence is deliberate.</b> An unattended name
+          search lets anyone establish whether a named young person is at tonight's youth event — an
+          attendee-enumeration surface, not a convenience (D-K5, US-K3 AC1). Someone who cannot produce a code
+          goes to the usherer, which is the path that already exists. <b>This absence is a decision, recorded
+          in the spec, not a gap in this mockup.</b></li>
+        <li><b>The response payload is name, status, time — and the screen proves it</b> (US-K3 AC6). The kiosk
+          never receives a restricted field, so there is no panel here that could display one; the refusal
+          screens are the proof, because they route a person onward without revealing anything to reveal. The
+          exclusion is enforced by a payload schema test, not by trust in this screen.</li>
+        <li><b>"Already checked in at 09:41" is teal with a tick, next to a success state</b> (G11). An
+          idempotent success that looks like a failure trains people to scan again, and a second scan that
+          <i>did</i> write would be the bug this design is preventing.</li>
+        <li><b>Every refusal names the next human step</b> (Norman: signifiers; Progressive Disclosure). "Blocked"
+          with no destination is a dead end; three different refusals all resolve to the same sentence — go to a
+          person — because that is what they have in common.</li>
+        <li><b>Consent and child refusals are rose; the device refusal is amber.</b> Rose means a person's state
+          stopped them and a person must resolve it. Amber means this device is not authorised and no one is
+          implicated. Colour is never the only signal: each state carries a glyph and a word.</li>
+        <li><b>The child refusal refuses by category, not by appearance.</b> The screen says the code is for a
+          child and routes; it does not ask the child to explain, and it does not collect or release anything.</li>
+        <li><b>Touch targets are the largest on the screen</b> (Fitts's Law; WCAG 2.2 target size). A kiosk is
+          used standing, one-handed, possibly in a queue that is watching.</li>
+      </ul>
+    </div>
+  </div>
+</figure>
+
+<!-- ==========================================================================
+     S4 · DEVICE REGISTRY
+     ========================================================================== -->
+<figure class="frame wide" id="S4" style="scroll-margin-top:80px">
+  <figcaption>
+    <b>S4. Device registry — enroll and retire the surfaces that perform a check-in</b>
+    <code>/events/:id/devices</code>
+  </figcaption>
+  <div class="screen wide">
+
+    <div class="nav">
+      <div class="logo"></div>
+      <div class="grow"><div class="bar xs"></div>
+        <div class="tiny muted">Check-in devices · Lagos North Youth Summit 2026 · Ikeja Branch</div></div>
+      <span class="pill on">Branch admin</span>
+      <span class="badge">4 active · 1 retired</span>
+    </div>
+
+    <div class="note plain">
+      <span class="glyph">◆</span>Every self-service check-in names the device that performed it, and every
+      staff check-in names the staff member. A check-in row is never ambiguous about <i>who</i> or <i>what</i>
+      acted. A volunteer can see which devices are live; a volunteer cannot enroll or retire one.
+    </div>
+
+    <div class="card" style="padding:0;overflow:hidden">
+        <div class="row between" style="padding:8px 10px;border-bottom:1px solid var(--line);background:var(--box2)">
+          <b style="font-size:12px">Enrolled devices — seven columns, so this table is full width</b>
+          <span class="pill">All branches in scope ▾</span>
+        </div>
+        <table>
+          <thead><tr><th>Label</th><th>Kind</th><th>Scope</th><th>Status</th><th>Last seen</th><th>Credential</th><th>Action</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><b>Kiosk — north door</b></td><td>Kiosk</td>
+              <td>This event · Ikeja</td>
+              <td><span class="badge g">✓ Active</span></td>
+              <td>14 Nov 09:41</td>
+              <td>issued 02 Nov · held in the secret store</td>
+              <td><span class="btn sm danger">Retire</span></td>
+            </tr>
+            <tr>
+              <td><b>Kiosk — hall B entrance</b></td><td>Kiosk</td>
+              <td>This event · Ikeja</td>
+              <td><span class="badge g">✓ Active</span></td>
+              <td>14 Nov 09:38</td>
+              <td>issued 02 Nov · held in the secret store</td>
+              <td><span class="btn sm danger">Retire</span></td>
+            </tr>
+            <tr>
+              <td><b>Welcome-desk station</b></td><td>Station</td>
+              <td>Branch · any event</td>
+              <td><span class="badge g">✓ Active</span></td>
+              <td>14 Nov 09:44</td>
+              <td>staff sign-in · no device credential</td>
+              <td><span class="btn sm ghost">Edit</span></td>
+            </tr>
+            <tr>
+              <td><b>Registration desk</b></td><td>Scanner</td>
+              <td>Branch · any event</td>
+              <td><span class="badge g">✓ Active</span></td>
+              <td>14 Nov 08:55</td>
+              <td>issued 19 Oct · held in the secret store</td>
+              <td><span class="btn sm danger">Retire</span></td>
+            </tr>
+            <tr>
+              <td><b>Kiosk — old hall</b></td><td>Kiosk</td>
+              <td>This event · Ikeja</td>
+              <td><span class="badge r">✕ Retired 02 Oct</span></td>
+              <td>02 Oct 17:02</td>
+              <td>revoked 02 Oct</td>
+              <td><span class="btn sm ghost">Re-enroll</span></td>
+            </tr>
+          </tbody>
+        </table>
+    </div>
+
+    <div class="pair">
+        <div class="card">
+          <h4>Enroll a device</h4>
+          <div class="field"><span class="lab">Label — what the report will show</span>
+            <div class="input">Kiosk — south door</div></div>
+          <div class="field" style="margin-top:7px"><span class="lab">Kind</span>
+            <div class="input">Kiosk ▾</div></div>
+          <div class="field" style="margin-top:7px"><span class="lab">Usable at</span>
+            <div class="input">This event only ▾</div></div>
+          <div class="row" style="gap:6px;margin-top:9px">
+            <span class="btn sm accent">Enroll</span><span class="btn sm ghost">Cancel</span>
+          </div>
+          <div class="tiny muted" style="margin-top:8px">Enrolling issues a credential once. It is stored in the
+            secret store, never in the portal, never in a document and never in a message. If the device is
+            lost, retire it — a retired device cannot check anyone in, immediately and without a deploy.</div>
+        </div>
+
+        <div class="card" style="margin-top:10px;border-color:var(--warn-line);background:var(--warn)">
+          <h4 style="color:var(--warn-ink)">Retire — confirming</h4>
+          <div class="note warn" style="background:#fff"><span class="glyph">?</span>
+            Retire <b>Kiosk — north door</b>? From the moment you confirm, that kiosk stops checking anyone in.
+            It says so on screen and points to the usherer's desk. Registrations already checked in through it
+            keep their check-in and their method — retiring a device does not rewrite the door's history.</div>
+          <div class="row" style="gap:6px;margin-top:8px">
+            <span class="btn sm danger">Yes, retire it</span><span class="btn sm ghost">Keep it active</span>
+          </div>
+          <div class="tiny" style="margin-top:7px;color:var(--warn-ink)">The confirm names the device and says
+            what stops. It does not threaten, and it does not hide the way out.</div>
+        </div>
+    </div>
+
+    <div class="later">
+      <div class="lh"><span class="lt">A proximity reader as a device kind</span>
+        <span class="tag">Later — decision required</span></div>
+      <p>A reader that accepts a tap instead of a scan would be a new device kind, and the slot for it is already
+        reserved and inert: it cannot be enrolled, it writes nothing, and it is counted nowhere. That is why it
+        has no row in the table above and no option in the Kind dropdown — an inert value that looks selectable
+        would be a half-built feature wearing a working feature's clothes. The data shape admits it without a
+        redesign, so nothing has to be broken to add it later, but the reader class, the tag form, custody on
+        site and the retention treatment of tap events are all undecided. No hardware class, vendor or protocol
+        is named here, and none may be inferred from the reserved slot.</p>
+    </div>
+
+    <div class="row wrapg" style="gap:10px">
+      <div class="state warn" style="flex:1 1 300px">
+        <h6><span class="glyph">!</span> Device refused — three reasons, one message shape</h6>
+        <p>Not enrolled to this event · retired · enrolled to another branch. All three are refused
+          <b>before any registrant is looked up</b>, so a refused device learns nothing about who is attending.
+          The kiosk screen shows a plain sentence; this is where staff see which of the three it was.</p>
+      </div>
+      <div class="state" style="flex:1 1 300px">
+        <h6><span class="glyph">◦</span> Volunteer view — read only</h6>
+        <p>A volunteer with this event's check-in role sees which kiosk is live and when it was last used, and
+          cannot enroll, retire or re-issue anything. The buttons above are not rendered for that role — a
+          control a person may not use is absent, not greyed out.</p>
+      </div>
+      <div class="state" style="flex:1 1 300px">
+        <h6><span class="glyph">◦</span> Turning self check-in off for one event</h6>
+        <p>A branch admin can switch self check-in off for this event without a deploy. That switch is the
+          rollback path: if anything at the door goes wrong, one toggle turns the kiosk off and the staff list
+          is still there. The staff path is unaffected either way.</p>
+      </div>
+    </div>
+
+    <div class="later">
+      <div class="lh"><span class="lt">How often a device credential is rotated</span>
+        <span class="tag">Later — decision required</span></div>
+      <p>Rotation itself is decided: rotation is re-enrollment — a new credential is issued and the previous one
+        revoked in the same action. What is <b>not</b> decided is a time-based interval, because a schedule with
+        no named custody owner is a scheduled outage. On-site custody is itself open, so the interval waits with it.</p>
+    </div>
+
+    <div class="why">
+      <b>Design decisions on this screen</b>
+      <ul>
+        <li><b>The label is the interface.</b> "Kiosk — north door" is what a report shows and what a volunteer
+          says out loud. That is why the field asks for the label first, not the identifier (Mental Models: match
+          the label to the world).</li>
+        <li><b>Credential values are never on this screen</b>, not even to a branch admin. Issued, stored and
+          revoked in the secret store; the table shows only when it was issued and revoked.</li>
+        <li><b>Retire confirms in plain words and keeps the door honest</b> (Forgiveness: confirm destructive
+          actions). It says what stops immediately, says what is kept, and offers the way out. It is not
+          confirmshaming — the copy does not moralise, and the honest option is one click away.</li>
+        <li><b>Volunteer sees a smaller screen, not a disabled one.</b> A section a person cannot use is not
+          rendered (AFC-151 convention) — not greyed, not hidden behind a tooltip.</li>
+        <li><b>The reserved reader kind is named in a dashed block, not offered in the Kind dropdown</b>, so that
+          "why is there no tap option?" has a visible answer instead of an absence. A reserved value that looked
+          selectable would be a half-built feature wearing a working feature's clothes (C-K8; D-K11).</li>
+        <li><b>The device table is full width because it has seven columns.</b> Squeezed into a half-column it
+          clipped its own actions and truncated the credential text — a table you cannot read is not a faster
+          layout, it is a slower one (Pareto: the columns that matter most get the space).</li>
+      </ul>
+    </div>
+  </div>
+</figure>
+
+<!-- ==========================================================================
+     S5 · CHECK-IN-METHOD REPORT
+     ========================================================================== -->
+<figure class="frame wide" id="S5" style="scroll-margin-top:80px">
+  <figcaption>
+    <b>S5. Check-in-method report — "how they came in"</b>
+    <code>/reports/events/:id</code>
+  </figcaption>
+  <div class="screen wide">
+
+    <div class="row between wrapg">
+      <div class="row" style="gap:6px;flex-wrap:wrap">
+        <span class="pill on">Period: 14 Nov 2026 ▾</span>
+        <span class="pill">Scope: Ikeja Branch ▾</span>
+        <span class="pill">All sessions ▾</span>
+      </div>
+      <div class="row" style="gap:6px">
+        <span class="btn sm ghost">Compare period</span>
+        <span class="btn sm accent">Export CSV</span>
+      </div>
+    </div>
+
+    <div class="row between">
+      <div class="grow">
+        <div class="bar m"></div>
+        <div class="tiny muted">Event report · Lagos North Youth Summit 2026 · read at 14 Nov 10:05</div>
+      </div>
+    </div>
+
+    <div class="row wrapg" style="gap:8px">
+      <div class="stat link" style="flex:1 1 120px"><div class="n">268</div><div class="k">Registered ▸</div></div>
+      <div class="stat" style="flex:1 1 120px;border-color:var(--accent)"><div class="n" style="color:var(--accent)">214</div><div class="k">Checked in ▸</div></div>
+      <div class="stat link" style="flex:1 1 120px"><div class="n">37</div><div class="k">Counted, not checked in ▸</div></div>
+      <div class="stat link" style="flex:1 1 120px"><div class="n">17</div><div class="k">Confirmed, not arrived ▸</div></div>
+    </div>
+
+    <!-- how they came in -->
+    <div class="split">
+      <div class="grow card" style="min-width:0;flex:1 1 620px">
+        <h4>How they came in — event level</h4>
+        <table>
+          <thead><tr><th>Method</th><th class="num">Count</th><th>Share of check-ins</th><th>Where</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>Kiosk self check-in</td>
+              <td class="num"><span class="countlink">96</span></td>
+              <td style="width:180px"><div style="background:var(--accent);height:9px;border-radius:3px;width:86%"></div></td>
+              <td class="tiny muted">Kiosk — north door 61 · Kiosk — hall B 35</td>
+            </tr>
+            <tr>
+              <td>QR scan by an usherer</td>
+              <td class="num"><span class="countlink">58</span></td>
+              <td style="width:180px"><div style="background:var(--box);height:9px;border-radius:3px;width:52%"></div></td>
+              <td class="tiny muted">Welcome-desk station</td>
+            </tr>
+            <tr>
+              <td>Code typed by an usherer</td>
+              <td class="num"><span class="countlink">31</span></td>
+              <td style="width:180px"><div style="background:var(--box);height:9px;border-radius:3px;width:28%"></div></td>
+              <td class="tiny muted">Welcome-desk station</td>
+            </tr>
+            <tr>
+              <td>Name search by an usherer</td>
+              <td class="num"><span class="countlink">24</span></td>
+              <td style="width:180px"><div style="background:var(--box);height:9px;border-radius:3px;width:22%"></div></td>
+              <td class="tiny muted">Welcome-desk station · Registration desk</td>
+            </tr>
+            <tr>
+              <td>Staff override</td>
+              <td class="num"><span class="countlink">5</span></td>
+              <td style="width:180px"><div style="background:var(--box);height:9px;border-radius:3px;width:5%"></div></td>
+              <td class="tiny muted">Branch admin only · every one has a reason on record</td>
+            </tr>
+            <tr style="background:var(--box2)">
+              <td><b>Total checked in</b></td>
+              <td class="num"><b>214</b></td>
+              <td class="tiny muted">100%</td>
+              <td class="tiny muted">Equals the checked-in total for this scope</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="note" style="margin-top:9px"><span class="glyph">◆</span>
+          <b>The five method counts sum to the checked-in total, and the total is not computed anywhere else.</b>
+          Someone checked in twice, or checked in at the kiosk and then found on the usherer's list, is counted
+          <b>once</b> — however many attempts were made. That is why the duplicate state on S1 and S3 is a
+          notice: the race is resolved by the door, and the report reflects the door, not the retries.</div>
+
+        <h4 style="margin-top:14px">Self-service drill-down — which surface actually did it</h4>
+        <table>
+          <thead><tr><th>Device</th><th class="num">Check-ins</th><th class="num">Attempts</th><th>Last seen</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td><b>Kiosk — north door</b></td><td class="num"><span class="countlink">61</span></td><td class="num">66</td><td>14 Nov 09:41</td><td><span class="badge g">✓ Active</span></td></tr>
+            <tr><td><b>Kiosk — hall B entrance</b></td><td class="num"><span class="countlink">35</span></td><td class="num">37</td><td>14 Nov 09:38</td><td><span class="badge g">✓ Active</span></td></tr>
+            <tr style="background:var(--box2)"><td><b>Kiosk self check-in</b></td><td class="num"><b>96</b></td><td class="num">103</td><td colspan="2" class="tiny muted">61 + 35 = 96 · attempts exceed check-ins by 7, all already checked in</td></tr>
+          </tbody>
+        </table>
+        <div class="note plain" style="margin-top:9px"><span class="glyph">◆</span>
+          <b>Attempts are shown next to check-ins, never instead of them.</b> The gap between them is the honest
+          measure of how often the door was used twice — useful to a branch admin, and not a number to optimise
+          down. One check-in, one count.</div>
+        <div class="note plain" style="margin-top:8px"><span class="glyph">◆</span>
+          <b>Drill-down obeys the same read rules as the roster.</b> A minor's row appears here only for a role
+          that may read it; a kiosk has no read access at all. This list carries the same field set the usherer's
+          list carries and no more.</div>
+      </div>
+
+      <div style="flex:1 1 340px;min-width:300px">
+        <div class="card">
+          <h4>Counted, not checked in — 37</h4>
+          <div class="note warn"><span class="glyph">!</span>Count capture is attendance counting, not a check-in.
+            These 37 people were counted into the hall. They are <b>never added</b> to the 214 above and they
+            never appear in a method count.</div>
+          <table style="margin-top:8px"><tbody>
+            <tr><th>Session</th><th class="num">Counted</th></tr>
+            <tr><td>Main Hall · 10:15</td><td class="num">31</td></tr>
+            <tr><td>Hall B · 14:00</td><td class="num">6</td></tr>
+            <tr><td><b>Count capture total</b></td><td class="num"><b>37</b></td></tr>
+            <tr><td class="muted">Of which checked in by any method</td><td class="num muted">0</td></tr>
+          </tbody></table>
+          <div class="tiny muted" style="margin-top:6px">Adding these rows to the method table would answer a
+            different question than the one on this screen, and would double-count anyone who did both.</div>
+        </div>
+
+        <div class="card" style="margin-top:10px">
+          <h4>Session level — shown beside, never added</h4>
+          <table><tbody>
+            <tr><td>Main Hall · 10:15</td><td class="num">155</td></tr>
+            <tr><td>Hall B · 14:00</td><td class="num">41</td></tr>
+            <tr><td>Track A workshop · 16:00</td><td class="num">28</td></tr>
+            <tr><td><b>Session check-ins</b></td><td class="num"><b>224</b></td></tr>
+          </tbody></table>
+          <div class="note warn" style="margin-top:8px"><span class="glyph">!</span>
+            A person checked into the event and into three sessions is <b>one</b> event check-in, not four.
+            214 and 224 are different questions about the same afternoon and must never be added together.</div>
+        </div>
+
+        <div class="later" style="border-color:var(--line)">
+          <div class="lh"><span class="lt">Proximity tap as a reported method</span>
+            <span class="tag">Later — decision required</span></div>
+          <p>The reserved tap method has a slot in these tables and will always read zero. It is not a
+            placeholder chart to fill in later: nothing writes it and nothing counts it until the feature is
+            approved.</p>
+        </div>
+      </div>
+    </div>
+
+
+
+    <div class="why">
+      <b>Design decisions on this screen</b>
+      <ul>
+        <li><b>Method counts are teal, underlined, clickable</b> (AFC-151 convention) — every number is a claim
+          about rows, and every number is one click from the rows.</li>
+        <li><b>The total row is drawn, not implied.</b> 214 sits in the table with a line through it so a
+          reviewer can check the sum in one glance rather than trusting that it adds up. That is the whole
+          acceptance criterion made visible.</li>
+        <li><b>Count capture is a separate card with an explicit "never added"</b> (C18). The temptation to
+          fold 37 into the 214 is exactly the kind of small dishonest number that makes a board report
+          untrustworthy two years later.</li>
+        <li><b>Event and session scopes are never summed</b>, and the screen says so in words (US-K5 AC3). Two
+          totals that must not be added should not sit in a table with a total row without that sentence.</li>
+        <li><b>Attempts are displayed but framed as evidence, not a target.</b> No "reduce duplicate scans"
+          framing — that would be asking staff to make the number look better instead of making the door work.</li>
+        <li><b>Nothing on this screen invites a nudge</b>. There is no "remind non-attendees" action, no export
+          of phones, no campaign handoff. A report that reads attendance does not become a messaging list
+          (the kiosk is not a campaign surface).</li>
+      </ul>
+    </div>
+  </div>
+</figure>
+
+</div>
+
+<footer>
+  AFC-307 · layout intent only. Five surfaces: single badge print (S1), batch badge print (S2), kiosk self
+  check-in (S3), device registry (S4), check-in-method report (S5). States drawn where they occur — success,
+  duplicate notice, consent block, child refusal, void badge, device refused, badge not printed / printed / void,
+  kiosk idle and code entry. Four deferred capabilities are marked on the screen where the question arises.
+  No restricted field appears in any screen copy; no hardware, vendor or provider is named anywhere in this file.
+  Specification: <a href="/AFC/issues/AFC-304" style="color:var(--accent)">AFC-304</a>
+  <code>checkin-badge-kiosk-addendum</code> (US-K1–US-K5) and <code>checkin-badge-kiosk-model</code>. Conventions
+  from AFC-151 <code>wireframes-v3</code> as applied in AFC-185. All names, codes, devices and figures are
+  synthetic — nothing here is a real member, child or household.
+</footer>
+</body>
+</html>

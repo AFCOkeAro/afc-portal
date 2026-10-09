@@ -1,0 +1,119 @@
+{
+  "source_of_truth": "docs/wireframes/church-portal-group-registration.html",
+  "manifest": "docs/wireframes/group-registration-png/render-manifest.json",
+  "out_dir": "docs/wireframes/group-registration-png",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "device_scale_factor": 1,
+  "capture_width": 1440,
+  "layout_width": 1440,
+  "chrome": "/home/paperclip/.cache/ms-playwright/chromium_headless_shell-1243/chrome-headless-shell-linux64/chrome-headless-shell",
+  "generated_by": "scripts/render-group-registration-png.mjs",
+  "regenerable": true,
+  "manifest_entries": 6,
+  "renders_produced": 6,
+  "not_rendered": 0,
+  "width_mismatch": [],
+  "console": [],
+  "font_status": "loaded",
+  "results": [
+    {
+      "id": "S0",
+      "file": "S0.png",
+      "rule": "figure.frame at 1440",
+      "rendered": true,
+      "clip": {
+        "x": 0,
+        "y": 448,
+        "width": 1440,
+        "height": 483
+      },
+      "png_width": 1440,
+      "png_height": 483,
+      "bytes": 71850,
+      "width_matches_expectation": true
+    },
+    {
+      "id": "S1",
+      "file": "S1.png",
+      "rule": "figure.frame at 1440",
+      "rendered": true,
+      "clip": {
+        "x": 0,
+        "y": 985,
+        "width": 1440,
+        "height": 966
+      },
+      "png_width": 1440,
+      "png_height": 966,
+      "bytes": 134783,
+      "width_matches_expectation": true
+    },
+    {
+      "id": "S2",
+      "file": "S2.png",
+      "rule": "figure.frame at 1440",
+      "rendered": true,
+      "clip": {
+        "x": 0,
+        "y": 2005,
+        "width": 1440,
+        "height": 740
+      },
+      "png_width": 1440,
+      "png_height": 740,
+      "bytes": 116755,
+      "width_matches_expectation": true
+    },
+    {
+      "id": "S3",
+      "file": "S3.png",
+      "rule": "figure.frame at 1440",
+      "rendered": true,
+      "clip": {
+        "x": 0,
+        "y": 2798,
+        "width": 1440,
+        "height": 749
+      },
+      "png_width": 1440,
+      "png_height": 749,
+      "bytes": 116596,
+      "width_matches_expectation": true
+    },
+    {
+      "id": "S4",
+      "file": "S4.png",
+      "rule": "figure.frame at 1440",
+      "rendered": true,
+      "clip": {
+        "x": 0,
+        "y": 3602,
+        "width": 1440,
+        "height": 634
+      },
+      "png_width": 1440,
+      "png_height": 634,
+      "bytes": 115944,
+      "width_matches_expectation": true
+    },
+    {
+      "id": "S5",
+      "file": "S5.png",
+      "rule": "figure.frame at 1440",
+      "rendered": true,
+      "clip": {
+        "x": 0,
+        "y": 4290,
+        "width": 1440,
+        "height": 343
+      },
+      "png_width": 1440,
+      "png_height": 343,
+      "bytes": 80922,
+      "width_matches_expectation": true
+    }
+  ]
+}

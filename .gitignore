@@ -45,10 +45,19 @@ scripts/_diag.mjs
 /*-tmp.mjs
 /*-tmp.js
 
-# Derived design renders (AFC-223). The PNG exports of
-# docs/wireframes/church-portal-events-hifi.html are ~8.8 MB of binary output
-# regenerated from that one tracked HTML file. The render manifest in the same
-# directory IS tracked; it is what records where the PNGs live. Ignore the
-# directory's PNGs specifically, never the directory, so the manifest stays
-# tracked and cannot go missing with them.
-docs/wireframes/*-png/*.png
+# Derived design renders are NOT ignored (AFC-305).
+#
+# AFC-223 added `docs/wireframes/*-png/*.png` here on the reasoning that ~8 MB of
+# regenerable binary is a bad trade for a reviewer who opens the files once, and
+# pointed at an attachment as the canonical copy instead. That reasoning was
+# sound and the outcome was not: the PNGs were never in the tree, the tree's
+# `find . -name "*.png"` stayed at 0, and a work product on AFC-198 was left
+# registered on the strength of files no reader of the repository could reach.
+# The cost of the ignore rule was borne by the board, not by repo size.
+#
+# The exports are tracked now, and they are cheap to verify:
+# `CHROME_BIN=... node scripts/render-events-png.mjs` regenerates all of them
+# from the one tracked HTML file and exits non-zero unless renders produced
+# equals manifest entries and every width matches the manifest. The render
+# script and render-report.json are tracked alongside the PNGs, so the binary
+# is inspectable output with a recorded provenance rather than an opaque blob.
