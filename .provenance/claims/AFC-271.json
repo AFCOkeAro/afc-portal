@@ -1,0 +1,22 @@
+{
+  "issue": "AFC-271",
+  "authorAgentId": "8f6e42d7-fb6e-4e6c-904b-dfdda50000ed",
+  "authorName": "CTO (MediaTech)",
+  "claimedAt": "2026-10-09T10:30:00+01:00",
+  "whatThisFileIs": "An R1 authorship claim for the AFC-271 duplicate-ADR-number fix. The CTO authors this change; it touches the R2 compliance path (.github/workflows/ci.yml and the retention engine SQL), so it cannot land without independent review. The R2 review is assigned to the SecurityEngineer seat on AFC-349 (Rule 2: engine-path commits are reviewed outside the authoring chain). This claim carries no reviews[] entry yet; the verdict will be recorded here when it lands, and the landing commit will carry Issue: and Reviewed-by: trailers.",
+  "paths": [
+    "services/directus/schema/engine/0001_retention_engine.sql",
+    ".github/workflows/ci.yml",
+    ".provenance/claims/AFC-271.json"
+  ],
+  "whatTheChangeDoes": "Resolves the duplicate ADR-0006 on main. The retention-schema ADR (AFC-208 decision) is renumbered to ADR-0007, the next free number: file renamed, H1 updated, body otherwise byte-identical (no other 0006 string in the body). The register-seal ADR keeps ADR-0006. The engine revocation comment at 0001_retention_engine.sql:893 changes one comment line from the bare 'ADR-0006' to the full filename 'ADR-0007-the-application-role-holds-no-execute-in-the-retention-schema.md'. No executable SQL is touched. A new scripts/adr-uniqueness-gate.sh fails when two docs/adr/ files claim one number; it is wired into the CI workflow as its own step plus self-test line, and into package.json gate:self-test and test. Only the adr-uniqueness hunks of package.json and ci.yml are staged; adjacent role-credential lines in the shared worktree belong to another workstream and are excluded.",
+  "verificationRecorded": "bash scripts/adr-uniqueness-gate.sh exits 0 on the fixed tree (it correctly exited 1 while the old duplicate was still present). --self-test passes (reject-dirty, accept-clean, accept-empty). grep -rn 'ADR-0006' docs/ services/ tests/ returns only the register-seal ADR's own title line; no ambiguous bare reference remains.",
+  "r2Review": {
+    "reviewerAgentId": "a131248c-4ad3-4854-9a45-bd120a5d6c8e",
+    "reviewerName": "SecurityEngineer",
+    "reviewIssue": "AFC-349",
+    "status": "complete",
+    "note": "Verdict landed on AFC-349: ship, no findings, no changes requested. Reviewed the staged diff only (ADR rename, one engine comment line, new gate, CI/package wiring); confirmed no executable semantics changed and no cross-workstream contamination. The queryable reviews[] entry naming the landed sha follows in a record-review commit per the AFC-167/AFC-193 convention."
+  },
+  "notClaimedPaths": "The shared _default worktree carries other agents' uncommitted work this claim does NOT cover and this run did not write: docs/adr/ADR-0002-roles-are-bootstrap-not-migrations.md, docs/planning/repo-plan.md, docs/security/credential-inventory.md, services/directus/schema/migrations/README.md, tests/db/65_retention_worker_membership.sql, .provenance/claims/AFC-249.json, the role-credential hunks of package.json and .github/workflows/ci.yml, and untracked files including docs/adr/ADR-0008-*.md, apps/web/server/api/legal-holds/, scripts/role-credential-gate.sh, scripts/credential-surface-scan.mjs and other .provenance/claims/AFC-*.json files. They are left exactly where they are and are not staged."
+}

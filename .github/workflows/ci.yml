@@ -147,6 +147,7 @@ jobs:
           bash scripts/retention-literal-gate.sh --self-test
           bash scripts/migration-privilege-gate.sh --self-test
           node scripts/migration-rollback-gate.mjs --self-test
+          bash scripts/adr-uniqueness-gate.sh --self-test
 
       - name: Awareness write-context gate
         run: bash scripts/awareness-write-context-gate.sh
@@ -161,6 +162,13 @@ jobs:
       # to directus_app and escalate to full read/write on the app database.
       - name: Migration privilege boundary gate
         run: bash scripts/migration-privilege-gate.sh
+
+      # AFC-271. Two ADRs shared number ADR-0006 while the engine's
+      # revocation comment cited the bare number, so a reader had a 50/50
+      # chance of landing on the wrong decision. Separate step so a
+      # failure names itself.
+      - name: ADR uniqueness gate
+        run: bash scripts/adr-uniqueness-gate.sh
 
       # AFC-266. A migration's down script must not remove a control whose
       # referent survives it without restoring that control. This is the AFC-253

@@ -890,7 +890,7 @@ REVOKE ALL ON FUNCTION retention.terminal_ladder_stage(jsonb) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION retention.run(text, text, timestamptz) TO retention_worker;
 GRANT EXECUTE ON FUNCTION retention.sync_clocks(timestamptz) TO retention_worker;
 -- ---------------------------------------------------------------------------
--- THE APPLICATION ROLE CANNOT RELEASE A HOLD. AFC-208, ADR-0006.
+-- THE APPLICATION ROLE CANNOT RELEASE A HOLD. AFC-208, ADR-0007-the-application-role-holds-no-execute-in-the-retention-schema.md.
 --
 -- AFC-249 (F3) built the right mechanism here and then attached it to the wrong
 -- caller, so the two halves of this decision are deliberately split:

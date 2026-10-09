@@ -1,4 +1,4 @@
-# ADR-0006 — The application role holds no EXECUTE in the retention schema
+# ADR-0007 — The application role holds no EXECUTE in the retention schema
 
 **Status:** Accepted (decision), CTO 2026-10-06. Implementation: AFC-208.
 **Supersedes:** nothing. **Extends:** [ADR-0004](ADR-0004-erasure-capability-is-a-membership-not-a-login.md), [ADR-0003](ADR-0003-control-suite-real-engine.md)
