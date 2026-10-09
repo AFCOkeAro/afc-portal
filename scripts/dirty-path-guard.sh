@@ -948,6 +948,160 @@ Issue: AFC-996
     echo "  self-test ok: complete claim-file review record accepted with no trailer"
   fi
 
+  # 9p. R2 CLASSIFIES THE VERDICT'S VALUE, NOT JUST ITS PRESENCE. AFC-236.
+  #
+  #     The defect, verified by the CEO at HEAD 75c4ae9: review_record() checked
+  #     the verdict was a non-empty string but never checked its VALUE, and
+  #     check_commit() then printed `ok  R2 review record ...` unconditionally.
+  #     A commit whose recorded verdict was `do not ship` exited 0 with an ok
+  #     line -- the gate certifying a refused commit as compliant.
+  #
+  #     The binding rule is the CEO decision of 2026-10-06, three classes:
+  #       approve          -> exit 0,     ok (attribution only) + details
+  #       ship with fixes  -> exit 0,     CONDITIONS naming the class + N open
+  #       do not ship      -> NON-ZERO,   REFUSED naming verdict + sha
+  #       anything else    -> NON-ZERO,   VIOLATION, fail closed (data problem)
+  #     An honest conditional approval must never block, and no non-approve
+  #     verdict may ever print a bare ok line. The `Reviewed-by:` trailer path
+  #     carries no verdict and is not classified here.
+  #
+  #     Same fixture shape as 9f: the claim is rewritten with the verdict under
+  #     test and committed, then check_commit() reads $rev_range. Each case
+  #     asserts BOTH the printed prefix AND the exit code.
+  write_verdict_996() {
+    node -e '
+      const fs = require("fs");
+      const out = process.argv[1], sha = process.argv[2];
+      const verdict = process.argv[3], findings = process.argv[4];
+      const claim = {
+        issue: "AFC-996",
+        authorAgentId: "agent-author",
+        claimedAt: "2026-10-06T02:57:00Z",
+        paths: ["tests/db/**", ".provenance/**"],
+        reviews: [{
+          commit: sha,
+          reviewIssue: "AFC-995",
+          reviewerAgentId: "agent-reviewer",
+          verdict: verdict,
+          findings: findings
+        }]
+      };
+      fs.writeFileSync(out, JSON.stringify(claim, null, 2) + "\n");
+    ' "$repo/.provenance/claims/AFC-996.json" "$rev9f" "$1" "$2"
+  }
+
+  # The vocabulary is declared once at the top of this file (R2_VERDICT_*).
+  # Non-empty, pairwise distinct, and each assigned exactly once: a second
+  # declaration site, or two classes sharing one string, is a defect in the
+  # thing the classifier below is about to be judged against.
+  local _vname
+  for _vname in R2_VERDICT_APPROVE R2_VERDICT_CONDITIONAL R2_VERDICT_REFUSED; do
+    if [ -z "${!_vname:-}" ]; then
+      echo "SELF-TEST FAIL: $_vname is empty; the R2 verdict vocabulary must be declared and non-empty (AFC-236)"
+      rc=1
+    elif [ "$(grep -c "^$_vname=" "${BASH_SOURCE[0]}")" -ne 1 ]; then
+      echo "SELF-TEST FAIL: $_vname is not declared exactly once; the verdict vocabulary must live in one place (AFC-236)"
+      rc=1
+    fi
+  done
+  if [ "$R2_VERDICT_APPROVE" = "$R2_VERDICT_CONDITIONAL" ] \
+    || [ "$R2_VERDICT_APPROVE" = "$R2_VERDICT_REFUSED" ] \
+    || [ "$R2_VERDICT_CONDITIONAL" = "$R2_VERDICT_REFUSED" ]; then
+    echo "SELF-TEST FAIL: the R2 verdict vocabulary is not self-consistent: two classes share one string (AFC-236)"
+    rc=1
+  else
+    echo "  self-test ok: R2 verdict vocabulary declared once, non-empty and self-consistent"
+  fi
+
+  local verdict_out verdict_rc approve_out refused_out
+  # approve: exit 0 with the attribution-only ok line. Empty findings: a clean
+  # approval carries none, and it keeps this fixture's claim byte-different
+  # from 9f's so the fixture commit below always lands content.
+  write_verdict_996 "$R2_VERDICT_APPROVE" ""
+  git -C "$repo" add -A
+  git -C "$repo" commit -q -m "chore(provenance): approve-verdict fixture"
+  verdict_out=$(check_commit "$repo" "$rev_range" 2>&1); verdict_rc=$?
+  if [ "$verdict_rc" -ne 0 ]; then
+    echo "SELF-TEST FAIL: verdict approve exited $verdict_rc, expected 0 (AFC-236)"
+    echo "$verdict_out" | sed 's/^/    /'
+    rc=1
+  elif ! printf '%s' "$verdict_out" | grep -q 'ok  R2 review record (attribution only)'; then
+    echo "SELF-TEST FAIL: verdict approve passed without the attribution-only ok line (AFC-236)"
+    echo "$verdict_out" | sed 's/^/    /'
+    rc=1
+  else
+    echo "  self-test ok: verdict approve exits 0 with the attribution-only ok line"
+  fi
+  approve_out="$verdict_out"
+
+  # ship with fixes: exit 0 with a CONDITIONS line naming the class and the
+  # open-findings count. Findings "F1-F6" is one comma-separated segment, so
+  # N is 1 -- pinning the counting rule, not just the prefix.
+  write_verdict_996 "$R2_VERDICT_CONDITIONAL" "F1-F6"
+  git -C "$repo" add -A
+  git -C "$repo" commit -q -m "chore(provenance): conditional-verdict fixture"
+  verdict_out=$(check_commit "$repo" "$rev_range" 2>&1); verdict_rc=$?
+  if [ "$verdict_rc" -ne 0 ]; then
+    echo "SELF-TEST FAIL: verdict ship with fixes exited $verdict_rc; a conditional approval must never block (AFC-236)"
+    echo "$verdict_out" | sed 's/^/    /'
+    rc=1
+  elif ! printf '%s' "$verdict_out" | grep -q "CONDITIONS  R2 review record: verdict \"$R2_VERDICT_CONDITIONAL\"; 1 findings open"; then
+    echo "SELF-TEST FAIL: verdict ship with fixes passed without the CONDITIONS line naming the class and count (AFC-236)"
+    echo "$verdict_out" | sed 's/^/    /'
+    rc=1
+  elif printf '%s' "$verdict_out" | grep -q 'ok  R2 review record'; then
+    echo "SELF-TEST FAIL: verdict ship with fixes printed a bare ok line; only approve may do that (AFC-236)"
+    echo "$verdict_out" | sed 's/^/    /'
+    rc=1
+  else
+    echo "  self-test ok: verdict ship with fixes exits 0 with a CONDITIONS line, never a bare ok"
+  fi
+
+  # do not ship: non-zero with a REFUSED line naming the verdict and the sha.
+  write_verdict_996 "$R2_VERDICT_REFUSED" "F1"
+  git -C "$repo" add -A
+  git -C "$repo" commit -q -m "chore(provenance): refused-verdict fixture"
+  verdict_out=$(check_commit "$repo" "$rev_range" 2>&1); verdict_rc=$?
+  if [ "$verdict_rc" -eq 0 ]; then
+    echo "SELF-TEST FAIL: verdict do not ship exited 0; the gate certified a refused commit as compliant (AFC-236)"
+    echo "$verdict_out" | sed 's/^/    /'
+    rc=1
+  elif ! printf '%s' "$verdict_out" | grep -q "REFUSED  R2 review record: verdict \"$R2_VERDICT_REFUSED\""; then
+    echo "SELF-TEST FAIL: verdict do not ship refused without the REFUSED line naming verdict and sha (AFC-236)"
+    echo "$verdict_out" | sed 's/^/    /'
+    rc=1
+  else
+    echo "  self-test ok: verdict do not ship refused with a REFUSED line"
+  fi
+  refused_out="$verdict_out"
+
+  # Unrecognised non-empty string: non-zero, fail closed, VIOLATION naming it.
+  # This is the case broken today: any non-empty string used to print ok.
+  write_verdict_996 "needs coffee" "F1"
+  git -C "$repo" add -A
+  git -C "$repo" commit -q -m "chore(provenance): unrecognised-verdict fixture"
+  verdict_out=$(check_commit "$repo" "$rev_range" 2>&1); verdict_rc=$?
+  if [ "$verdict_rc" -eq 0 ]; then
+    echo "SELF-TEST FAIL: unrecognised verdict exited 0; unknown verdicts fail closed (AFC-236)"
+    echo "$verdict_out" | sed 's/^/    /'
+    rc=1
+  elif ! printf '%s' "$verdict_out" | grep -q 'VIOLATION  R2 review record: verdict "needs coffee" is not a recognised verdict'; then
+    echo "SELF-TEST FAIL: unrecognised verdict refused without the VIOLATION line naming it (AFC-236)"
+    echo "$verdict_out" | sed 's/^/    /'
+    rc=1
+  else
+    echo "  self-test ok: unrecognised verdict fails closed with a VIOLATION line"
+  fi
+
+  # approve vs do not ship must NOT read the same. Byte-identical output for
+  # opposite verdicts is the pass/fail inversion this issue exists to end.
+  if [ "$approve_out" = "$refused_out" ]; then
+    echo "SELF-TEST FAIL: approve and do-not-ship outputs are byte-identical; the classes must print differently (AFC-236)"
+    rc=1
+  else
+    echo "  self-test ok: approve and do-not-ship outputs differ"
+  fi
+
   # 9g. THE LOAD-BEARING ASSERTION. A reviews[] entry missing ANY ONE of the
   #     four required fields MUST be a violation -- not a pass, not a skip.
   #
