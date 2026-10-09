@@ -29,6 +29,18 @@
 # cannot run -- including the case where the guard itself is syntactically broken
 # -- the gate REFUSES, because a gate that cannot answer must not answer "pass".
 #
+# WHICH REPOSITORY'S GUARD ANSWERS (AFC-332). The committing repository's, never
+# this script's own. The installed hook is a launcher holding an ABSOLUTE path,
+# and the hooks directory is shared across linked worktrees, so the code running
+# here routinely belongs to a DIFFERENT worktree than the commit: hooks
+# installed from the AFC-300 worktree while the commit is made on afc243, for
+# example. Resolving the guard from this file's location would then read the
+# installing tree's claims (zero AFC-270 entries on the installing tree) instead
+# of this branch's, and refuse a commit it was never in a position to certify.
+# run_as_hook() therefore re-resolves the guard from `git rev-parse
+# --show-toplevel` -- the tree git is committing -- and refuses fail-closed when
+# that tree carries no guard at all.
+#
 # SCOPE. Strict on the compliance path only:
 #     services/directus/schema/engine/**
 #     services/directus/schema/migrations/**
@@ -146,7 +158,7 @@ MSG
 # yields argc=1, argv[1]=.git/COMMIT_EDITMSG, with the staged tree intact). That
 # asymmetry is the whole reason this gate is commit-msg and not pre-commit.
 run_as_hook() {
-  local msg_file="${1:-}" root head tree sha guard_rc
+  local msg_file="${1:-}" root head tree sha guard_rc guard
 
   root="$(git rev-parse --show-toplevel)"
   head="$(git rev-parse --verify HEAD 2>/dev/null || true)"
@@ -166,17 +178,42 @@ run_as_hook() {
     exit 0
   fi
 
+  # AFC-332: the guard that certifies this commit is the COMMITTING tree's own.
+  # GUARD is bound at this file's install location, which is a different
+  # worktree whenever the shared hooks launch a stale copy. The committing
+  # tree's guard reads the committing tree's claims; any other copy reads
+  # somebody else's registry and cannot certify this branch. Missing guard is
+  # a refusal, not a fallback: falling back to this file's copy would silently
+  # reintroduce the defect this block exists to close.
+  guard="$root/scripts/dirty-path-guard.sh"
+  if [ ! -f "$guard" ]; then
+    cat >&2 <<MSG
+
+merge-in gate: REFUSED -- the provenance guard cannot run.
+
+$guard does not exist in the committing repository ($root), so this gate
+cannot answer whether the staged compliance-path change is compliant. It
+refuses rather than assume, and rather than ask a different worktree's copy.
+
+  This is not a policy violation in your change. Commit the guard with the
+  tree it governs, then commit. Refusing here is the fail-closed path: a gate
+  that cannot find the committing tree's guard must not read as "nothing to
+  check".
+MSG
+    exit 1
+  fi
+
   # The guard must exist and parse before we trust it. `bash -n` costs
   # milliseconds and turns "the guard is broken" from a confusing downstream
   # failure into an honest refusal. (Verified necessary: an in-progress edit to
   # dirty-path-guard.sh in a shared tree made it syntactically invalid, and the
   # naive version of this gate reported that as a policy violation.)
-  if ! bash -n "$GUARD" 2>/dev/null; then
+  if ! bash -n "$guard" 2>/dev/null; then
     cat >&2 <<MSG
 
 merge-in gate: REFUSED -- the provenance guard cannot run.
 
-$GUARD does not parse (bash -n fails), so this gate cannot answer whether the
+$guard does not parse (bash -n fails), so this gate cannot answer whether the
 staged compliance-path change is compliant. It refuses rather than assume.
 
   This is not a policy violation in your change. Fix or finish the guard, then
@@ -204,7 +241,7 @@ MSG
   # the gate then refuses an innocent commit. `$sha^..$sha` is the one-commit
   # range the guard documents.
   set +e
-  bash "$GUARD" --check-commit "$sha^..$sha"
+  bash "$guard" --check-commit "$sha^..$sha"
   guard_rc=$?
   set -e
 
