@@ -1,0 +1,20 @@
+# AFC Church Portal — staging Caddyfile snippet (AFC-385).
+#
+# Web only. No postgres, no Directus blocks yet — they arrive with the backend
+# cutover and follow docs/planning/infra-spec.md §4.
+#
+# Replace staging.example.org with the board-provided staging domain before
+# first boot. Nothing else in this file needs editing per host.
+
+staging.example.org {
+	encode gzip
+
+	reverse_proxy web:3000
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+}
