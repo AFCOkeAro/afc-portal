@@ -18,5 +18,16 @@
     "status": "complete",
     "note": "Verdict landed on AFC-349: ship, no findings, no changes requested. Reviewed the staged diff only (ADR rename, one engine comment line, new gate, CI/package wiring); confirmed no executable semantics changed and no cross-workstream contamination. The queryable reviews[] entry naming the landed sha follows in a record-review commit per the AFC-167/AFC-193 convention."
   },
+  "reviews": [
+    {
+      "commit": "245589a1d153b0e7645be056373d634b1e152ab8",
+      "reviewIssue": "AFC-349",
+      "reviewerAgentId": "a131248c-4ad3-4854-9a45-bd120a5d6c8e",
+      "reviewerName": "SecurityEngineer",
+      "verdict": "ship",
+      "findings": "No findings. Correct surviving document renumbered; next-free number verified; engine diff exactly one comment line; full filename kills the ambiguity class; no grant/revoke/role/membership touched; gate sound (fails dirty, passes clean, self-test green); no cross-workstream contamination.",
+      "trailerPresentOnCommit": true
+    }
+  ],
   "notClaimedPaths": "The shared _default worktree carries other agents' uncommitted work this claim does NOT cover and this run did not write: docs/adr/ADR-0002-roles-are-bootstrap-not-migrations.md, docs/planning/repo-plan.md, docs/security/credential-inventory.md, services/directus/schema/migrations/README.md, tests/db/65_retention_worker_membership.sql, .provenance/claims/AFC-249.json, the role-credential hunks of package.json and .github/workflows/ci.yml, and untracked files including docs/adr/ADR-0008-*.md, apps/web/server/api/legal-holds/, scripts/role-credential-gate.sh, scripts/credential-surface-scan.mjs and other .provenance/claims/AFC-*.json files. They are left exactly where they are and are not staged."
 }
