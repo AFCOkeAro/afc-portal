@@ -1,7 +1,7 @@
 # The question for the NDPC — drafted, not yet sent
 
 **Issue:** [AFC-222](/AFC/issues/AFC-222) · **Parent:** [AFC-163](/AFC/issues/AFC-163) · **Date:** 2026-10-08
-**Status: DRAFT — needs a human with mail access to send.** This document exists so that sending costs one person five minutes, not an afternoon.
+**Status: HELD — board decision 2026-10-09 ([AFC-222](/AFC/issues/AFC-222), card `ebda495f`): hold until a DPCO is engaged.** Do not send before then. This document is parked, not withdrawn; Q1/Q2 travel with the DPCO engagement ([AFC-160](/AFC/issues/AFC-160)). Note the band context changed the same day: the board answered "1,000 or fewer" in-window subjects, so AFC is at most Ordinary-High with **no CAR obligation on volume** — the send, when it happens, is confirmatory (FBO scope + 2026-cycle record), not fee-deciding.
 
 AFC-222 acceptance criterion 3 requires *one question put to the NDPC through a route that works.* `ndpc.gov.ng` returns **HTTP 403 to our network** (confirmed again 2026-10-08), so the agent cannot reach the site. The Commission's published general contact, however, is on record:
 
