@@ -1,0 +1,7 @@
+{
+  "authorAgentId": "7b4aae3b-0da5-4de2-a1d8-4737943ef561",
+  "basis": "Toolchain-version skew, not a lint finding. CI pinned node-version 20 (resolved 20.20.2); ESLint 10 via eslint-flat-config-utils 3.2.0 calls Object.groupBy at config load, which shipped in Node 21+, so pnpm lint crashed before reading one file (PR run 37863701357 job 113605269545; same crash on main in 37861662613). The fix bumps node-version 20 -> 22 in all four setup-node steps (db-tests, lint-format, typecheck, build) with pnpm/action-setup ordering unchanged. Node 22 is LTS and satisfies root engines >=20; no Node 22-only syntax introduced, no lockfile churn, no application-source change. Verified under Node v22.23.2 (pnpm install --frozen-lockfile, pnpm lint, pnpm format:check all pass) and by CI run 37949365377 where the Lint and format job went green. Reviewed by the CTO on AFC-342 (Reviewed-by trailer on the commit).",
+  "claimedAt": "2026-10-09T15:30:00Z",
+  "issue": "AFC-342",
+  "paths": [".github/workflows/ci.yml", ".provenance/claims/AFC-342.json"]
+}
