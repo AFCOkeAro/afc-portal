@@ -413,3 +413,59 @@ BEGIN
     $q$SELECT 1 FROM weca_return_formulas WHERE version = 'weca-2026-01'$q$,
     'weca', 'the app can read the formula schedule');
 END $$;
+
+-- ---------------------------------------------------------------------------
+-- 68.8  ACTOR STAMPS (AFC-544). submitted_by/confirmed_by name who moved the
+--        return; the route stamps them from the server session, never the
+--        client body. No backfill: a guessed actor is a fabricated trail, so
+--        existing rows keep NULLs and only new transitions stamp an actor.
+-- ---------------------------------------------------------------------------
+DO $$
+DECLARE
+  v_branch uuid;
+  v_rec uuid;
+  v_ret uuid;
+BEGIN
+  SELECT branch_id INTO v_branch FROM fixture_weca_branches WHERE label = 'LEGUN';
+
+  -- The columns exist, bare uuids, nullable (no actor before a transition).
+  PERFORM test_support.assert_true(
+    (SELECT count(*) = 2 FROM information_schema.columns
+      WHERE table_name = 'weca_returns'
+        AND column_name IN ('submitted_by', 'confirmed_by')
+        AND data_type = 'uuid' AND is_nullable = 'YES'),
+    'weca', 'weca_returns carries nullable submitted_by + confirmed_by uuid columns');
+
+  INSERT INTO branch_financial_records (branch, month, income, currency)
+  VALUES (v_branch, DATE '2026-08-01', 60000.00, 'NGN') RETURNING id INTO v_rec;
+  INSERT INTO weca_returns (branch, financial_record, period)
+  VALUES (v_branch, v_rec, '2026-08') RETURNING id INTO v_ret;
+  PERFORM weca_compute_return(v_ret);
+
+  PERFORM test_support.assert_true(
+    (SELECT submitted_by IS NULL AND confirmed_by IS NULL
+       FROM weca_returns WHERE id = v_ret),
+    'weca', 'a fresh return names no actor (no backfill of historic actors)');
+
+  -- Submit stamps the actor: the app may write the status + stamp + actor
+  -- together, exactly what the route sends.
+  PERFORM test_support.assert_not_raises('directus_app',
+    format('UPDATE weca_returns SET computation_status = ''submitted'', submitted_at = now(), submitted_by = gen_random_uuid() WHERE id = ''%s''', v_ret),
+    'weca', 'the app can stamp submitted_by on submit');
+
+  -- Confirm stamps the actor the same way.
+  PERFORM test_support.assert_not_raises('directus_app',
+    format('UPDATE weca_returns SET computation_status = ''confirmed'', confirmed_at = now(), confirmed_by = gen_random_uuid() WHERE id = ''%s''', v_ret),
+    'weca', 'the app can stamp confirmed_by on confirm');
+
+  -- No widening: the actor grant does not buy a hand-edit of a computed line.
+  PERFORM test_support.assert_raises('directus_app',
+    format('UPDATE weca_returns SET computed_mf = 1.00 WHERE id = ''%s''', v_ret),
+    '42501', 'weca', 'the app still cannot hand-edit a computed line beside the actor grant');
+
+  -- Invalid transition unchanged: the status CHECK still refuses a value
+  -- outside the lifecycle (the route's 409 has this as backstop).
+  PERFORM test_support.assert_raises(NULL,
+    format('UPDATE weca_returns SET computation_status = ''bogus'' WHERE id = ''%s''', v_ret),
+    '23514', 'weca', 'a status outside calculated/submitted/confirmed/pending is refused');
+END $$;
