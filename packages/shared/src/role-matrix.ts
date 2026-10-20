@@ -697,10 +697,8 @@ const FIELD_RESTRICTIONS: Readonly<
   Record<string, { fields: readonly string[]; roles: readonly StaffRole[]; note: string }>
 > = {
   [COLLECTIONS.people]: {
-    fields: ['safeguarding_flag', 'notes', 'date_of_birth'],
     fields: ['safeguarding_flag', 'notes', 'date_of_birth', 'marriage_date'],
     roles: ['super_admin', 'area_admin', 'branch_admin'],
-    note: 'designated safeguarding lead is not a staff_role; excluded',
     note: 'designated safeguarding lead is not a staff_role; excluded. marriage_date joins the restricted set per expansion §11.1 (AFC-476).',
   },
   // Youth PII (AFC-476, least-privilege lens): a volunteer sees that a youth
