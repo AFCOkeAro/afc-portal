@@ -17,6 +17,28 @@ export interface BranchSummary {
   code: string
   branch_type: string
   status: string
+  city?: string | null
+  state?: string | null
+  parent_branch?: string | null
+  type_label?: string | null
+  zone?: string | null
+  area?: string | null
+}
+
+export interface BranchDetail extends Branch {
+  people_count: number
+  youth_count: number
+  minor_count: number
+  open_follow_ups: number
+  open_welfare: number
+  upcoming_events: number
+  attendance_last_sunday: number
+  attendance_last_30_days: number
+  attendance_trend: DashboardAttendancePoint[]
+  recent_people: PersonRow[]
+  events: EventRow[]
+  follow_ups: VisitorRow[]
+  welfare_cases: WelfareCaseRow[]
 }
 
 export interface PersonRow extends Person {
@@ -187,5 +209,59 @@ export interface Paginated<T> {
     total: number
     page: number
     limit: number
+  }
+}
+
+export type AttendanceReportGroup = 'branch' | 'zone'
+
+export type AttendanceReportPeriod =
+  'weekly' | 'monthly' | 'quarterly' | 'yearly' | 'custom'
+
+/** One grouped row of the split contract: group x service x bucket x category. */
+export interface AttendanceSplitRow {
+  branch: string | null
+  branch_name: string | null
+  zone: string | null
+  zone_name: string | null
+  service: string
+  /** Date bucket for the period (week-start YYYY-MM-DD, YYYY-MM, YYYY-Qn, YYYY, or day). */
+  date: string
+  category: string
+  male: number
+  female: number
+  total: number
+}
+
+export interface AttendanceReportTotals {
+  sessions: number
+  male: number
+  female: number
+  total: number
+}
+
+export interface AttendanceReportCompare extends AttendanceReportTotals {
+  from: string
+  to: string
+  has_data: boolean
+}
+
+export interface AttendanceReport {
+  rows: AttendanceSplitRow[]
+  totals: AttendanceReportTotals
+  /** Prior-year side of the compare toggle; null when the toggle is off. */
+  compare: AttendanceReportCompare | null
+  meta: {
+    total: number
+    page: number
+    limit: number
+  }
+  filters: {
+    from: string
+    to: string
+    branch: string | null
+    zone: string | null
+    session_type: string | null
+    group_by: AttendanceReportGroup
+    period: AttendanceReportPeriod
   }
 }
