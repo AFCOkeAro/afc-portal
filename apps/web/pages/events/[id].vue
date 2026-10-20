@@ -23,6 +23,7 @@ const id = String(route.params.id)
 const showEdit = ref(false)
 const showBlessingForm = ref(false)
 const showWalkinForm = ref(false)
+const showGroupForm = ref(false)
 const managingRegistration = ref<RegistrationRow | null>(null)
 const showManageOpen = computed({
   get: () => managingRegistration.value !== null,
@@ -409,6 +410,14 @@ async function afterRegistrationSaved(): Promise<void> {
                 icon="i-lucide-plus"
                 @click="showWalkinForm = true"
               />
+              <UButton
+                v-if="canCreateRegistrations"
+                size="xs"
+                variant="outline"
+                label="Register group"
+                icon="i-lucide-users"
+                @click="showGroupForm = true"
+              />
             </div>
           </div>
         </template>
@@ -622,6 +631,11 @@ async function afterRegistrationSaved(): Promise<void> {
         :branches="branches.data.value ?? []"
         :event-branch="event.branch"
         :medical-visible="medicalVisible"
+        @saved="afterRegistrationSaved()"
+      />
+      <RegistrationGroupModal
+        v-model:open="showGroupForm"
+        :event-id="event.id"
         @saved="afterRegistrationSaved()"
       />
       <EventFormModal

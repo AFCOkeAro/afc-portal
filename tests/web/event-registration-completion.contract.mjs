@@ -533,3 +533,30 @@ describe('detail page: manage and walk-in actions with capability gates', () => 
     assert.match(src, /refresh\(\), loadRollups\(\)/)
   })
 })
+
+describe('group modal: one code, N members, safe retry', () => {
+  const src = read('apps/web/components/RegistrationGroupModal.vue')
+
+  it('posts the code plus members to the group route', () => {
+    assert.match(src, /\/api\/events\/\$\{props\.eventId\}\/group-registrations`, \{/)
+    assert.match(src, /group_code: groupCode\.value\.trim\(\)/)
+  })
+
+  it('caps the batch and maps server member errors to rows', () => {
+    assert.match(src, /members\.length < 50/)
+    assert.match(src, /members\.\$\{index\}\./)
+  })
+
+  it('treats an all-skipped replay as information, not a silent close', () => {
+    assert.match(src, /already registered under this code/)
+  })
+})
+
+describe('detail page: group action with the create gate', () => {
+  const src = read('apps/web/pages/events/[id].vue')
+
+  it('opens the group modal from a create-gated button and reloads on save', () => {
+    assert.match(src, /showGroupForm = true/)
+    assert.match(src, /RegistrationGroupModal/)
+  })
+})
