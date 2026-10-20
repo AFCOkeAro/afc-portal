@@ -24,7 +24,10 @@ import path from 'node:path'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const read = (rel) => readFileSync(path.join(root, rel), 'utf8')
-const codeOf = (rel) => read(rel).replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*/g, '')
+const codeOf = (rel) =>
+  read(rel)
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\/\/.*/g, '')
 
 /* ---- Inline mirrors of the helper (kept small; structural asserts below pin the source) ---- */
 
@@ -38,11 +41,17 @@ const TRANSITIONS = {
 }
 const allowed = (from, to) => from === to || (TRANSITIONS[from] ?? []).includes(to)
 
-const normalize = (value) => String(value ?? '').trim().toLowerCase().replace(/\s+/g, '')
+const normalize = (value) =>
+  String(value ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '')
 function memberKey(eventId, groupCode, m) {
   const name = `${normalize(m.registrant_first_name)}|${normalize(m.registrant_last_name)}`
   const contact = normalize(m.phone) || normalize(m.email) || 'no-contact'
-  return [String(eventId), String(groupCode).trim().toLowerCase(), name, contact].join(':')
+  return [String(eventId), String(groupCode).trim().toLowerCase(), name, contact].join(
+    ':',
+  )
 }
 function splitReplay(existing, eventId, groupCode, members) {
   const seen = new Set(existing)
@@ -51,7 +60,10 @@ function splitReplay(existing, eventId, groupCode, members) {
   const batch = new Set()
   for (const m of members) {
     const key = memberKey(eventId, groupCode, m)
-    if (seen.has(key) || batch.has(key)) { skipped.push(m); continue }
+    if (seen.has(key) || batch.has(key)) {
+      skipped.push(m)
+      continue
+    }
     batch.add(key)
     toCreate.push(m)
   }
@@ -74,7 +86,10 @@ function summarize(rows) {
   }
   return {
     registered: rows.filter((r) => r.registration_status !== 'cancelled').length,
-    confirmed, attended, expected, collected,
+    confirmed,
+    attended,
+    expected,
+    collected,
     outstanding: Math.max(0, expected - collected),
     byStatus,
   }
@@ -140,7 +155,7 @@ describe('payment patch: amounts reconcile before status flips', () => {
   const src = codeOf(HELPER)
 
   it('pins the four payment states', () => {
-    assert.match(src, /'not_required',\s*\n\s*'pending',\s*\n\s*'paid',\s*\n\s*'refunded'/)
+    assert.match(src, /'not_required',\s*'pending',\s*'paid',\s*'refunded'/)
   })
 
   it('paid and refunded require an amount collected', () => {
@@ -163,9 +178,24 @@ describe('group idempotency: N members in, replay writes zero rows', () => {
 
   it('first submission of N members yields exactly N rows to create', () => {
     const members = [
-      { registrant_first_name: 'Ada', registrant_last_name: 'Oke', phone: '0803 123 4567', email: '' },
-      { registrant_first_name: 'Bola', registrant_last_name: 'Ade', phone: '', email: 'Bola@Example.COM' },
-      { registrant_first_name: 'Chidi', registrant_last_name: 'Obi', phone: '', email: '' },
+      {
+        registrant_first_name: 'Ada',
+        registrant_last_name: 'Oke',
+        phone: '0803 123 4567',
+        email: '',
+      },
+      {
+        registrant_first_name: 'Bola',
+        registrant_last_name: 'Ade',
+        phone: '',
+        email: 'Bola@Example.COM',
+      },
+      {
+        registrant_first_name: 'Chidi',
+        registrant_last_name: 'Obi',
+        phone: '',
+        email: '',
+      },
     ]
     const { toCreate, skipped } = splitReplay([], 'e1', 'GRP-7', members)
     assert.equal(toCreate.length, 3)
@@ -174,8 +204,18 @@ describe('group idempotency: N members in, replay writes zero rows', () => {
 
   it('replay with the same keys creates zero new rows', () => {
     const members = [
-      { registrant_first_name: 'Ada', registrant_last_name: 'Oke', phone: '0803 123 4567', email: '' },
-      { registrant_first_name: 'Bola', registrant_last_name: 'Ade', phone: '', email: 'Bola@Example.COM' },
+      {
+        registrant_first_name: 'Ada',
+        registrant_last_name: 'Oke',
+        phone: '0803 123 4567',
+        email: '',
+      },
+      {
+        registrant_first_name: 'Bola',
+        registrant_last_name: 'Ade',
+        phone: '',
+        email: 'Bola@Example.COM',
+      },
     ]
     const first = splitReplay([], 'e1', 'GRP-7', members)
     const stored = first.toCreate.map((m) => memberKey('e1', 'GRP-7', m))
@@ -185,16 +225,36 @@ describe('group idempotency: N members in, replay writes zero rows', () => {
   })
 
   it('normalization makes retries match despite case and spacing drift', () => {
-    const a = memberKey('e1', 'GRP-7', { registrant_first_name: 'Ada', registrant_last_name: 'Oke', phone: '0803 123 4567' })
-    const b = memberKey('e1', ' GRP-7 ', { registrant_first_name: ' ada ', registrant_last_name: 'OKE', phone: '08031234567' })
+    const a = memberKey('e1', 'GRP-7', {
+      registrant_first_name: 'Ada',
+      registrant_last_name: 'Oke',
+      phone: '0803 123 4567',
+    })
+    const b = memberKey('e1', ' GRP-7 ', {
+      registrant_first_name: ' ada ',
+      registrant_last_name: 'OKE',
+      phone: '08031234567',
+    })
     assert.equal(a, b)
-    const c = memberKey('e1', 'GRP-7', { registrant_first_name: 'Ada', registrant_last_name: 'Oke', email: 'ADA@x.ng' })
-    const d = memberKey('e1', 'grp-7', { registrant_first_name: 'ada', registrant_last_name: 'oke', email: 'ada@x.ng' })
+    const c = memberKey('e1', 'GRP-7', {
+      registrant_first_name: 'Ada',
+      registrant_last_name: 'Oke',
+      email: 'ADA@x.ng',
+    })
+    const d = memberKey('e1', 'grp-7', {
+      registrant_first_name: 'ada',
+      registrant_last_name: 'oke',
+      email: 'ada@x.ng',
+    })
     assert.equal(c, d)
   })
 
   it('duplicates inside one batch collapse to a single row', () => {
-    const m = { registrant_first_name: 'Ada', registrant_last_name: 'Oke', phone: '08031234567' }
+    const m = {
+      registrant_first_name: 'Ada',
+      registrant_last_name: 'Oke',
+      phone: '08031234567',
+    }
     const { toCreate, skipped } = splitReplay([], 'e1', 'GRP-7', [m, { ...m }])
     assert.equal(toCreate.length, 1)
     assert.equal(skipped.length, 1)
@@ -233,5 +293,132 @@ describe('check-in: exact ticket or single name match, else disambiguate', () =>
     assert.match(src, /resolveCheckIn/)
     assert.match(src, /ambiguous/)
     assert.match(src, /cancelled/)
+  })
+})
+
+describe('staff create route: staff-only, allowlist, no client status', () => {
+  const src = codeOf('apps/web/server/api/events/[id]/registrations.post.ts')
+
+  it('requires the event_registrations create grant', () => {
+    assert.match(src, /requireCan\(scope, 'event_registrations', 'create'\)/)
+  })
+
+  it('scopes the event before writing anything', () => {
+    assert.match(src, /eventScopeFilter\(scope\)/)
+    assert.match(src, /findScopedItem/)
+  })
+
+  it('rejects ticket_code and registration_status from the client', () => {
+    assert.match(src, /STAFF_CREATE_FORBIDDEN_FIELDS/)
+    assert.match(src, /client_forbidden_field/)
+  })
+
+  it('validates through the shared form schema and stamps the staff payload', () => {
+    assert.match(src, /registrationFormSchema\.safeParse/)
+    assert.match(src, /toStaffPayload/)
+  })
+
+  it('never touches the public allowlist module beyond importing it', () => {
+    assert.doesNotMatch(src, /PUBLIC_REGISTRATION_FIELDS\s*=/)
+  })
+})
+
+describe('patch route: allowlisted fields, legal edges, reconciled money', () => {
+  const src = codeOf('apps/web/server/api/events/registrations/[id].patch.ts')
+
+  it('requires the update grant and scope-checks the owning event', () => {
+    assert.match(src, /requireCan\(scope, 'event_registrations', 'update'\)/)
+    assert.match(src, /eventScopeFilter\(scope\)/)
+  })
+
+  it('rejects unknown patch keys', () => {
+    assert.match(src, /unpatchable_field/)
+  })
+
+  it('guards the transition with a 409 and the money with a 400', () => {
+    assert.match(src, /assertStatusTransitionAllowed/)
+    assert.match(read(HELPER), /invalid_status_transition/)
+    assert.match(src, /validatePaymentPatch/)
+  })
+
+  it('caps the reference and the audit note, and names the activity log as the trail', () => {
+    assert.match(src, /slice\(0, 120\)/)
+    assert.match(src, /500/)
+    assert.match(src, /directus_activity/)
+  })
+})
+
+describe('check-in route: update grant, one query, no roster leak', () => {
+  const src = codeOf('apps/web/server/api/events/[id]/check-in.post.ts')
+
+  it('lets the volunteer update grant check in without a read grant', () => {
+    assert.match(src, /requireCan\(scope, 'event_registrations', 'update'\)/)
+  })
+
+  it('demands exactly one of ticket_code or name', () => {
+    assert.match(src, /checkin_needs_one_query/)
+  })
+
+  it('answers ambiguous names with a count, never a roster', () => {
+    assert.match(src, /checkin_ambiguous/)
+    assert.match(src, /resolveCheckIn/)
+    assert.doesNotMatch(src, /person_name/)
+  })
+
+  it('re-check-in is idempotent and cancelled rows refuse with 409', () => {
+    assert.match(src, /already: true/)
+    assert.match(src, /checkin_cancelled/)
+  })
+
+  it('sets attended through the single-match row only', () => {
+    assert.match(src, /registration_status: 'attended'/)
+  })
+})
+
+describe('group route: validate-all-first, idempotent retry, honest partial failure', () => {
+  const src = codeOf('apps/web/server/api/events/[id]/group-registrations.post.ts')
+
+  it('requires the create grant and a bounded batch', () => {
+    assert.match(src, /requireCan\(scope, 'event_registrations', 'create'\)/)
+    assert.match(src, /MAX_GROUP_MEMBERS/)
+  })
+
+  it('validates every member before writing any row', () => {
+    assert.match(src, /nothing was registered/)
+    assert.match(src, /registrationFormSchema\.safeParse/)
+  })
+
+  it('replays through the idempotency split and reports created/skipped', () => {
+    assert.match(src, /splitGroupReplay/)
+    assert.match(src, /groupMemberKey/)
+    assert.match(src, /skipped/)
+  })
+
+  it('does not persist a group_code column the data-model does not have', () => {
+    assert.doesNotMatch(codeOf(HELPER), /group_code/)
+    assert.match(
+      read('apps/web/server/api/events/[id]/group-registrations.post.ts'),
+      /has no `group_code`\n \* column/,
+    )
+  })
+
+  it('names partial failure with the ids written so a retry skips them', () => {
+    assert.match(src, /group_partial_failure/)
+    assert.match(src, /created_ids/)
+  })
+})
+
+describe('rollups route: aggregate query, same gates as the export', () => {
+  const src = codeOf('apps/web/server/api/events/[id]/rollups.get.ts')
+
+  it('requires both read grants and the event scope', () => {
+    assert.match(src, /requireCan\(scope, 'events', 'read'\)/)
+    assert.match(src, /requireCan\(scope, 'event_registrations', 'read'\)/)
+    assert.match(src, /eventScopeFilter\(scope\)/)
+  })
+
+  it('folds through the shared summarizer over visible fields only', () => {
+    assert.match(src, /summarizeRegistrations/)
+    assert.match(src, /visibleFields/)
   })
 })

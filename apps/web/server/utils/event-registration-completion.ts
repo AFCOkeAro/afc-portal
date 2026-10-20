@@ -1,7 +1,4 @@
-import {
-  PUBLIC_REGISTRATION_FIELDS,
-  registrationFormSchema,
-} from '@afc/shared'
+import { PUBLIC_REGISTRATION_FIELDS, registrationFormSchema } from '@afc/shared'
 import type { RegistrationForm } from '@afc/shared'
 
 /**
@@ -42,19 +39,17 @@ export const STAFF_CREATE_FORBIDDEN_FIELDS = [
 ] as const
 
 export type StaffRegistrationStatus =
-  | 'pending'
-  | 'confirmed'
-  | 'waitlisted'
-  | 'cancelled'
-  | 'attended'
-  | 'no_show'
+  'pending' | 'confirmed' | 'waitlisted' | 'cancelled' | 'attended' | 'no_show'
 
 /**
  * Allowed status edges. Terminal states (`attended`, `cancelled`, `no_show`)
  * have no outgoing edge: a mistaken check-in is corrected by a new
  * registration or a CTO-approved data fix, never by flipping the row back.
  */
-export const STATUS_TRANSITIONS: Record<StaffRegistrationStatus, readonly StaffRegistrationStatus[]> = {
+export const STATUS_TRANSITIONS: Record<
+  StaffRegistrationStatus,
+  readonly StaffRegistrationStatus[]
+> = {
   pending: ['confirmed', 'waitlisted', 'cancelled'],
   waitlisted: ['confirmed', 'pending', 'cancelled'],
   confirmed: ['attended', 'cancelled', 'no_show'],
@@ -83,12 +78,7 @@ export function assertStatusTransitionAllowed(
   })
 }
 
-export const PAYMENT_STATUSES = [
-  'not_required',
-  'pending',
-  'paid',
-  'refunded',
-] as const
+export const PAYMENT_STATUSES = ['not_required', 'pending', 'paid', 'refunded'] as const
 
 export type PaymentStatus = (typeof PAYMENT_STATUSES)[number]
 
@@ -105,13 +95,19 @@ function toAmount(value: unknown): number | null {
  * Smallest defensible rules: amounts must be non-negative numbers; `paid`
  * needs an amount actually collected; `refunded` needs something to refund.
  */
-export function validatePaymentPatch(body: Record<string, unknown>): Record<string, string> {
+export function validatePaymentPatch(
+  body: Record<string, unknown>,
+): Record<string, string> {
   const fields: Record<string, string> = {}
   const status = body.payment_status
-  if (status !== undefined && !(PAYMENT_STATUSES as readonly unknown[]).includes(status)) {
+  if (
+    status !== undefined &&
+    !(PAYMENT_STATUSES as readonly unknown[]).includes(status)
+  ) {
     fields.payment_status = 'Pick not_required, pending, paid or refunded'
   }
-  const expected = body.amount_expected !== undefined ? toAmount(body.amount_expected) : undefined
+  const expected =
+    body.amount_expected !== undefined ? toAmount(body.amount_expected) : undefined
   const paid = body.amount_paid !== undefined ? toAmount(body.amount_paid) : undefined
   if (expected !== undefined && expected !== null && Number.isNaN(expected)) {
     fields.amount_expected = 'Enter a non-negative amount'
@@ -149,7 +145,10 @@ export function toStaffPayload(form: RegistrationForm): Record<string, unknown> 
 
 /** Normalise one contact for idempotency: lowercase, trim, drop spaces. */
 export function normalizeMemberContact(value: unknown): string {
-  return String(value ?? '').trim().toLowerCase().replace(/\s+/g, '')
+  return String(value ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '')
 }
 
 /**
@@ -160,14 +159,21 @@ export function normalizeMemberContact(value: unknown): string {
 export function groupMemberKey(
   eventId: string,
   groupCode: string,
-  member: { registrant_first_name: unknown; registrant_last_name: unknown; email?: unknown; phone?: unknown },
+  member: {
+    registrant_first_name: unknown
+    registrant_last_name: unknown
+    email?: unknown
+    phone?: unknown
+  },
 ): string {
   const name = `${normalizeMemberContact(member.registrant_first_name)}|${normalizeMemberContact(member.registrant_last_name)}`
   const contact =
     normalizeMemberContact(member.phone) ||
     normalizeMemberContact(member.email) ||
     'no-contact'
-  return [String(eventId), String(groupCode).trim().toLowerCase(), name, contact].join(':')
+  return [String(eventId), String(groupCode).trim().toLowerCase(), name, contact].join(
+    ':',
+  )
 }
 
 /**
@@ -180,7 +186,12 @@ export function splitGroupReplay(
   existingKeys: ReadonlySet<string> | readonly string[],
   eventId: string,
   groupCode: string,
-  members: Array<{ registrant_first_name: unknown; registrant_last_name: unknown; email?: unknown; phone?: unknown }>,
+  members: Array<{
+    registrant_first_name: unknown
+    registrant_last_name: unknown
+    email?: unknown
+    phone?: unknown
+  }>,
 ): { toCreate: typeof members; skipped: typeof members } {
   const seen = existingKeys instanceof Set ? existingKeys : new Set(existingKeys)
   const toCreate: typeof members = []
@@ -265,21 +276,29 @@ export function resolveCheckIn(
   rows: ReadonlyArray<Record<string, unknown>>,
   query: CheckInQuery,
 ): CheckInResolution {
-  const ticket = String(query.ticket_code ?? '').trim().toLowerCase()
+  const ticket = String(query.ticket_code ?? '')
+    .trim()
+    .toLowerCase()
   if (ticket) {
     const hit = rows.find(
-      (row) => String(row.ticket_code ?? '').trim().toLowerCase() === ticket,
+      (row) =>
+        String(row.ticket_code ?? '')
+          .trim()
+          .toLowerCase() === ticket,
     )
     return hit ? { kind: 'match', row: hit } : { kind: 'not_found' }
   }
-  const name = String(query.name ?? '').trim().toLowerCase()
+  const name = String(query.name ?? '')
+    .trim()
+    .toLowerCase()
   if (!name) return { kind: 'not_found' }
   const live = rows.filter((row) => row.registration_status !== 'cancelled')
-  const hits = live.filter((row =>
+  const hits = live.filter((row) =>
     `${String(row.registrant_first_name ?? '')} ${String(row.registrant_last_name ?? '')}`
       .trim()
       .toLowerCase()
-      .includes(name)))
+      .includes(name),
+  )
   if (hits.length === 1) return { kind: 'match', row: hits[0] }
   if (hits.length > 1) return { kind: 'ambiguous', count: hits.length }
   return { kind: 'not_found' }
