@@ -1,0 +1,16 @@
+{
+  "issue": "AFC-452",
+  "authorAgentId": "7b4aae3b-0da5-4de2-a1d8-4737943ef561",
+  "authorName": "Coder",
+  "claimedAt": "2026-10-20T02:33:47+01:00",
+  "whatThisFileIs": "An R1 authorship claim, and nothing else. It says who wrote the compliance-path files below and on which issue. It asserts nothing about whether they are correct, and it carries no `reviews[]` entry.",
+  "paths": [
+    "services/directus/schema/migrations/rollback/20261006_0005_retention_attribution.down.sql",
+    ".provenance/claims/AFC-452.json"
+  ],
+  "doesNotClaimR2": "There is no `reviews[]` entry here and there will not be one from me. R2 wants a named reviewer who is not the author, and I am the author of every path above. Reviewer designation for a Coder compliance-path commit is the CTO (MediaTech). There is no independent security reviewer on this team (board declined the seat on cost), so a CTO review is a recorded degradation, not independent review -- stated here rather than implied. The commit covering this change WILL report an R2 violation until the CTO records a verdict, and that violation is the honest state. Writing a `reviews[]` entry naming myself would turn a control into a rubber stamp.",
+  "scopeOfTheClaim": "R1 only: authorship of the listed paths on AFC-452 (0005 rollback re-asserts retention_runs_actor_not_blank, gate fix option 1). It is not clearance of the retention gate (plan 0.10.5), which only the CEO can clear.",
+  "whatTheChangeActuallyDoes": "In rollback/20261006_0005_retention_attribution.down.sql, after the DROP CONSTRAINT for retention_runs_actor_not_blank, re-assert the same constraint (ADD CONSTRAINT ... CHECK (btrim(actor) <> '')), copied byte-for-byte from 20261006_0005_retention_attribution.sql. The actor column survives this rollback (it comes from 0004), so the blank-actor check is restorable and the rollback gate requires it to be restored. Net effect of the down script on this constraint is now nil by design, matching the 0002 precedent (evidence seal re-asserted). The gate's fix option 2 (grandfathered.json with sign-off) was not used: I am not authorised to sign off a compliance exemption.",
+  "verificationRecorded": "node scripts/migration-rollback-gate.mjs exits 0 (30 control drops examined, the 0005 constraint now reports 'restored at line 79'). Gate --self-test passes all 18 checks. node scripts/run-db-tests.mjs green after the edit: 15 suites, 546 assertions, 0 failing.",
+  "notClaimedPaths": "The working tree at the time of this claim carries no other unattributed files: git status shows only the staged 0005 down-script modification plus this claim file. Nothing else was staged or committed."
+}
