@@ -217,7 +217,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     none: [NONE, 'none'],
   },
   [COLLECTIONS.wecaReturnFormulas]: {
-    // In no permission matrix: the formulas table is new in ADR-0007, and
+    // In no permission matrix: the formulas table is new in ADR-0008, and
     // §11.1 names readers ("area+, finance lead") without granting a cell.
     // Treated as a reference collection like leadership_positions (readable,
     // written only as reviewed migration rows): "finance lead" is not a

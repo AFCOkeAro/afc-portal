@@ -14,9 +14,13 @@ const personId = ref('manual')
 const attendeeName = ref('')
 const category = ref('member')
 
-const { data: session, pending, error, refresh } = await useAsyncData(
-  `attendance-${id}`,
-  () => api.get<AttendanceDetail>(`/api/attendance/${id}`),
+const {
+  data: session,
+  pending,
+  error,
+  refresh,
+} = await useAsyncData(`attendance-${id}`, () =>
+  api.get<AttendanceDetail>(`/api/attendance/${id}`),
 )
 
 const people = await useAsyncData('attendance-people', () =>
@@ -72,7 +76,8 @@ async function submitCheckin(): Promise<void> {
     await api.post(`/api/attendance/${id}/records`, {
       session: id,
       person: personId.value === 'manual' ? undefined : personId.value,
-      attendee_name: personId.value === 'manual' ? attendeeName.value.trim() || undefined : undefined,
+      attendee_name:
+        personId.value === 'manual' ? attendeeName.value.trim() || undefined : undefined,
       attendance_category: category.value,
     })
     personId.value = 'manual'
@@ -80,7 +85,8 @@ async function submitCheckin(): Promise<void> {
     category.value = 'member'
     await refresh()
   } catch (cause) {
-    checkinError.value = (cause as { message?: string }).message ?? 'Could not check in that person'
+    checkinError.value =
+      (cause as { message?: string }).message ?? 'Could not check in that person'
   } finally {
     savingCheckin.value = false
   }
@@ -119,7 +125,11 @@ async function submitCheckin(): Promise<void> {
       />
 
       <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Total" :value="session.headcount_total ?? 0" hint="Recorded headcount" />
+        <StatCard
+          label="Total"
+          :value="session.headcount_total ?? 0"
+          hint="Recorded headcount"
+        />
         <StatCard label="Men" :value="session.headcount_men ?? 0" />
         <StatCard label="Women" :value="session.headcount_women ?? 0" />
         <StatCard label="Children" :value="session.headcount_children ?? 0" />
@@ -127,14 +137,25 @@ async function submitCheckin(): Promise<void> {
 
       <div class="mt-6 grid gap-6 xl:grid-cols-3">
         <UCard v-if="canCheckin" class="xl:col-span-1">
-          <template #header><h2 class="text-base font-semibold">Named check-in</h2></template>
+          <template #header
+            ><h2 class="text-base font-semibold">Named check-in</h2></template
+          >
           <form class="space-y-3" novalidate @submit.prevent="submitCheckin">
-            <UAlert v-if="checkinError" color="error" variant="subtle" :description="checkinError" />
+            <UAlert
+              v-if="checkinError"
+              color="error"
+              variant="subtle"
+              :description="checkinError"
+            />
             <UFormField label="Person">
               <USelect v-model="personId" :items="personOptions" class="w-full" />
             </UFormField>
             <UFormField label="Or type a name">
-              <UInput v-model="attendeeName" class="w-full" :disabled="Boolean(personId)" />
+              <UInput
+                v-model="attendeeName"
+                class="w-full"
+                :disabled="Boolean(personId)"
+              />
             </UFormField>
             <UFormField label="Category">
               <USelect v-model="category" :items="categoryOptions" class="w-full" />
@@ -147,7 +168,9 @@ async function submitCheckin(): Promise<void> {
           <template #header>
             <div class="flex items-center justify-between">
               <h2 class="text-base font-semibold">Checked-in people</h2>
-              <span class="text-xs text-gray-500 dark:text-gray-400">{{ session.records.length }} records</span>
+              <span class="text-xs text-gray-500 dark:text-gray-400"
+                >{{ session.records.length }} records</span
+              >
             </div>
           </template>
 
@@ -166,9 +189,13 @@ async function submitCheckin(): Promise<void> {
           />
 
           <div v-else class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
+            <table
+              class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800"
+            >
               <thead>
-                <tr class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                <tr
+                  class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400"
+                >
                   <th class="px-3 py-2 font-medium">Name</th>
                   <th class="px-3 py-2 font-medium">Category</th>
                   <th class="px-3 py-2 font-medium">Recorded</th>
@@ -176,12 +203,18 @@ async function submitCheckin(): Promise<void> {
               </thead>
               <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                 <tr v-for="record in session.records" :key="record.id">
-                  <td class="px-3 py-3">{{ record.person_name || record.attendee_name || '—' }}</td>
+                  <td class="px-3 py-3">
+                    {{ record.person_name || record.attendee_name || '—' }}
+                  </td>
                   <td class="px-3 py-3 capitalize text-gray-600 dark:text-gray-300">
                     {{ (record.attendance_category || 'member').replace(/_/g, ' ') }}
                   </td>
                   <td class="px-3 py-3 text-gray-600 dark:text-gray-300">
-                    {{ record.recorded_at ? new Date(record.recorded_at).toLocaleString() : '—' }}
+                    {{
+                      record.recorded_at
+                        ? new Date(record.recorded_at).toLocaleString()
+                        : '—'
+                    }}
                   </td>
                 </tr>
               </tbody>

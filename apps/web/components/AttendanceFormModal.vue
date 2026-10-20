@@ -126,7 +126,12 @@ async function submit(): Promise<void> {
   >
     <template #body>
       <form class="space-y-4" novalidate @submit.prevent="submit">
-        <UAlert v-if="formError" color="error" variant="subtle" :description="formError" />
+        <UAlert
+          v-if="formError"
+          color="error"
+          variant="subtle"
+          :description="formError"
+        />
 
         <div class="grid gap-4 sm:grid-cols-2">
           <UFormField label="Branch" :error="fieldErrors.branch">
@@ -158,7 +163,12 @@ async function submit(): Promise<void> {
             <UInput v-model="form.headcount_women" type="number" min="0" class="w-full" />
           </UFormField>
           <UFormField label="Children" :error="fieldErrors.headcount_children">
-            <UInput v-model="form.headcount_children" type="number" min="0" class="w-full" />
+            <UInput
+              v-model="form.headcount_children"
+              type="number"
+              min="0"
+              class="w-full"
+            />
           </UFormField>
         </div>
 

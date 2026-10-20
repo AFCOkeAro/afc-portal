@@ -312,7 +312,7 @@ person, event_type (`transfer`, `department_change`, `status_change`, `appointme
 
 **Indexes:** `(branch, month)` unique; `zone`; `status`.
 
-### 5.2 `weca_returns` (formula v1 implemented per ADR-0007)
+### 5.2 `weca_returns` (formula v1 implemented per ADR-0008)
 | Field | Type | Notes |
 | --- | --- | --- |
 | id | uuid (PK) | |
@@ -327,7 +327,7 @@ person, event_type (`transfer`, `department_change`, `status_change`, `appointme
 | generated_by | M2O `directus_users` | |
 
 **Indexes:** `(branch, period)` unique; `computation_status`.
-**Implemented:** formula v1 per ADR-0007 (`weca-2026-01`, board answer `cb89849b`).
+**Implemented:** formula v1 per ADR-0008 (`weca-2026-01`, board answer `cb89849b`).
 `computation_status = formula_pending` with null computed fields remains the
 correct state for a period with no effective formula version -- it is no longer
 the state of every return. The board's formula is a versioned config

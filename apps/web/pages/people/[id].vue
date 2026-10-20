@@ -12,10 +12,12 @@ const showEdit = ref(false)
 const savingStatus = ref(false)
 const actionError = ref('')
 
-const { data: person, pending, error, refresh } = await useAsyncData(
-  `person-${id}`,
-  () => api.get<PersonDetail>(`/api/people/${id}`),
-)
+const {
+  data: person,
+  pending,
+  error,
+  refresh,
+} = await useAsyncData(`person-${id}`, () => api.get<PersonDetail>(`/api/people/${id}`))
 
 const branches = await useAsyncData('people-branches', () =>
   api.get<BranchSummary[]>('/api/branches'),
@@ -34,10 +36,7 @@ const restrictedMessage = computed(() => {
 const displayName = computed(() => {
   const row = person.value
   if (!row) return 'Person'
-  return (
-    row.preferred_name ||
-    [row.first_name, row.last_name].filter(Boolean).join(' ')
-  )
+  return row.preferred_name || [row.first_name, row.last_name].filter(Boolean).join(' ')
 })
 
 function formatDate(value: string | null | undefined): string {
@@ -69,7 +68,8 @@ async function toggleStatus(): Promise<void> {
     })
     await refresh()
   } catch (cause) {
-    actionError.value = (cause as { message?: string }).message ?? 'Could not update status'
+    actionError.value =
+      (cause as { message?: string }).message ?? 'Could not update status'
   } finally {
     savingStatus.value = false
   }
@@ -115,7 +115,11 @@ async function toggleStatus(): Promise<void> {
               :loading="savingStatus"
               @click="toggleStatus"
             />
-            <UButton label="Edit person" icon="i-lucide-pencil" @click="showEdit = true" />
+            <UButton
+              label="Edit person"
+              icon="i-lucide-pencil"
+              @click="showEdit = true"
+            />
           </PermissionGate>
         </template>
       </PageHeader>
@@ -146,7 +150,10 @@ async function toggleStatus(): Promise<void> {
             <div class="flex justify-between gap-4">
               <dt class="text-gray-500 dark:text-gray-400">Status</dt>
               <dd>
-                <UBadge :color="person.status === 'active' ? 'success' : 'neutral'" variant="subtle">
+                <UBadge
+                  :color="person.status === 'active' ? 'success' : 'neutral'"
+                  variant="subtle"
+                >
                   {{ person.status }}
                 </UBadge>
               </dd>
@@ -183,16 +190,25 @@ async function toggleStatus(): Promise<void> {
               <dt class="text-gray-500 dark:text-gray-400">Media consent</dt>
               <dd>{{ person.consent_media ? 'Yes' : 'No' }}</dd>
             </div>
-            <div v-if="person.safeguarding_flag" class="flex items-center gap-2 rounded-lg bg-amber-50 p-3 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+            <div
+              v-if="person.safeguarding_flag"
+              class="flex items-center gap-2 rounded-lg bg-amber-50 p-3 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+            >
               <UIcon name="i-lucide-shield-alert" class="size-4" />
               Safeguarding flag is set
             </div>
           </dl>
-          <div v-if="person.address" class="mt-4 border-t border-gray-100 pt-4 text-sm dark:border-gray-800">
+          <div
+            v-if="person.address"
+            class="mt-4 border-t border-gray-100 pt-4 text-sm dark:border-gray-800"
+          >
             <p class="text-gray-500 dark:text-gray-400">Address</p>
             <p class="mt-1 whitespace-pre-line">{{ person.address }}</p>
           </div>
-          <div v-if="person.notes" class="mt-4 border-t border-gray-100 pt-4 text-sm dark:border-gray-800">
+          <div
+            v-if="person.notes"
+            class="mt-4 border-t border-gray-100 pt-4 text-sm dark:border-gray-800"
+          >
             <p class="text-gray-500 dark:text-gray-400">Notes</p>
             <p class="mt-1 whitespace-pre-line">{{ person.notes }}</p>
           </div>
@@ -214,10 +230,18 @@ async function toggleStatus(): Promise<void> {
             description="Attendance, event registrations, visitor follow-ups and welfare cases will appear here."
           />
 
-          <ol v-else class="relative space-y-4 border-l border-gray-200 pl-6 dark:border-gray-800">
+          <ol
+            v-else
+            class="relative space-y-4 border-l border-gray-200 pl-6 dark:border-gray-800"
+          >
             <li v-for="item in person.timeline" :key="item.id" class="relative">
-              <span class="absolute -left-[31px] flex size-6 items-center justify-center rounded-full bg-white ring-1 ring-gray-200 dark:bg-gray-900 dark:ring-gray-700">
-                <UIcon :name="timelineIcon[item.kind] ?? 'i-lucide-circle'" class="size-3.5 text-gray-500" />
+              <span
+                class="absolute -left-[31px] flex size-6 items-center justify-center rounded-full bg-white ring-1 ring-gray-200 dark:bg-gray-900 dark:ring-gray-700"
+              >
+                <UIcon
+                  :name="timelineIcon[item.kind] ?? 'i-lucide-circle'"
+                  class="size-3.5 text-gray-500"
+                />
               </span>
               <p class="text-sm font-medium">{{ item.title }}</p>
               <p v-if="item.detail" class="text-sm text-gray-600 dark:text-gray-300">

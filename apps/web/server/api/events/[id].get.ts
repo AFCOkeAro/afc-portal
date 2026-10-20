@@ -72,7 +72,8 @@ export default defineEventHandler(async (event): Promise<EventDetail> => {
   requireCan(scope, 'events', 'read')
 
   const id = getRouterParam(event, 'id')
-  if (!id) throw createError({ statusCode: 400, statusMessage: 'An event id is required' })
+  if (!id)
+    throw createError({ statusCode: 400, statusMessage: 'An event id is required' })
 
   const row = await findScopedItem<Record<string, unknown>>(event, scope, 'events', id, {
     fields: EVENT_FIELDS,
@@ -82,17 +83,12 @@ export default defineEventHandler(async (event): Promise<EventDetail> => {
 
   let registrations: RegistrationRow[] = []
   if (can(scope, 'event_registrations', 'read')) {
-    const result = await listItems<RegistrationRow>(
-      event,
-      scope,
-      'event_registrations',
-      {
-        filter: { event: { _eq: id } },
-        fields: visibleFields(scope, 'event_registrations', REGISTRATION_FIELDS),
-        sort: 'registrant_last_name,registrant_first_name',
-        limit: -1,
-      },
-    )
+    const result = await listItems<RegistrationRow>(event, scope, 'event_registrations', {
+      filter: { event: { _eq: id } },
+      fields: visibleFields(scope, 'event_registrations', REGISTRATION_FIELDS),
+      sort: 'registrant_last_name,registrant_first_name',
+      limit: -1,
+    })
     registrations = stripHiddenMany(
       scope,
       'event_registrations',

@@ -1,8 +1,4 @@
-import {
-  personFormNeedsGuardian,
-  personFormSchema,
-  toPersonPayload,
-} from '@afc/shared'
+import { personFormNeedsGuardian, personFormSchema, toPersonPayload } from '@afc/shared'
 import {
   ageFromDob,
   findScopedItem,
@@ -19,7 +15,8 @@ export default defineEventHandler(async (event) => {
   requireCan(scope, 'people', 'update')
 
   const id = getRouterParam(event, 'id')
-  if (!id) throw createError({ statusCode: 400, statusMessage: 'A person id is required' })
+  if (!id)
+    throw createError({ statusCode: 400, statusMessage: 'A person id is required' })
   const existing = await findScopedItem<Record<string, unknown>>(
     event,
     scope,
@@ -30,7 +27,10 @@ export default defineEventHandler(async (event) => {
 
   const body = (await readBody(event)) as Record<string, unknown>
 
-  if (Object.keys(body).length === 1 && (body.status === 'active' || body.status === 'archived')) {
+  if (
+    Object.keys(body).length === 1 &&
+    (body.status === 'active' || body.status === 'archived')
+  ) {
     const updated = await updateItem<Record<string, unknown>>(
       event,
       scope,

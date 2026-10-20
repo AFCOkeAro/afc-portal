@@ -20,8 +20,8 @@ const saving = ref(false)
 const formError = ref('')
 const fieldErrors = ref<Record<string, string>>({})
 
-const showRestricted = computed(
-  () => permissions.isFieldVisible(COLLECTIONS.welfareCases, 'description'),
+const showRestricted = computed(() =>
+  permissions.isFieldVisible(COLLECTIONS.welfareCases, 'description'),
 )
 
 function defaultRef(): string {
@@ -166,7 +166,12 @@ async function submit(): Promise<void> {
   >
     <template #body>
       <form class="space-y-4" novalidate @submit.prevent="submit">
-        <UAlert v-if="formError" color="error" variant="subtle" :description="formError" />
+        <UAlert
+          v-if="formError"
+          color="error"
+          variant="subtle"
+          :description="formError"
+        />
 
         <div class="grid gap-4 sm:grid-cols-2">
           <UFormField label="Case reference" required :error="fieldErrors.case_ref">
@@ -200,10 +205,22 @@ async function submit(): Promise<void> {
 
         <div class="grid gap-4 sm:grid-cols-2">
           <UFormField label="Amount requested" :error="fieldErrors.amount_requested">
-            <UInput v-model="form.amount_requested" type="number" min="0" step="0.01" class="w-full" />
+            <UInput
+              v-model="form.amount_requested"
+              type="number"
+              min="0"
+              step="0.01"
+              class="w-full"
+            />
           </UFormField>
           <UFormField label="Amount assisted" :error="fieldErrors.amount_assisted">
-            <UInput v-model="form.amount_assisted" type="number" min="0" step="0.01" class="w-full" />
+            <UInput
+              v-model="form.amount_assisted"
+              type="number"
+              min="0"
+              step="0.01"
+              class="w-full"
+            />
           </UFormField>
         </div>
 

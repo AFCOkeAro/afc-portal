@@ -1,10 +1,5 @@
 import type { BranchSummary } from '../../types/portal'
-import {
-  getPortalScope,
-  listItems,
-  mergeFilters,
-  scopeFilter,
-} from '../utils/portal'
+import { getPortalScope, listItems, mergeFilters, scopeFilter } from '../utils/portal'
 
 export default defineEventHandler(async (event): Promise<BranchSummary[]> => {
   const scope = await getPortalScope(event)

@@ -99,17 +99,12 @@ export default defineEventHandler(async (event): Promise<WelfareDetail> => {
 
   let events: WelfareEvent[] = []
   if (can(scope, 'welfare_case_events', 'read')) {
-    const result = await listItems<WelfareEvent>(
-      event,
-      scope,
-      'welfare_case_events',
-      {
-        filter: { case: { _eq: id } },
-        fields: ['id', 'case', 'event_type', 'summary', 'actor', 'created_at'],
-        sort: '-created_at',
-        limit: -1,
-      },
-    )
+    const result = await listItems<WelfareEvent>(event, scope, 'welfare_case_events', {
+      filter: { case: { _eq: id } },
+      fields: ['id', 'case', 'event_type', 'summary', 'actor', 'created_at'],
+      sort: '-created_at',
+      limit: -1,
+    })
     events = result.data.map((welfareEvent) => ({
       ...welfareEvent,
       id: String(welfareEvent.id),

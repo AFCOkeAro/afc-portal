@@ -12,7 +12,8 @@ export default defineEventHandler(async (event) => {
   requireCan(scope, 'attendance_records', 'create')
 
   const id = getRouterParam(event, 'id')
-  if (!id) throw createError({ statusCode: 400, statusMessage: 'A session id is required' })
+  if (!id)
+    throw createError({ statusCode: 400, statusMessage: 'A session id is required' })
   await findScopedItem(event, scope, 'attendance_sessions', id, { fields: ['id'] })
 
   const parsed = attendanceRecordFormSchema.safeParse(await readBody(event))

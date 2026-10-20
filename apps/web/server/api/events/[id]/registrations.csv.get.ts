@@ -46,7 +46,8 @@ export default defineEventHandler(async (event): Promise<string> => {
   requireCan(scope, 'event_registrations', 'read')
 
   const id = getRouterParam(event, 'id')
-  if (!id) throw createError({ statusCode: 400, statusMessage: 'An event id is required' })
+  if (!id)
+    throw createError({ statusCode: 400, statusMessage: 'An event id is required' })
 
   const eventRow = await findScopedItem<Record<string, unknown>>(
     event,
@@ -65,8 +66,7 @@ export default defineEventHandler(async (event): Promise<string> => {
   })
 
   const medicalVisible =
-    can(scope, 'event_registrations', 'read') &&
-    fields.includes('medical_notes')
+    can(scope, 'event_registrations', 'read') && fields.includes('medical_notes')
   const headers = [
     'ticket_code',
     'first_name',
@@ -85,7 +85,12 @@ export default defineEventHandler(async (event): Promise<string> => {
     'source',
     'created_at',
     ...(medicalVisible
-      ? ['medical_notes', 'allergies', 'emergency_contact_name', 'emergency_contact_phone']
+      ? [
+          'medical_notes',
+          'allergies',
+          'emergency_contact_name',
+          'emergency_contact_phone',
+        ]
       : []),
   ]
 

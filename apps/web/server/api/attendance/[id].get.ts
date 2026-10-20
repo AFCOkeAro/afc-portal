@@ -40,7 +40,8 @@ export default defineEventHandler(async (event): Promise<AttendanceDetail> => {
   requireCan(scope, 'attendance_sessions', 'read')
 
   const id = getRouterParam(event, 'id')
-  if (!id) throw createError({ statusCode: 400, statusMessage: 'A session id is required' })
+  if (!id)
+    throw createError({ statusCode: 400, statusMessage: 'A session id is required' })
 
   const row = await findScopedItem<Record<string, unknown>>(
     event,

@@ -1,11 +1,6 @@
 <script setup lang="ts">
 import { COLLECTIONS } from '@afc/shared'
-import type {
-  BranchSummary,
-  Paginated,
-  PersonRow,
-  WelfareCaseRow,
-} from '~/types/portal'
+import type { BranchSummary, Paginated, PersonRow, WelfareCaseRow } from '~/types/portal'
 
 definePageMeta({ middleware: ['staff', 'welfare'] })
 
@@ -179,7 +174,9 @@ const priorityColor: Record<string, 'success' | 'warning' | 'neutral' | 'error'>
       <div v-else class="mt-4 overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
           <thead>
-            <tr class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+            <tr
+              class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400"
+            >
               <th class="px-3 py-2 font-medium">Case</th>
               <th class="px-3 py-2 font-medium">Person</th>
               <th class="px-3 py-2 font-medium">Category</th>
@@ -204,23 +201,41 @@ const priorityColor: Record<string, 'success' | 'warning' | 'neutral' | 'error'>
                 >
                   {{ welfareCase.case_ref }}
                 </NuxtLink>
-                <p class="text-xs text-gray-500 dark:text-gray-400">{{ welfareCase.branch_name || 'No branch' }}</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400">
+                  {{ welfareCase.branch_name || 'No branch' }}
+                </p>
               </td>
-              <td class="px-3 py-3 text-gray-600 dark:text-gray-300">{{ welfareCase.person_name || '—' }}</td>
-              <td class="px-3 py-3 capitalize text-gray-600 dark:text-gray-300">{{ welfareCase.category }}</td>
+              <td class="px-3 py-3 text-gray-600 dark:text-gray-300">
+                {{ welfareCase.person_name || '—' }}
+              </td>
+              <td class="px-3 py-3 capitalize text-gray-600 dark:text-gray-300">
+                {{ welfareCase.category }}
+              </td>
               <td class="px-3 py-3">
-                <UBadge :color="priorityColor[welfareCase.priority ?? 'normal'] ?? 'neutral'" variant="subtle">
+                <UBadge
+                  :color="priorityColor[welfareCase.priority ?? 'normal'] ?? 'neutral'"
+                  variant="subtle"
+                >
                   {{ welfareCase.priority ?? 'normal' }}
                 </UBadge>
               </td>
               <td class="px-3 py-3 tabular-nums text-gray-600 dark:text-gray-300">
                 <p>{{ welfareCase.amount_assisted || '0.00' }} assisted</p>
-                <p class="text-xs text-gray-500 dark:text-gray-400">{{ welfareCase.contribution_total }} contributed</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400">
+                  {{ welfareCase.contribution_total }} contributed
+                </p>
               </td>
-              <td class="px-3 py-3 text-gray-600 dark:text-gray-300">{{ welfareCase.event_count }} entries</td>
-              <td class="px-3 py-3 text-gray-600 dark:text-gray-300">{{ formatDate(welfareCase.opened_at) }}</td>
+              <td class="px-3 py-3 text-gray-600 dark:text-gray-300">
+                {{ welfareCase.event_count }} entries
+              </td>
+              <td class="px-3 py-3 text-gray-600 dark:text-gray-300">
+                {{ formatDate(welfareCase.opened_at) }}
+              </td>
               <td class="px-3 py-3">
-                <UBadge :color="statusColor[welfareCase.status ?? 'open'] ?? 'neutral'" variant="subtle">
+                <UBadge
+                  :color="statusColor[welfareCase.status ?? 'open'] ?? 'neutral'"
+                  variant="subtle"
+                >
                   {{ (welfareCase.status ?? 'open').replace(/_/g, ' ') }}
                 </UBadge>
               </td>
@@ -244,8 +259,22 @@ const priorityColor: Record<string, 'success' | 'warning' | 'neutral' | 'error'>
           {{ total }} cases · page {{ page }} of {{ pageCount }}
         </p>
         <div class="flex gap-2">
-          <UButton color="neutral" variant="outline" size="sm" label="Previous" :disabled="page <= 1" @click="page -= 1" />
-          <UButton color="neutral" variant="outline" size="sm" label="Next" :disabled="page >= pageCount" @click="page += 1" />
+          <UButton
+            color="neutral"
+            variant="outline"
+            size="sm"
+            label="Previous"
+            :disabled="page <= 1"
+            @click="page -= 1"
+          />
+          <UButton
+            color="neutral"
+            variant="outline"
+            size="sm"
+            label="Next"
+            :disabled="page >= pageCount"
+            @click="page += 1"
+          />
         </div>
       </div>
     </UCard>

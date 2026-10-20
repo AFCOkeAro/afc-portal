@@ -49,11 +49,9 @@ export default defineEventHandler(async (event) => {
   const search =
     typeof query.search === 'string' ? query.search.trim().slice(0, 120) : undefined
   const branch = typeof query.branch === 'string' ? query.branch : undefined
-  const eventType =
-    typeof query.event_type === 'string' ? query.event_type : undefined
+  const eventType = typeof query.event_type === 'string' ? query.event_type : undefined
   const status = typeof query.status === 'string' ? query.status : undefined
-  const when =
-    query.when === 'past' ? 'past' : query.when === 'all' ? 'all' : 'upcoming'
+  const when = query.when === 'past' ? 'past' : query.when === 'all' ? 'all' : 'upcoming'
   const now = new Date().toISOString()
 
   const result = await listItems<EventRow>(event, scope, 'events', {

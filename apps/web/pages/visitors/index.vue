@@ -89,7 +89,11 @@ const statusColor: Record<string, 'success' | 'warning' | 'neutral' | 'error'> =
     >
       <template #actions>
         <PermissionGate :collection="COLLECTIONS.visitors" action="create">
-          <UButton label="Record intake" icon="i-lucide-user-plus" @click="showForm = true" />
+          <UButton
+            label="Record intake"
+            icon="i-lucide-user-plus"
+            @click="showForm = true"
+          />
         </PermissionGate>
       </template>
     </PageHeader>
@@ -132,7 +136,9 @@ const statusColor: Record<string, 'success' | 'warning' | 'neutral' | 'error'> =
       <div v-else class="mt-4 overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
           <thead>
-            <tr class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+            <tr
+              class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400"
+            >
               <th class="px-3 py-2 font-medium">Visitor</th>
               <th class="px-3 py-2 font-medium">Visit</th>
               <th class="px-3 py-2 font-medium">Branch</th>
@@ -175,7 +181,10 @@ const statusColor: Record<string, 'success' | 'warning' | 'neutral' | 'error'> =
                 </p>
               </td>
               <td class="px-3 py-3">
-                <UBadge :color="statusColor[visitor.status] ?? 'neutral'" variant="subtle">
+                <UBadge
+                  :color="statusColor[visitor.status] ?? 'neutral'"
+                  variant="subtle"
+                >
                   {{ visitor.status.replace(/_/g, ' ') }}
                 </UBadge>
               </td>
@@ -199,8 +208,22 @@ const statusColor: Record<string, 'success' | 'warning' | 'neutral' | 'error'> =
           {{ total }} visitors · page {{ page }} of {{ pageCount }}
         </p>
         <div class="flex gap-2">
-          <UButton color="neutral" variant="outline" size="sm" label="Previous" :disabled="page <= 1" @click="page -= 1" />
-          <UButton color="neutral" variant="outline" size="sm" label="Next" :disabled="page >= pageCount" @click="page += 1" />
+          <UButton
+            color="neutral"
+            variant="outline"
+            size="sm"
+            label="Previous"
+            :disabled="page <= 1"
+            @click="page -= 1"
+          />
+          <UButton
+            color="neutral"
+            variant="outline"
+            size="sm"
+            label="Next"
+            :disabled="page >= pageCount"
+            @click="page += 1"
+          />
         </div>
       </div>
     </UCard>

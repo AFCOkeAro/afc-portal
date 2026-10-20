@@ -197,7 +197,12 @@ async function submit(): Promise<void> {
 
         <div class="grid gap-4 sm:grid-cols-2">
           <UFormField label="Phone" :error="fieldErrors.phone">
-            <UInput v-model="form.phone" type="tel" class="w-full" placeholder="08012345678" />
+            <UInput
+              v-model="form.phone"
+              type="tel"
+              class="w-full"
+              placeholder="08012345678"
+            />
           </UFormField>
           <UFormField label="Email" :error="fieldErrors.email">
             <UInput v-model="form.email" type="email" class="w-full" />
@@ -219,7 +224,11 @@ async function submit(): Promise<void> {
           hint="Required for a person under 18."
           :error="fieldErrors.guardian"
         >
-          <UInput v-model="form.guardian" class="w-full" placeholder="Guardian name and phone" />
+          <UInput
+            v-model="form.guardian"
+            class="w-full"
+            placeholder="Guardian name and phone"
+          />
         </UFormField>
 
         <UFormField label="Address" :error="fieldErrors.address">

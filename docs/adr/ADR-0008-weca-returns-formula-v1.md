@@ -1,4 +1,4 @@
-# ADR-0007 — WECA returns formula v1: compute MF + 5% funds, remit MF + intervention + Faith City
+# ADR-0008 — WECA returns formula v1: compute MF + 5% funds, remit MF + intervention + Faith City
 
 **Status:** Accepted (decision), CTO 2026-10-20. Implementation delegated ([AFC-450](/AFC/issues/AFC-450)).
 **Supersedes:** nothing. **Closes the pending-formula dependency in:** `docs/planning/prd-expansion.md` §5,

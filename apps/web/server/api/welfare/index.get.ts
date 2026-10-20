@@ -138,9 +138,7 @@ export default defineEventHandler(async (event) => {
     return {
       ...record,
       id: String(record.id),
-      branch_name: record.branch
-        ? (names.get(String(record.branch)) ?? null)
-        : null,
+      branch_name: record.branch ? (names.get(String(record.branch)) ?? null) : null,
       person_name: record.person ? (people.get(record.person) ?? null) : null,
       contribution_total: (totals.get(String(record.id)) ?? 0).toFixed(2),
       event_count: eventCounts.get(String(record.id)) ?? 0,

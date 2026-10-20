@@ -35,7 +35,8 @@ const query = computed(() => ({
 
 const { data, pending, error, refresh } = await useAsyncData(
   'attendance-list',
-  () => api.get<Paginated<AttendanceSessionRow>>('/api/attendance', { query: query.value }),
+  () =>
+    api.get<Paginated<AttendanceSessionRow>>('/api/attendance', { query: query.value }),
   { watch: [query] },
 )
 
@@ -79,7 +80,11 @@ function typeLabel(value: string): string {
     >
       <template #actions>
         <PermissionGate :collection="COLLECTIONS.attendanceSessions" action="create">
-          <UButton label="Capture headcount" icon="i-lucide-plus" @click="showForm = true" />
+          <UButton
+            label="Capture headcount"
+            icon="i-lucide-plus"
+            @click="showForm = true"
+          />
         </PermissionGate>
       </template>
     </PageHeader>
@@ -122,7 +127,9 @@ function typeLabel(value: string): string {
       <div v-else class="mt-4 overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
           <thead>
-            <tr class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+            <tr
+              class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400"
+            >
               <th class="px-3 py-2 font-medium">Session</th>
               <th class="px-3 py-2 font-medium">Date</th>
               <th class="px-3 py-2 font-medium">Branch</th>
@@ -159,8 +166,12 @@ function typeLabel(value: string): string {
               </td>
               <td class="px-3 py-3 tabular-nums">{{ session.headcount_men ?? 0 }}</td>
               <td class="px-3 py-3 tabular-nums">{{ session.headcount_women ?? 0 }}</td>
-              <td class="px-3 py-3 tabular-nums">{{ session.headcount_children ?? 0 }}</td>
-              <td class="px-3 py-3 font-semibold tabular-nums">{{ session.headcount_total ?? 0 }}</td>
+              <td class="px-3 py-3 tabular-nums">
+                {{ session.headcount_children ?? 0 }}
+              </td>
+              <td class="px-3 py-3 font-semibold tabular-nums">
+                {{ session.headcount_total ?? 0 }}
+              </td>
               <td class="px-3 py-3 tabular-nums text-gray-600 dark:text-gray-300">
                 {{ session.records_count }}
               </td>
@@ -184,8 +195,22 @@ function typeLabel(value: string): string {
           {{ total }} sessions · page {{ page }} of {{ pageCount }}
         </p>
         <div class="flex gap-2">
-          <UButton color="neutral" variant="outline" size="sm" label="Previous" :disabled="page <= 1" @click="page -= 1" />
-          <UButton color="neutral" variant="outline" size="sm" label="Next" :disabled="page >= pageCount" @click="page += 1" />
+          <UButton
+            color="neutral"
+            variant="outline"
+            size="sm"
+            label="Previous"
+            :disabled="page <= 1"
+            @click="page -= 1"
+          />
+          <UButton
+            color="neutral"
+            variant="outline"
+            size="sm"
+            label="Next"
+            :disabled="page >= pageCount"
+            @click="page += 1"
+          />
         </div>
       </div>
     </UCard>

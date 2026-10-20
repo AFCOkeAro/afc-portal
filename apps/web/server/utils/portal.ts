@@ -135,19 +135,15 @@ export function eventScopeFilter(scope: PortalScope): Filter {
 }
 
 export function mergeFilters(...filters: Array<Filter | undefined>): Filter | undefined {
-  const active = filters.filter(
-    (filter): filter is Filter => Boolean(filter && Object.keys(filter).length > 0),
+  const active = filters.filter((filter): filter is Filter =>
+    Boolean(filter && Object.keys(filter).length > 0),
   )
   if (active.length === 0) return undefined
   if (active.length === 1) return active[0]
   return { _and: active }
 }
 
-export function isHidden(
-  scope: PortalScope,
-  collection: string,
-  field: string,
-): boolean {
+export function isHidden(scope: PortalScope, collection: string, field: string): boolean {
   return (scope.hiddenFields[collection] ?? []).includes(field)
 }
 
@@ -231,10 +227,7 @@ export async function findScopedItem<T>(
   id: string,
   options: { fields?: string[]; scope?: Filter } = {},
 ): Promise<T> {
-  const filter = mergeFilters(
-    { id: { _eq: id } },
-    options.scope ?? scopeFilter(scope),
-  )
+  const filter = mergeFilters({ id: { _eq: id } }, options.scope ?? scopeFilter(scope))
   const result = await listItems<T>(event, scope, collection, {
     filter,
     fields: options.fields,
@@ -257,11 +250,11 @@ export async function createItem<T>(
   collection: string,
   body: Record<string, unknown>,
 ): Promise<T> {
-  const response = await directusFetch<{ data: T }>(
-    event,
-    `/items/${collection}`,
-    { method: 'POST', accessToken: scope.token, body },
-  )
+  const response = await directusFetch<{ data: T }>(event, `/items/${collection}`, {
+    method: 'POST',
+    accessToken: scope.token,
+    body,
+  })
   return response.data
 }
 
@@ -272,11 +265,11 @@ export async function updateItem<T>(
   id: string,
   body: Record<string, unknown>,
 ): Promise<T> {
-  const response = await directusFetch<{ data: T }>(
-    event,
-    `/items/${collection}/${id}`,
-    { method: 'PATCH', accessToken: scope.token, body },
-  )
+  const response = await directusFetch<{ data: T }>(event, `/items/${collection}/${id}`, {
+    method: 'PATCH',
+    accessToken: scope.token,
+    body,
+  })
   return response.data
 }
 
@@ -304,9 +297,7 @@ export async function branchNames(
     accessToken: scope.token,
     query: { limit: -1, fields: 'id,name,code', sort: 'sort,name' },
   })
-  return new Map(
-    response.data.map((branch) => [String(branch.id), branch.name]),
-  )
+  return new Map(response.data.map((branch) => [String(branch.id), branch.name]))
 }
 
 export function ageFromDob(dateOfBirth: string | null | undefined): number | null {
@@ -317,8 +308,7 @@ export function ageFromDob(dateOfBirth: string | null | undefined): number | nul
   let age = today.getUTCFullYear() - born.getUTCFullYear()
   const beforeBirthday =
     today.getUTCMonth() < born.getUTCMonth() ||
-    (today.getUTCMonth() === born.getUTCMonth() &&
-      today.getUTCDate() < born.getUTCDate())
+    (today.getUTCMonth() === born.getUTCMonth() && today.getUTCDate() < born.getUTCDate())
   if (beforeBirthday) age -= 1
   return age
 }

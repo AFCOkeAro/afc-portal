@@ -28,7 +28,7 @@ export const COLLECTIONS = {
   welfareCaseEvents: 'welfare_case_events',
   users: 'directus_users',
   /**
-   * WECA finance (AFC-451, ADR-0007). Capture + computed returns under the
+   * WECA finance (AFC-451, ADR-0008). Capture + computed returns under the
    * board-ratified formula version. Finance scope only.
    */
   branchFinancialRecords: 'branch_financial_records',

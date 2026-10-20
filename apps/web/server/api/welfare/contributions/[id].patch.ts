@@ -14,7 +14,8 @@ export default defineEventHandler(async (event) => {
   requireCan(scope, 'welfare_contributions', 'update')
 
   const id = getRouterParam(event, 'id')
-  if (!id) throw createError({ statusCode: 400, statusMessage: 'A contribution id is required' })
+  if (!id)
+    throw createError({ statusCode: 400, statusMessage: 'A contribution id is required' })
 
   const body = (await readBody(event)) as { status?: unknown }
   if (!body.status || !STATUSES.includes(body.status as (typeof STATUSES)[number])) {

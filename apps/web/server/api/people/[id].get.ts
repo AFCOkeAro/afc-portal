@@ -100,10 +100,7 @@ export default defineEventHandler(async (event): Promise<PersonDetail> => {
     }),
     can(scope, 'events', 'read')
       ? listItems<RegistrationRow>(event, scope, 'event_registrations', {
-          filter: mergeFilters(
-            { person: { _eq: id } },
-            scopeFilter(scope),
-          ),
+          filter: mergeFilters({ person: { _eq: id } }, scopeFilter(scope)),
           fields: ['id', 'event', 'registration_status', 'created_at'],
           sort: '-created_at',
           limit: 20,
@@ -118,17 +115,18 @@ export default defineEventHandler(async (event): Promise<PersonDetail> => {
         })
       : Promise.resolve({ data: [], meta: { total: 0, page: 1, limit: 10 } }),
     can(scope, 'welfare_cases', 'read')
-      ? listItems<{ id: string | number; case_ref: string; category: string; status: string; opened_at: string | null }>(
-          event,
-          scope,
-          'welfare_cases',
-          {
-            filter: mergeFilters({ person: { _eq: id } }, scopeFilter(scope)),
-            fields: ['id', 'case_ref', 'category', 'status', 'opened_at'],
-            sort: '-opened_at',
-            limit: 10,
-          },
-        )
+      ? listItems<{
+          id: string | number
+          case_ref: string
+          category: string
+          status: string
+          opened_at: string | null
+        }>(event, scope, 'welfare_cases', {
+          filter: mergeFilters({ person: { _eq: id } }, scopeFilter(scope)),
+          fields: ['id', 'case_ref', 'category', 'status', 'opened_at'],
+          sort: '-opened_at',
+          limit: 10,
+        })
       : Promise.resolve({ data: [], meta: { total: 0, page: 1, limit: 10 } }),
   ])
 
@@ -220,9 +218,7 @@ export default defineEventHandler(async (event): Promise<PersonDetail> => {
   const row = stripHidden(scope, 'people', {
     ...record,
     id: String(record.id),
-    branch_name: record.branch
-      ? (names.get(String(record.branch)) ?? null)
-      : null,
+    branch_name: record.branch ? (names.get(String(record.branch)) ?? null) : null,
     age: isHidden(scope, 'people', 'date_of_birth')
       ? null
       : ageFromDob(record.date_of_birth as string | null | undefined),

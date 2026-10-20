@@ -1,9 +1,12 @@
+import { personFormNeedsGuardian, personFormSchema, toPersonPayload } from '@afc/shared'
 import {
-  personFormNeedsGuardian,
-  personFormSchema,
-  toPersonPayload,
-} from '@afc/shared'
-import { ageFromDob, createItem, getPortalScope, requireCan, resolveBranch, throwValidation } from '../../utils/portal'
+  ageFromDob,
+  createItem,
+  getPortalScope,
+  requireCan,
+  resolveBranch,
+  throwValidation,
+} from '../../utils/portal'
 
 export default defineEventHandler(async (event) => {
   const scope = await getPortalScope(event)
@@ -26,16 +29,11 @@ export default defineEventHandler(async (event) => {
 
   const branch = resolveBranch(scope, form.branch)
   const age = ageFromDob(form.date_of_birth)
-  const created = await createItem<Record<string, unknown>>(
-    event,
-    scope,
-    'people',
-    {
-      ...toPersonPayload({ ...form, branch: branch ?? undefined }),
-      is_minor: age !== null && age < 18,
-      status: 'active',
-    },
-  )
+  const created = await createItem<Record<string, unknown>>(event, scope, 'people', {
+    ...toPersonPayload({ ...form, branch: branch ?? undefined }),
+    is_minor: age !== null && age < 18,
+    status: 'active',
+  })
 
   return { data: { ...created, id: String(created.id) } }
 })

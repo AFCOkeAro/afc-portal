@@ -120,7 +120,9 @@ watch(
         title: row.title,
         summary: row.summary ?? '',
         event_type: row.event_type,
-        branch: row.branch ?? (canCreateAreaWide.value ? 'area' : (props.branches[0]?.id ?? '')),
+        branch:
+          row.branch ??
+          (canCreateAreaWide.value ? 'area' : (props.branches[0]?.id ?? '')),
         start_at: toLocal(row.start_at),
         end_at: toLocal(row.end_at),
         location: row.location ?? '',
@@ -202,7 +204,12 @@ async function submit(): Promise<void> {
   >
     <template #body>
       <form class="space-y-4" novalidate @submit.prevent="submit">
-        <UAlert v-if="formError" color="error" variant="subtle" :description="formError" />
+        <UAlert
+          v-if="formError"
+          color="error"
+          variant="subtle"
+          :description="formError"
+        />
 
         <UFormField label="Title" required :error="fieldErrors.title">
           <UInput v-model="form.title" class="w-full" />
@@ -234,7 +241,11 @@ async function submit(): Promise<void> {
           <UFormField label="Location" :error="fieldErrors.location">
             <UInput v-model="form.location" class="w-full" />
           </UFormField>
-          <UFormField label="Capacity" hint="Blank means unlimited" :error="fieldErrors.capacity">
+          <UFormField
+            label="Capacity"
+            hint="Blank means unlimited"
+            :error="fieldErrors.capacity"
+          >
             <UInput v-model="form.capacity" type="number" min="0" class="w-full" />
           </UFormField>
         </div>
@@ -244,25 +255,55 @@ async function submit(): Promise<void> {
         </UFormField>
 
         <details class="rounded-lg border border-gray-200 p-3 dark:border-gray-800">
-          <summary class="cursor-pointer text-sm font-medium">Registration and eligibility</summary>
+          <summary class="cursor-pointer text-sm font-medium">
+            Registration and eligibility
+          </summary>
           <div class="mt-4 space-y-4">
             <div class="grid gap-4 sm:grid-cols-2">
-              <UFormField label="Registration opens" :error="fieldErrors.registration_opens_at">
-                <UInput v-model="form.registration_opens_at" type="datetime-local" class="w-full" />
+              <UFormField
+                label="Registration opens"
+                :error="fieldErrors.registration_opens_at"
+              >
+                <UInput
+                  v-model="form.registration_opens_at"
+                  type="datetime-local"
+                  class="w-full"
+                />
               </UFormField>
-              <UFormField label="Registration closes" :error="fieldErrors.registration_closes_at">
-                <UInput v-model="form.registration_closes_at" type="datetime-local" class="w-full" />
+              <UFormField
+                label="Registration closes"
+                :error="fieldErrors.registration_closes_at"
+              >
+                <UInput
+                  v-model="form.registration_closes_at"
+                  type="datetime-local"
+                  class="w-full"
+                />
               </UFormField>
             </div>
             <div class="grid gap-4 sm:grid-cols-3">
               <UFormField label="Fee" :error="fieldErrors.fee_amount">
-                <UInput v-model="form.fee_amount" type="number" min="0" step="0.01" class="w-full" />
+                <UInput
+                  v-model="form.fee_amount"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  class="w-full"
+                />
               </UFormField>
               <UFormField label="Currency" :error="fieldErrors.currency">
-                <USelect v-model="form.currency" :items="currencyOptions" class="w-full" />
+                <USelect
+                  v-model="form.currency"
+                  :items="currencyOptions"
+                  class="w-full"
+                />
               </UFormField>
               <UFormField label="Visibility" :error="fieldErrors.visibility">
-                <USelect v-model="form.visibility" :items="visibilityOptions" class="w-full" />
+                <USelect
+                  v-model="form.visibility"
+                  :items="visibilityOptions"
+                  class="w-full"
+                />
               </UFormField>
             </div>
             <div class="grid gap-4 sm:grid-cols-2">
@@ -274,8 +315,14 @@ async function submit(): Promise<void> {
               </UFormField>
             </div>
             <div class="grid gap-3 sm:grid-cols-2">
-              <UCheckbox v-model="form.waitlist_enabled" label="Enable a waitlist when full" />
-              <UCheckbox v-model="form.requires_guardian_consent" label="Requires guardian consent" />
+              <UCheckbox
+                v-model="form.waitlist_enabled"
+                label="Enable a waitlist when full"
+              />
+              <UCheckbox
+                v-model="form.requires_guardian_consent"
+                label="Requires guardian consent"
+              />
               <UCheckbox v-model="form.collect_medical" label="Collect medical notes" />
             </div>
           </div>

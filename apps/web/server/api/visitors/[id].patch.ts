@@ -13,7 +13,8 @@ export default defineEventHandler(async (event) => {
   requireCan(scope, 'visitors', 'update')
 
   const id = getRouterParam(event, 'id')
-  if (!id) throw createError({ statusCode: 400, statusMessage: 'A visitor id is required' })
+  if (!id)
+    throw createError({ statusCode: 400, statusMessage: 'A visitor id is required' })
   await findScopedItem(event, scope, 'visitors', id, { fields: ['id'] })
 
   const body = (await readBody(event)) as Record<string, unknown>

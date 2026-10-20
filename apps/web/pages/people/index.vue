@@ -46,9 +46,8 @@ const rows = computed(() => data.value?.data ?? [])
 const total = computed(() => data.value?.meta.total ?? 0)
 const pageCount = computed(() => Math.max(1, Math.ceil(total.value / limit)))
 
-const branches = await useAsyncData(
-  'people-branches',
-  () => api.get<BranchSummary[]>('/api/branches'),
+const branches = await useAsyncData('people-branches', () =>
+  api.get<BranchSummary[]>('/api/branches'),
 )
 
 const branchOptions = computed(() => [
@@ -74,7 +73,9 @@ const statusOptions = [
 ]
 
 const restricted = computed(() => permissions.hiddenFields(COLLECTIONS.people))
-const showDob = computed(() => permissions.isFieldVisible(COLLECTIONS.people, 'date_of_birth'))
+const showDob = computed(() =>
+  permissions.isFieldVisible(COLLECTIONS.people, 'date_of_birth'),
+)
 
 function fullName(person: PersonRow): string {
   return (
@@ -150,7 +151,9 @@ function fullName(person: PersonRow): string {
       <div v-else class="mt-4 overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
           <thead>
-            <tr class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+            <tr
+              class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400"
+            >
               <th class="px-3 py-2 font-medium">Person</th>
               <th class="px-3 py-2 font-medium">Contact</th>
               <th class="px-3 py-2 font-medium">Branch</th>
@@ -179,7 +182,9 @@ function fullName(person: PersonRow): string {
               </td>
               <td class="px-3 py-3 text-gray-600 dark:text-gray-300">
                 <p>{{ person.phone || '—' }}</p>
-                <p class="text-xs text-gray-500 dark:text-gray-400">{{ person.email || '' }}</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400">
+                  {{ person.email || '' }}
+                </p>
               </td>
               <td class="px-3 py-3 text-gray-600 dark:text-gray-300">
                 {{ person.branch_name || '—' }}
@@ -189,11 +194,17 @@ function fullName(person: PersonRow): string {
                   {{ person.membership_status.replace(/_/g, ' ') }}
                 </UBadge>
               </td>
-              <td v-if="showDob" class="px-3 py-3 tabular-nums text-gray-600 dark:text-gray-300">
+              <td
+                v-if="showDob"
+                class="px-3 py-3 tabular-nums text-gray-600 dark:text-gray-300"
+              >
                 {{ person.age ?? '—' }}
               </td>
               <td class="px-3 py-3">
-                <UBadge :color="person.status === 'active' ? 'success' : 'neutral'" variant="subtle">
+                <UBadge
+                  :color="person.status === 'active' ? 'success' : 'neutral'"
+                  variant="subtle"
+                >
                   {{ person.status }}
                 </UBadge>
               </td>

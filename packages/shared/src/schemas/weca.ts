@@ -1,5 +1,5 @@
 /**
- * WECA finance capture (AFC-451, ADR-0007).
+ * WECA finance capture (AFC-451, ADR-0008).
  *
  * A form sends what the treasurer typed, which is not the row: income arrives
  * as a decimal string (Postgres `numeric(14,2)` is not a float), the month as
@@ -10,7 +10,7 @@
  * computation lives in exactly one place -- `weca_compute_return()` in
  * `20261020_0001_weca_returns.sql`, reading the effective
  * `weca_return_formulas` row. A second implementation here would drift from
- * the first the way every duplicated formula does, and ADR-0007 A3 rejects
+ * the first the way every duplicated formula does, and ADR-0008 A3 rejects
  * hard-coded rates anywhere outside the versioned config row.
  */
 import { z } from 'zod'
@@ -47,7 +47,7 @@ export const requiredMoneySchema = z
 
 /**
  * Treasurer capture. Intervention and Faith City are manual inputs that
- * default to 0 in the total (ADR-0007 R3) -- hence `moneySchema`, which
+ * default to 0 in the total (ADR-0008 R3) -- hence `moneySchema`, which
  * normalises `""` to null rather than failing the form.
  */
 export const financialRecordFormSchema = z.object({

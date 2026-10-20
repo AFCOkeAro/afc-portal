@@ -96,7 +96,12 @@ export default defineEventHandler(async (event): Promise<DashboardData> => {
     trendSessions,
     welfareCases,
   ] = await Promise.all([
-    countItems(event, scope, 'people', mergeFilters({ status: { _eq: 'active' } }, branchFilter)),
+    countItems(
+      event,
+      scope,
+      'people',
+      mergeFilters({ status: { _eq: 'active' } }, branchFilter),
+    ),
     listItems<Record<string, unknown>>(event, scope, 'branches', {
       filter: mergeFilters({ status: { _eq: 'active' } }, branchFilter),
       fields: ['id', 'name', 'code', 'branch_type', 'status'],
@@ -113,50 +118,37 @@ export default defineEventHandler(async (event): Promise<DashboardData> => {
       limit: 5,
     }),
     listItems<VisitorRow>(event, scope, 'visitors', {
-      filter: mergeFilters(
-        { status: { _in: ['new', 'follow_up'] } },
-        branchFilter,
-      ),
+      filter: mergeFilters({ status: { _in: ['new', 'follow_up'] } }, branchFilter),
       fields: VISITOR_FIELDS,
       sort: 'next_follow_up_date,visit_date',
       limit: 5,
     }),
-    listItems<{ headcount_total: number | null }>(
-      event,
-      scope,
-      'attendance_sessions',
-      {
-        filter: mergeFilters(
-          {
-            session_date: {
-              _gte: dateDaysAgo(30),
-              _lte: dateDaysAgo(0),
-            },
+    listItems<{ headcount_total: number | null }>(event, scope, 'attendance_sessions', {
+      filter: mergeFilters(
+        {
+          session_date: {
+            _gte: dateDaysAgo(30),
+            _lte: dateDaysAgo(0),
           },
-          branchFilter,
-        ),
-        fields: ['headcount_total'],
-        limit: -1,
-      },
-    ),
-    listItems<{ headcount_total: number | null }>(
-      event,
-      scope,
-      'attendance_sessions',
-      {
-        filter: mergeFilters(
-          {
-            session_date: {
-              _gte: dateDaysAgo(60),
-              _lt: dateDaysAgo(30),
-            },
+        },
+        branchFilter,
+      ),
+      fields: ['headcount_total'],
+      limit: -1,
+    }),
+    listItems<{ headcount_total: number | null }>(event, scope, 'attendance_sessions', {
+      filter: mergeFilters(
+        {
+          session_date: {
+            _gte: dateDaysAgo(60),
+            _lt: dateDaysAgo(30),
           },
-          branchFilter,
-        ),
-        fields: ['headcount_total'],
-        limit: -1,
-      },
-    ),
+        },
+        branchFilter,
+      ),
+      fields: ['headcount_total'],
+      limit: -1,
+    }),
     listItems<{
       id: string | number
       session_date: string
@@ -222,9 +214,7 @@ export default defineEventHandler(async (event): Promise<DashboardData> => {
     .map((session) => ({
       date: session.session_date,
       total: Number(session.headcount_total ?? 0),
-      branch_name: session.branch
-        ? (names.get(String(session.branch)) ?? null)
-        : null,
+      branch_name: session.branch ? (names.get(String(session.branch)) ?? null) : null,
     }))
 
   const upcomingRegistrationCounts = new Map<string, number>()

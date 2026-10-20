@@ -147,7 +147,12 @@ async function submit(): Promise<void> {
   >
     <template #body>
       <form class="space-y-4" novalidate @submit.prevent="submit">
-        <UAlert v-if="formError" color="error" variant="subtle" :description="formError" />
+        <UAlert
+          v-if="formError"
+          color="error"
+          variant="subtle"
+          :description="formError"
+        />
 
         <div class="grid gap-4 sm:grid-cols-2">
           <UFormField label="First name" required :error="fieldErrors.visitor_first_name">
@@ -160,7 +165,12 @@ async function submit(): Promise<void> {
 
         <div class="grid gap-4 sm:grid-cols-2">
           <UFormField label="Phone" :error="fieldErrors.phone">
-            <UInput v-model="form.phone" type="tel" class="w-full" placeholder="08012345678" />
+            <UInput
+              v-model="form.phone"
+              type="tel"
+              class="w-full"
+              placeholder="08012345678"
+            />
           </UFormField>
           <UFormField label="Email" :error="fieldErrors.email">
             <UInput v-model="form.email" type="email" class="w-full" />
@@ -190,7 +200,11 @@ async function submit(): Promise<void> {
             <UInput v-model="form.invited_by" class="w-full" placeholder="Optional" />
           </UFormField>
           <UFormField label="Follow-up owner" :error="fieldErrors.follow_up_owner">
-            <UInput v-model="form.follow_up_owner" class="w-full" placeholder="Optional" />
+            <UInput
+              v-model="form.follow_up_owner"
+              class="w-full"
+              placeholder="Optional"
+            />
           </UFormField>
         </div>
 

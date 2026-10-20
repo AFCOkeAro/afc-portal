@@ -12,10 +12,12 @@ const showEdit = ref(false)
 const savingStatus = ref(false)
 const actionError = ref('')
 
-const { data: event, pending, error, refresh } = await useAsyncData(
-  `event-${id}`,
-  () => api.get<EventDetail>(`/api/events/${id}`),
-)
+const {
+  data: event,
+  pending,
+  error,
+  refresh,
+} = await useAsyncData(`event-${id}`, () => api.get<EventDetail>(`/api/events/${id}`))
 
 const branches = await useAsyncData('events-branches', () =>
   api.get<BranchSummary[]>('/api/branches'),
@@ -72,7 +74,8 @@ async function setStatus(status: 'published' | 'closed' | 'cancelled'): Promise<
     await api.patch(`/api/events/${id}`, { status })
     await refresh()
   } catch (cause) {
-    actionError.value = (cause as { message?: string }).message ?? 'Could not update event'
+    actionError.value =
+      (cause as { message?: string }).message ?? 'Could not update event'
   } finally {
     savingStatus.value = false
   }
@@ -105,7 +108,10 @@ async function setStatus(status: 'published' | 'closed' | 'cancelled'): Promise<
     />
 
     <template v-else-if="event">
-      <PageHeader :title="event.title" :description="`${event.event_type} · ${event.branch_name || 'Area-wide'}`">
+      <PageHeader
+        :title="event.title"
+        :description="`${event.event_type} · ${event.branch_name || 'Area-wide'}`"
+      >
         <template #actions>
           <UButton
             v-if="canExport"
@@ -122,7 +128,13 @@ async function setStatus(status: 'published' | 'closed' | 'cancelled'): Promise<
         </template>
       </PageHeader>
 
-      <UAlert v-if="actionError" class="mb-4" color="error" variant="subtle" :description="actionError" />
+      <UAlert
+        v-if="actionError"
+        class="mb-4"
+        color="error"
+        variant="subtle"
+        :description="actionError"
+      />
       <UAlert
         v-if="restrictedMessage"
         class="mb-4"
@@ -134,8 +146,16 @@ async function setStatus(status: 'published' | 'closed' | 'cancelled'): Promise<
       />
 
       <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Registered" :value="event.registered_count" :hint="event.capacity ? `Capacity ${event.capacity}` : 'Unlimited capacity'" />
-        <StatCard label="Confirmed" :value="event.confirmed_count" hint="Confirmed registrations" />
+        <StatCard
+          label="Registered"
+          :value="event.registered_count"
+          :hint="event.capacity ? `Capacity ${event.capacity}` : 'Unlimited capacity'"
+        />
+        <StatCard
+          label="Confirmed"
+          :value="event.confirmed_count"
+          hint="Confirmed registrations"
+        />
         <StatCard label="Attended" :value="event.attended_count" hint="Marked attended" />
         <StatCard label="Status" :value="event.status" :hint="event.visibility" />
       </div>
@@ -144,33 +164,89 @@ async function setStatus(status: 'published' | 'closed' | 'cancelled'): Promise<
         <UCard>
           <template #header><h2 class="text-base font-semibold">Schedule</h2></template>
           <dl class="space-y-3 text-sm">
-            <div><dt class="text-gray-500 dark:text-gray-400">Starts</dt><dd>{{ formatDateTime(event.start_at) }}</dd></div>
-            <div><dt class="text-gray-500 dark:text-gray-400">Ends</dt><dd>{{ formatDateTime(event.end_at) }}</dd></div>
-            <div><dt class="text-gray-500 dark:text-gray-400">Location</dt><dd>{{ event.location || '—' }}</dd></div>
-            <div v-if="event.address"><dt class="text-gray-500 dark:text-gray-400">Address</dt><dd class="whitespace-pre-line">{{ event.address }}</dd></div>
+            <div>
+              <dt class="text-gray-500 dark:text-gray-400">Starts</dt>
+              <dd>{{ formatDateTime(event.start_at) }}</dd>
+            </div>
+            <div>
+              <dt class="text-gray-500 dark:text-gray-400">Ends</dt>
+              <dd>{{ formatDateTime(event.end_at) }}</dd>
+            </div>
+            <div>
+              <dt class="text-gray-500 dark:text-gray-400">Location</dt>
+              <dd>{{ event.location || '—' }}</dd>
+            </div>
+            <div v-if="event.address">
+              <dt class="text-gray-500 dark:text-gray-400">Address</dt>
+              <dd class="whitespace-pre-line">{{ event.address }}</dd>
+            </div>
           </dl>
         </UCard>
 
         <UCard>
-          <template #header><h2 class="text-base font-semibold">Registration</h2></template>
+          <template #header
+            ><h2 class="text-base font-semibold">Registration</h2></template
+          >
           <dl class="space-y-3 text-sm">
-            <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400">Registration open</dt><dd>{{ event.registration_open ? 'Yes' : 'No' }}</dd></div>
-            <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400">Opens</dt><dd class="text-right">{{ formatDateTime(event.registration_opens_at) }}</dd></div>
-            <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400">Closes</dt><dd class="text-right">{{ formatDateTime(event.registration_closes_at) }}</dd></div>
-            <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400">Fee</dt><dd>{{ event.fee_amount ? `${event.fee_amount} ${event.currency ?? ''}` : 'Free' }}</dd></div>
-            <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400">Waitlist</dt><dd>{{ event.waitlist_enabled ? 'Enabled' : 'Off' }}</dd></div>
+            <div class="flex justify-between gap-3">
+              <dt class="text-gray-500 dark:text-gray-400">Registration open</dt>
+              <dd>{{ event.registration_open ? 'Yes' : 'No' }}</dd>
+            </div>
+            <div class="flex justify-between gap-3">
+              <dt class="text-gray-500 dark:text-gray-400">Opens</dt>
+              <dd class="text-right">
+                {{ formatDateTime(event.registration_opens_at) }}
+              </dd>
+            </div>
+            <div class="flex justify-between gap-3">
+              <dt class="text-gray-500 dark:text-gray-400">Closes</dt>
+              <dd class="text-right">
+                {{ formatDateTime(event.registration_closes_at) }}
+              </dd>
+            </div>
+            <div class="flex justify-between gap-3">
+              <dt class="text-gray-500 dark:text-gray-400">Fee</dt>
+              <dd>
+                {{
+                  event.fee_amount
+                    ? `${event.fee_amount} ${event.currency ?? ''}`
+                    : 'Free'
+                }}
+              </dd>
+            </div>
+            <div class="flex justify-between gap-3">
+              <dt class="text-gray-500 dark:text-gray-400">Waitlist</dt>
+              <dd>{{ event.waitlist_enabled ? 'Enabled' : 'Off' }}</dd>
+            </div>
           </dl>
         </UCard>
 
         <UCard>
-          <template #header><h2 class="text-base font-semibold">Eligibility</h2></template>
+          <template #header
+            ><h2 class="text-base font-semibold">Eligibility</h2></template
+          >
           <dl class="space-y-3 text-sm">
-            <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400">Age range</dt><dd>{{ event.age_min ?? 'Any' }} – {{ event.age_max ?? 'Any' }}</dd></div>
-            <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400">Guardian consent</dt><dd>{{ event.requires_guardian_consent ? 'Required' : 'Not required' }}</dd></div>
-            <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400">Medical data</dt><dd>{{ event.collect_medical ? 'Collected' : 'Not collected' }}</dd></div>
-            <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400">Visibility</dt><dd class="capitalize">{{ event.visibility }}</dd></div>
+            <div class="flex justify-between gap-3">
+              <dt class="text-gray-500 dark:text-gray-400">Age range</dt>
+              <dd>{{ event.age_min ?? 'Any' }} – {{ event.age_max ?? 'Any' }}</dd>
+            </div>
+            <div class="flex justify-between gap-3">
+              <dt class="text-gray-500 dark:text-gray-400">Guardian consent</dt>
+              <dd>{{ event.requires_guardian_consent ? 'Required' : 'Not required' }}</dd>
+            </div>
+            <div class="flex justify-between gap-3">
+              <dt class="text-gray-500 dark:text-gray-400">Medical data</dt>
+              <dd>{{ event.collect_medical ? 'Collected' : 'Not collected' }}</dd>
+            </div>
+            <div class="flex justify-between gap-3">
+              <dt class="text-gray-500 dark:text-gray-400">Visibility</dt>
+              <dd class="capitalize">{{ event.visibility }}</dd>
+            </div>
           </dl>
-          <div v-if="canEdit" class="mt-4 flex flex-wrap gap-2 border-t border-gray-100 pt-4 dark:border-gray-800">
+          <div
+            v-if="canEdit"
+            class="mt-4 flex flex-wrap gap-2 border-t border-gray-100 pt-4 dark:border-gray-800"
+          >
             <UButton
               v-if="event.status !== 'published'"
               size="xs"
@@ -227,7 +303,9 @@ async function setStatus(status: 'published' | 'closed' | 'cancelled'): Promise<
         <div v-else class="overflow-x-auto">
           <table class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
             <thead>
-              <tr class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+              <tr
+                class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400"
+              >
                 <th class="px-3 py-2 font-medium">Ticket</th>
                 <th class="px-3 py-2 font-medium">Name</th>
                 <th class="px-3 py-2 font-medium">Contact</th>
@@ -239,25 +317,43 @@ async function setStatus(status: 'published' | 'closed' | 'cancelled'): Promise<
             </thead>
             <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
               <tr v-for="registration in event.registrations" :key="registration.id">
-                <td class="px-3 py-3 font-mono text-xs">{{ registration.ticket_code || '—' }}</td>
+                <td class="px-3 py-3 font-mono text-xs">
+                  {{ registration.ticket_code || '—' }}
+                </td>
                 <td class="px-3 py-3">
                   <p class="font-medium">{{ registration.person_name }}</p>
-                  <p class="text-xs text-gray-500 dark:text-gray-400">{{ registration.email || registration.phone || '' }}</p>
+                  <p class="text-xs text-gray-500 dark:text-gray-400">
+                    {{ registration.email || registration.phone || '' }}
+                  </p>
                 </td>
                 <td class="px-3 py-3 text-gray-600 dark:text-gray-300">
                   {{ registration.guardian_name || '—' }}
                 </td>
-                <td class="px-3 py-3 capitalize text-gray-600 dark:text-gray-300">{{ registration.age_group }}</td>
-                <td v-if="medicalVisible" class="px-3 py-3 text-gray-600 dark:text-gray-300">
+                <td class="px-3 py-3 capitalize text-gray-600 dark:text-gray-300">
+                  {{ registration.age_group }}
+                </td>
+                <td
+                  v-if="medicalVisible"
+                  class="px-3 py-3 text-gray-600 dark:text-gray-300"
+                >
                   <p>{{ registration.allergies || 'No allergies' }}</p>
-                  <p class="text-xs text-gray-500 dark:text-gray-400">{{ registration.medical_notes || '' }}</p>
+                  <p class="text-xs text-gray-500 dark:text-gray-400">
+                    {{ registration.medical_notes || '' }}
+                  </p>
                 </td>
                 <td class="px-3 py-3 text-gray-600 dark:text-gray-300">
                   {{ registration.payment_status || '—' }}
-                  <span v-if="registration.amount_paid"> · {{ registration.amount_paid }}</span>
+                  <span v-if="registration.amount_paid">
+                    · {{ registration.amount_paid }}</span
+                  >
                 </td>
                 <td class="px-3 py-3">
-                  <UBadge :color="registrationColor[registration.registration_status] ?? 'neutral'" variant="subtle">
+                  <UBadge
+                    :color="
+                      registrationColor[registration.registration_status] ?? 'neutral'
+                    "
+                    variant="subtle"
+                  >
                     {{ registration.registration_status.replace(/_/g, ' ') }}
                   </UBadge>
                 </td>

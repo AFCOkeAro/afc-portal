@@ -166,7 +166,9 @@ const statusColor: Record<string, 'success' | 'warning' | 'neutral' | 'error'> =
       <div v-else class="mt-4 overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
           <thead>
-            <tr class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+            <tr
+              class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400"
+            >
               <th class="px-3 py-2 font-medium">Event</th>
               <th class="px-3 py-2 font-medium">Starts</th>
               <th class="px-3 py-2 font-medium">Branch</th>
@@ -199,7 +201,8 @@ const statusColor: Record<string, 'success' | 'warning' | 'neutral' | 'error'> =
                 {{ event.branch_name || 'Area-wide' }}
               </td>
               <td class="px-3 py-3 tabular-nums text-gray-600 dark:text-gray-300">
-                {{ event.registered_count }}<span v-if="event.capacity"> / {{ event.capacity }}</span>
+                {{ event.registered_count
+                }}<span v-if="event.capacity"> / {{ event.capacity }}</span>
               </td>
               <td class="px-3 py-3">
                 <UBadge :color="statusColor[event.status] ?? 'neutral'" variant="subtle">

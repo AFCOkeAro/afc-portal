@@ -83,9 +83,7 @@ export default defineEventHandler(async (event) => {
     return stripHidden(scope, 'people', {
       ...record,
       id: String(record.id),
-      branch_name: record.branch
-        ? (names.get(String(record.branch)) ?? null)
-        : null,
+      branch_name: record.branch ? (names.get(String(record.branch)) ?? null) : null,
       age: isHidden(scope, 'people', 'date_of_birth')
         ? null
         : ageFromDob(record.date_of_birth as string | null | undefined),

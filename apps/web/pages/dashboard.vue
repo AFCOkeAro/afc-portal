@@ -7,14 +7,11 @@ definePageMeta({ middleware: 'staff' })
 const api = useApi()
 const permissions = usePermissions()
 
-const { data, pending, error, refresh } = await useAsyncData(
-  'dashboard',
-  () => api.get<DashboardData>('/api/dashboard'),
+const { data, pending, error, refresh } = await useAsyncData('dashboard', () =>
+  api.get<DashboardData>('/api/dashboard'),
 )
 
-const canWelfare = computed(() =>
-  permissions.can(COLLECTIONS.welfareCases, 'read'),
-)
+const canWelfare = computed(() => permissions.can(COLLECTIONS.welfareCases, 'read'))
 
 const attendanceChange = computed(() => {
   const current = data.value?.metrics.attendanceCurrent ?? 0
@@ -52,7 +49,11 @@ function formatDate(value: string | null | undefined): string {
   <div>
     <PageHeader
       title="Dashboard"
-      :description="data ? `${data.scope.label} · ${data.scope.branchCount} branches in scope` : 'Loading the current picture.'"
+      :description="
+        data
+          ? `${data.scope.label} · ${data.scope.branchCount} branches in scope`
+          : 'Loading the current picture.'
+      "
     >
       <template #actions>
         <UButton
@@ -81,7 +82,11 @@ function formatDate(value: string | null | undefined): string {
     <template v-else-if="data">
       <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <NuxtLink to="/people" class="block transition hover:-translate-y-0.5">
-          <StatCard label="People" :value="data.metrics.people" hint="Active records in scope" />
+          <StatCard
+            label="People"
+            :value="data.metrics.people"
+            hint="Active records in scope"
+          />
         </NuxtLink>
         <NuxtLink to="/events" class="block transition hover:-translate-y-0.5">
           <StatCard
@@ -107,11 +112,23 @@ function formatDate(value: string | null | undefined): string {
       </div>
 
       <div class="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <NuxtLink v-if="canWelfare" to="/welfare" class="block transition hover:-translate-y-0.5">
-          <StatCard label="Open welfare" :value="data.metrics.openWelfare" hint="Open and in-progress cases" />
+        <NuxtLink
+          v-if="canWelfare"
+          to="/welfare"
+          class="block transition hover:-translate-y-0.5"
+        >
+          <StatCard
+            label="Open welfare"
+            :value="data.metrics.openWelfare"
+            hint="Open and in-progress cases"
+          />
         </NuxtLink>
         <NuxtLink to="/people?status=all" class="block transition hover:-translate-y-0.5">
-          <StatCard label="Branches" :value="data.scope.branchCount" hint="Active branches in scope" />
+          <StatCard
+            label="Branches"
+            :value="data.scope.branchCount"
+            hint="Active branches in scope"
+          />
         </NuxtLink>
       </div>
 
@@ -139,12 +156,16 @@ function formatDate(value: string | null | undefined): string {
               class="flex min-w-8 flex-1 flex-col items-center justify-end gap-1"
               :title="`${point.date}: ${point.total}${point.branch_name ? ` · ${point.branch_name}` : ''}`"
             >
-              <span class="text-[10px] tabular-nums text-gray-500 dark:text-gray-400">{{ point.total }}</span>
+              <span class="text-[10px] tabular-nums text-gray-500 dark:text-gray-400">{{
+                point.total
+              }}</span>
               <div
                 class="w-full rounded-t bg-primary-500/80 transition hover:bg-primary-600"
                 :style="{ height: `${Math.max(4, (point.total / trendMax) * 170)}px` }"
               />
-              <span class="whitespace-nowrap text-[10px] text-gray-400">{{ point.date.slice(5) }}</span>
+              <span class="whitespace-nowrap text-[10px] text-gray-400">{{
+                point.date.slice(5)
+              }}</span>
             </div>
           </div>
         </UCard>
@@ -153,16 +174,30 @@ function formatDate(value: string | null | undefined): string {
           <template #header>
             <div class="flex items-center justify-between">
               <h2 class="text-base font-semibold">Next events</h2>
-              <UButton to="/events" color="neutral" variant="ghost" size="xs" label="All" />
+              <UButton
+                to="/events"
+                color="neutral"
+                variant="ghost"
+                size="xs"
+                label="All"
+              />
             </div>
           </template>
-          <EmptyState v-if="data.upcomingEvents.length === 0" title="Nothing scheduled" description="No published events in the coming weeks." />
+          <EmptyState
+            v-if="data.upcomingEvents.length === 0"
+            title="Nothing scheduled"
+            description="No published events in the coming weeks."
+          />
           <ul v-else class="space-y-3">
             <li v-for="event in data.upcomingEvents" :key="event.id">
-              <NuxtLink :to="`/events/${event.id}`" class="block rounded-lg p-2 hover:bg-gray-50 dark:hover:bg-gray-900">
+              <NuxtLink
+                :to="`/events/${event.id}`"
+                class="block rounded-lg p-2 hover:bg-gray-50 dark:hover:bg-gray-900"
+              >
                 <p class="text-sm font-medium">{{ event.title }}</p>
                 <p class="text-xs text-gray-500 dark:text-gray-400">
-                  {{ formatDateTime(event.start_at) }} · {{ event.registered_count }} registered
+                  {{ formatDateTime(event.start_at) }} ·
+                  {{ event.registered_count }} registered
                 </p>
               </NuxtLink>
             </li>
@@ -175,22 +210,42 @@ function formatDate(value: string | null | undefined): string {
           <template #header>
             <div class="flex items-center justify-between">
               <h2 class="text-base font-semibold">Follow-ups</h2>
-              <UButton to="/visitors" color="neutral" variant="ghost" size="xs" label="All" />
+              <UButton
+                to="/visitors"
+                color="neutral"
+                variant="ghost"
+                size="xs"
+                label="All"
+              />
             </div>
           </template>
-          <EmptyState v-if="data.followUps.length === 0" title="No open follow-ups" description="Every visitor has a next step recorded." />
+          <EmptyState
+            v-if="data.followUps.length === 0"
+            title="No open follow-ups"
+            description="Every visitor has a next step recorded."
+          />
           <ul v-else class="divide-y divide-gray-100 dark:divide-gray-800">
-            <li v-for="visitor in data.followUps" :key="visitor.id" class="py-3 first:pt-0 last:pb-0">
-              <NuxtLink :to="`/visitors/${visitor.id}`" class="flex items-start justify-between gap-3">
+            <li
+              v-for="visitor in data.followUps"
+              :key="visitor.id"
+              class="py-3 first:pt-0 last:pb-0"
+            >
+              <NuxtLink
+                :to="`/visitors/${visitor.id}`"
+                class="flex items-start justify-between gap-3"
+              >
                 <div>
                   <p class="text-sm font-medium">
                     {{ visitor.visitor_first_name }} {{ visitor.visitor_last_name }}
                   </p>
                   <p class="text-xs text-gray-500 dark:text-gray-400">
-                    Visited {{ formatDate(visitor.visit_date) }} · {{ visitor.branch_name || 'No branch' }}
+                    Visited {{ formatDate(visitor.visit_date) }} ·
+                    {{ visitor.branch_name || 'No branch' }}
                   </p>
                 </div>
-                <UBadge color="warning" variant="subtle">{{ visitor.status.replace(/_/g, ' ') }}</UBadge>
+                <UBadge color="warning" variant="subtle">{{
+                  visitor.status.replace(/_/g, ' ')
+                }}</UBadge>
               </NuxtLink>
             </li>
           </ul>
@@ -200,20 +255,40 @@ function formatDate(value: string | null | undefined): string {
           <template #header>
             <div class="flex items-center justify-between">
               <h2 class="text-base font-semibold">Welfare cases</h2>
-              <UButton to="/welfare" color="neutral" variant="ghost" size="xs" label="All" />
+              <UButton
+                to="/welfare"
+                color="neutral"
+                variant="ghost"
+                size="xs"
+                label="All"
+              />
             </div>
           </template>
-          <EmptyState v-if="data.welfareCases.length === 0" title="No open cases" description="No welfare case needs attention right now." />
+          <EmptyState
+            v-if="data.welfareCases.length === 0"
+            title="No open cases"
+            description="No welfare case needs attention right now."
+          />
           <ul v-else class="divide-y divide-gray-100 dark:divide-gray-800">
-            <li v-for="welfareCase in data.welfareCases" :key="welfareCase.id" class="py-3 first:pt-0 last:pb-0">
-              <NuxtLink :to="`/welfare/${welfareCase.id}`" class="flex items-start justify-between gap-3">
+            <li
+              v-for="welfareCase in data.welfareCases"
+              :key="welfareCase.id"
+              class="py-3 first:pt-0 last:pb-0"
+            >
+              <NuxtLink
+                :to="`/welfare/${welfareCase.id}`"
+                class="flex items-start justify-between gap-3"
+              >
                 <div>
                   <p class="font-mono text-xs font-medium">{{ welfareCase.case_ref }}</p>
                   <p class="text-xs text-gray-500 dark:text-gray-400">
-                    {{ welfareCase.category }} · {{ welfareCase.branch_name || 'No branch' }}
+                    {{ welfareCase.category }} ·
+                    {{ welfareCase.branch_name || 'No branch' }}
                   </p>
                 </div>
-                <UBadge color="warning" variant="subtle">{{ (welfareCase.status ?? 'open').replace(/_/g, ' ') }}</UBadge>
+                <UBadge color="warning" variant="subtle">{{
+                  (welfareCase.status ?? 'open').replace(/_/g, ' ')
+                }}</UBadge>
               </NuxtLink>
             </li>
           </ul>

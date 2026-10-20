@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import { welfareContributionFormSchema } from '@afc/shared'
 import {
   createItem,
   findScopedItem,
@@ -6,19 +6,6 @@ import {
   requireCan,
   throwValidation,
 } from '../../../utils/portal'
-
-const contributionSchema = z.object({
-  contribution_type: z.enum(['cash', 'goods', 'service']).default('cash'),
-  amount: z
-    .string()
-    .trim()
-    .regex(/^\d+(\.\d{1,2})?$/, 'Expected a decimal amount')
-    .optional()
-    .or(z.literal('')),
-  description: z.string().trim().max(4000).optional(),
-  contributor: z.string().trim().max(200).optional(),
-  status: z.enum(['pending', 'approved', 'disbursed']).default('pending'),
-})
 
 export default defineEventHandler(async (event) => {
   const scope = await getPortalScope(event)
@@ -28,10 +15,10 @@ export default defineEventHandler(async (event) => {
   if (!id) throw createError({ statusCode: 400, statusMessage: 'A case id is required' })
   await findScopedItem(event, scope, 'welfare_cases', id, { fields: ['id'] })
 
-  const parsed = contributionSchema.safeParse(await readBody(event))
+  const parsed = welfareContributionFormSchema.safeParse(await readBody(event))
   if (!parsed.success) throwValidation(parsed.error)
   const form = parsed.data
-  const amount = form.amount && form.amount !== '' ? form.amount : null
+  const amount = form.amount ?? null
   if (!amount && form.contribution_type === 'cash') {
     throw createError({
       statusCode: 400,
