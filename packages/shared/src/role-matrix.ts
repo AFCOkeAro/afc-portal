@@ -360,6 +360,111 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     volunteer: [R, 'own_branch'],
     none: [NONE, 'none'],
   },
+  // Campus care (AFC-483, data-model-expansion §11). `zone_admin` is not a
+  // StaffRole, so the zone column's grant lives in the Directus policy only;
+  // the cells below give the closest portal-role reading and never invent a
+  // wider grant. campusInstitutions keeps the Slice 1 read-only posture (the
+  // migration leaves its SELECT-only ceiling intact and suite 70.4 pins it),
+  // even though §11 names CRUD for super/area admin -- a wider cell would
+  // claim a write the database refuses with 42501.
+  [COLLECTIONS.campusStudents]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [ALL, 'all'],
+    branch_admin: [ALL, 'own_branch', 'CRUD (own)'],
+    department_leader: [CRU, 'own_department', 'CRU (campus)'],
+    volunteer: [R, 'own_branch', 'R (assigned)'],
+    none: [NONE, 'none'],
+  },
+  [COLLECTIONS.coachingProgrammes]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [ALL, 'all'],
+    branch_admin: [ALL, 'own_branch', 'CRUD (own)'],
+    department_leader: [CRU, 'own_department', 'CRU (campus)'],
+    volunteer: [CRU, 'own_branch', 'CRU (assigned class)'],
+    none: [NONE, 'none'],
+  },
+  [COLLECTIONS.coachingTimetable]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [ALL, 'all'],
+    branch_admin: [ALL, 'own_branch', 'CRUD (own)'],
+    department_leader: [CRU, 'own_department', 'CRU (campus)'],
+    volunteer: [CRU, 'own_branch', 'CRU (assigned class)'],
+    none: [NONE, 'none'],
+  },
+  [COLLECTIONS.coachingFacilitators]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [ALL, 'all'],
+    branch_admin: [ALL, 'own_branch', 'CRUD (own)'],
+    department_leader: [CRU, 'own_department', 'CRU (campus)'],
+    volunteer: [CRU, 'own_branch', 'CRU (assigned class)'],
+    none: [NONE, 'none'],
+  },
+  [COLLECTIONS.coachingStudents]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [ALL, 'all'],
+    branch_admin: [ALL, 'own_branch', 'CRUD (own)'],
+    department_leader: [CRU, 'own_department', 'CRU (campus)'],
+    volunteer: [CRU, 'own_branch', 'CRU (assigned class)'],
+    none: [NONE, 'none'],
+  },
+  [COLLECTIONS.coachingClassAttendance]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [ALL, 'all'],
+    branch_admin: [ALL, 'own_branch', 'CRUD (own)'],
+    department_leader: [CRU, 'own_department', 'CRU (campus)'],
+    volunteer: [CRU, 'own_branch', 'CRU (assigned class)'],
+    none: [NONE, 'none'],
+  },
+  [COLLECTIONS.coachingProgress]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [ALL, 'all'],
+    branch_admin: [ALL, 'own_branch', 'CRUD (own)'],
+    department_leader: [CRU, 'own_department', 'CRU (campus)'],
+    volunteer: [CRU, 'own_branch', 'CRU (assigned class)'],
+    none: [NONE, 'none'],
+  },
+  [COLLECTIONS.examResults]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [ALL, 'all'],
+    branch_admin: [ALL, 'own_branch', 'CRUD (own)'],
+    department_leader: [CRU, 'own_department', 'CRU (campus)'],
+    volunteer: [CU, 'own_branch', 'C/U (own class)'],
+    none: [NONE, 'none'],
+  },
+  [COLLECTIONS.coachingResources]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [ALL, 'all'],
+    branch_admin: [ALL, 'own_branch', 'CRUD (own)'],
+    department_leader: [CRU, 'own_department', 'CRU (campus)'],
+    volunteer: [CRU, 'own_branch', 'CRU (assigned class)'],
+    none: [NONE, 'none'],
+  },
+  [COLLECTIONS.coachingFeedback]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [ALL, 'all'],
+    branch_admin: [ALL, 'own_branch', 'CRUD (own)'],
+    department_leader: [CRU, 'own_department', 'CRU (campus)'],
+    volunteer: [CRU, 'own_branch', 'CRU (assigned class)'],
+    none: [NONE, 'none'],
+  },
+  [COLLECTIONS.campusFinancialSupport]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [ALL, 'all'],
+    branch_admin: [CRU, 'own_branch', 'CRU (own)'],
+    department_leader: [R, 'own_department', 'R (campus)'],
+    volunteer: [NONE, 'none'],
+    none: [NONE, 'none'],
+  },
+  [COLLECTIONS.nyscStatusTransitions]: {
+    // Ratified NYSC graph, seeded by migration 0003; the routes read it,
+    // nobody writes it from the portal.
+    super_admin: [R, 'all'],
+    area_admin: [R, 'all'],
+    branch_admin: [R, 'own_zone', 'R'],
+    department_leader: [R, 'assigned_branches'],
+    volunteer: [R, 'own_branch'],
+    none: [NONE, 'none'],
+  },
   // Attendance split (AFC-468, data-model-expansion §11):
   // attendance_counts CRUD / CRUD / CRUD (zone) / CRUD (own) / CRU (dept) /
   // C/U (assigned). `zone_admin` is not a StaffRole, so the zone column has
@@ -559,6 +664,30 @@ const FIELD_RESTRICTIONS: Readonly<
     ],
     roles: ['super_admin', 'area_admin'],
     note: 'computed returns: area+, finance lead (not a staff_role; excluded)',
+  },
+  // Campus scores + support (AFC-483, data-model-expansion §11.1):
+  // coordinator, branch admin+, own student reads. Neither "campus
+  // coordinator" nor "own student" is a staff_role (same precedent as the
+  // safeguarding lead above): they grant nothing here, which errs towards
+  // hiding. Branch-admin-own scoping is record-level in the Directus policy.
+  // aggregate rides with scores (it is derived from them; showing it while
+  // hiding them would leak the same fact). coaching_progress score/max_score
+  // are deliberately NOT listed: §11.1 names campus_students/exam_results and
+  // support only, and the route policy still scopes progress reads.
+  [COLLECTIONS.campusStudents]: {
+    fields: ['financial_support_total'],
+    roles: ['super_admin', 'area_admin', 'branch_admin'],
+    note: 'derived total: branch admin (own records, enforced by policy), area+',
+  },
+  [COLLECTIONS.examResults]: {
+    fields: ['scores', 'aggregate'],
+    roles: ['super_admin', 'area_admin', 'branch_admin'],
+    note: 'scores: branch admin (own records, enforced by policy), area+',
+  },
+  [COLLECTIONS.campusFinancialSupport]: {
+    fields: ['amount'],
+    roles: ['super_admin', 'area_admin', 'branch_admin'],
+    note: 'amounts: branch admin (own records, enforced by policy), area+',
   },
   // Newcomer follow-up notes (AFC-471, data-model-v4 §5: restricted to
   // branch admin + assigned officer + area). Whole-field hiding here covers

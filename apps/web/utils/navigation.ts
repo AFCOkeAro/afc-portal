@@ -90,4 +90,11 @@ export const NAVIGATION: readonly NavigationItem[] = [
     requires: ['celebrations', 'read'],
     inSidebar: true,
   },
+  {
+    label: 'Campus',
+    to: '/campus',
+    icon: 'i-lucide-graduation-cap',
+    requires: ['coaching_programmes', 'read'],
+    inSidebar: true,
+  },
 ]

@@ -94,6 +94,26 @@ export const COLLECTIONS = {
    */
   personPreviousBranches: 'person_previous_branches',
   personMilestones: 'person_milestones',
+  /**
+   * Campus care (AFC-483, data-model-expansion §7).
+   * `campusInstitutions` graduates from reference-only (0002) to the §7.1
+   * field set; the rest are created by migration 0003_campus. Table names
+   * are the collection names 1:1 (exam_results is the spec-exact table).
+   * `nyscStatusTransitions` is SELECT-only reference the campus API reads
+   * to validate NYSC transitions.
+   */
+  campusStudents: 'campus_students',
+  coachingProgrammes: 'coaching_programmes',
+  coachingTimetable: 'coaching_timetable',
+  coachingFacilitators: 'coaching_facilitators',
+  coachingStudents: 'coaching_students',
+  coachingClassAttendance: 'coaching_class_attendance',
+  coachingProgress: 'coaching_progress',
+  examResults: 'exam_results',
+  coachingResources: 'coaching_resources',
+  coachingFeedback: 'coaching_feedback',
+  campusFinancialSupport: 'campus_financial_support',
+  nyscStatusTransitions: 'nysc_status_transitions',
 } as const
 
 export type CollectionName = (typeof COLLECTIONS)[keyof typeof COLLECTIONS]
