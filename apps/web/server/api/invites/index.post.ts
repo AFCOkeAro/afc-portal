@@ -14,8 +14,11 @@ import {
   readMemberLimits,
   redactInviteForMember,
   renderInvitePreview,
+  requiresGuardianBand,
   requireInviteCap,
   throwInviteValidation,
+  throwOnForgedInviterIdentity,
+  validateInviterNote,
 } from '../../utils/event-invites'
 import type { InviteRow } from '../../utils/event-invites'
 
@@ -31,6 +34,18 @@ import type { InviteRow } from '../../utils/event-invites'
  * Minor without a guardian number is rejected at creation (400, and the DB
  * CHECK pins it too). Staff cannot override an opt-out: blocked_optout rows
  * have no approval path (approve route refuses them).
+ *
+ * F3 (AFC-512, RECORDED GAP): the rolling count below (countInviterWindows)
+ * is a UX pre-check ONLY and the count-then-insert is a known TOCTOU: 20
+ * parallel submits can all read a below-limit count and all queue. Atomic
+ * enforcement (BEFORE INSERT trigger serialised per inviter+day, rewriting
+ * over-limit rows to blocked_rate_limit) is specified but NOT landed: the
+ * trigger would sit on event_invites (owned by AFC-480/0005) and its
+ * rollback drops a control whose referent survives, which the
+ * rollback-control gate refuses without a CTO-signed grandfather entry.
+ * Owner: CTO. Until that lands, the Flow/query count stays the UX
+ * pre-check and burst abuse is handled by branch-admin approval of the
+ * blocked rows, not by a race-free cap.
  */
 export default defineEventHandler(async (event) => {
   const scope = await getPortalScope(event)
@@ -38,6 +53,9 @@ export default defineEventHandler(async (event) => {
   requireInviteCap(caps, 'create', 'submit event invitations')
 
   const body = await readBody<Record<string, unknown>>(event)
+  // F2 (AFC-512 S8): inviter identity is session-derived; a body carrying
+  // inviter_* values is forgery -> 403, never silently overwritten.
+  throwOnForgedInviterIdentity(body)
   const eventId = typeof body.event === 'string' ? body.event : ''
   const inviteeName = typeof body.invitee_name === 'string' ? body.invitee_name.trim() : ''
   const phone = normalizeInvitePhone(body.invitee_phone)
@@ -45,7 +63,10 @@ export default defineEventHandler(async (event) => {
   const ageBand = typeof body.invitee_age_band === 'string' ? body.invitee_age_band : 'unknown'
   const guardian = normalizeInvitePhone(body.guardian_phone)
   const relationship = typeof body.invitee_relationship === 'string' ? body.invitee_relationship : null
-  const note = typeof body.inviter_note === 'string' ? body.inviter_note.trim().slice(0, 280) : ''
+  // F7: note bound to 140 chars, no URLs/phone numbers, delimited render.
+  const { note, error: noteError } = validateInviterNote(body.inviter_note)
+  // F5: explicit guardian attestation for child/teen/unknown, staff-confirmable.
+  const guardianAttested = body.guardian_attested === true
 
   const fields: Record<string, string> = {}
   if (!eventId) fields.event = 'Choose an event to invite to'
@@ -57,9 +78,14 @@ export default defineEventHandler(async (event) => {
   if (relationship !== null && !INVITE_RELATIONSHIPS.includes(relationship as never)) {
     fields.invitee_relationship = 'Pick a relationship or leave it blank'
   }
-  if (isMinorBand(ageBand) && !guardian) {
-    fields.guardian_phone = 'A guardian number is required for a child or teen invitee'
+  // F5: unknown defaults to the guardian path (never treated as adult).
+  if (requiresGuardianBand(ageBand) && !guardian) {
+    fields.guardian_phone = 'A guardian number is required for a child, teen or unknown-age invitee'
   }
+  if (isMinorBand(ageBand) && !guardianAttested) {
+    fields.guardian_attested = 'Confirm that a guardian agreed to this invitation so staff can verify it'
+  }
+  if (noteError) fields.inviter_note = noteError
   const inviterPerson = scope.session.user.personId
   if (!inviterPerson) {
     fields.inviter = 'Your login is not linked to a member record yet; ask your branch admin to link it'

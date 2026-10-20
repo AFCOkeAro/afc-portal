@@ -132,9 +132,18 @@ describe('preview route: exact text before queue, no write', () => {
     assert.match(src, /requireInviteCap\(caps, 'create', /)
   })
 
-  it('rejects minor invites without a guardian number', () => {
-    assert.match(src, /isMinorBand\(ageBand\) && !guardian/)
+  it('rejects minor and unknown-age invites without a guardian number (unknown defaults to guardian path)', () => {
+    assert.match(src, /requiresGuardianBand\(ageBand\) && !guardian/)
     assert.match(src, /guardian_phone/)
+  })
+
+  it('requires explicit guardian attestation and rejects forged inviter_* fields', () => {
+    assert.match(src, /guardian_attested/)
+    assert.match(src, /throwOnForgedInviterIdentity\(body\)/)
+  })
+
+  it('bounds the inviter note (140 chars, no URLs/phones)', () => {
+    assert.match(src, /validateInviterNote\(body\.inviter_note\)/)
   })
 
   it('refuses branch-private events to cross-branch inviters', () => {
@@ -160,8 +169,29 @@ describe('create route: gates with an auditable row each', () => {
     assert.match(src, /requireInviteCap\(caps, 'create', /)
   })
 
-  it('rejects minor invites without a guardian number', () => {
-    assert.match(src, /isMinorBand\(ageBand\) && !guardian/)
+  it('rejects minor and unknown-age invites without a guardian number (unknown defaults to guardian path)', () => {
+    assert.match(src, /requiresGuardianBand\(ageBand\) && !guardian/)
+    assert.match(src, /guardian_phone/)
+  })
+
+  it('requires explicit guardian attestation for child/teen so staff can confirm it', () => {
+    assert.match(src, /guardian_attested/)
+  })
+
+  it('rejects forged inviter_* fields with 403 instead of overwriting them', () => {
+    assert.match(src, /throwOnForgedInviterIdentity\(body\)/)
+  })
+
+  it('bounds the inviter note (140 chars, no URLs/phones) and renders it delimited', () => {
+    assert.match(src, /validateInviterNote\(body\.inviter_note\)/)
+    assert.match(src, /inviter_note/)
+  })
+
+  it('treats the rolling count as a UX pre-check with the atomic cap as a recorded CTO-owned gap (F3)', () => {
+    assert.match(src, /countInviterWindows/)
+    const raw = read('apps/web/server/api/invites/index.post.ts')
+    assert.match(raw, /TOCTOU/)
+    assert.match(raw, /Owner: CTO/)
   })
 
   it('records suppressed numbers as blocked_optout, never queued', () => {
@@ -295,5 +325,46 @@ describe('migration encodes the acceptance rule the routes read', () => {
     )
     assert.match(down, /refusing to roll back event invites/)
     assert.match(down, /DROP TABLE IF EXISTS event_invites/)
+  })
+})
+
+describe('AFC-512: quota TOCTOU recorded gap (F3)', () => {
+  const raw = read('apps/web/server/api/invites/index.post.ts')
+
+  it('names the count-then-insert as a UX pre-check only, with the atomic trigger as a recorded CTO-owned gap', () => {
+    assert.match(raw, /countInviterWindows/)
+    assert.match(raw, /TOCTOU/)
+    assert.match(raw, /Owner: CTO/)
+  })
+
+  it('does not ship a trigger migration without the rollback-gate grandfather sign-off', () => {
+    // The gate refuses a rollback that drops a control whose referent
+    // survives; landing the trigger needs a CTO-signed entry, so no
+    // 0016 trigger file may exist until then.
+    assert.doesNotMatch(raw, /event_invites_quota_atomic/)
+  })
+})
+
+describe('AFC-512: note hygiene + guardian helpers (F5/F7)', () => {
+  const source = codeOf('apps/web/server/utils/event-invites.ts')
+
+  it('requires a guardian for child, teen AND unknown (unknown defaults to guardian path)', () => {
+    assert.match(source, /requiresGuardianBand/)
+    assert.ok(source.includes("'unknown'"), 'unknown band named in the guardian rule')
+  })
+
+  it('bounds the note to 140 chars and rejects URLs and phone numbers', () => {
+    assert.match(source, /INVITER_NOTE_MAX_LENGTH = 140/)
+    assert.match(source, /https\?:/)
+  })
+
+  it('renders the note delimited from the official body', () => {
+    assert.match(source, /formatInviteNoteDelimited/)
+    assert.match(source, /Note from inviter/)
+  })
+
+  it('rejects forged inviter_* fields with 403', () => {
+    assert.match(source, /throwOnForgedInviterIdentity/)
+    assert.match(source, /inviter_identity_forged/)
   })
 })

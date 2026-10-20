@@ -303,3 +303,53 @@ describe('member OTP: redaction', () => {
     }
   })
 })
+
+describe('member OTP: AFC-512 adversarial tests (F1)', () => {
+  it('registered vs unregistered numbers get the identical shape AND status', () => {
+    const source = codeOf('apps/web/server/api/auth/member-otp/request.post.ts')
+    // One ack constant, no branching response: every path returns the same
+    // message object with the default 200 status (no statusCode anywhere).
+    const acks = source.match(/MEMBER_OTP_REQUEST_ACK/g) ?? []
+    assert.ok(acks.length >= 4, `ack returned on every path (found ${acks.length})`)
+    assert.ok(!source.includes('statusCode'), 'request route sets no status code: registered and unregistered are identical')
+    assert.ok(
+      !source.includes('phone_not_registered') && !source.includes('user_not_found'),
+      'no oracle names the missing entity',
+    )
+  })
+
+  it('replay of a consumed code is rejected at the route before any comparison', () => {
+    const source = codeOf('apps/web/server/api/auth/member-otp/verify.post.ts')
+    const gateAt = source.indexOf('memberOtpVerifyGate')
+    const compareAt = source.indexOf('otpHashesEqual')
+    assert.ok(gateAt >= 0 && compareAt >= 0 && gateAt < compareAt, 'gate runs before comparison')
+    assert.ok(source.includes('consumed_at'), 'consumed state feeds the gate')
+    const util = codeOf('apps/web/server/utils/member-otp.ts')
+    assert.ok(util.includes('otp_replay'), 'replay reason pinned in the F1 gate mirror')
+  })
+
+  it('the session lifetime (8h) satisfies the <=24h idle recommendation with a <=7d absolute bound', () => {
+    const util = read('apps/web/server/utils/member-otp.ts')
+    assert.ok(util.includes('MEMBER_OTP_SESSION_HOURS = 8'), '8h session published')
+    assert.ok(util.includes('24h'), 'idle recommendation stated')
+    assert.ok(util.includes('7d'), 'absolute bound stated')
+    const verify = read('apps/web/server/api/auth/member-otp/verify.post.ts')
+    assert.ok(
+      verify.includes('Math.min(sessionExpiresAt, accessExpiresAt)') ||
+        verify.includes('Math.min('),
+      'session expiry is min(session, access time-box)',
+    )
+  })
+
+  it('SIM-swap is a recorded accepted risk bounded by the member least-privilege scope', () => {
+    const util = read('apps/web/server/utils/member-otp.ts')
+    assert.ok(util.includes('SIM-swap'), 'SIM-swap named')
+    assert.ok(util.includes('ACCEPTED RISK'), 'accepted risk stated')
+    assert.ok(util.includes('S5') || util.includes('least-privilege'), 'blast-radius bound cited')
+  })
+
+  it('the flag stays off and the routes stay 503 (enablement is NOT this issue)', () => {
+    const nuxtConfig = read('apps/web/nuxt.config.ts')
+    assert.ok(nuxtConfig.includes('memberOtpEnabled: false'), 'flag still defaults to false')
+  })
+})

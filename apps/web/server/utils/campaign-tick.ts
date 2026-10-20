@@ -48,6 +48,7 @@ export type ExclusionReason =
   | 'quiet_hours'
   | 'fallback_too_soon'
   | 'duplicate'
+  | 'branch_mismatch'
 
 export interface DueEnrollment {
   enrollmentId: string
@@ -188,6 +189,48 @@ export function withinWeeklyCap(sendsThisWeek: number, cap: number = MARKETING_W
   return sendsThisWeek < cap
 }
 
+/**
+ * F6 audience scoping (AFC-512): intersect a saved audience (campaign_
+ * audiences.person_ids and the visitors_by_stage / celebrations_window /
+ * event_registrants sources) with the author's branch scope at resolution.
+ * Person ids outside the scope are never queued -- they are counted as
+ * branch_mismatch exclusions. Pure over inputs so the worker and the
+ * route share the rule; the caller supplies the scope as a set.
+ */
+export function resolveAudienceScope(
+  personIds: string[],
+  personBranchById: Record<string, string | null>,
+  scopeBranchIds: string[],
+  isAreaWide: boolean,
+): { inScope: string[], outOfScope: string[] } {
+  if (isAreaWide) return { inScope: [...personIds], outOfScope: [] }
+  const scope = new Set(scopeBranchIds)
+  const inScope: string[] = []
+  const outOfScope: string[] = []
+  for (const id of personIds) {
+    const branch = personBranchById[id] ?? null
+    if (branch !== null && scope.has(branch)) inScope.push(id)
+    else outOfScope.push(id)
+  }
+  return { inScope, outOfScope }
+}
+
+/**
+ * F8b positive-reply statement (AFC-512): positive-reply classification is
+ * EPHEMERAL -- it runs in memory during the tick to decide the next step
+ * and only the OUTCOME (enrollment state advance, follow-up task) is
+ * stored. No reply body, no classification label, and no score is written
+ * to any table. If a future change persists classification output, this
+ * comment and the no-body-storage claim in the docs must be updated first.
+ */
+export function classifyPositiveReplyEphemeral(
+  replyText: string | null | undefined,
+): 'positive' | 'neutral' {
+  const text = (replyText ?? '').toLowerCase()
+  if (/\b(yes|amen|attending|coming|interested|volunteer)\b/.test(text)) return 'positive'
+  return 'neutral'
+}
+
 /** Fallback due (mirrors campaign_fallback_due): at/after the window with no activity, never before. */
 export function fallbackDue(
   sentAt: Date | null,
@@ -208,8 +251,7 @@ export function fallbackAllowed(lastFallbackAt: Date | null, now: Date = new Dat
 }
 
 /** Per-campaign estimate: audience size times the channel unit cost. */
-export function estimateCost(audienceSize: number, unitCost: number): number {
-  if (audienceSize < 0 || unitCost < 0) {
+export function estimateCost(audienceSize: number, unitCost: number): number {  if (audienceSize < 0 || unitCost < 0) {
     throw new Error('campaign tick: audience and unit cost must be non-negative')
   }
   return audienceSize * unitCost

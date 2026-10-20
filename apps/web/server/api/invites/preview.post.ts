@@ -10,8 +10,11 @@ import {
   loadInviteEvent,
   normalizeInvitePhone,
   renderInvitePreview,
+  requiresGuardianBand,
   requireInviteCap,
   throwInviteValidation,
+  throwOnForgedInviterIdentity,
+  validateInviterNote,
 } from '../../utils/event-invites'
 
 /**
@@ -26,6 +29,8 @@ export default defineEventHandler(async (event) => {
   requireInviteCap(caps, 'create', 'preview event invitations')
 
   const body = await readBody<Record<string, unknown>>(event)
+  // F2 (AFC-512 S8): preview accepts no inviter_* fields either.
+  throwOnForgedInviterIdentity(body)
   const eventId = typeof body.event === 'string' ? body.event : ''
   const inviteeName = typeof body.invitee_name === 'string' ? body.invitee_name.trim() : ''
   const phone = normalizeInvitePhone(body.invitee_phone)
@@ -33,7 +38,8 @@ export default defineEventHandler(async (event) => {
   const ageBand = typeof body.invitee_age_band === 'string' ? body.invitee_age_band : 'unknown'
   const guardian = normalizeInvitePhone(body.guardian_phone)
   const relationship = typeof body.invitee_relationship === 'string' ? body.invitee_relationship : null
-  const note = typeof body.inviter_note === 'string' ? body.inviter_note.trim().slice(0, 280) : ''
+  const { note, error: noteError } = validateInviterNote(body.inviter_note)
+  const guardianAttested = body.guardian_attested === true
 
   const fields: Record<string, string> = {}
   if (!eventId) fields.event = 'Choose an event to invite to'
@@ -45,9 +51,14 @@ export default defineEventHandler(async (event) => {
   if (relationship !== null && !INVITE_RELATIONSHIPS.includes(relationship as never)) {
     fields.invitee_relationship = 'Pick a relationship or leave it blank'
   }
-  if (isMinorBand(ageBand) && !guardian) {
-    fields.guardian_phone = 'A guardian number is required for a child or teen invitee'
+  // F5: unknown defaults to the guardian path.
+  if (requiresGuardianBand(ageBand) && !guardian) {
+    fields.guardian_phone = 'A guardian number is required for a child, teen or unknown-age invitee'
   }
+  if (isMinorBand(ageBand) && !guardianAttested) {
+    fields.guardian_attested = 'Confirm that a guardian agreed to this invitation so staff can verify it'
+  }
+  if (noteError) fields.inviter_note = noteError
   if (Object.keys(fields).length > 0) throwInviteValidation(fields)
 
   const brief = await loadInviteEvent(event, scope, eventId)

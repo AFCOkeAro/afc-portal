@@ -242,3 +242,18 @@ describe('stubbed transports (procurement out of scope)', () => {
     assert.match(source, /providerReference: `stub:/)
   })
 })
+
+describe('AFC-512: branch-scope intersection (F6)', () => {
+  it('intersects saved audiences with the author branch scope at resolution', () => {
+    assert.match(source, /resolveAudienceScope/)
+    assert.match(source, /branch_mismatch/)
+  })
+})
+
+describe('AFC-512: positive-reply classification is ephemeral (F8b)', () => {
+  it('states in code that only the outcome is stored, never the body or label', () => {
+    assert.match(source, /EPHEMERAL/)
+    assert.match(source, /classifyPositiveReplyEphemeral/)
+    assert.doesNotMatch(source, /positive_reply_body|reply_body/)
+  })
+})

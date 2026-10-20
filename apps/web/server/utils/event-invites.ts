@@ -218,6 +218,73 @@ export function isMinorBand(band: string | null | undefined): boolean {
   return band === 'child' || band === 'teen'
 }
 
+/**
+ * F5 guardian rule (AFC-512): unknown age band defaults to the guardian
+ * path -- an invite whose age band is not provably adult travels with a
+ * guardian number and a staff-confirmable attestation. `youth` stays on
+ * the adult path (youth profiles are staff-managed, US-Y1); only
+ * child/teen/unknown require the guardian.
+ */
+export function requiresGuardianBand(band: string | null | undefined): boolean {
+  return band === 'child' || band === 'teen' || band === 'unknown'
+}
+
+/** F7: inviter note bound -- 140 chars, rendered delimited from the body. */
+export const INVITER_NOTE_MAX_LENGTH = 140
+
+const INVITER_NOTE_URL_RE = /(https?:\/\/|www\.)/i
+const INVITER_NOTE_PHONE_RE = /(\+?\d[\d\s\-().]{6,}\d)/
+
+/**
+ * F7 note hygiene: bounded length, no URLs, no phone numbers. Returns the
+ * trimmed note when clean, otherwise the caller records a validation
+ * field (the note is never silently stripped: a member who pastes a link
+ * learns why it was refused).
+ */
+export function validateInviterNote(note: unknown): { note: string, error: string | null } {
+  const text = typeof note === 'string' ? note.trim() : ''
+  if (!text) return { note: '', error: null }
+  if (text.length > INVITER_NOTE_MAX_LENGTH) {
+    return {
+      note: '',
+      error: `Keep the note to ${INVITER_NOTE_MAX_LENGTH} characters so it fits one message`,
+    }
+  }
+  if (INVITER_NOTE_URL_RE.test(text)) {
+    return { note: '', error: 'Links are not allowed in the note; the invitation carries the official RSVP link' }
+  }
+  if (INVITER_NOTE_PHONE_RE.test(text)) {
+    return { note: '', error: 'Phone numbers are not allowed in the note; the invitee number is already on the invitation' }
+  }
+  return { note: text, error: null }
+}
+
+/** F7: the note is delimited from the official body, never interpolated. */
+export function formatInviteNoteDelimited(note: string): string {
+  const text = note.trim()
+  if (!text) return ''
+  return ` — Note from inviter: "${text}"`
+}
+
+/**
+ * F2 forged-identity rejection (AFC-478 F2, AFC-512 S8): the invite routes
+ * accept NO inviter_* fields at all -- identity comes from the session
+ * only. A body carrying any of them is rejected with 403 (never silently
+ * overwritten: silent overwrite hides confused-deputy bugs, and a member
+ * creating an invite as another person gets 403).
+ */
+export function throwOnForgedInviterIdentity(body: Record<string, unknown>): void {
+  for (const field of ['inviter_person', 'inviter_user', 'inviter', 'inviter_id']) {
+    if (body[field] !== undefined && body[field] !== null && String(body[field]).trim() !== '') {
+      throw createError({
+        statusCode: 403,
+        statusMessage: 'Inviter identity comes from your login; do not send inviter fields',
+        data: { code: 'inviter_identity_forged', field },
+      })
+    }
+  }
+}
+
 export interface InvitePreviewVariables {
   invitee_name: string
   inviter_name: string
@@ -233,10 +300,12 @@ export interface InvitePreviewVariables {
  * Board sentence (prd-addendum-v4 §3.1) rendered before queue
  * (US-E1 AC2: the member sees the exact text before confirming, no blind
  * sends). Single send only: the route states that further messages need a
- * real consent grant (§3.3 -- no drip).
+ * real consent grant (§3.3 -- no drip). F7: the inviter note is appended
+ * delimited from the official body via formatInviteNoteDelimited, so a
+ * member note can never be mistaken for official instructions.
  */
 export function renderInvitePreview(vars: InvitePreviewVariables): string {
-  const note = vars.inviter_note.trim() ? ` ${vars.inviter_note.trim()}` : ''
+  const note = formatInviteNoteDelimited(vars.inviter_note ?? '')
   const location = vars.event_location.trim() ? ` at ${vars.event_location.trim()}` : ''
   return (
     `Dear ${vars.invitee_name}, ${vars.inviter_name} is inviting you to ` +
