@@ -24,39 +24,63 @@ const { data, pending } = await useAsyncData(
     api.get<{ data: Record<string, unknown>[] }>(`/api/calendar`, { query: query.value }),
   { watch: [query] },
 )
+
+const typeOptions = [
+  { label: 'All types', value: 'all' },
+  { label: 'Services', value: 'service' },
+  { label: 'Events', value: 'event' },
+  { label: 'Programmes', value: 'programme' },
+  { label: 'Celebrations', value: 'celebration' },
+]
+
+const rows = computed(() => data.value?.data ?? [])
 </script>
 
 <template>
-  <div class="mx-auto max-w-5xl px-4 py-8">
-    <h1 class="text-2xl font-semibold">Calendar</h1>
-    <p class="mt-2 text-sm text-gray-600">
-      Services, events, programmes and celebrations in your scope. Click an entry for its
-      detail.
-    </p>
-    <div class="mt-4 flex gap-2 text-sm">
-      <select v-model="itemType" class="rounded border px-2 py-1">
-        <option value="all">All types</option>
-        <option value="service">Services</option>
-        <option value="event">Events</option>
-        <option value="programme">Programmes</option>
-        <option value="celebration">Celebrations</option>
-      </select>
-      <input v-model="dateFrom" type="date" class="rounded border px-2 py-1" />
-      <input v-model="dateTo" type="date" class="rounded border px-2 py-1" />
-    </div>
-    <p v-if="pending" class="mt-4">Loading…</p>
-    <ul v-else class="mt-4">
-      <li
-        v-for="row in data?.data ?? []"
-        :key="`${row.item_type}-${String(row.id)}`"
-        class="border-t py-2 text-sm"
-      >
-        <span class="rounded bg-gray-100 px-1.5 py-0.5 text-xs">{{ row.item_type }}</span>
-        <NuxtLink :to="String(row.href ?? '#')" class="ml-2 font-medium text-blue-600">{{
-          row.title
-        }}</NuxtLink>
-        <span class="ml-2 text-gray-500">{{ row.date }}</span>
-      </li>
-    </ul>
+  <div>
+    <PageHeader
+      title="Calendar"
+      description="Services, events, programmes and celebrations in your scope. Select an entry for its detail."
+    />
+
+    <UCard>
+      <div class="grid gap-3 sm:grid-cols-3">
+        <USelect
+          v-model="itemType"
+          :items="typeOptions"
+          class="w-full"
+          aria-label="Filter by entry type"
+        />
+        <UInput v-model="dateFrom" type="date" class="w-full" aria-label="From date" />
+        <UInput v-model="dateTo" type="date" class="w-full" aria-label="To date" />
+      </div>
+
+      <div v-if="pending" class="mt-8 flex justify-center py-10">
+        <UIcon name="i-lucide-loader-circle" class="size-6 animate-spin text-gray-400" />
+      </div>
+
+      <EmptyState
+        v-else-if="rows.length === 0"
+        title="No calendar entries in this window"
+        description="Widen the dates or pick another entry type."
+      />
+
+      <ul v-else class="mt-4 divide-y divide-gray-100 dark:divide-gray-800">
+        <li
+          v-for="row in rows"
+          :key="`${row.item_type}-${String(row.id)}`"
+          class="flex flex-wrap items-center gap-x-3 gap-y-1 py-2.5 text-sm"
+        >
+          <UBadge color="neutral" variant="subtle">{{ row.item_type }}</UBadge>
+          <NuxtLink
+            :to="String(row.href ?? '#')"
+            class="font-medium text-gray-900 hover:text-primary-600 dark:text-white"
+          >
+            {{ row.title }}
+          </NuxtLink>
+          <span class="text-gray-500 dark:text-gray-400">{{ row.date }}</span>
+        </li>
+      </ul>
+    </UCard>
   </div>
 </template>

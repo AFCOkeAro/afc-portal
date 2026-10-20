@@ -6,6 +6,8 @@
  * session's capabilities allow. A volunteer sees four links and no Welfare; an
  * area admin sees all six. Nothing in this file names a role.
  */
+import type { NavigationItem } from '~/utils/navigation'
+
 const { user, logout } = useAuth()
 const permissions = usePermissions()
 
@@ -13,6 +15,18 @@ const items = computed(() =>
   NAVIGATION.filter(
     (item) => permissions.can(...item.requires) && item.inSidebar !== false,
   ),
+)
+
+/**
+ * Sidebar sections (AFC-549). Groups render in NAVIGATION_GROUPS order and
+ * groups with no permitted items are dropped, so capability-gating stays
+ * per item: a volunteer sees only the sections their grants allow.
+ */
+const sections = computed(() =>
+  NAVIGATION_GROUPS.map((group) => ({
+    ...group,
+    items: items.value.filter((item: NavigationItem) => item.group === group.key),
+  })).filter((section) => section.items.length > 0),
 )
 
 const initials = computed(() => {
@@ -35,18 +49,25 @@ const initials = computed(() => {
       </NuxtLink>
 
       <nav aria-label="Portal sections" class="px-3 pb-4 lg:pb-0">
-        <ul class="space-y-1">
-          <li v-for="item in items" :key="item.to">
-            <NuxtLink
-              :to="item.to"
-              class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-200 dark:text-gray-200 dark:hover:bg-gray-800"
-              active-class="bg-gray-200 font-medium text-gray-900 dark:bg-gray-800 dark:text-white"
-            >
-              <UIcon :name="item.icon" class="size-5 shrink-0" />
-              <span>{{ item.label }}</span>
-            </NuxtLink>
-          </li>
-        </ul>
+        <div v-for="section in sections" :key="section.key" class="mt-4 first:mt-1">
+          <p
+            class="px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400"
+          >
+            {{ section.label }}
+          </p>
+          <ul class="space-y-1">
+            <li v-for="item in section.items" :key="item.to">
+              <NuxtLink
+                :to="item.to"
+                class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-200 dark:text-gray-200 dark:hover:bg-gray-800"
+                active-class="bg-gray-200 font-medium text-gray-900 dark:bg-gray-800 dark:text-white"
+              >
+                <UIcon :name="item.icon" class="size-5 shrink-0" />
+                <span>{{ item.label }}</span>
+              </NuxtLink>
+            </li>
+          </ul>
+        </div>
 
         <p
           v-if="items.length === 0"

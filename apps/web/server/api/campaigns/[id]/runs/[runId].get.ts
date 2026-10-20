@@ -1,4 +1,9 @@
-import { findScopedItem, getPortalScope, requireCan } from '../../../../utils/portal'
+import {
+  findScopedItem,
+  getPortalScope,
+  requireCan,
+  throwStoreUnavailable,
+} from '../../../../utils/portal'
 
 /**
  * Campaign run report reads (AFC-527, US-C2, wireframes v3 screen 12).
@@ -55,29 +60,37 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'A run id is required' })
 
   // The campaign read is the scope gate: a branch session that cannot read
-  // the campaign cannot read its runs either.
-  const campaign = await findScopedItem<Record<string, unknown>>(
-    event,
-    scope,
-    'campaigns',
-    id,
-    {
-      fields: ['id', 'key', 'name', 'status', 'branch', 'consent_policy'],
-      scope: scope.isArea
-        ? undefined
-        : {
-            _or: [{ branch: { _in: scope.branchIds } }, { branch: { _null: true } }],
-          },
-    },
-  )
+  // the campaign cannot read its runs either. AFC-550: both reads hit 0006
+  // collections — map store failures to the named error, never a bare 500.
+  // The step-name lookup below stays best-effort (unknown step → null name).
+  let campaign: Record<string, unknown>
+  let run: Record<string, unknown>
+  try {
+    campaign = await findScopedItem<Record<string, unknown>>(
+      event,
+      scope,
+      'campaigns',
+      id,
+      {
+        fields: ['id', 'key', 'name', 'status', 'branch', 'consent_policy'],
+        scope: scope.isArea
+          ? undefined
+          : {
+              _or: [{ branch: { _in: scope.branchIds } }, { branch: { _null: true } }],
+            },
+      },
+    )
 
-  const run = await findScopedItem<Record<string, unknown>>(
-    event,
-    scope,
-    'campaign_runs',
-    runId,
-    { fields: RUN_FIELDS },
-  )
+    run = await findScopedItem<Record<string, unknown>>(
+      event,
+      scope,
+      'campaign_runs',
+      runId,
+      { fields: RUN_FIELDS },
+    )
+  } catch (error) {
+    throwStoreUnavailable(error, 'campaign_store', '0006')
+  }
   if (String(run.campaign) !== String(campaign.id)) {
     throw createError({
       statusCode: 404,

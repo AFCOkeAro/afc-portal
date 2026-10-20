@@ -135,7 +135,12 @@ curl -fsS https://afc-staging.bluespace.ng/api/health
 
 Both answer `200` with `{"status":"ok",...}`. Expect
 `"directusConfigured":false` until the backend cutover — that is the healthy
-staging state, not a failure. Caddy serves gzip with `Strict-Transport-Security`
+staging state, not a failure. Note: `compose.yml` only _exposes_ port 3000
+(it is not published to the host), so `curl http://localhost:3000` from the
+VPS host gets connection refused — that is pre-existing compose design, not a
+regression. Run the first check from inside the container instead
+(`docker compose -f services/staging/compose.yml exec web wget -qO- http://127.0.0.1:3000/api/health`).
+Caddy serves gzip with `Strict-Transport-Security`
 (HSTS), `X-Content-Type-Options: nosniff` and `X-Frame-Options: DENY`
 (see the `Caddyfile`).
 

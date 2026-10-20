@@ -1,4 +1,10 @@
-import { getPortalScope, listItems, mergeFilters, requireCan } from '../../utils/portal'
+import {
+  getPortalScope,
+  listItems,
+  mergeFilters,
+  requireCan,
+  throwStoreUnavailable,
+} from '../../utils/portal'
 import type { PortalScope } from '../../utils/portal'
 
 /**
@@ -81,65 +87,92 @@ export default defineEventHandler(async (event) => {
       ? query.status
       : undefined
 
-  const result = await listItems<Record<string, unknown>>(event, scope, 'campaigns', {
-    filter: mergeFilters(
-      campaignScope(scope),
-      status ? { status: { _eq: status } } : undefined,
-    ),
-    fields: CAMPAIGN_FIELDS,
-    sort: 'key',
-    limit: -1,
-  })
+  // AFC-550: every read below hits a 0006 collection. A missing table and
+  // a missing read grant both arrive as DirectusAuthError, which without a
+  // mapping is a bare 500 — throw the named store error instead so the UI
+  // can explain it. The aggregation after this block is pure and stays
+  // outside the try so a code bug never masquerades as drift.
+  let campaignRows: Record<string, unknown>[]
+  let stepRows: { campaign: string }[]
+  let runRows: Record<string, unknown>[]
+  try {
+    const result = await listItems<Record<string, unknown>>(event, scope, 'campaigns', {
+      filter: mergeFilters(
+        campaignScope(scope),
+        status ? { status: { _eq: status } } : undefined,
+      ),
+      fields: CAMPAIGN_FIELDS,
+      sort: 'key',
+      limit: -1,
+    })
+    campaignRows = result.data
 
-  const ids = result.data.map((row) => String(row.id))
+    const ids = campaignRows.map((row) => String(row.id))
+
+    stepRows = []
+    runRows = []
+    if (ids.length > 0) {
+      const steps = await listItems<{ campaign: string }>(
+        event,
+        scope,
+        'campaign_steps',
+        {
+          filter: { campaign: { _in: ids } },
+          fields: ['campaign'],
+          limit: -1,
+        },
+      )
+      stepRows = steps.data
+
+      const runs = await listItems<Record<string, unknown>>(
+        event,
+        scope,
+        'campaign_runs',
+        {
+          filter: { campaign: { _in: ids } },
+          fields: [
+            'id',
+            'campaign',
+            'status',
+            'window_start',
+            'sent_count',
+            'delivered_count',
+            'failed_count',
+          ],
+          sort: '-window_start',
+          limit: 200,
+        },
+      )
+      runRows = runs.data
+    }
+  } catch (error) {
+    throwStoreUnavailable(error, 'campaign_store', '0006')
+  }
 
   // Step counts (one query, no enrollment/contact reads).
   const stepCounts = new Map<string, number>()
-  if (ids.length > 0) {
-    const steps = await listItems<{ campaign: string }>(event, scope, 'campaign_steps', {
-      filter: { campaign: { _in: ids } },
-      fields: ['campaign'],
-      limit: -1,
-    })
-    for (const step of steps.data) {
-      const key = String(step.campaign)
-      stepCounts.set(key, (stepCounts.get(key) ?? 0) + 1)
-    }
+  for (const step of stepRows) {
+    const key = String(step.campaign)
+    stepCounts.set(key, (stepCounts.get(key) ?? 0) + 1)
   }
 
   // Latest run per campaign (one query, newest first, first row wins).
   const lastRunByCampaign = new Map<string, CampaignListRow['last_run']>()
-  if (ids.length > 0) {
-    const runs = await listItems<Record<string, unknown>>(event, scope, 'campaign_runs', {
-      filter: { campaign: { _in: ids } },
-      fields: [
-        'id',
-        'campaign',
-        'status',
-        'window_start',
-        'sent_count',
-        'delivered_count',
-        'failed_count',
-      ],
-      sort: '-window_start',
-      limit: 200,
-    })
-    for (const run of runs.data) {
-      const key = String(run.campaign)
-      if (!lastRunByCampaign.has(key)) {
-        lastRunByCampaign.set(key, {
-          id: String(run.id),
-          status: String(run.status),
-          window_start: (run.window_start as string | null) ?? null,
-          sent_count: Number(run.sent_count ?? 0),
-          delivered_count: Number(run.delivered_count ?? 0),
-          failed_count: Number(run.failed_count ?? 0),
-        })
-      }
+  for (const run of runRows) {
+    const key = String(run.campaign)
+    if (!lastRunByCampaign.has(key)) {
+      lastRunByCampaign.set(key, {
+        id: String(run.id),
+        status: String(run.status),
+        window_start: (run.window_start as string | null) ?? null,
+        sent_count: Number(run.sent_count ?? 0),
+        delivered_count: Number(run.delivered_count ?? 0),
+        failed_count: Number(run.failed_count ?? 0),
+      })
     }
   }
 
-  const rows: CampaignListRow[] = result.data.map((row) => ({
+  const rows: CampaignListRow[] = campaignRows.map((row) => ({
     id: String(row.id),
     key: String(row.key),
     name: String(row.name),
