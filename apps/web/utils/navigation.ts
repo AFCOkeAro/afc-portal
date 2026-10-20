@@ -63,6 +63,13 @@ export const NAVIGATION: readonly NavigationItem[] = [
     inSidebar: true,
   },
   {
+    label: 'Services',
+    to: '/services',
+    icon: 'i-lucide-church',
+    requires: ['sunday_services', 'read'],
+    inSidebar: true,
+  },
+  {
     label: 'Visitors',
     to: '/visitors',
     icon: 'i-lucide-user-plus',
