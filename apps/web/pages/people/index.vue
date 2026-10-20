@@ -9,8 +9,8 @@ const permissions = usePermissions()
 const showForm = ref(false)
 const searchInput = ref('')
 const search = ref('')
-const branch = ref('')
-const membership = ref('')
+const branch = ref('all')
+const membership = ref('all')
 const status = ref('active')
 const page = ref(1)
 const limit = 25
@@ -31,8 +31,8 @@ const query = computed(() => ({
   page: page.value,
   limit,
   ...(search.value ? { search: search.value } : {}),
-  ...(branch.value ? { branch: branch.value } : {}),
-  ...(membership.value ? { membership_status: membership.value } : {}),
+  ...(branch.value !== 'all' ? { branch: branch.value } : {}),
+  ...(membership.value !== 'all' ? { membership_status: membership.value } : {}),
   status: status.value,
 }))
 
@@ -52,12 +52,12 @@ const branches = await useAsyncData(
 )
 
 const branchOptions = computed(() => [
-  { label: 'All branches', value: '' },
+  { label: 'All branches', value: 'all' },
   ...(branches.data.value ?? []).map((row) => ({ label: row.name, value: row.id })),
 ])
 
 const membershipOptions = [
-  { label: 'Any membership', value: '' },
+  { label: 'Any membership', value: 'all' },
   { label: 'Member', value: 'member' },
   { label: 'Regular attendee', value: 'regular_attendee' },
   { label: 'Visitor', value: 'visitor' },

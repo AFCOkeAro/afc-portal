@@ -15,9 +15,9 @@ const showForm = ref(false)
 const searchInput = ref('')
 const search = ref('')
 const status = ref('open')
-const branch = ref('')
-const category = ref('')
-const priority = ref('')
+const branch = ref('all')
+const category = ref('all')
+const priority = ref('all')
 const page = ref(1)
 const limit = 25
 
@@ -38,9 +38,9 @@ const query = computed(() => ({
   limit,
   status: status.value,
   ...(search.value ? { search: search.value } : {}),
-  ...(branch.value ? { branch: branch.value } : {}),
-  ...(category.value ? { category: category.value } : {}),
-  ...(priority.value ? { priority: priority.value } : {}),
+  ...(branch.value !== 'all' ? { branch: branch.value } : {}),
+  ...(category.value !== 'all' ? { category: category.value } : {}),
+  ...(priority.value !== 'all' ? { priority: priority.value } : {}),
 }))
 
 const { data, pending, error, refresh } = await useAsyncData(
@@ -72,7 +72,7 @@ const statusOptions = [
 ]
 
 const categoryOptions = [
-  { label: 'Any category', value: '' },
+  { label: 'Any category', value: 'all' },
   { label: 'Medical', value: 'medical' },
   { label: 'Financial', value: 'financial' },
   { label: 'Bereavement', value: 'bereavement' },
@@ -81,7 +81,7 @@ const categoryOptions = [
 ]
 
 const priorityOptions = [
-  { label: 'Any priority', value: '' },
+  { label: 'Any priority', value: 'all' },
   { label: 'Low', value: 'low' },
   { label: 'Normal', value: 'normal' },
   { label: 'High', value: 'high' },
@@ -89,7 +89,7 @@ const priorityOptions = [
 ]
 
 const branchOptions = computed(() => [
-  { label: 'All branches', value: '' },
+  { label: 'All branches', value: 'all' },
   ...(branches.data.value ?? []).map((row) => ({ label: row.name, value: row.id })),
 ])
 

@@ -24,7 +24,7 @@ const initials = computed(() => {
 <template>
   <div class="min-h-screen lg:flex">
     <aside
-      class="border-b border-gray-200 bg-gray-50 lg:fixed lg:inset-y-0 lg:w-64 lg:border-b-0 lg:border-r dark:border-gray-800 dark:bg-gray-900"
+      class="border-b border-gray-200 bg-white lg:fixed lg:inset-y-0 lg:w-64 lg:border-b-0 lg:border-r dark:border-gray-800 dark:bg-gray-900"
     >
       <NuxtLink
         to="/dashboard"

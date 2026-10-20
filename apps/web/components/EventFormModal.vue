@@ -28,7 +28,7 @@ function empty() {
     title: '',
     summary: '',
     event_type: 'other',
-    branch: props.branches[0]?.id ?? '',
+    branch: canCreateAreaWide.value ? 'area' : (props.branches[0]?.id ?? ''),
     start_at: '',
     end_at: '',
     location: '',
@@ -82,7 +82,7 @@ const statusOptions = [
 
 const branchOptions = computed(() => [
   ...(canCreateAreaWide.value
-    ? [{ label: 'Area-wide (all branches)', value: '' }]
+    ? [{ label: 'Area-wide (all branches)', value: 'area' }]
     : []),
   ...props.branches.map((branch) => ({ label: branch.name, value: branch.id })),
 ])
@@ -120,7 +120,7 @@ watch(
         title: row.title,
         summary: row.summary ?? '',
         event_type: row.event_type,
-        branch: row.branch ?? '',
+        branch: row.branch ?? (canCreateAreaWide.value ? 'area' : (props.branches[0]?.id ?? '')),
         start_at: toLocal(row.start_at),
         end_at: toLocal(row.end_at),
         location: row.location ?? '',
@@ -152,7 +152,7 @@ async function submit(): Promise<void> {
   fieldErrors.value = {}
   const candidate = {
     ...form,
-    branch: form.branch || undefined,
+    branch: form.branch === 'area' ? undefined : form.branch || undefined,
     start_at: toIso(form.start_at) ?? form.start_at,
     end_at: toIso(form.end_at) ?? form.end_at,
     registration_opens_at: toIso(form.registration_opens_at),

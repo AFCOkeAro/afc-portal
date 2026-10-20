@@ -34,7 +34,7 @@ function empty() {
   return {
     case_ref: defaultRef(),
     branch: props.branches[0]?.id ?? '',
-    person: '',
+    person: 'none',
     category: 'other',
     priority: 'normal',
     status: 'open',
@@ -75,7 +75,7 @@ const branchOptions = computed(() =>
 )
 
 const personOptions = computed(() => [
-  { label: 'No linked person', value: '' },
+  { label: 'No linked person', value: 'none' },
   ...props.people.map((person) => ({
     label:
       person.preferred_name ||
@@ -96,7 +96,7 @@ watch(
       Object.assign(form, {
         case_ref: row.case_ref,
         branch: row.branch ?? props.branches[0]?.id ?? '',
-        person: row.person ?? '',
+        person: row.person ?? 'none',
         category: row.category,
         priority: row.priority ?? 'normal',
         status: row.status ?? 'open',
@@ -120,7 +120,7 @@ async function submit(): Promise<void> {
   fieldErrors.value = {}
   const candidate = {
     ...form,
-    person: form.person || undefined,
+    person: form.person === 'none' ? undefined : form.person,
     assigned_to: form.assigned_to || undefined,
     description: form.description || undefined,
     outcome_notes: form.outcome_notes || undefined,

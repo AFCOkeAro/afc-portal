@@ -9,7 +9,7 @@ const showForm = ref(false)
 const searchInput = ref('')
 const search = ref('')
 const status = ref('open')
-const branch = ref('')
+const branch = ref('all')
 const page = ref(1)
 const limit = 25
 
@@ -30,7 +30,7 @@ const query = computed(() => ({
   limit,
   status: status.value,
   ...(search.value ? { search: search.value } : {}),
-  ...(branch.value ? { branch: branch.value } : {}),
+  ...(branch.value !== 'all' ? { branch: branch.value } : {}),
 }))
 
 const { data, pending, error, refresh } = await useAsyncData(
@@ -58,7 +58,7 @@ const statusOptions = [
 ]
 
 const branchOptions = computed(() => [
-  { label: 'All branches', value: '' },
+  { label: 'All branches', value: 'all' },
   ...(branches.data.value ?? []).map((row) => ({ label: row.name, value: row.id })),
 ])
 

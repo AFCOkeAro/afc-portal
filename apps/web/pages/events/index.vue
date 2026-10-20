@@ -9,9 +9,9 @@ const showForm = ref(false)
 const searchInput = ref('')
 const search = ref('')
 const when = ref('upcoming')
-const type = ref('')
-const branch = ref('')
-const status = ref('')
+const type = ref('all')
+const branch = ref('all')
+const status = ref('all')
 const page = ref(1)
 const limit = 25
 
@@ -32,9 +32,9 @@ const query = computed(() => ({
   limit,
   when: when.value,
   ...(search.value ? { search: search.value } : {}),
-  ...(type.value ? { event_type: type.value } : {}),
-  ...(branch.value ? { branch: branch.value } : {}),
-  ...(status.value ? { status: status.value } : {}),
+  ...(type.value !== 'all' ? { event_type: type.value } : {}),
+  ...(branch.value !== 'all' ? { branch: branch.value } : {}),
+  ...(status.value !== 'all' ? { status: status.value } : {}),
 }))
 
 const { data, pending, error, refresh } = await useAsyncData(
@@ -58,7 +58,7 @@ const whenOptions = [
 ]
 
 const typeOptions = [
-  { label: 'Any type', value: '' },
+  { label: 'Any type', value: 'all' },
   { label: 'Service', value: 'service' },
   { label: 'Summit', value: 'summit' },
   { label: 'Camp', value: 'camp' },
@@ -69,7 +69,7 @@ const typeOptions = [
 ]
 
 const statusOptions = [
-  { label: 'Any status', value: '' },
+  { label: 'Any status', value: 'all' },
   { label: 'Draft', value: 'draft' },
   { label: 'Published', value: 'published' },
   { label: 'Closed', value: 'closed' },
@@ -77,7 +77,7 @@ const statusOptions = [
 ]
 
 const branchOptions = computed(() => [
-  { label: 'All branches', value: '' },
+  { label: 'All branches', value: 'all' },
   ...(branches.data.value ?? []).map((row) => ({ label: row.name, value: row.id })),
 ])
 

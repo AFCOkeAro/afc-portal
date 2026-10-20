@@ -10,7 +10,7 @@ const permissions = usePermissions()
 const id = String(route.params.id)
 const checkinError = ref('')
 const savingCheckin = ref(false)
-const personId = ref('')
+const personId = ref('manual')
 const attendeeName = ref('')
 const category = ref('member')
 
@@ -33,7 +33,7 @@ const canReadRecords = computed(() =>
 )
 
 const personOptions = computed(() => [
-  { label: 'Type a name instead', value: '' },
+  { label: 'Type a name instead', value: 'manual' },
   ...(people.data.value?.data ?? []).map((person) => ({
     label:
       person.preferred_name ||
@@ -63,7 +63,7 @@ function formatDate(value: string): string {
 
 async function submitCheckin(): Promise<void> {
   checkinError.value = ''
-  if (!personId.value && !attendeeName.value.trim()) {
+  if (personId.value === 'manual' && !attendeeName.value.trim()) {
     checkinError.value = 'Choose a person or type a name to check in.'
     return
   }
@@ -71,11 +71,11 @@ async function submitCheckin(): Promise<void> {
   try {
     await api.post(`/api/attendance/${id}/records`, {
       session: id,
-      person: personId.value || undefined,
-      attendee_name: personId.value ? undefined : attendeeName.value.trim() || undefined,
+      person: personId.value === 'manual' ? undefined : personId.value,
+      attendee_name: personId.value === 'manual' ? attendeeName.value.trim() || undefined : undefined,
       attendance_category: category.value,
     })
-    personId.value = ''
+    personId.value = 'manual'
     attendeeName.value = ''
     category.value = 'member'
     await refresh()

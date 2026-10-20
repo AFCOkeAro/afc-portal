@@ -8,8 +8,8 @@ const api = useApi()
 const showForm = ref(false)
 const searchInput = ref('')
 const search = ref('')
-const type = ref('')
-const branch = ref('')
+const type = ref('all')
+const branch = ref('all')
 const page = ref(1)
 const limit = 25
 
@@ -29,8 +29,8 @@ const query = computed(() => ({
   page: page.value,
   limit,
   ...(search.value ? { search: search.value } : {}),
-  ...(type.value ? { session_type: type.value } : {}),
-  ...(branch.value ? { branch: branch.value } : {}),
+  ...(type.value !== 'all' ? { session_type: type.value } : {}),
+  ...(branch.value !== 'all' ? { branch: branch.value } : {}),
 }))
 
 const { data, pending, error, refresh } = await useAsyncData(
@@ -48,7 +48,7 @@ const total = computed(() => data.value?.meta.total ?? 0)
 const pageCount = computed(() => Math.max(1, Math.ceil(total.value / limit)))
 
 const typeOptions = [
-  { label: 'Any session type', value: '' },
+  { label: 'Any session type', value: 'all' },
   { label: 'Sunday service', value: 'sunday_service' },
   { label: 'Midweek', value: 'midweek' },
   { label: 'Event', value: 'event' },
@@ -57,7 +57,7 @@ const typeOptions = [
 ]
 
 const branchOptions = computed(() => [
-  { label: 'All branches', value: '' },
+  { label: 'All branches', value: 'all' },
   ...(branches.data.value ?? []).map((row) => ({ label: row.name, value: row.id })),
 ])
 
