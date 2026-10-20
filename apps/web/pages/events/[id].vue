@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { COLLECTIONS } from '@afc/shared'
 import { ApiRequestError } from '~/composables/useApi'
-import type { BranchSummary, EventDetail } from '~/types/portal'
+import type { BranchSummary, EventDetail, RegistrationRow } from '~/types/portal'
 
 definePageMeta({ middleware: 'staff' })
 
@@ -22,6 +22,14 @@ const permissions = usePermissions()
 const id = String(route.params.id)
 const showEdit = ref(false)
 const showBlessingForm = ref(false)
+const showWalkinForm = ref(false)
+const managingRegistration = ref<RegistrationRow | null>(null)
+const showManageOpen = computed({
+  get: () => managingRegistration.value !== null,
+  set: (open: boolean) => {
+    if (!open) managingRegistration.value = null
+  },
+})
 const savingStatus = ref(false)
 const actionError = ref('')
 const checkinTicket = ref('')
@@ -52,6 +60,9 @@ const canReadRegistrations = computed(() =>
 )
 const canUpdateRegistrations = computed(() =>
   permissions.can(COLLECTIONS.eventRegistrations, 'update'),
+)
+const canCreateRegistrations = computed(() =>
+  permissions.can(COLLECTIONS.eventRegistrations, 'create'),
 )
 const canExport = computed(
   () =>
@@ -163,6 +174,11 @@ async function checkIn(): Promise<void> {
 onMounted(() => {
   void loadRollups()
 })
+
+/** Re-run after any registration write: list counts and revenue move together. */
+async function afterRegistrationSaved(): Promise<void> {
+  await Promise.all([refresh(), loadRollups()])
+}
 </script>
 
 <template>
@@ -381,9 +397,19 @@ onMounted(() => {
         <template #header>
           <div class="flex flex-wrap items-center justify-between gap-2">
             <h2 class="text-base font-semibold">Registrations</h2>
-            <span class="text-xs text-gray-500 dark:text-gray-400">
-              {{ event.registrations.length }} records
-            </span>
+            <div class="flex items-center gap-2">
+              <span class="text-xs text-gray-500 dark:text-gray-400">
+                {{ event.registrations.length }} records
+              </span>
+              <UButton
+                v-if="canCreateRegistrations"
+                size="xs"
+                variant="outline"
+                label="Register walk-in"
+                icon="i-lucide-plus"
+                @click="showWalkinForm = true"
+              />
+            </div>
           </div>
         </template>
 
@@ -414,6 +440,9 @@ onMounted(() => {
                 <th v-if="medicalVisible" class="px-3 py-2 font-medium">Medical</th>
                 <th class="px-3 py-2 font-medium">Payment</th>
                 <th class="px-3 py-2 font-medium">Status</th>
+                <th v-if="canUpdateRegistrations" class="px-3 py-2 font-medium">
+                  <span class="sr-only">Actions</span>
+                </th>
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
@@ -457,6 +486,15 @@ onMounted(() => {
                   >
                     {{ registration.registration_status.replace(/_/g, ' ') }}
                   </UBadge>
+                </td>
+                <td v-if="canUpdateRegistrations" class="px-3 py-3 text-right">
+                  <UButton
+                    size="xs"
+                    color="neutral"
+                    variant="ghost"
+                    label="Manage"
+                    @click="managingRegistration = registration"
+                  />
                 </td>
               </tr>
             </tbody>
@@ -572,6 +610,20 @@ onMounted(() => {
         </div>
       </UCard>
 
+      <RegistrationManageModal
+        v-model:open="showManageOpen"
+        :registration="managingRegistration"
+        :currency="event.currency"
+        @saved="afterRegistrationSaved()"
+      />
+      <RegistrationCreateModal
+        v-model:open="showWalkinForm"
+        :event-id="event.id"
+        :branches="branches.data.value ?? []"
+        :event-branch="event.branch"
+        :medical-visible="medicalVisible"
+        @saved="afterRegistrationSaved()"
+      />
       <EventFormModal
         v-model:open="showEdit"
         :event="event"

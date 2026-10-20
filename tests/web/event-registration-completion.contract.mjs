@@ -454,3 +454,82 @@ describe('detail page: revenue rollups and check-in wired to the new routes', ()
     assert.match(src, /refresh\(\), loadRollups\(\)/)
   })
 })
+
+describe('manage modal: legal edges, reconciled money, audit note', () => {
+  const src = read('apps/web/components/RegistrationManageModal.vue')
+
+  it('patches the single-registration route with an allowlisted body', () => {
+    assert.match(src, /\/api\/events\/registrations\/\$\{props\.registration\.id\}/)
+    assert.match(src, /registration_status/)
+    assert.match(src, /audit_note/)
+  })
+
+  it('mirrors the server transition map, which stays the authority', () => {
+    assert.match(src, /STATUS_TRANSITIONS/)
+    const line = (text, key) =>
+      text.split('\n').find((l) => l.trim().startsWith(`${key}: [`))
+    const edges = [
+      ['pending', ['confirmed', 'waitlisted', 'cancelled']],
+      ['waitlisted', ['confirmed', 'pending', 'cancelled']],
+      ['confirmed', ['attended', 'cancelled', 'no_show']],
+    ]
+    const helper = read('apps/web/server/utils/event-registration-completion.ts')
+    for (const [status, targets] of edges) {
+      for (const target of targets) {
+        assert.ok(
+          line(helper, status).includes(`'${target}'`),
+          `server allows ${status} -> ${target}`,
+        )
+        assert.ok(
+          line(src, status).includes(`'${target}'`),
+          `modal offers ${status} -> ${target}`,
+        )
+      }
+    }
+  })
+
+  it('surfaces server field errors next to the inputs', () => {
+    assert.match(src, /fieldErrors/)
+    assert.match(src, /error\.fields/)
+  })
+})
+
+describe('walk-in modal: shared schema, server-owned columns stay server-side', () => {
+  const src = read('apps/web/components/RegistrationCreateModal.vue')
+
+  it('validates through the shared form schema before posting', () => {
+    assert.match(src, /registrationFormSchema\.safeParse/)
+  })
+
+  it('posts the schema output — which cannot hold ticket or status — to create', () => {
+    assert.match(
+      src,
+      /api\.post\(`\/api\/events\/\$\{props\.eventId\}\/registrations`, parsed\.data\)/,
+    )
+  })
+
+  it('hides medical inputs where the role must not see them', () => {
+    assert.match(src, /medicalVisible/)
+  })
+})
+
+describe('detail page: manage and walk-in actions with capability gates', () => {
+  const src = read('apps/web/pages/events/[id].vue')
+
+  it('opens the manage modal from a gated actions column', () => {
+    assert.match(src, /canUpdateRegistrations/)
+    assert.match(src, /managingRegistration = registration/)
+    assert.match(src, /RegistrationManageModal/)
+  })
+
+  it('opens the walk-in modal from a create-gated button', () => {
+    assert.match(src, /canCreateRegistrations/)
+    assert.match(src, /showWalkinForm = true/)
+    assert.match(src, /RegistrationCreateModal/)
+  })
+
+  it('reloads the list and the rollups after either modal saves', () => {
+    assert.match(src, /afterRegistrationSaved/)
+    assert.match(src, /refresh\(\), loadRollups\(\)/)
+  })
+})
