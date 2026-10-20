@@ -74,6 +74,36 @@ const initials = computed(() => {
   const name = user.value?.firstName?.trim()
   return name ? name.slice(0, 1).toUpperCase() : '?'
 })
+
+/**
+ * Account menu (AFC-574). `UDropdownMenu` supplies focus management and
+ * Escape-to-close via the kit default; no custom trap is added. The header
+ * row renders through `#content-top` so name/email + role stay visible in
+ * the open menu. Sign out reuses the existing `useAuth` logout flow.
+ */
+const displayName = computed(
+  () => user.value?.firstName?.trim() || user.value?.email || 'Signed in',
+)
+
+const menuItems = computed(() => [
+  [
+    {
+      label: 'Settings',
+      icon: 'i-lucide-settings',
+      to: '/settings',
+    },
+  ],
+  [
+    {
+      label: 'Sign out',
+      icon: 'i-lucide-log-out',
+      onSelect(e: Event) {
+        e.preventDefault()
+        void logout()
+      },
+    },
+  ],
+])
 </script>
 
 <template>
@@ -145,16 +175,29 @@ const initials = computed(() => {
           </p>
         </div>
 
-        <div class="flex items-center gap-3">
-          <UAvatar :alt="initials" size="sm" />
+        <UDropdownMenu :items="menuItems" :content="{ align: 'end' }">
           <UButton
             color="neutral"
             variant="ghost"
-            icon="i-lucide-log-out"
-            label="Sign out"
-            @click="logout"
-          />
-        </div>
+            square
+            :aria-label="`Account menu for ${displayName}`"
+            class="rounded-full"
+          >
+            <UAvatar :alt="initials" size="sm" />
+          </UButton>
+
+          <template #content-top>
+            <div class="min-w-0 px-3 py-2">
+              <p class="truncate text-sm font-medium text-gray-900 dark:text-white">
+                {{ displayName }}
+              </p>
+              <p class="truncate text-xs text-gray-500 dark:text-gray-400">
+                {{ user?.staffRole?.replace(/_/g, ' ') ?? '' }}
+              </p>
+            </div>
+            <USeparator />
+          </template>
+        </UDropdownMenu>
       </header>
 
       <main class="min-w-0 flex-1 p-5 lg:p-8">
