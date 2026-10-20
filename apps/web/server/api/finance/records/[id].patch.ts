@@ -68,7 +68,7 @@ export default defineEventHandler(async (event) => {
       'branch_financial_records',
       id,
       {
-        status,
+        status: next,
         [actorField]: scope.session.user.id,
         updated_at: new Date().toISOString(),
       },
