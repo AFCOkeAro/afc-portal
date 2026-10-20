@@ -13,10 +13,13 @@
       class="border-b border-gray-200 bg-white px-5 py-4 dark:border-gray-800 dark:bg-gray-900"
     >
       <div class="mx-auto flex max-w-3xl items-center justify-between gap-4">
-        <div class="flex items-center gap-2">
+        <NuxtLink
+          to="/"
+          class="flex items-center gap-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500"
+        >
           <UIcon name="i-lucide-church" class="size-6 text-primary-500" />
           <span class="font-semibold">AFC Church Portal</span>
-        </div>
+        </NuxtLink>
         <UButton
           to="/login"
           color="neutral"

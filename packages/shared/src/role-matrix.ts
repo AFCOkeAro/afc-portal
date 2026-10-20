@@ -195,6 +195,40 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     volunteer: [R, 'own_branch'],
     none: [NONE, 'none'],
   },
+  [COLLECTIONS.branchFinancialRecords]: {
+    // data-model-expansion §11: CRUD / CRUD / R (zone) / CRU (own).
+    // `zone_admin` is not a StaffRole, so the zone column has no cell here;
+    // that grant lives in the Directus policy only. Recorded, not invented.
+    super_admin: [ALL, 'all'],
+    area_admin: [ALL, 'all'],
+    branch_admin: [CRU, 'own_branch', 'own'],
+    department_leader: [NONE, 'none'],
+    volunteer: [NONE, 'none'],
+    none: [NONE, 'none'],
+  },
+  [COLLECTIONS.wecaReturns]: {
+    // data-model-expansion §11: CRUD / CRUD / R (zone) / R (own).
+    // Same zone_admin caveat as above.
+    super_admin: [ALL, 'all'],
+    area_admin: [ALL, 'all'],
+    branch_admin: [R, 'own_branch', 'own'],
+    department_leader: [NONE, 'none'],
+    volunteer: [NONE, 'none'],
+    none: [NONE, 'none'],
+  },
+  [COLLECTIONS.wecaReturnFormulas]: {
+    // In no permission matrix: the formulas table is new in ADR-0008, and
+    // §11.1 names readers ("area+, finance lead") without granting a cell.
+    // Treated as a reference collection like leadership_positions (readable,
+    // written only as reviewed migration rows): "finance lead" is not a
+    // StaffRole, so it grants nothing here. Flagged for the CTO.
+    super_admin: [ALL, 'all'],
+    area_admin: [R, 'all'],
+    branch_admin: [R, 'own_branch'],
+    department_leader: [R, 'assigned_branches'],
+    volunteer: [NONE, 'none'],
+    none: [NONE, 'none'],
+  },
 }
 
 /**
@@ -235,6 +269,27 @@ const FIELD_RESTRICTIONS: Readonly<
     fields: ['branch_ids', 'department_ids'],
     roles: [],
     note: 'system/Flow only, no UI edit',
+  },
+  // data-model-expansion §11.1. "finance lead" is not a staff_role (same
+  // precedent as safeguarding lead above): it grants no field here, which
+  // errs towards hiding amounts. Branch-admin-own scoping is record-level and
+  // lives in the Directus policy; this table only hides whole fields by role.
+  [COLLECTIONS.branchFinancialRecords]: {
+    fields: ['income', 'intervention', 'faith_city'],
+    roles: ['super_admin', 'area_admin', 'branch_admin'],
+    note: 'amounts: branch admin (own records only, enforced by policy), area+, finance lead (not a staff_role; excluded)',
+  },
+  [COLLECTIONS.wecaReturns]: {
+    fields: [
+      'computed_mf',
+      'computed_area',
+      'computed_savings',
+      'computed_intervention',
+      'computed_faith_city',
+      'total_due',
+    ],
+    roles: ['super_admin', 'area_admin'],
+    note: 'computed returns: area+, finance lead (not a staff_role; excluded)',
   },
 }
 

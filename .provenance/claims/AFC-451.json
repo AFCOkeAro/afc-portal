@@ -1,0 +1,18 @@
+{
+  "issue": "AFC-451",
+  "authorAgentId": "7b4aae3b-0da5-4de2-a1d8-4737943ef561",
+  "authorName": "Coder",
+  "claimedAt": "2026-10-20T00:00:00+01:00",
+  "whatThisFileIs": "An R1 authorship claim, and nothing else. It says who wrote the compliance-path files below and on which issue. It asserts nothing about whether they are correct, and it carries no `reviews[]` entry.",
+  "paths": [
+    "services/directus/schema/migrations/20261020_0001_weca_returns.sql",
+    "services/directus/schema/migrations/rollback/20261020_0001_weca_returns.down.sql",
+    "tests/db/68_weca_returns.sql",
+    ".provenance/claims/AFC-451.json"
+  ],
+  "doesNotClaimR2": "There is no `reviews[]` entry here and there will not be one from me. R2 wants a named reviewer who is not the author, and I am the author of every path above. Reviewer designation for a Coder compliance-path commit is the CTO (MediaTech). There is no independent security reviewer on this team (board declined the seat on cost), so a CTO review is a recorded degradation, not independent review -- stated here rather than implied. The commit this claim covers WILL report an R2 violation until the CTO records a verdict, and that violation is the honest state. Writing a `reviews[]` entry naming myself would turn a control into a rubber stamp.",
+  "scopeOfTheClaim": "R1 only: authorship of the listed paths on AFC-451 (WECA returns capture + formula v1 per ADR-0007). It is not clearance of the retention gate (plan 0.10.5), which only the CEO can clear. Non-compliance-path files changed on the same issue (packages/shared collections/schemas/role-matrix, docs/planning flips) are ordinary code and docs, not claimed here.",
+  "whatTheChangeActuallyDoes": "New migration creating branch_financial_records (treasurer inputs: income, intervention, Faith City; MF and 5% lines deliberately NOT captured, deviation recorded in the header), weca_return_formulas (seed weca-2026-01 as board-ratified config citing ADR-0007 + answer cb89849b), and weca_returns, plus weca_compute_return() implementing R1-R4 with rates read from the effective config row (period-based effectiveness; no effective version leaves formula_pending with nulls). Grants follow data-model-expansion 10/11.1 at the SQL ceiling (Directus policy enforces branch-own/area scoping); formulas read-only to the app; computed lines never hand-editable by the app. Rollback refuses while any captured row exists. tests/db/68 proves the four January board figures, band boundaries, intervention non-derivation, pending state, config-driven recompute, R4 aggregation, and the grant ceiling.",
+  "verificationRecorded": "pnpm test:db green: 15 suites, 546 assertions, 0 failing (migration applies cleanly). pnpm typecheck green. Prettier clean on touched TS. gate:awareness, gate:retention, gate:migration-privilege green. gate:rollback-control is RED on this tree for a pre-existing reason outside this change: migrations/rollback/20261006_0005_retention_attribution.down.sql drops the retention_runs_actor_not_blank constraint while its column survives -- proven pre-existing by removing the AFC-451 files and re-running the gate (still exit 1, same finding). Full pnpm test therefore cannot go green until the 0005 rollback is addressed by its owner; escalated to the CTO in the AFC-451 thread.",
+  "notClaimedPaths": "The working tree at the time of this commit carried no other unattributed files: git status showed only the AFC-451 paths above (staged by me with explicit paths) plus this claim file. Nothing else was staged or committed."
+}

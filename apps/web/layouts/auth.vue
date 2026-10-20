@@ -12,10 +12,13 @@
     class="flex min-h-screen items-center justify-center bg-gray-50 p-4 dark:bg-gray-950"
   >
     <div class="w-full max-w-md">
-      <div class="mb-6 flex items-center justify-center gap-2">
+      <NuxtLink
+        to="/"
+        class="mb-6 flex items-center justify-center gap-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500"
+      >
         <UIcon name="i-lucide-church" class="size-7 text-primary-500" />
         <h1 class="text-xl font-semibold">AFC Church Portal</h1>
-      </div>
+      </NuxtLink>
       <slot />
     </div>
   </div>

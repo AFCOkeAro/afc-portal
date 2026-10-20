@@ -1,0 +1,20 @@
+# AFC Church Portal — staging Caddyfile snippet (AFC-386).
+#
+# Web only. No postgres, no Directus blocks yet — they arrive with the backend
+# cutover and follow docs/planning/infra-spec.md §4.
+#
+# Staging domain is afc-staging.bluespace.ng (board decision, AFC-383).
+# To change it again: replace the site address on line 10 with the new domain.
+
+afc-staging.bluespace.ng {
+	encode gzip
+
+	reverse_proxy web:3000
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+}

@@ -24,12 +24,15 @@ const initials = computed(() => {
 <template>
   <div class="min-h-screen lg:flex">
     <aside
-      class="border-b border-gray-200 bg-gray-50 lg:fixed lg:inset-y-0 lg:w-64 lg:border-b-0 lg:border-r dark:border-gray-800 dark:bg-gray-900"
+      class="border-b border-gray-200 bg-white lg:fixed lg:inset-y-0 lg:w-64 lg:border-b-0 lg:border-r dark:border-gray-800 dark:bg-gray-900"
     >
-      <div class="flex h-16 items-center gap-2 px-5">
+      <NuxtLink
+        to="/dashboard"
+        class="flex h-16 items-center gap-2 px-5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500"
+      >
         <UIcon name="i-lucide-church" class="size-6 text-primary-500" />
         <span class="font-semibold">AFC Portal</span>
-      </div>
+      </NuxtLink>
 
       <nav aria-label="Portal sections" class="px-3 pb-4 lg:pb-0">
         <ul class="space-y-1">

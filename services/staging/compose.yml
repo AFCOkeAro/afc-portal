@@ -1,0 +1,67 @@
+# AFC Church Portal — staging deploy bundle (AFC-385).
+#
+# SCOPE: staging only. Web (Nuxt SSR) + Caddy. No postgres, no Directus yet.
+# Parent: AFC-383 (board chose VPS). Sibling: AFC-384 (build verification).
+# Spec: docs/planning/infra-spec.md sections 2 and 4; image: apps/web/Dockerfile.
+#
+# Production compose (services/directus/compose.yml) is untouched by design.
+# This file is a snippet the operator copies onto a fresh VPS next to the
+# staging Caddyfile and staging .env in this directory.
+#
+# NAMES ONLY. Every environment value is a `${VAR}` reference resolved from
+# services/staging/.env on the host (mode 600, git-ignored). No secret value
+# and no real domain appears in this file or in any other committed file.
+# A real value here would be a secret committed to a repository that will
+# hold children's records.
+
+services:
+  web:
+    # Built from the workspace root (apps/web/Dockerfile needs
+    # pnpm-workspace.yaml, the root lockfile and packages/shared).
+    # On the VPS the operator copies the repo or builds the image in CI
+    # (AFC-384) and sets WEB_IMAGE to the published tag instead.
+    build:
+      context: ../..
+      dockerfile: apps/web/Dockerfile
+    image: ${WEB_IMAGE:-afc-web:staging}
+    restart: unless-stopped
+    environment:
+      # Staging serves the real auth path stub-OFF. See .env.example.
+      NUXT_STUB_AUTH: ${NUXT_STUB_AUTH:-false}
+      NUXT_SESSION_SECRET: ${NUXT_SESSION_SECRET}
+      # Directus is not deployed yet: leave all four empty. The app is
+      # degraded-safe — GET /api/health still answers 200 with
+      # directusConfigured:false; login and public registration answer 503
+      # with a message that says Directus is not deployed.
+      NUXT_DIRECTUS_URL: ${NUXT_DIRECTUS_URL:-}
+      NUXT_PUBLIC_DIRECTUS_URL: ${NUXT_PUBLIC_DIRECTUS_URL:-}
+      NUXT_DIRECTUS_SERVER_TOKEN: ${NUXT_DIRECTUS_SERVER_TOKEN:-}
+      NUXT_DIRECTUS_PUBLIC_TOKEN: ${NUXT_DIRECTUS_PUBLIC_TOKEN:-}
+      NITRO_HOST: 0.0.0.0
+      NITRO_PORT: 3000
+    expose:
+      - "3000"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      web:
+        condition: service_started
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

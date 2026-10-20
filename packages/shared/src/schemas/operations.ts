@@ -116,3 +116,21 @@ export const welfareCaseFormSchema = z.object({
 })
 
 export type WelfareCaseForm = z.infer<typeof welfareCaseFormSchema>
+
+const CONTRIBUTION_TYPES = ['cash', 'goods', 'service'] as const
+const CONTRIBUTION_STATUSES = ['pending', 'approved', 'disbursed'] as const
+
+/**
+ * A contribution record against a welfare case. `amount` is optional because
+ * goods and services may have no cash value; a cash contribution is checked
+ * again in the route, where the error can point at the amount input.
+ */
+export const welfareContributionFormSchema = z.object({
+  contribution_type: z.enum(CONTRIBUTION_TYPES).default('cash'),
+  amount: moneySchema.optional(),
+  description: optionalNote(),
+  contributor: optionalText(200),
+  status: z.enum(CONTRIBUTION_STATUSES).default('pending'),
+})
+
+export type WelfareContributionForm = z.infer<typeof welfareContributionFormSchema>
