@@ -54,6 +54,14 @@ export default defineNuxtConfig({
      * off in staging and production — it authenticates nobody.
      */
     stubAuth: false,
+    /**
+     * Member phone-OTP enablement (AFC-482, ADR-0009 decision 6). Default
+     * off: the request/verify/self-service routes answer 503
+     * member_otp_disabled. Flipping to NUXT_MEMBER_OTP_ENABLED=true
+     * requires the AFC-478 SecurityEngineer re-review verdict plus CTO
+     * approval -- it is an enablement action, not a config tweak.
+     */
+    memberOtpEnabled: false,
     public: {
       appName: 'AFC Church Portal',
       /** Browser-visible Directus URL, for file links and the public form. */
