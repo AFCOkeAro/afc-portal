@@ -6,6 +6,7 @@ import {
   mergeFilters,
   requireCan,
   scopeFilter,
+  throwStoreUnavailable,
 } from '../../utils/portal'
 
 const FIELDS = [
@@ -37,41 +38,53 @@ export default defineEventHandler(async (event) => {
   const sessionType =
     typeof query.session_type === 'string' ? query.session_type : undefined
 
-  const result = await listItems<AttendanceSessionRow>(
-    event,
-    scope,
-    'attendance_sessions',
-    {
-      filter: mergeFilters(
-        branch ? { branch: { _eq: branch } } : undefined,
-        sessionType ? { session_type: { _eq: sessionType } } : undefined,
-        scopeFilter(scope),
-      ),
-      fields: FIELDS,
-      sort: '-session_date,-id',
-      page,
-      limit,
-      search: search || undefined,
-    },
-  )
-
-  const ids = result.data.map((row) => String(row.id))
+  // AFC-566: both reads hit 0023 registers. A missing table and a
+  // missing read grant both arrive as DirectusAuthError — map to the named
+  // store error, never a bare 500. Deliberate 4xx pass through untouched.
+  let result: {
+    data: AttendanceSessionRow[]
+    meta: { total: number; page: number; limit: number }
+  }
   const counts = new Map<string, number>()
-  if (ids.length > 0) {
-    const records = await listItems<{ session: string }>(
+  try {
+    result = await listItems<AttendanceSessionRow>(
       event,
       scope,
-      'attendance_records',
+      'attendance_sessions',
       {
-        filter: { session: { _in: ids } },
-        fields: ['session'],
-        limit: -1,
+        filter: mergeFilters(
+          branch ? { branch: { _eq: branch } } : undefined,
+          sessionType ? { session_type: { _eq: sessionType } } : undefined,
+          scopeFilter(scope),
+        ),
+        fields: FIELDS,
+        sort: '-session_date,-id',
+        page,
+        limit,
+        search: search || undefined,
       },
     )
-    for (const record of records.data) {
-      const key = String(record.session)
-      counts.set(key, (counts.get(key) ?? 0) + 1)
+
+    const ids = result.data.map((row) => String(row.id))
+    if (ids.length > 0) {
+      const records = await listItems<{ session: string }>(
+        event,
+        scope,
+        'attendance_records',
+        {
+          filter: { session: { _in: ids } },
+          fields: ['session'],
+          limit: -1,
+        },
+      )
+      for (const record of records.data) {
+        const key = String(record.session)
+        counts.set(key, (counts.get(key) ?? 0) + 1)
+      }
     }
+  } catch (error) {
+    if ((error as { statusCode?: number })?.statusCode) throw error
+    throwStoreUnavailable(error, 'attendance_store', '0023')
   }
 
   const names = await branchNames(event, scope)

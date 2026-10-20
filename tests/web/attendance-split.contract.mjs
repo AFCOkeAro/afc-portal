@@ -230,3 +230,51 @@ describe('gate hygiene on the touched paths', () => {
     }
   })
 })
+
+describe('attendance routes: unreadable store fails named, never bare 500 (AFC-566)', () => {
+  const list = read('apps/web/server/api/attendance/index.get.ts')
+  const detail = read('apps/web/server/api/attendance/[id].get.ts')
+  const post = read('apps/web/server/api/attendance/index.post.ts')
+  const patch = read('apps/web/server/api/attendance/[id].patch.ts')
+  const records = read('apps/web/server/api/attendance/[id]/records.post.ts')
+  const capture = read('apps/web/server/api/attendance/capture.post.ts')
+  const collector = read('apps/web/server/utils/attendance-report.ts')
+
+  it('list/detail wrap the 0023 registers in the named store error', () => {
+    assert.match(list, /throwStoreUnavailable\(error, 'attendance_store', '0023'\)/)
+    assert.match(detail, /throwStoreUnavailable\(error, 'attendance_store', '0023'\)/)
+  })
+
+  it('create/patch/records wrap the 0023 registers in the named store error', () => {
+    assert.match(post, /throwStoreUnavailable\(error, 'attendance_store', '0023'\)/)
+    assert.match(patch, /throwStoreUnavailable\(error, 'attendance_store', '0023'\)/)
+    assert.match(records, /throwStoreUnavailable\(error, 'attendance_store', '0023'\)/)
+  })
+
+  it('capture maps a missing sessions table to the named error, keeping the 409', () => {
+    assert.match(capture, /throwStoreUnavailable\(cause, 'attendance_store', '0023'\)/)
+    assert.match(capture, /duplicate_capture/)
+  })
+
+  it('the shared report collector hardens both report surfaces at once', () => {
+    assert.match(
+      collector,
+      /throwStoreUnavailable\(error, 'attendance_store', '0023'\)/,
+    )
+  })
+
+  it('deliberate 4xx pass through instead of being renamed into the store', () => {
+    for (const src of [list, detail, post, patch, records]) {
+      assert.match(src, /statusCode\?\: number \}\)\?\.statusCode\) throw error/)
+    }
+  })
+
+  it('the 0023 migration owns exactly the tables these routes assume', () => {
+    const migration = read(
+      'services/directus/schema/migrations/20261020_0023_attendance_sessions.sql',
+    )
+    assert.match(migration, /CREATE TABLE IF NOT EXISTS attendance_sessions/)
+    assert.match(migration, /CREATE TABLE IF NOT EXISTS attendance_records/)
+    assert.match(migration, /attendance_counts_session_fkey/)
+  })
+})

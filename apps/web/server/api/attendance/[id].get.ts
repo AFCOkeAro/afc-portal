@@ -7,6 +7,7 @@ import {
   listItems,
   requireCan,
   stripHiddenMany,
+  throwStoreUnavailable,
 } from '../../utils/portal'
 
 const SESSION_FIELDS = [
@@ -43,42 +44,51 @@ export default defineEventHandler(async (event): Promise<AttendanceDetail> => {
   if (!id)
     throw createError({ statusCode: 400, statusMessage: 'A session id is required' })
 
-  const row = await findScopedItem<Record<string, unknown>>(
-    event,
-    scope,
-    'attendance_sessions',
-    id,
-    { fields: SESSION_FIELDS },
-  )
-  const names = await branchNames(event, scope)
-
+  // AFC-566: core reads hit 0023 registers — map an unreadable store
+  // to the named error, never a bare 500. Deliberate 4xx (scope 404s)
+  // pass through; the people-name enrichment stays outside the try.
+  let row: Record<string, unknown>
   let records: AttendanceRecordRow[] = []
-  if (can(scope, 'attendance_records', 'read')) {
-    const result = await listItems<AttendanceRecordRow>(
+  try {
+    row = await findScopedItem<Record<string, unknown>>(
       event,
       scope,
-      'attendance_records',
-      {
-        filter: { session: { _eq: id } },
-        fields: [
-          'id',
-          'session',
-          'person',
-          'attendee_name',
-          'attendance_category',
-          'recorded_by',
-          'recorded_at',
-        ],
-        sort: 'attendee_name',
-        limit: -1,
-      },
+      'attendance_sessions',
+      id,
+      { fields: SESSION_FIELDS },
     )
-    records = stripHiddenMany(
-      scope,
-      'attendance_records',
-      result.data as unknown as Record<string, unknown>[],
-    ) as unknown as AttendanceRecordRow[]
+
+    if (can(scope, 'attendance_records', 'read')) {
+      const result = await listItems<AttendanceRecordRow>(
+        event,
+        scope,
+        'attendance_records',
+        {
+          filter: { session: { _eq: id } },
+          fields: [
+            'id',
+            'session',
+            'person',
+            'attendee_name',
+            'attendance_category',
+            'recorded_by',
+            'recorded_at',
+          ],
+          sort: 'attendee_name',
+          limit: -1,
+        },
+      )
+      records = stripHiddenMany(
+        scope,
+        'attendance_records',
+        result.data as unknown as Record<string, unknown>[],
+      ) as unknown as AttendanceRecordRow[]
+    }
+  } catch (error) {
+    if ((error as { statusCode?: number })?.statusCode) throw error
+    throwStoreUnavailable(error, 'attendance_store', '0023')
   }
+  const names = await branchNames(event, scope)
 
   const personIds = [
     ...new Set(

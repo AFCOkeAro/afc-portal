@@ -15,6 +15,7 @@ import {
   requireZoneInScope,
   resolveBranch,
   scopeZoneIds,
+  throwStoreUnavailable,
   throwValidation,
 } from '../../utils/portal'
 
@@ -188,6 +189,10 @@ export default defineEventHandler(async (event) => {
         data: { code: 'duplicate_capture' },
       })
     }
+    // AFC-566: a missing/unreadable sessions register arrives here without
+    // a status (DirectusAuthError) — map it to the named store error, never
+    // a bare 500. Deliberate 4xx keep their codes.
+    if (status == null) throwStoreUnavailable(cause, 'attendance_store', '0023')
     throw cause
   }
   const sessionId = String(session.id)
