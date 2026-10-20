@@ -24,12 +24,14 @@ const canAttendance = computed(() =>
 )
 const canEvents = computed(() => permissions.can(COLLECTIONS.events, 'read'))
 const canVisitors = computed(() => permissions.can(COLLECTIONS.visitors, 'read'))
+const canBlessings = computed(() => permissions.can(COLLECTIONS.blessings, 'read'))
 
 const sections = computed(() => [
   { id: 'overview', label: 'Overview' },
   ...(canAttendance.value ? [{ id: 'attendance', label: 'Attendance' }] : []),
   ...(canEvents.value ? [{ id: 'registrations', label: 'Registrations' }] : []),
   ...(canVisitors.value ? [{ id: 'follow-ups', label: 'Follow-ups' }] : []),
+  ...(canBlessings.value ? [{ id: 'blessings', label: 'Blessings' }] : []),
 ])
 </script>
 
@@ -109,6 +111,27 @@ const sections = computed(() => [
         <EmptyState
           title="BSC follow-ups appear here"
           description="Visitor follow-ups for this centre render here once the hierarchy endpoints land."
+        />
+      </UCard>
+    </section>
+
+    <section v-if="canBlessings" id="blessings" class="mt-8 scroll-mt-28">
+      <UCard>
+        <template #header>
+          <div class="flex items-center justify-between">
+            <h2 class="text-base font-semibold" tabindex="-1">Blessings</h2>
+            <UButton
+              :to="`/blessings?bsc=${bscId}`"
+              color="neutral"
+              variant="ghost"
+              size="xs"
+              label="Open blessings"
+            />
+          </div>
+        </template>
+        <EmptyState
+          title="BSC blessings appear here"
+          description="Blessing totals for this centre render here once the hierarchy endpoints land. Drill-down: the button opens the blessings list filtered to this centre."
         />
       </UCard>
     </section>

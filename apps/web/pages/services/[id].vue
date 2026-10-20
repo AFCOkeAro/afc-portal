@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { COLLECTIONS, SERVICE_ROLES } from '@afc/shared'
-import type { Paginated, PersonRow, ServiceDetail } from '~/types/portal'
+import type { BranchSummary, Paginated, PersonRow, ServiceDetail } from '~/types/portal'
 
 definePageMeta({ middleware: 'staff' })
 
@@ -17,6 +17,7 @@ const role = ref<string>('usher')
 const statusMoving = ref<string | null>(null)
 const completing = ref(false)
 const actionError = ref('')
+const showBlessingForm = ref(false)
 
 const {
   data: service,
@@ -33,14 +34,20 @@ const people = await useAsyncData('service-people', () =>
   }),
 )
 
+const branches = await useAsyncData('service-branches', () =>
+  api.get<BranchSummary[]>('/api/branches'),
+)
+
 const canAssign = computed(() =>
   permissions.can(COLLECTIONS.serviceAssignments, 'create'),
 )
 const canMoveStatus = computed(() =>
   permissions.can(COLLECTIONS.serviceAssignments, 'update'),
 )
-const canComplete = computed(() =>
-  permissions.can(COLLECTIONS.sundayServices, 'update'),
+const canComplete = computed(() => permissions.can(COLLECTIONS.sundayServices, 'update'))
+const canBlessings = computed(() => permissions.can(COLLECTIONS.blessings, 'read'))
+const canRecordBlessings = computed(() =>
+  permissions.can(COLLECTIONS.blessings, 'create'),
 )
 
 const personOptions = computed(() => [
@@ -189,9 +196,21 @@ async function markCompleted(): Promise<void> {
       />
 
       <div class="grid gap-4 sm:grid-cols-3">
-        <StatCard label="Type" :value="service.service_type" hint="Sunday, midweek, special or camp" />
-        <StatCard label="Expected" :value="service.expected_attendance ?? 0" hint="Planned attendance" />
-        <StatCard label="Recorded" :value="service.total_attendance ?? 0" hint="Copied from the linked session" />
+        <StatCard
+          label="Type"
+          :value="service.service_type"
+          hint="Sunday, midweek, special or camp"
+        />
+        <StatCard
+          label="Expected"
+          :value="service.expected_attendance ?? 0"
+          hint="Planned attendance"
+        />
+        <StatCard
+          label="Recorded"
+          :value="service.total_attendance ?? 0"
+          hint="Copied from the linked session"
+        />
       </div>
 
       <div class="mt-6 flex gap-2" role="tablist" aria-label="Service sections">
@@ -211,6 +230,15 @@ async function markCompleted(): Promise<void> {
           :aria-selected="tab === 'audit'"
           @click="tab = 'audit'"
         />
+        <UButton
+          v-if="canBlessings"
+          label="Blessings"
+          :color="tab === 'blessings' ? 'primary' : 'neutral'"
+          :variant="tab === 'blessings' ? 'solid' : 'outline'"
+          role="tab"
+          :aria-selected="tab === 'blessings'"
+          @click="tab = 'blessings'"
+        />
       </div>
 
       <div v-if="tab === 'roster'" class="mt-4 grid gap-6 xl:grid-cols-3">
@@ -219,7 +247,12 @@ async function markCompleted(): Promise<void> {
             <h2 class="text-base font-semibold">Assign a role</h2>
           </template>
           <form class="space-y-3" novalidate @submit.prevent="submitAssign">
-            <UAlert v-if="assignError" color="error" variant="subtle" :description="assignError" />
+            <UAlert
+              v-if="assignError"
+              color="error"
+              variant="subtle"
+              :description="assignError"
+            />
             <UFormField label="Person">
               <USelect v-model="personId" :items="personOptions" class="w-full" />
             </UFormField>
@@ -247,9 +280,13 @@ async function markCompleted(): Promise<void> {
           />
 
           <div v-else class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
+            <table
+              class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800"
+            >
               <thead>
-                <tr class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                <tr
+                  class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400"
+                >
                   <th class="px-3 py-2 font-medium">Person</th>
                   <th class="px-3 py-2 font-medium">Role</th>
                   <th class="px-3 py-2 font-medium">Status</th>
@@ -266,7 +303,10 @@ async function markCompleted(): Promise<void> {
                     {{ assignment.status }}
                   </td>
                   <td class="px-3 py-3 text-right">
-                    <div v-if="canMoveStatus && statusMoving !== assignment.id" class="flex justify-end gap-1">
+                    <div
+                      v-if="canMoveStatus && statusMoving !== assignment.id"
+                      class="flex justify-end gap-1"
+                    >
                       <UButton
                         v-if="assignment.status !== 'confirmed'"
                         size="xs"
@@ -297,7 +337,7 @@ async function markCompleted(): Promise<void> {
         </UCard>
       </div>
 
-      <UCard v-else class="mt-4">
+      <UCard v-if="tab === 'audit'" class="mt-4">
         <template #header>
           <div class="flex items-center justify-between">
             <h2 class="text-base font-semibold">Audit trail</h2>
@@ -321,17 +361,104 @@ async function markCompleted(): Promise<void> {
           >
             <UIcon name="i-lucide-history" class="mt-0.5 size-4 shrink-0 text-gray-400" />
             <div>
-              <p class="text-sm font-medium capitalize">{{ eventLabel(item.event_type) }}</p>
-              <p class="text-sm text-gray-600 dark:text-gray-300">{{ item.detail || '—' }}</p>
+              <p class="text-sm font-medium capitalize">
+                {{ eventLabel(item.event_type) }}
+              </p>
+              <p class="text-sm text-gray-600 dark:text-gray-300">
+                {{ item.detail || '—' }}
+              </p>
               <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                {{
-                  item.created_at ? new Date(item.created_at).toLocaleString() : '—'
-                }}
+                {{ item.created_at ? new Date(item.created_at).toLocaleString() : '—' }}
               </p>
             </div>
           </li>
         </ol>
       </UCard>
+
+      <UCard v-if="tab === 'blessings' && canBlessings" class="mt-4">
+        <template #header>
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <h2 class="text-base font-semibold">Blessings</h2>
+            <div class="flex items-center gap-2">
+              <span class="text-xs text-gray-500 dark:text-gray-400">
+                {{ service.blessings_total }} total ·
+                {{ service.blessings.length }} records
+              </span>
+              <UButton
+                v-if="canRecordBlessings"
+                size="xs"
+                color="neutral"
+                variant="outline"
+                label="Record blessings"
+                icon="i-lucide-plus"
+                @click="showBlessingForm = true"
+              />
+            </div>
+          </div>
+        </template>
+
+        <EmptyState
+          v-if="service.blessings.length === 0"
+          title="No blessings recorded"
+          description="Record salvation, healing and the other blessing types for this service."
+        />
+
+        <div v-else class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
+            <thead>
+              <tr
+                class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400"
+              >
+                <th class="px-3 py-2 font-medium">Blessing</th>
+                <th class="px-3 py-2 font-medium">Date</th>
+                <th class="px-3 py-2 font-medium">Male</th>
+                <th class="px-3 py-2 font-medium">Female</th>
+                <th class="px-3 py-2 font-medium">Total</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+              <tr v-for="blessing in service.blessings" :key="blessing.id">
+                <td class="px-3 py-3">
+                  <NuxtLink
+                    :to="`/blessings/${blessing.id}`"
+                    class="font-medium capitalize hover:text-primary-600"
+                  >
+                    {{
+                      blessing.blessing_type === 'other' && blessing.other_label
+                        ? blessing.other_label
+                        : blessing.blessing_type.replace(/_/g, ' ')
+                    }}
+                  </NuxtLink>
+                </td>
+                <td class="px-3 py-3 text-gray-600 dark:text-gray-300">
+                  {{ blessing.service_date }}
+                </td>
+                <td class="px-3 py-3 tabular-nums text-gray-600 dark:text-gray-300">
+                  {{ blessing.male_count }}
+                </td>
+                <td class="px-3 py-3 tabular-nums text-gray-600 dark:text-gray-300">
+                  {{ blessing.female_count }}
+                </td>
+                <td class="px-3 py-3 font-medium tabular-nums">
+                  {{ blessing.total_count }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </UCard>
+
+      <BlessingFormModal
+        v-if="service"
+        v-model:open="showBlessingForm"
+        :branches="branches.data.value ?? []"
+        :preset="{
+          sunday_service: service.id,
+          branch: service.branch,
+          service_date: service.service_date,
+        }"
+        @saved="refresh()"
+      />
     </template>
   </div>
 </template>

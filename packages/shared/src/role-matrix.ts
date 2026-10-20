@@ -373,6 +373,28 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     volunteer: [CU, 'own_branch', 'C/U (assigned)'],
     none: [NONE, 'none'],
   },
+  // Blessings (AFC-474, data-model-expansion §11):
+  // blessings CRUD / CRUD / CRUD (zone) / CRUD (own) / CRU (dept) /
+  // C/U (assigned). `zone_admin` is not a StaffRole, so the zone column has
+  // no cell here; that grant lives in the Directus policy only. Recorded, not
+  // invented. The audit trail is append-only in spirit (no D for any role --
+  // corrections are new rows).
+  [COLLECTIONS.blessings]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [ALL, 'all'],
+    branch_admin: [ALL, 'own_branch', 'CRUD (own)'],
+    department_leader: [CRU, 'own_department', 'CRU (dept)'],
+    volunteer: [CU, 'own_branch', 'C/U (assigned)'],
+    none: [NONE, 'none'],
+  },
+  [COLLECTIONS.blessingEvents]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [R, 'all'],
+    branch_admin: [R, 'own_branch'],
+    department_leader: [R, 'assigned_departments', 'assigned'],
+    volunteer: [NONE, 'none'],
+    none: [NONE, 'none'],
+  },
   [COLLECTIONS.serviceTypeDefinitions]: {
     // Board config, not in the §11 table: the capture form reads it at every
     // level, the board edits it at area level. Definitions are area-wide

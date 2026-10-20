@@ -28,6 +28,13 @@ export const COLLECTIONS = {
    */
   serviceTypeDefinitions: 'service_type_definitions',
   attendanceCounts: 'attendance_counts',
+  /**
+   * Blessings per service/program (AFC-474, data-model-expansion §3.4).
+   * `blessingEvents` is the explicit audit trail (created/updated/note),
+   * following the welfare_case_events precedent.
+   */
+  blessings: 'blessings',
+  blessingEvents: 'blessing_events',
   sundayServices: 'sunday_services',
   serviceAssignments: 'service_assignments',
   visitors: 'visitors',

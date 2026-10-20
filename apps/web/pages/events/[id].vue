@@ -9,6 +9,7 @@ const api = useApi()
 const permissions = usePermissions()
 const id = String(route.params.id)
 const showEdit = ref(false)
+const showBlessingForm = ref(false)
 const savingStatus = ref(false)
 const actionError = ref('')
 
@@ -24,6 +25,10 @@ const branches = await useAsyncData('events-branches', () =>
 )
 
 const canEdit = computed(() => permissions.can(COLLECTIONS.events, 'update'))
+const canBlessings = computed(() => permissions.can(COLLECTIONS.blessings, 'read'))
+const canRecordBlessings = computed(() =>
+  permissions.can(COLLECTIONS.blessings, 'create'),
+)
 const canReadRegistrations = computed(() =>
   permissions.can(COLLECTIONS.eventRegistrations, 'read'),
 )
@@ -363,10 +368,92 @@ async function setStatus(status: 'published' | 'closed' | 'cancelled'): Promise<
         </div>
       </UCard>
 
+      <UCard v-if="canBlessings" class="mt-6">
+        <template #header>
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <h2 class="text-base font-semibold">Blessings</h2>
+            <div class="flex items-center gap-2">
+              <span class="text-xs text-gray-500 dark:text-gray-400">
+                {{ event.blessings_total }} total · {{ event.blessings.length }} records
+              </span>
+              <UButton
+                v-if="canRecordBlessings"
+                size="xs"
+                color="neutral"
+                variant="outline"
+                label="Record blessings"
+                icon="i-lucide-plus"
+                @click="showBlessingForm = true"
+              />
+            </div>
+          </div>
+        </template>
+
+        <EmptyState
+          v-if="event.blessings.length === 0"
+          title="No blessings recorded"
+          description="Blessings recorded against this event will appear here."
+        />
+
+        <div v-else class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
+            <thead>
+              <tr
+                class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400"
+              >
+                <th class="px-3 py-2 font-medium">Blessing</th>
+                <th class="px-3 py-2 font-medium">Date</th>
+                <th class="px-3 py-2 font-medium">Male</th>
+                <th class="px-3 py-2 font-medium">Female</th>
+                <th class="px-3 py-2 font-medium">Total</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+              <tr v-for="blessing in event.blessings" :key="blessing.id">
+                <td class="px-3 py-3">
+                  <NuxtLink
+                    :to="`/blessings/${blessing.id}`"
+                    class="font-medium capitalize hover:text-primary-600"
+                  >
+                    {{
+                      blessing.blessing_type === 'other' && blessing.other_label
+                        ? blessing.other_label
+                        : blessing.blessing_type.replace(/_/g, ' ')
+                    }}
+                  </NuxtLink>
+                </td>
+                <td class="px-3 py-3 text-gray-600 dark:text-gray-300">
+                  {{ blessing.service_date }}
+                </td>
+                <td class="px-3 py-3 tabular-nums text-gray-600 dark:text-gray-300">
+                  {{ blessing.male_count }}
+                </td>
+                <td class="px-3 py-3 tabular-nums text-gray-600 dark:text-gray-300">
+                  {{ blessing.female_count }}
+                </td>
+                <td class="px-3 py-3 font-medium tabular-nums">
+                  {{ blessing.total_count }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </UCard>
+
       <EventFormModal
         v-model:open="showEdit"
         :event="event"
         :branches="branches.data.value ?? []"
+        @saved="refresh()"
+      />
+      <BlessingFormModal
+        v-model:open="showBlessingForm"
+        :branches="branches.data.value ?? []"
+        :preset="{
+          event: event.id,
+          branch: event.branch,
+          service_date: event.start_at.slice(0, 10),
+        }"
         @saved="refresh()"
       />
     </template>

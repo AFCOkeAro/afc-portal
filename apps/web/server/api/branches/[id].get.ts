@@ -1,3 +1,4 @@
+import { blessingsRollup } from '../../utils/blessing-report'
 import type {
   BranchDetail,
   DashboardAttendancePoint,
@@ -146,6 +147,7 @@ export default defineEventHandler(async (event): Promise<BranchDetail> => {
     recentPeople,
     followUps,
     welfareCases,
+    blessings,
   ] = await Promise.all([
     countItems(
       event,
@@ -218,6 +220,12 @@ export default defineEventHandler(async (event): Promise<BranchDetail> => {
           limit: 5,
         })
       : Promise.resolve({ data: [], meta: { total: 0, page: 1, limit: 5 } }),
+    // Blessings breakdown (AFC-474, prd-expansion §1.1
+    // analytics-with-drill-down): counts that link to the filtered list.
+    // Gated on blessings:read; anything else renders zero, never foreign.
+    can(scope, 'blessings', 'read')
+      ? blessingsRollup(event, scope, { branch: id })
+      : Promise.resolve({ total: 0, breakdown: [] }),
   ])
 
   const names = await branchNames(event, scope)
@@ -248,6 +256,8 @@ export default defineEventHandler(async (event): Promise<BranchDetail> => {
     attendance_last_sunday: Number(lastSunday?.headcount_total ?? 0),
     attendance_last_30_days: attendanceLast30Days,
     attendance_trend: attendanceTrend,
+    blessings_total: blessings.total,
+    blessings_breakdown: blessings.breakdown,
     recent_people: stripHiddenMany(
       scope,
       'people',

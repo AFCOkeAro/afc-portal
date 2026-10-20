@@ -1,4 +1,5 @@
 export * from './attendance-split'
+export * from './blessings'
 export * from './common'
 export * from './department'
 export * from './household'

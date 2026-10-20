@@ -1,6 +1,8 @@
 import type {
   AttendanceRecord,
   AttendanceSession,
+  Blessing,
+  BlessingEvent,
   Branch,
   Department,
   EventRecord,
@@ -42,6 +44,8 @@ export interface BranchDetail extends Branch {
   events: EventRow[]
   follow_ups: VisitorRow[]
   welfare_cases: WelfareCaseRow[]
+  blessings_total: number
+  blessings_breakdown: BlessingBreakdownRow[]
 }
 
 export interface PersonRow extends Person {
@@ -128,6 +132,8 @@ export interface EventRow extends EventRecord {
 
 export interface EventDetail extends EventRow {
   registrations: RegistrationRow[]
+  blessings: BlessingRow[]
+  blessings_total: number
 }
 
 export interface AttendanceSessionRow extends AttendanceSession {
@@ -148,6 +154,25 @@ export interface ServiceDetail extends ServiceRow {
   assignments: ServiceAssignmentRow[]
   assignment_count: number
   events: SundayServiceEvent[]
+  blessings: BlessingRow[]
+  blessings_total: number
+}
+
+/** Blessing list/detail row (AFC-474): the shared Blessing plus resolved scope names. */
+export interface BlessingRow extends Blessing {
+  branch_name: string | null
+  zone_name: string | null
+}
+
+export interface BlessingBreakdownRow {
+  blessing_type: string
+  male: number
+  female: number
+  total: number
+}
+
+export interface BlessingDetail extends BlessingRow {
+  events: BlessingEvent[]
 }
 
 export interface AttendanceDetail extends AttendanceSessionRow {

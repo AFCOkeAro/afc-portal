@@ -22,6 +22,7 @@ const canPeople = computed(() => permissions.can(COLLECTIONS.people, 'read'))
 const canEvents = computed(() => permissions.can(COLLECTIONS.events, 'read'))
 const canVisitors = computed(() => permissions.can(COLLECTIONS.visitors, 'read'))
 const canLeadership = computed(() => permissions.can(COLLECTIONS.departments, 'read'))
+const canBlessings = computed(() => permissions.can(COLLECTIONS.blessings, 'read'))
 
 const { data, pending, error, refresh } = await useAsyncData(
   () => `branch-${id.value}`,
@@ -36,6 +37,7 @@ const sections = computed(() => [
   ...(canEvents.value ? [{ id: 'events', label: 'Events' }] : []),
   ...(canVisitors.value ? [{ id: 'follow-ups', label: 'Follow-ups' }] : []),
   ...(canWelfare.value ? [{ id: 'welfare-with-scope', label: 'Welfare' }] : []),
+  ...(canBlessings.value ? [{ id: 'blessings', label: 'Blessings' }] : []),
   ...(canLeadership.value ? [{ id: 'leadership', label: 'Leadership' }] : []),
 ])
 
@@ -153,6 +155,17 @@ function formatDateTime(value: string | null | undefined): string {
               label="Open welfare"
               :value="data.open_welfare"
               hint="Open and in-progress cases"
+            />
+          </NuxtLink>
+          <NuxtLink
+            v-if="canBlessings"
+            :to="`/blessings?branch=${data.id}`"
+            class="block"
+          >
+            <StatCard
+              label="Blessings"
+              :value="data.blessings_total"
+              hint="Recorded blessings, all types"
             />
           </NuxtLink>
         </div>
@@ -449,6 +462,49 @@ function formatDateTime(value: string | null | undefined): string {
                   </p>
                 </div>
                 <UIcon name="i-lucide-chevron-right" class="size-4 text-gray-400" />
+              </NuxtLink>
+            </li>
+          </ul>
+        </UCard>
+      </section>
+
+      <section v-if="canBlessings" id="blessings" class="mt-8 scroll-mt-28">
+        <UCard>
+          <template #header>
+            <div class="flex items-center justify-between">
+              <h2 class="text-base font-semibold" tabindex="-1">Blessings breakdown</h2>
+              <UButton
+                :to="`/blessings?branch=${data.id}`"
+                color="neutral"
+                variant="ghost"
+                size="xs"
+                label="All blessings"
+              />
+            </div>
+          </template>
+          <EmptyState
+            v-if="data.blessings_breakdown.length === 0"
+            title="No blessings recorded yet"
+            description="Blessings recorded for this branch will break down by type here."
+          />
+          <ul v-else class="divide-y divide-gray-100 dark:divide-gray-800">
+            <li
+              v-for="group in data.blessings_breakdown"
+              :key="`blessing-${group.blessing_type}`"
+            >
+              <NuxtLink
+                :to="`/blessings?branch=${data.id}&blessing_type=${group.blessing_type}`"
+                class="flex items-center justify-between gap-4 py-3 hover:text-primary-600"
+              >
+                <div>
+                  <p class="text-sm font-medium capitalize">
+                    {{ group.blessing_type.replace(/_/g, ' ') }}
+                  </p>
+                  <p class="text-xs text-gray-500 dark:text-gray-400">
+                    {{ group.male }} male · {{ group.female }} female
+                  </p>
+                </div>
+                <span class="text-sm font-semibold tabular-nums">{{ group.total }}</span>
               </NuxtLink>
             </li>
           </ul>

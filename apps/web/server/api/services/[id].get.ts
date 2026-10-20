@@ -1,4 +1,5 @@
 import type { ServiceAssignment, SundayService, SundayServiceEvent } from '@afc/shared'
+import type { BlessingRow } from '../../../types/portal'
 import {
   branchNames,
   can,
@@ -43,6 +44,20 @@ const ASSIGNMENT_FIELDS = [
 
 const EVENT_FIELDS = ['id', 'service', 'event_type', 'detail', 'actor_user', 'created_at']
 
+const BLESSING_FIELDS = [
+  'id',
+  'blessing_type',
+  'other_label',
+  'male_count',
+  'female_count',
+  'total_count',
+  'branch',
+  'service_date',
+  'sunday_service',
+  'event',
+  'created_at',
+]
+
 export interface ServiceAssignmentRow extends ServiceAssignment {
   person_name: string | null
 }
@@ -53,6 +68,8 @@ export interface ServiceDetail extends SundayService {
   assignments: ServiceAssignmentRow[]
   assignment_count: number
   events: SundayServiceEvent[]
+  blessings: BlessingRow[]
+  blessings_total: number
 }
 
 /**
@@ -68,7 +85,8 @@ export default defineEventHandler(async (event): Promise<ServiceDetail> => {
   requireCan(scope, 'sunday_services', 'read')
 
   const id = getRouterParam(event, 'id')
-  if (!id) throw createError({ statusCode: 400, statusMessage: 'A service id is required' })
+  if (!id)
+    throw createError({ statusCode: 400, statusMessage: 'A service id is required' })
 
   // Same hierarchy predicate as the list: area all, zone grants by zone,
   // branch staff by branch. A service outside the caller's scope is a 404.
@@ -106,21 +124,23 @@ export default defineEventHandler(async (event): Promise<ServiceDetail> => {
       ...new Set(
         result.data
           .map((assignment) => assignment.person)
-          .filter((person): person is string => typeof person === 'string' && person.length > 0),
+          .filter(
+            (person): person is string => typeof person === 'string' && person.length > 0,
+          ),
       ),
     ]
     const personNames = new Map<string, string>()
     if (personIds.length > 0 && can(scope, 'people', 'read')) {
-      const people = await listItems<{ id: string | number; first_name: string; last_name: string; preferred_name: string | null }>(
-        event,
-        scope,
-        'people',
-        {
-          filter: mergeFilters({ id: { _in: personIds } }, scopeFilter(scope)),
-          fields: ['id', 'first_name', 'last_name', 'preferred_name'],
-          limit: -1,
-        },
-      )
+      const people = await listItems<{
+        id: string | number
+        first_name: string
+        last_name: string
+        preferred_name: string | null
+      }>(event, scope, 'people', {
+        filter: mergeFilters({ id: { _in: personIds } }, scopeFilter(scope)),
+        fields: ['id', 'first_name', 'last_name', 'preferred_name'],
+        limit: -1,
+      })
       for (const person of people.data) {
         personNames.set(
           String(person.id),
@@ -141,25 +161,30 @@ export default defineEventHandler(async (event): Promise<ServiceDetail> => {
 
   let events: SundayServiceEvent[] = []
   if (can(scope, 'sunday_services', 'read')) {
-    const trail = await listItems<SundayServiceEvent>(event, scope, 'sunday_service_events', {
-      filter: { service: { _eq: id } },
-      fields: EVENT_FIELDS,
-      sort: 'created_at',
-      limit: -1,
-    })
+    const trail = await listItems<SundayServiceEvent>(
+      event,
+      scope,
+      'sunday_service_events',
+      {
+        filter: { service: { _eq: id } },
+        fields: EVENT_FIELDS,
+        sort: 'created_at',
+        limit: -1,
+      },
+    )
     events = trail.data.map((item) => ({ ...item, id: String(item.id) }))
   }
 
   let preacherName: string | null = null
   if (row.preacher && can(scope, 'people', 'read')) {
     try {
-      const preacher = await findScopedItem<{ first_name: string; last_name: string; preferred_name: string | null }>(
-        event,
-        scope,
-        'people',
-        String(row.preacher),
-        { fields: ['first_name', 'last_name', 'preferred_name'] },
-      )
+      const preacher = await findScopedItem<{
+        first_name: string
+        last_name: string
+        preferred_name: string | null
+      }>(event, scope, 'people', String(row.preacher), {
+        fields: ['first_name', 'last_name', 'preferred_name'],
+      })
       preacherName =
         preacher.preferred_name ||
         [preacher.first_name, preacher.last_name].filter(Boolean).join(' ') ||
@@ -167,6 +192,34 @@ export default defineEventHandler(async (event): Promise<ServiceDetail> => {
     } catch {
       preacherName = null
     }
+  }
+
+  // Blessings recorded against this service (US-B1: record from the
+  // service page; US-E1 surface for the service side). Gated on
+  // blessings:read with the same hierarchy predicate as the service
+  // itself, so a cross-branch blessing linked here never leaks into a
+  // narrower session.
+  let blessings: BlessingRow[] = []
+  if (can(scope, 'blessings', 'read')) {
+    const linked = await listItems<BlessingRow>(event, scope, 'blessings', {
+      filter: mergeFilters(
+        { sunday_service: { _eq: id } },
+        scope.isArea
+          ? undefined
+          : scope.zoneIds.length > 0
+            ? zoneScopeFilter(scope)
+            : scopeFilter(scope),
+      ),
+      fields: BLESSING_FIELDS,
+      sort: 'blessing_type,service_date',
+      limit: -1,
+    })
+    blessings = linked.data.map((row) => ({
+      ...row,
+      id: String(row.id),
+      branch_name: row.branch ? (names.get(String(row.branch)) ?? null) : null,
+      zone_name: null,
+    }))
   }
 
   return {
@@ -177,5 +230,10 @@ export default defineEventHandler(async (event): Promise<ServiceDetail> => {
     assignments,
     assignment_count: assignments.length,
     events,
+    blessings,
+    blessings_total: blessings.reduce(
+      (sum, row) => sum + Number(row.total_count ?? 0),
+      0,
+    ),
   }
 })

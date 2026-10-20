@@ -32,12 +32,14 @@ const canAttendance = computed(() =>
 const canVisitors = computed(() => permissions.can(COLLECTIONS.visitors, 'read'))
 const canWelfare = computed(() => permissions.can(COLLECTIONS.welfareCases, 'read'))
 const canLeadership = computed(() => permissions.can(COLLECTIONS.departments, 'read'))
+const canBlessings = computed(() => permissions.can(COLLECTIONS.blessings, 'read'))
 
 const sections = computed(() => [
   { id: 'overview', label: 'Overview' },
   ...(canAttendance.value ? [{ id: 'attendance', label: 'Attendance' }] : []),
   ...(canVisitors.value ? [{ id: 'follow-ups', label: 'Follow-ups' }] : []),
   ...(canWelfare.value ? [{ id: 'welfare-with-scope', label: 'Welfare' }] : []),
+  ...(canBlessings.value ? [{ id: 'blessings', label: 'Blessings' }] : []),
   ...(canLeadership.value ? [{ id: 'leadership', label: 'Leadership' }] : []),
 ])
 
@@ -132,6 +134,27 @@ const rows = computed(() => branches.value ?? [])
           <EmptyState
             title="Zone welfare aggregates here"
             description="Open welfare counts per branch render here once the zone endpoint lands. Hidden from accounts without welfare_cases:read."
+          />
+        </UCard>
+      </section>
+
+      <section v-if="canBlessings" id="blessings" class="mt-8 scroll-mt-28">
+        <UCard>
+          <template #header>
+            <div class="flex items-center justify-between">
+              <h2 class="text-base font-semibold" tabindex="-1">Blessings</h2>
+              <UButton
+                :to="`/blessings?zone=${zoneId}`"
+                color="neutral"
+                variant="ghost"
+                size="xs"
+                label="Open blessings"
+              />
+            </div>
+          </template>
+          <EmptyState
+            title="Zone blessings aggregate here"
+            description="Per-type blessing totals render here once the zone endpoint lands. Drill-down: the button opens the blessings list filtered to this zone."
           />
         </UCard>
       </section>
