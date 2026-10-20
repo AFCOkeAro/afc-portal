@@ -369,6 +369,23 @@ export async function createItem<T>(
   return response.data
 }
 
+/**
+ * Delete one row by id (AFC-516, ADR-0011): the invite-quota slot release
+ * path. Best-effort callers tolerate errors; the one place a DELETE helper
+ * lives, next to `createItem`.
+ */
+export async function deleteItem(
+  event: H3Event,
+  scope: PortalScope,
+  collection: string,
+  id: string,
+): Promise<void> {
+  await directusFetch(event, `/items/${collection}/${id}`, {
+    method: 'DELETE',
+    accessToken: scope.token,
+  })
+}
+
 export async function updateItem<T>(
   event: H3Event,
   scope: PortalScope,

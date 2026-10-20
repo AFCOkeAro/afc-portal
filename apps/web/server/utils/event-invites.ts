@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 import type { H3Event } from 'h3'
 import type { PortalScope } from './portal'
+import { createItem, deleteItem } from './portal'
 import { directusFetch } from './directus'
 
 /**
@@ -488,4 +489,175 @@ export function throwInviteValidation(
     statusMessage: message,
     data: { code: 'validation_error', fields },
   })
+}
+
+/**
+ * Lagos calendar keys (AFC-516, ADR-0011). The quota windows are calendar
+ * windows in Africa/Lagos, not rolling 24h/7d: the daily window resets at
+ * 00:00 Lagos, the weekly window is Monday-to-Sunday Lagos. Pure and
+ * unit-testable: the caller passes the clock.
+ */
+
+/** YYYY-MM-DD of `now` in Africa/Lagos. */
+export function lagosDayKey(now: Date): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Africa/Lagos',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(now)
+  const get = (type: string): string =>
+    parts.find((part) => part.type === type)?.value ?? ''
+  return `${get('year')}-${get('month')}-${get('day')}`
+}
+
+/** YYYY-MM-DD of the Monday of `now`'s Africa/Lagos week (Mon-Sun). */
+export function lagosWeekMonday(now: Date): string {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Africa/Lagos',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+  }).formatToParts(now)
+  const get = (type: string): number =>
+    Number(parts.find((part) => part.type === type)?.value ?? 0)
+  // Arithmetic on the Lagos calendar date in UTC: the weekday of a calendar
+  // date is timezone-independent, so getUTCDay of the YMD triple is the
+  // Lagos weekday (0 = Sunday .. 6 = Saturday).
+  const lagosDate = new Date(Date.UTC(get('year'), get('month') - 1, get('day')))
+  lagosDate.setUTCDate(lagosDate.getUTCDate() - ((lagosDate.getUTCDay() + 6) % 7))
+  const pad = (value: number): string => String(value).padStart(2, '0')
+  return (
+    `${lagosDate.getUTCFullYear()}-` +
+    `${pad(lagosDate.getUTCMonth() + 1)}-${pad(lagosDate.getUTCDate())}`
+  )
+}
+
+export interface InviteQuotaLimits {
+  daily: number
+  weekly: number
+}
+
+export type InviteQuotaClaim =
+  | { allowed: true, release: () => Promise<void> }
+  | { allowed: false }
+
+/**
+ * True when a Directus write error is a uniqueness conflict. Directus
+ * surfaces a UNIQUE violation as a 400 whose message names the constraint
+ * ("unique", case-insensitive) or whose extensions code carries a uniqueness
+ * marker. Anything else is a different failure and must fail closed.
+ */
+export function isUniqueViolation(error: unknown): boolean {
+  const err = error as {
+    statusCode?: number
+    status?: number
+    statusMessage?: string
+    message?: string
+    data?: { code?: string, errors?: Array<{ message?: string, extensions?: { code?: string } }> }
+  }
+  const status = err?.statusCode ?? err?.status ?? 0
+  if (status !== 400) return false
+  const haystacks: string[] = []
+  if (typeof err?.statusMessage === 'string') haystacks.push(err.statusMessage)
+  if (typeof err?.message === 'string') haystacks.push(err.message)
+  if (typeof err?.data?.code === 'string') haystacks.push(err.data.code)
+  for (const entry of err?.data?.errors ?? []) {
+    if (typeof entry?.message === 'string') haystacks.push(entry.message)
+    if (typeof entry?.extensions?.code === 'string') haystacks.push(entry.extensions.code)
+  }
+  return haystacks.some((text) => /unique/i.test(text))
+}
+
+async function claimQuotaSlot(
+  event: H3Event,
+  scope: PortalScope,
+  inviterUserId: string,
+  period: 'day' | 'week',
+  periodStart: string,
+  limit: number,
+): Promise<string | null> {
+  for (let slot = 0; slot < limit; slot++) {
+    try {
+      const row = await createItem<{ id: string | number }>(event, scope, 'invite_quota_slots', {
+        inviter_user: inviterUserId,
+        period,
+        period_start: periodStart,
+        slot_no: slot,
+      })
+      return String(row.id)
+    }
+    catch (error) {
+      // Taken by a concurrent claimant: try the next slot. Any other error
+      // is a real failure -- fail closed (no invite written) rather than
+      // guessing that quota remains.
+      if (!isUniqueViolation(error)) throw error
+    }
+  }
+  return null
+}
+
+/**
+ * Atomic invite-quota claim (AFC-516, ADR-0011) -- the AUTHORITATIVE verdict.
+ *
+ * Protocol: INSERT day slots 0..daily-1 until one succeeds (a unique
+ * violation means a concurrent claimant won that slot, so try the next);
+ * then INSERT week slots 0..weekly-1 the same way. If the week claim fails,
+ * the claimed day slot is released and `{ allowed: false }` is returned. On
+ * success the caller writes the invite, and on invite-write failure MUST
+ * call `release()` so no quota leaks on the handled path.
+ *
+ * Correctness rests on the UNIQUE (inviter_user, period, period_start,
+ * slot_no), not on timing: concurrent writers serialize on the index, so
+ * exactly D day-winners and W week-winners exist regardless of interleaving.
+ * Crash orphans (claim succeeds, process dies before the invite write or the
+ * release) waste quota -- the fail-safe direction: they block more, never
+ * queue past the limit -- so there is deliberately no sweeper.
+ *
+ * Zero-limit edge: `daily: 0` (or `weekly: 0`) claims nothing, so the claim
+ * is not allowed. The suppressed (STOP) path never calls this function.
+ */
+export async function claimInviteQuota(
+  event: H3Event,
+  scope: PortalScope,
+  inviterUserId: string,
+  limits: InviteQuotaLimits,
+  now: Date = new Date(),
+): Promise<InviteQuotaClaim> {
+  const release = async (ids: Array<string | null>): Promise<void> => {
+    for (const id of ids) {
+      if (id === null) continue
+      try {
+        await deleteItem(event, scope, 'invite_quota_slots', id)
+      }
+      catch {
+        // Best-effort: a failed release wastes one slot (fail-safe), it must
+        // never turn a successful claim into a 500.
+      }
+    }
+  }
+
+  if (!Number.isInteger(limits.daily) || limits.daily <= 0) return { allowed: false }
+  if (!Number.isInteger(limits.weekly) || limits.weekly <= 0) return { allowed: false }
+
+  const daySlot = await claimQuotaSlot(event, scope, inviterUserId, 'day', lagosDayKey(now), limits.daily)
+  if (daySlot === null) return { allowed: false }
+
+  let weekSlot: string | null
+  try {
+    weekSlot = await claimQuotaSlot(event, scope, inviterUserId, 'week', lagosWeekMonday(now), limits.weekly)
+  }
+  catch (error) {
+    await release([daySlot])
+    throw error
+  }
+  if (weekSlot === null) {
+    await release([daySlot])
+    return { allowed: false }
+  }
+
+  return {
+    allowed: true,
+    release: () => release([daySlot, weekSlot]),
+  }
 }

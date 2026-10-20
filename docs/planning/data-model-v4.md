@@ -235,7 +235,7 @@ One row = one invite request from one member to one person.
 | invite_weekly_limit | integer | default **50** |
 | member_access_expires_at | datetime | nullable; time-boxed access supported (mirrors the guest pattern) |
 
-The limit check is a Flow/query over `event_invites` in the rolling day/week. Above the limit → `status = blocked_rate_limit`, `approval_required = true`, visible to the branch admin. *Least privilege: the limit lives in the user row so it is configurable per member without a code change.*
+The limit check is a Flow/query over `event_invites` in the rolling day/week. Above the limit → `status = blocked_rate_limit`, `approval_required = true`, visible to the branch admin. *Least privilege: the limit lives in the user row so it is configurable per member without a code change.* The authoritative enforcement is the `invite_quota_slots` ledger-slot claim (ADR-0011, AFC-516): the single `claimInviteQuota` protocol claims one day slot and one week slot by INSERT against the ledger UNIQUE, so the route and the Flow `invite.create` share one atomic rule; windows are Africa/Lagos calendar day (resets 00:00 Lagos) and calendar week (Monday-to-Sunday Lagos).
 
 ### 3.3 Changes to `events`
 

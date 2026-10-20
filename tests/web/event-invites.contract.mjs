@@ -187,11 +187,13 @@ describe('create route: gates with an auditable row each', () => {
     assert.match(src, /inviter_note/)
   })
 
-  it('treats the rolling count as a UX pre-check with the atomic cap as a recorded CTO-owned gap (F3)', () => {
+  it('treats the atomic ledger-slot claim as authoritative with the rolling count advisory only (F3 closed, ADR-0011)', () => {
+    assert.match(src, /claimInviteQuota\(event, scope, inviterUserId, limits\)/)
+    assert.match(src, /if \(!claim\.allowed\)/)
     assert.match(src, /countInviterWindows/)
     const raw = read('apps/web/server/api/invites/index.post.ts')
-    assert.match(raw, /TOCTOU/)
-    assert.match(raw, /Owner: CTO/)
+    assert.match(raw, /the claim is AUTHORITATIVE/)
+    assert.match(raw, /advisory/)
   })
 
   it('records suppressed numbers as blocked_optout, never queued', () => {
@@ -328,20 +330,86 @@ describe('migration encodes the acceptance rule the routes read', () => {
   })
 })
 
-describe('AFC-512: quota TOCTOU recorded gap (F3)', () => {
+describe('AFC-516: quota TOCTOU closed by the ledger-slot claim (F3)', () => {
   const raw = read('apps/web/server/api/invites/index.post.ts')
 
-  it('names the count-then-insert as a UX pre-check only, with the atomic trigger as a recorded CTO-owned gap', () => {
+  it('names the claim as authoritative and the count as advisory, citing ADR-0011', () => {
+    assert.match(raw, /claimInviteQuota/)
+    assert.match(raw, /AUTHORITATIVE/)
+    assert.match(raw, /ADR-0011/)
     assert.match(raw, /countInviterWindows/)
-    assert.match(raw, /TOCTOU/)
-    assert.match(raw, /Owner: CTO/)
   })
 
-  it('does not ship a trigger migration without the rollback-gate grandfather sign-off', () => {
+  it('claims after the suppression check, so STOP numbers never consume quota', () => {
+    const src = codeOf('apps/web/server/api/invites/index.post.ts')
+    assert.ok(
+      src.indexOf("status: 'blocked_optout'") < src.indexOf('claimInviteQuota('),
+      'the blocked_optout write (with its early return) precedes the claim',
+    )
+  })
+
+  it('releases claimed slots when the invite write fails, then rethrows', () => {
+    const src = codeOf('apps/web/server/api/invites/index.post.ts')
+    const raw = read('apps/web/server/api/invites/index.post.ts')
+    assert.match(src, /claim\.release\(\)/)
+    assert.match(raw, /No leaked quota on the handled path/)
+  })
+
+  it('states the crash-orphan direction (waste blocks more, never queues past the limit)', () => {
+    assert.match(raw, /fail-safe/)
+    assert.match(raw, /never queues past the limit/)
+  })
+
+  it('does not ship a trigger migration: no trigger on event_invites', () => {
     // The gate refuses a rollback that drops a control whose referent
-    // survives; landing the trigger needs a CTO-signed entry, so no
-    // 0016 trigger file may exist until then.
+    // survives; the ledger needs no trigger, so none may exist.
     assert.doesNotMatch(raw, /event_invites_quota_atomic/)
+  })
+})
+
+describe('AFC-516: claim helper + Lagos calendar keys', () => {
+  const source = codeOf('apps/web/server/utils/event-invites.ts')
+  const rawSource = read('apps/web/server/utils/event-invites.ts')
+
+  it('computes the Lagos day key (YYYY-MM-DD) via Intl in Africa/Lagos', () => {
+    assert.match(source, /lagosDayKey/)
+    assert.match(rawSource, /Africa\/Lagos/)
+    assert.match(rawSource, /en-CA/)
+  })
+
+  it('computes the Lagos week Monday (Monday of that week)', () => {
+    assert.match(source, /lagosWeekMonday/)
+    assert.match(source, /Monday/)
+  })
+
+  it('claims day slots 0..daily-1 then week slots 0..weekly-1, unique-violation means next slot', () => {
+    assert.match(source, /claimInviteQuota/)
+    assert.match(source, /slot_no: slot/)
+    assert.match(source, /isUniqueViolation\(error\)/)
+  })
+
+  it('detects unique violations as Directus 400s naming uniqueness, and fails closed otherwise', () => {
+    assert.match(source, /isUniqueViolation/)
+    assert.match(source, /status !== 400/)
+    assert.match(rawSource, /\/unique\/i/)
+    assert.match(rawSource, /fail closed/)
+  })
+
+  it('releases the day slot when the week claim fails, and releases both on demand', () => {
+    assert.match(source, /release\(\[daySlot\]\)/)
+    assert.match(source, /release: \(\) => release\(\[daySlot, weekSlot\]\)/)
+  })
+
+  it('claims nothing on a zero limit, so the claim is not allowed', () => {
+    assert.match(source, /limits\.daily.*<= 0/)
+    assert.match(source, /limits\.weekly.*<= 0/)
+  })
+
+  it('deletes slot rows by id through one helper next to createItem', () => {
+    const portal = codeOf('apps/web/server/utils/portal.ts')
+    assert.match(portal, /deleteItem/)
+    assert.match(portal, /method: 'DELETE'/)
+    assert.match(source, /deleteItem/)
   })
 })
 

@@ -3,6 +3,7 @@ import {
   INVITE_AGE_BANDS,
   INVITE_CHANNELS,
   INVITE_RELATIONSHIPS,
+  claimInviteQuota,
   countInviterWindows,
   hashInvitePhone,
   inviteCapabilities,
@@ -27,7 +28,7 @@ import type { InviteRow } from '../../utils/event-invites'
  * created WITH the rendered message + variables snapshot, so the DB never
  * needs a later UPDATE of frozen columns. Outcomes:
  *   suppressed number  -> created as blocked_optout (auditable, never queued)
- *   over member limits -> created as blocked_rate_limit + approval_required
+ *   quota claim fails  -> created as blocked_rate_limit + approval_required
  *   event-level approval flag -> pending_approval + approval_required
  *   otherwise          -> queued (single send only; later messages need a
  *                         real consent grant, §3.3 -- no drip).
@@ -35,17 +36,19 @@ import type { InviteRow } from '../../utils/event-invites'
  * CHECK pins it too). Staff cannot override an opt-out: blocked_optout rows
  * have no approval path (approve route refuses them).
  *
- * F3 (AFC-512, RECORDED GAP): the rolling count below (countInviterWindows)
- * is a UX pre-check ONLY and the count-then-insert is a known TOCTOU: 20
- * parallel submits can all read a below-limit count and all queue. Atomic
- * enforcement (BEFORE INSERT trigger serialised per inviter+day, rewriting
- * over-limit rows to blocked_rate_limit) is specified but NOT landed: the
- * trigger would sit on event_invites (owned by AFC-480/0005) and its
- * rollback drops a control whose referent survives, which the
- * rollback-control gate refuses without a CTO-signed grandfather entry.
- * Owner: CTO. Until that lands, the Flow/query count stays the UX
- * pre-check and burst abuse is handled by branch-admin approval of the
- * blocked rows, not by a race-free cap.
+ * F3 CLOSED (AFC-516, ADR-0011 ledger-slot claim): the quota verdict is the
+ * atomic `claimInviteQuota` below, not the rolling count. Concurrent writers
+ * claim slots by INSERT into invite_quota_slots and serialize on the UNIQUE
+ * (inviter_user, period, period_start, slot_no): exactly D day-winners and W
+ * week-winners exist regardless of interleaving. `countInviterWindows` stays
+ * only as the advisory UX pre-check feeding the blocked-reason text; it
+ * decides nothing. The claim guarantees the cap is never queued past; it
+ * does NOT guarantee quota is never wasted -- crash orphans between claim
+ * and invite write (or between claim and release) consume a slot in the
+ * fail-safe direction (blocks more, never queues past the limit), so there
+ * is deliberately no sweeper. Windows are calendar windows in Africa/Lagos
+ * (day resets at 00:00 Lagos, week is Monday-to-Sunday Lagos); the previous
+ * rolling-24h/7d reading was the approximation this replaces.
  */
 export default defineEventHandler(async (event) => {
   const scope = await getPortalScope(event)
@@ -150,18 +153,21 @@ export default defineEventHandler(async (event) => {
     return { data: { ...blocked, id: String(blocked.id) } }
   }
 
-  // Rolling member limits (10/day + 50/week defaults, per-member columns).
+  // Atomic member quota (AFC-516, ADR-0011): the claim is AUTHORITATIVE.
+  // The rolling count below is advisory only -- it feeds the blocked-reason
+  // text so the member learns the numbers, but it decides nothing. Suppressed
+  // (STOP) numbers returned above and never claim.
   const inviterUserId = scope.session.user.id
   const [counts, limits] = await Promise.all([
     countInviterWindows(event, scope, inviterUserId),
     readMemberLimits(event, scope, inviterUserId),
   ])
-  const overLimit = counts.sent24h >= limits.daily || counts.sent7d >= limits.weekly
+  const claim = await claimInviteQuota(event, scope, inviterUserId, limits)
 
   let status = 'queued'
   let approvalRequired = false
   let blockedReason: string | null = null
-  if (overLimit && counts.countsVerified) {
+  if (!claim.allowed) {
     status = 'blocked_rate_limit'
     approvalRequired = true
     blockedReason =
@@ -175,25 +181,36 @@ export default defineEventHandler(async (event) => {
     blockedReason = 'That event needs staff approval for invitations.'
   }
 
-  const created = await createItem<Record<string, unknown>>(event, scope, 'event_invites', {
-    event: eventId,
-    branch,
-    inviter_person: inviterPerson,
-    inviter_user: inviterUserId,
-    invitee_name: inviteeName,
-    invitee_phone: phone,
-    invitee_contact_hash: contactHash,
-    invitee_relationship: relationship,
-    invitee_age_band: ageBand,
-    guardian_phone: guardian || null,
-    channel_choice: channel,
-    consent_basis: 'inviter_vouched',
-    message_rendered: rendered,
-    variables_snapshot: variables,
-    status,
-    approval_required: approvalRequired,
-    blocked_reason: blockedReason,
-  })
+  let created: Record<string, unknown>
+  try {
+    created = await createItem<Record<string, unknown>>(event, scope, 'event_invites', {
+      event: eventId,
+      branch,
+      inviter_person: inviterPerson,
+      inviter_user: inviterUserId,
+      invitee_name: inviteeName,
+      invitee_phone: phone,
+      invitee_contact_hash: contactHash,
+      invitee_relationship: relationship,
+      invitee_age_band: ageBand,
+      guardian_phone: guardian || null,
+      channel_choice: channel,
+      consent_basis: 'inviter_vouched',
+      message_rendered: rendered,
+      variables_snapshot: variables,
+      status,
+      approval_required: approvalRequired,
+      blocked_reason: blockedReason,
+    })
+  }
+  catch (error) {
+    // No leaked quota on the handled path: a failed invite write releases
+    // the claimed slots before the error propagates. Crash orphans (the
+    // process dying between claim and release) waste quota in the fail-safe
+    // direction -- they block more, never queue past the limit.
+    if (claim.allowed) await claim.release()
+    throw error
+  }
 
   // A member-shaped session (track d) reads back the redacted projection;
   // staff read the full row they just wrote.
