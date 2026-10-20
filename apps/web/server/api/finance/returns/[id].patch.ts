@@ -39,7 +39,8 @@ export default defineEventHandler(async (event) => {
   requireCan(scope, 'weca_returns', 'update')
 
   const id = getRouterParam(event, 'id')
-  if (!id) throw createError({ statusCode: 400, statusMessage: 'A return id is required' })
+  if (!id)
+    throw createError({ statusCode: 400, statusMessage: 'A return id is required' })
   const existing = await findScopedItem<Record<string, unknown>>(
     event,
     scope,
@@ -57,7 +58,8 @@ export default defineEventHandler(async (event) => {
   if (fabricated.length > 0) {
     throw createError({
       statusCode: 403,
-      statusMessage: 'Computed lines are never hand-edited. They arrive from the board formula.',
+      statusMessage:
+        'Computed lines are never hand-edited. They arrive from the board formula.',
       data: { code: 'computed_readonly', fields: fabricated },
     })
   }

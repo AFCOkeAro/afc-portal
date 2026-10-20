@@ -1,13 +1,5 @@
-import {
-  createItem,
-  getPortalScope,
-  listItems,
-  updateItem,
-} from '../../utils/portal'
-import {
-  HARDENING_COLLECTIONS,
-  hardeningAlert,
-} from '../../utils/hardening'
+import { createItem, getPortalScope, listItems, updateItem } from '../../utils/portal'
+import { HARDENING_COLLECTIONS, hardeningAlert } from '../../utils/hardening'
 
 /**
  * Pause-all single action (AFC-525 Q2, US-C5).
@@ -47,19 +39,20 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const body = await readBody<PauseAllBody>(event).catch(() => ({} as PauseAllBody))
+  const body = await readBody<PauseAllBody>(event).catch(() => ({}) as PauseAllBody)
   const reason =
     typeof body.reason === 'string' && body.reason.trim().length > 0
       ? body.reason.trim().slice(0, 280)
       : 'suspected wrong template — pause-all single action (AFC-525)'
-  const disableChannels = body.disable_channels === true || body.disable_channels === 'true'
+  const disableChannels =
+    body.disable_channels === true || body.disable_channels === 'true'
   const onlyChannel =
     typeof body.channel === 'string' &&
     (CHANNEL_KEYS as readonly string[]).includes(body.channel)
       ? body.channel
       : null
 
-  let campaigns: Array<{ id: string | number; key?: string }> = []
+  let campaigns: Array<{ id: string | number; key?: string }>
   try {
     const result = await listItems<{ id: string | number; key?: string }>(
       event,
@@ -101,15 +94,17 @@ export default defineEventHandler(async (event) => {
     }
   }
 
-  let disabledChannels: string[] = []
+  const disabledChannels: string[] = []
   if (disableChannels) {
     try {
-      const channels = await listItems<{ id: string | number; key: string; enabled: boolean }>(
-        event,
-        scope,
-        'communication_channels',
-        { fields: ['id', 'key', 'enabled'], limit: -1 },
-      )
+      const channels = await listItems<{
+        id: string | number
+        key: string
+        enabled: boolean
+      }>(event, scope, 'communication_channels', {
+        fields: ['id', 'key', 'enabled'],
+        limit: -1,
+      })
       const targets = channels.data.filter((row) =>
         onlyChannel ? row.key === onlyChannel : row.enabled === true,
       )
@@ -123,7 +118,8 @@ export default defineEventHandler(async (event) => {
     } catch (error) {
       throw createError({
         statusCode: 503,
-        statusMessage: 'Campaigns paused but channel disable failed — re-run with disable_channels',
+        statusMessage:
+          'Campaigns paused but channel disable failed — re-run with disable_channels',
         data: { code: 'channel_disable_failed', cause: String(error), paused: pausedIds },
       })
     }
@@ -136,7 +132,7 @@ export default defineEventHandler(async (event) => {
     ` reason=${reason}` +
     ` actor=${scope.session.user.id}`
 
-  let checkId: string | null = null
+  let checkId: string | null
   try {
     const check = await createItem<{ id: string }>(
       event,

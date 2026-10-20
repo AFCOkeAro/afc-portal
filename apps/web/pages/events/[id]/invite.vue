@@ -21,9 +21,12 @@ const route = useRoute()
 const api = useApi()
 const id = String(route.params.id)
 
-const { data: event, pending: eventPending, error: eventError } = await useAsyncData(
-  `event-invite-${id}`,
-  () => api.get<EventDetail>(`/api/events/${id}`),
+const {
+  data: event,
+  pending: eventPending,
+  error: eventError,
+} = await useAsyncData(`event-invite-${id}`, () =>
+  api.get<EventDetail>(`/api/events/${id}`),
 )
 
 /**
@@ -32,15 +35,26 @@ const { data: event, pending: eventPending, error: eventError } = await useAsync
  * counts (advisory; the POST ledger claim stays authoritative). Falls back
  * to the schema defaults (10/day, 50/week) when the read fails.
  */
-const { data: quota } = await useAsyncData(
-  'event-invite-quota',
-  () => api.get<{ data: { daily_limit: number, weekly_limit: number, sent_day: number, sent_week: number, remaining_day: number, remaining_week: number, counts_verified: boolean } }>('/api/invites/quota'),
+const { data: quota } = await useAsyncData('event-invite-quota', () =>
+  api.get<{
+    data: {
+      daily_limit: number
+      weekly_limit: number
+      sent_day: number
+      sent_week: number
+      remaining_day: number
+      remaining_week: number
+      counts_verified: boolean
+    }
+  }>('/api/invites/quota'),
 )
 const quotaDaily = computed(() => quota.value?.data.daily_limit ?? 10)
 const quotaWeekly = computed(() => quota.value?.data.weekly_limit ?? 50)
 const quotaSentDay = computed(() => quota.value?.data.sent_day ?? null)
 const quotaSentWeek = computed(() => quota.value?.data.sent_week ?? null)
-const quotaStale = computed(() => quota.value ? quota.value.data.counts_verified === false : false)
+const quotaStale = computed(() =>
+  quota.value ? quota.value.data.counts_verified === false : false,
+)
 
 const inviteeName = ref('')
 const inviteePhone = ref('')
@@ -54,13 +68,15 @@ const inviterNote = ref('')
 const preview = ref<{
   rendered: string
   channel_choice: string
-  eligibility: { eligible: boolean, requires_approval: boolean }
+  eligibility: { eligible: boolean; requires_approval: boolean }
 } | null>(null)
 const previewing = ref(false)
 const submitting = ref(false)
 const fieldErrors = ref<Record<string, string>>({})
 const formError = ref('')
-const created = ref<{ id: string, status: string, blocked_reason: string | null } | null>(null)
+const created = ref<{ id: string; status: string; blocked_reason: string | null } | null>(
+  null,
+)
 
 const relationshipOptions = [
   { label: 'Friend', value: 'friend' },
@@ -84,7 +100,8 @@ const channelOptions = [
 ]
 
 const needsGuardian = computed(
-  () => ageBand.value === 'child' || ageBand.value === 'teen' || ageBand.value === 'unknown',
+  () =>
+    ageBand.value === 'child' || ageBand.value === 'teen' || ageBand.value === 'unknown',
 )
 const needsAttestation = computed(
   () => ageBand.value === 'child' || ageBand.value === 'teen',
@@ -112,7 +129,7 @@ function payload() {
 }
 
 function applyError(cause: unknown): void {
-  const err = cause as { fields?: Record<string, string>, message?: string }
+  const err = cause as { fields?: Record<string, string>; message?: string }
   fieldErrors.value = err.fields ?? {}
   formError.value = err.message ?? 'Could not submit the invitation'
 }
@@ -127,7 +144,10 @@ async function renderPreview(): Promise<void> {
       payload(),
     )
     preview.value = result.data
-    document.getElementById('preview')?.querySelector('h2')?.focus({ preventScroll: false })
+    document
+      .getElementById('preview')
+      ?.querySelector('h2')
+      ?.focus({ preventScroll: false })
   } catch (cause) {
     preview.value = null
     applyError(cause)
@@ -140,10 +160,9 @@ async function confirmInvite(): Promise<void> {
   submitting.value = true
   formError.value = ''
   try {
-    const result = await api.post<{ data: { id: string, status: string, blocked_reason: string | null } }>(
-      '/api/invites',
-      payload(),
-    )
+    const result = await api.post<{
+      data: { id: string; status: string; blocked_reason: string | null }
+    }>('/api/invites', payload())
     created.value = {
       id: String(result.data.id),
       status: String(result.data.status),
@@ -202,7 +221,10 @@ async function confirmInvite(): Promise<void> {
         :color="created.status === 'blocked_optout' ? 'error' : 'success'"
         variant="subtle"
         :title="`Invitation ${created.status.replaceAll('_', ' ')}`"
-        :description="created.blocked_reason ?? 'The single invitation message is queued. Track it under My invitations.'"
+        :description="
+          created.blocked_reason ??
+          'The single invitation message is queued. Track it under My invitations.'
+        "
       />
 
       <SectionNav :sections="sections" />
@@ -218,10 +240,19 @@ async function confirmInvite(): Promise<void> {
               <UInput v-model="inviteeName" autocomplete="off" class="w-full" />
             </UFormField>
             <UFormField label="Invitee phone" :error="fieldErrors.invitee_phone" required>
-              <UInput v-model="inviteePhone" inputmode="tel" autocomplete="off" class="w-full" />
+              <UInput
+                v-model="inviteePhone"
+                inputmode="tel"
+                autocomplete="off"
+                class="w-full"
+              />
             </UFormField>
             <UFormField label="Relationship">
-              <USelect v-model="relationship" :items="relationshipOptions" class="w-full" />
+              <USelect
+                v-model="relationship"
+                :items="relationshipOptions"
+                class="w-full"
+              />
             </UFormField>
             <UFormField label="Age band" :error="fieldErrors.invitee_age_band" required>
               <USelect v-model="ageBand" :items="ageBandOptions" class="w-full" />
@@ -234,9 +265,18 @@ async function confirmInvite(): Promise<void> {
               help="Invitees under 18 are messaged via their guardian, never directly."
               required
             >
-              <UInput v-model="guardianPhone" inputmode="tel" autocomplete="off" class="w-full" />
+              <UInput
+                v-model="guardianPhone"
+                inputmode="tel"
+                autocomplete="off"
+                class="w-full"
+              />
             </UFormField>
-            <UFormField v-if="needsAttestation" label="Guardian consent" :error="fieldErrors.guardian_attested">
+            <UFormField
+              v-if="needsAttestation"
+              label="Guardian consent"
+              :error="fieldErrors.guardian_attested"
+            >
               <UCheckbox
                 v-model="guardianAttested"
                 label="A guardian agreed to this invitation and staff may verify it"
@@ -274,7 +314,9 @@ async function confirmInvite(): Promise<void> {
         <h2 class="sr-only" tabindex="-1">Preview and confirm</h2>
         <UCard>
           <template #header>
-            <h2 class="text-base font-semibold" tabindex="-1">Rendered preview before confirming</h2>
+            <h2 class="text-base font-semibold" tabindex="-1">
+              Rendered preview before confirming
+            </h2>
           </template>
           <UAlert
             v-if="formError"
@@ -307,8 +349,12 @@ async function confirmInvite(): Promise<void> {
           >
             {{ preview.rendered }}
           </div>
-          <p v-if="preview?.eligibility.requires_approval" class="mt-2 text-sm text-amber-600">
-            This event needs staff approval for invitations — your invite will wait as pending approval.
+          <p
+            v-if="preview?.eligibility.requires_approval"
+            class="mt-2 text-sm text-amber-600"
+          >
+            This event needs staff approval for invitations — your invite will wait as
+            pending approval.
           </p>
         </UCard>
       </section>
@@ -319,20 +365,28 @@ async function confirmInvite(): Promise<void> {
           <template #header>
             <h2 class="text-base font-semibold" tabindex="-1">Daily and weekly limits</h2>
           </template>
-            <p class="text-sm text-gray-600 dark:text-gray-300">
-              <span v-if="quotaSentDay !== null && quotaSentWeek !== null">
-                You have sent <strong class="tabular-nums">{{ quotaSentDay }}</strong> in the last 24h
-                (limit <strong class="tabular-nums">{{ quotaDaily }}</strong>) and
-                <strong class="tabular-nums">{{ quotaSentWeek }}</strong> in the last 7 days
-                (limit <strong class="tabular-nums">{{ quotaWeekly }}</strong>).
-                <span v-if="quotaStale">Counts could not be verified just now — the send-time check still applies.</span>
-              </span>
-              <span v-else>
-                Each member may send <strong>{{ quotaDaily }} invitations per day and {{ quotaWeekly }} per week</strong>.
-              </span>
-              Above the limit the invitation is held for your branch admin to approve —
-              nothing is sent silently. A number that replied STOP is never messaged again.
-            </p>
+          <p class="text-sm text-gray-600 dark:text-gray-300">
+            <span v-if="quotaSentDay !== null && quotaSentWeek !== null">
+              You have sent <strong class="tabular-nums">{{ quotaSentDay }}</strong> in
+              the last 24h (limit <strong class="tabular-nums">{{ quotaDaily }}</strong
+              >) and <strong class="tabular-nums">{{ quotaSentWeek }}</strong> in the last
+              7 days (limit <strong class="tabular-nums">{{ quotaWeekly }}</strong
+              >).
+              <span v-if="quotaStale"
+                >Counts could not be verified just now — the send-time check still
+                applies.</span
+              >
+            </span>
+            <span v-else>
+              Each member may send
+              <strong
+                >{{ quotaDaily }} invitations per day and {{ quotaWeekly }} per
+                week</strong
+              >.
+            </span>
+            Above the limit the invitation is held for your branch admin to approve —
+            nothing is sent silently. A number that replied STOP is never messaged again.
+          </p>
         </UCard>
       </section>
     </div>

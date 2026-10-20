@@ -1,7 +1,5 @@
 <script setup lang="ts">
-import { COLLECTIONS } from '@afc/shared'
-import type { BranchSummary, ServiceRow } from '~/types/portal'
-import type { Paginated } from '~/types/portal'
+import type { BranchSummary, ServiceRow, Paginated } from '~/types/portal'
 
 definePageMeta({ middleware: 'staff' })
 
@@ -83,7 +81,10 @@ function formatDate(value: string): string {
 
 <template>
   <div>
-    <PageHeader title="Sunday services" description="Planned and completed services with their rosters.">
+    <PageHeader
+      title="Sunday services"
+      description="Planned and completed services with their rosters."
+    >
       <template #actions>
         <PermissionGate :collection="COLLECTIONS.sundayServices" action="create">
           <UButton label="Plan a service" icon="i-lucide-plus" @click="showForm = true" />
@@ -130,7 +131,9 @@ function formatDate(value: string): string {
       <div v-else class="mt-4 overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
           <thead>
-            <tr class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+            <tr
+              class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400"
+            >
               <th class="px-3 py-2 font-medium">Service</th>
               <th class="px-3 py-2 font-medium">Date</th>
               <th class="px-3 py-2 font-medium">Branch</th>
@@ -140,7 +143,11 @@ function formatDate(value: string): string {
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-            <tr v-for="service in rows" :key="service.id" class="hover:bg-gray-50 dark:hover:bg-gray-900/60">
+            <tr
+              v-for="service in rows"
+              :key="service.id"
+              class="hover:bg-gray-50 dark:hover:bg-gray-900/60"
+            >
               <td class="px-3 py-3">
                 <NuxtLink
                   :to="`/services/${service.id}`"

@@ -23,8 +23,10 @@ export default defineEventHandler(async (event): Promise<BranchSummary[]> => {
   requireCan(scope, 'branches', 'read')
 
   const query = getQuery(event)
-  const zone = typeof query.zone === 'string' && query.zone.length > 0 ? query.zone : undefined
-  const area = typeof query.area === 'string' && query.area.length > 0 ? query.area : undefined
+  const zone =
+    typeof query.zone === 'string' && query.zone.length > 0 ? query.zone : undefined
+  const area =
+    typeof query.area === 'string' && query.area.length > 0 ? query.area : undefined
 
   const visibleZones = scope.isArea ? [] : await scopeZoneIds(event, scope)
   requireZoneInScope(scope, zone, visibleZones)

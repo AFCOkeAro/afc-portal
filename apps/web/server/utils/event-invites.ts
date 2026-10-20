@@ -134,13 +134,41 @@ export function inviteCapabilities(role: string): InviteCapabilities {
   switch (role) {
     case 'super_admin':
     case 'area_admin':
-      return { create: true, read: true, readFull: true, approve: true, retry: true, exportCsv: true }
+      return {
+        create: true,
+        read: true,
+        readFull: true,
+        approve: true,
+        retry: true,
+        exportCsv: true,
+      }
     case 'branch_admin':
-      return { create: true, read: true, readFull: true, approve: true, retry: true, exportCsv: true }
+      return {
+        create: true,
+        read: true,
+        readFull: true,
+        approve: true,
+        retry: true,
+        exportCsv: true,
+      }
     case 'member':
-      return { create: true, read: true, readFull: false, approve: false, retry: false, exportCsv: false }
+      return {
+        create: true,
+        read: true,
+        readFull: false,
+        approve: false,
+        retry: false,
+        exportCsv: false,
+      }
     default:
-      return { create: false, read: false, readFull: false, approve: false, retry: false, exportCsv: false }
+      return {
+        create: false,
+        read: false,
+        readFull: false,
+        approve: false,
+        retry: false,
+        exportCsv: false,
+      }
   }
 }
 
@@ -180,9 +208,10 @@ export function redactInviteForMember(row: InviteRow): Record<string, unknown> {
     invitee_age_band: row.invitee_age_band,
     status: row.status,
     approval_required: row.approval_required ?? false,
-    blocked_reason: row.status === 'blocked_rate_limit' || row.status === 'pending_approval'
-      ? (row.blocked_reason ?? null)
-      : null,
+    blocked_reason:
+      row.status === 'blocked_rate_limit' || row.status === 'pending_approval'
+        ? (row.blocked_reason ?? null)
+        : null,
     created_at: row.created_at,
   }
 }
@@ -242,7 +271,10 @@ const INVITER_NOTE_PHONE_RE = /(\+?\d[\d\s\-().]{6,}\d)/
  * field (the note is never silently stripped: a member who pastes a link
  * learns why it was refused).
  */
-export function validateInviterNote(note: unknown): { note: string, error: string | null } {
+export function validateInviterNote(note: unknown): {
+  note: string
+  error: string | null
+} {
   const text = typeof note === 'string' ? note.trim() : ''
   if (!text) return { note: '', error: null }
   if (text.length > INVITER_NOTE_MAX_LENGTH) {
@@ -252,10 +284,18 @@ export function validateInviterNote(note: unknown): { note: string, error: strin
     }
   }
   if (INVITER_NOTE_URL_RE.test(text)) {
-    return { note: '', error: 'Links are not allowed in the note; the invitation carries the official RSVP link' }
+    return {
+      note: '',
+      error:
+        'Links are not allowed in the note; the invitation carries the official RSVP link',
+    }
   }
   if (INVITER_NOTE_PHONE_RE.test(text)) {
-    return { note: '', error: 'Phone numbers are not allowed in the note; the invitee number is already on the invitation' }
+    return {
+      note: '',
+      error:
+        'Phone numbers are not allowed in the note; the invitee number is already on the invitation',
+    }
   }
   return { note: text, error: null }
 }
@@ -276,10 +316,15 @@ export function formatInviteNoteDelimited(note: string): string {
  */
 export function throwOnForgedInviterIdentity(body: Record<string, unknown>): void {
   for (const field of ['inviter_person', 'inviter_user', 'inviter', 'inviter_id']) {
-    if (body[field] !== undefined && body[field] !== null && String(body[field]).trim() !== '') {
+    if (
+      body[field] !== undefined &&
+      body[field] !== null &&
+      String(body[field]).trim() !== ''
+    ) {
       throw createError({
         statusCode: 403,
-        statusMessage: 'Inviter identity comes from your login; do not send inviter fields',
+        statusMessage:
+          'Inviter identity comes from your login; do not send inviter fields',
         data: { code: 'inviter_identity_forged', field },
       })
     }
@@ -341,7 +386,8 @@ export async function loadInviteEvent(
     {
       accessToken: scope.token,
       query: {
-        fields: 'id,title,branch,visibility,invite_eligible,invite_requires_approval,start_at,location,live_join_url',
+        fields:
+          'id,title,branch,visibility,invite_eligible,invite_requires_approval,start_at,location,live_join_url',
       },
     },
   ).then(
@@ -359,7 +405,8 @@ export async function loadInviteEvent(
     title: typeof row.title === 'string' ? row.title : 'Church event',
     branch: typeof row.branch === 'string' ? row.branch : null,
     visibility: typeof row.visibility === 'string' ? row.visibility : 'public',
-    invite_eligible: row.invite_eligible === undefined ? true : row.invite_eligible === true,
+    invite_eligible:
+      row.invite_eligible === undefined ? true : row.invite_eligible === true,
     invite_requires_approval: row.invite_requires_approval === true,
     start_at: typeof row.start_at === 'string' ? row.start_at : null,
     location: typeof row.location === 'string' ? row.location : null,
@@ -396,8 +443,7 @@ export async function isInviteSuppressed(
       },
     )
     return response.data.length > 0
-  }
-  catch {
+  } catch {
     return false
   }
 }
@@ -446,8 +492,7 @@ export async function countInviterWindows(
       sent7d: week.meta?.filter_count ?? 0,
       countsVerified: true,
     }
-  }
-  catch {
+  } catch {
     return { sent24h: 0, sent7d: 0, countsVerified: false }
   }
 }
@@ -458,7 +503,7 @@ export async function readMemberLimits(
   event: H3Event,
   scope: PortalScope,
   userId: string,
-): Promise<{ daily: number, weekly: number }> {
+): Promise<{ daily: number; weekly: number }> {
   try {
     const response = await directusFetch<{ data: Record<string, unknown> }>(
       event,
@@ -474,8 +519,7 @@ export async function readMemberLimits(
       daily: Number.isInteger(daily) && daily >= 0 ? daily : 10,
       weekly: Number.isInteger(weekly) && weekly >= 0 ? weekly : 50,
     }
-  }
-  catch {
+  } catch {
     return { daily: 10, weekly: 50 }
   }
 }
@@ -539,8 +583,7 @@ export interface InviteQuotaLimits {
 }
 
 export type InviteQuotaClaim =
-  | { allowed: true, release: () => Promise<void> }
-  | { allowed: false }
+  { allowed: true; release: () => Promise<void> } | { allowed: false }
 
 /**
  * True when a Directus write error is a uniqueness conflict. Directus
@@ -554,7 +597,10 @@ export function isUniqueViolation(error: unknown): boolean {
     status?: number
     statusMessage?: string
     message?: string
-    data?: { code?: string, errors?: Array<{ message?: string, extensions?: { code?: string } }> }
+    data?: {
+      code?: string
+      errors?: Array<{ message?: string; extensions?: { code?: string } }>
+    }
   }
   const status = err?.statusCode ?? err?.status ?? 0
   if (status !== 400) return false
@@ -579,15 +625,19 @@ async function claimQuotaSlot(
 ): Promise<string | null> {
   for (let slot = 0; slot < limit; slot++) {
     try {
-      const row = await createItem<{ id: string | number }>(event, scope, 'invite_quota_slots', {
-        inviter_user: inviterUserId,
-        period,
-        period_start: periodStart,
-        slot_no: slot,
-      })
+      const row = await createItem<{ id: string | number }>(
+        event,
+        scope,
+        'invite_quota_slots',
+        {
+          inviter_user: inviterUserId,
+          period,
+          period_start: periodStart,
+          slot_no: slot,
+        },
+      )
       return String(row.id)
-    }
-    catch (error) {
+    } catch (error) {
       // Taken by a concurrent claimant: try the next slot. Any other error
       // is a real failure -- fail closed (no invite written) rather than
       // guessing that quota remains.
@@ -629,8 +679,7 @@ export async function claimInviteQuota(
       if (id === null) continue
       try {
         await deleteItem(event, scope, 'invite_quota_slots', id)
-      }
-      catch {
+      } catch {
         // Best-effort: a failed release wastes one slot (fail-safe), it must
         // never turn a successful claim into a 500.
       }
@@ -640,14 +689,27 @@ export async function claimInviteQuota(
   if (!Number.isInteger(limits.daily) || limits.daily <= 0) return { allowed: false }
   if (!Number.isInteger(limits.weekly) || limits.weekly <= 0) return { allowed: false }
 
-  const daySlot = await claimQuotaSlot(event, scope, inviterUserId, 'day', lagosDayKey(now), limits.daily)
+  const daySlot = await claimQuotaSlot(
+    event,
+    scope,
+    inviterUserId,
+    'day',
+    lagosDayKey(now),
+    limits.daily,
+  )
   if (daySlot === null) return { allowed: false }
 
   let weekSlot: string | null
   try {
-    weekSlot = await claimQuotaSlot(event, scope, inviterUserId, 'week', lagosWeekMonday(now), limits.weekly)
-  }
-  catch (error) {
+    weekSlot = await claimQuotaSlot(
+      event,
+      scope,
+      inviterUserId,
+      'week',
+      lagosWeekMonday(now),
+      limits.weekly,
+    )
+  } catch (error) {
     await release([daySlot])
     throw error
   }

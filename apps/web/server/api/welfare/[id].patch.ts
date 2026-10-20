@@ -90,8 +90,7 @@ export default defineEventHandler(async (event) => {
     await findScopedItem(event, scope, 'people', form.person, { fields: ['id'] })
   }
 
-  const assignedChanged =
-    (body.assigned_to ?? null) !== (existing.assigned_to ?? null)
+  const assignedChanged = (body.assigned_to ?? null) !== (existing.assigned_to ?? null)
   const statusChanged = form.status !== existing.status
 
   const updated = await updateItem<Record<string, unknown>>(
@@ -120,7 +119,11 @@ export default defineEventHandler(async (event) => {
   // Every mutation leaves its audit row: status changes and assignments get
   // their own event types so the timeline reads as a trail, not a log of
   // "updated".
-  const auditType = statusChanged ? 'status_changed' : assignedChanged ? 'assigned' : 'updated'
+  const auditType = statusChanged
+    ? 'status_changed'
+    : assignedChanged
+      ? 'assigned'
+      : 'updated'
   const auditSummary =
     auditType === 'status_changed'
       ? `Status changed to ${form.status.replace(/_/g, ' ')}`

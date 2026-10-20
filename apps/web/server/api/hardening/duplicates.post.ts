@@ -1,9 +1,4 @@
-import {
-  createItem,
-  getPortalScope,
-  requireCan,
-  updateItem,
-} from '../../utils/portal'
+import { createItem, getPortalScope, requireCan, updateItem } from '../../utils/portal'
 import {
   HARDENING_COLLECTIONS,
   buildDuplicateWarning,
@@ -48,9 +43,14 @@ export default defineEventHandler(async (event) => {
       branch: typeof body.branch === 'string' ? body.branch : null,
     })
     try {
-      const row = await createItem<{ id: string }>(event, scope, HARDENING_COLLECTIONS.duplicateReviews, {
-        ...warning,
-      })
+      const row = await createItem<{ id: string }>(
+        event,
+        scope,
+        HARDENING_COLLECTIONS.duplicateReviews,
+        {
+          ...warning,
+        },
+      )
       return { warned: true, id: row.id, status: 'pending' as const }
     } catch (error) {
       throw createError({
@@ -80,12 +80,18 @@ export default defineEventHandler(async (event) => {
     })
   }
   try {
-    const row = await updateItem<{ id: string }>(event, scope, HARDENING_COLLECTIONS.duplicateReviews, review, {
-      status,
-      decided_by: body.decided_by,
-      decision_reason: body.reason,
-      decided_at: new Date().toISOString(),
-    })
+    const row = await updateItem<{ id: string }>(
+      event,
+      scope,
+      HARDENING_COLLECTIONS.duplicateReviews,
+      review,
+      {
+        status,
+        decided_by: body.decided_by,
+        decision_reason: body.reason,
+        decided_at: new Date().toISOString(),
+      },
+    )
     return { decided: true, id: row.id, status }
   } catch (error) {
     throw createError({

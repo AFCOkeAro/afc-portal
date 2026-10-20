@@ -1,14 +1,6 @@
 import type { H3Event } from 'h3'
-import {
-  campusProgressScopeFilter,
-  COACHING_PROGRESS_FIELDS,
-} from './campus'
-import {
-  listItems,
-  mergeFilters,
-  requireCan,
-  type PortalScope,
-} from './portal'
+import { campusProgressScopeFilter, COACHING_PROGRESS_FIELDS } from './campus'
+import { listItems, mergeFilters, requireCan, type PortalScope } from './portal'
 
 export interface CampusProgressFilters {
   programme: string | null
@@ -38,7 +30,7 @@ export async function collectCampusProgress(
   )
 
   const rows: Array<Record<string, unknown>> = []
-  let total = 0
+  let total: number
   let page = 1
   for (;;) {
     const result = await listItems<Record<string, unknown>>(

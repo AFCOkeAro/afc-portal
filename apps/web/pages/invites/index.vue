@@ -56,7 +56,10 @@ const query = computed(() => ({
 
 const { data, pending, error, refresh } = await useAsyncData(
   'staff-invites',
-  () => api.get<{ data: InviteRow[], meta: { total: number } }>('/api/invites', { query: query.value }),
+  () =>
+    api.get<{ data: InviteRow[]; meta: { total: number } }>('/api/invites', {
+      query: query.value,
+    }),
   { watch: [query] },
 )
 
@@ -99,7 +102,8 @@ async function act(id: string, action: 'approve' | 'retry' | 'withdraw'): Promis
     actionDone.value = `Invite ${action === 'approve' ? 'approved and queued' : action === 'retry' ? 're-queued once' : 'withdrawn'}.`
     await refresh()
   } catch (cause) {
-    actionError.value = cause instanceof Error ? cause.message : `Could not ${action} the invite`
+    actionError.value =
+      cause instanceof Error ? cause.message : `Could not ${action} the invite`
   } finally {
     acting.value = null
   }
@@ -136,13 +140,28 @@ async function act(id: string, action: 'approve' | 'retry' | 'withdraw'): Promis
     <PermissionGate :collection="COLLECTIONS.events" action="read">
       <div v-if="canManage" class="mb-4 grid max-w-3xl gap-3 sm:grid-cols-4">
         <UFormField label="Event id">
-          <UInput v-model="eventFilter" placeholder="event uuid" class="w-full" @update:model-value="page = 1" />
+          <UInput
+            v-model="eventFilter"
+            placeholder="event uuid"
+            class="w-full"
+            @update:model-value="page = 1"
+          />
         </UFormField>
         <UFormField label="Inviter user id">
-          <UInput v-model="inviterFilter" placeholder="user uuid" class="w-full" @update:model-value="page = 1" />
+          <UInput
+            v-model="inviterFilter"
+            placeholder="user uuid"
+            class="w-full"
+            @update:model-value="page = 1"
+          />
         </UFormField>
         <UFormField label="Status">
-          <USelect v-model="statusFilter" :items="statusOptions" class="w-full" @update:model-value="page = 1" />
+          <USelect
+            v-model="statusFilter"
+            :items="statusOptions"
+            class="w-full"
+            @update:model-value="page = 1"
+          />
         </UFormField>
       </div>
 
@@ -163,11 +182,15 @@ async function act(id: string, action: 'approve' | 'retry' | 'withdraw'): Promis
         <template #header>
           <h2 class="text-base font-semibold" tabindex="-1">Invitations ({{ total }})</h2>
         </template>
-        <p v-if="rows.length === 0" class="text-sm text-gray-600 dark:text-gray-300">No invitations match.</p>
+        <p v-if="rows.length === 0" class="text-sm text-gray-600 dark:text-gray-300">
+          No invitations match.
+        </p>
         <div v-else class="overflow-x-auto">
           <table class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
             <thead>
-              <tr class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+              <tr
+                class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400"
+              >
                 <th class="px-3 py-2 font-medium">Invitee</th>
                 <th class="px-3 py-2 font-medium">Status</th>
                 <th class="px-3 py-2 font-medium">Reason / error</th>
@@ -178,16 +201,25 @@ async function act(id: string, action: 'approve' | 'retry' | 'withdraw'): Promis
               <tr v-for="row in rows" :key="row.id">
                 <td class="px-3 py-2">
                   <p class="font-medium">{{ row.invitee_name ?? '—' }}</p>
-                  <p class="font-mono text-xs text-gray-500">{{ row.invitee_phone ?? '—' }} · {{ row.channel_choice ?? 'auto' }}</p>
+                  <p class="font-mono text-xs text-gray-500">
+                    {{ row.invitee_phone ?? '—' }} · {{ row.channel_choice ?? 'auto' }}
+                  </p>
                 </td>
                 <td class="px-3 py-2">
-                  <UBadge color="neutral" variant="subtle">{{ (row.status ?? 'unknown').replaceAll('_', ' ') }}</UBadge>
+                  <UBadge color="neutral" variant="subtle">{{
+                    (row.status ?? 'unknown').replaceAll('_', ' ')
+                  }}</UBadge>
                 </td>
-                <td class="px-3 py-2 text-xs text-gray-600 dark:text-gray-300">{{ row.blocked_reason ?? '—' }}</td>
+                <td class="px-3 py-2 text-xs text-gray-600 dark:text-gray-300">
+                  {{ row.blocked_reason ?? '—' }}
+                </td>
                 <td class="px-3 py-2">
                   <div class="flex flex-wrap gap-1">
                     <UButton
-                      v-if="row.status === 'pending_approval' || row.status === 'blocked_rate_limit'"
+                      v-if="
+                        row.status === 'pending_approval' ||
+                        row.status === 'blocked_rate_limit'
+                      "
                       size="xs"
                       color="success"
                       variant="outline"
@@ -205,7 +237,11 @@ async function act(id: string, action: 'approve' | 'retry' | 'withdraw'): Promis
                       @click="act(row.id, 'retry')"
                     />
                     <UButton
-                      v-if="['pending_approval', 'queued', 'blocked_rate_limit'].includes(row.status ?? '')"
+                      v-if="
+                        ['pending_approval', 'queued', 'blocked_rate_limit'].includes(
+                          row.status ?? '',
+                        )
+                      "
                       size="xs"
                       color="neutral"
                       variant="outline"
@@ -220,9 +256,23 @@ async function act(id: string, action: 'approve' | 'retry' | 'withdraw'): Promis
           </table>
         </div>
         <div class="mt-3 flex items-center gap-2">
-          <UButton size="xs" color="neutral" variant="outline" label="Previous" :disabled="page <= 1" @click="page = Math.max(1, page - 1)" />
+          <UButton
+            size="xs"
+            color="neutral"
+            variant="outline"
+            label="Previous"
+            :disabled="page <= 1"
+            @click="page = Math.max(1, page - 1)"
+          />
           <span class="text-xs text-gray-500">Page {{ page }} of {{ pageCount }}</span>
-          <UButton size="xs" color="neutral" variant="outline" label="Next" :disabled="page >= pageCount" @click="page = Math.min(pageCount, page + 1)" />
+          <UButton
+            size="xs"
+            color="neutral"
+            variant="outline"
+            label="Next"
+            :disabled="page >= pageCount"
+            @click="page = Math.min(pageCount, page + 1)"
+          />
         </div>
         <UAlert
           v-if="actionError"

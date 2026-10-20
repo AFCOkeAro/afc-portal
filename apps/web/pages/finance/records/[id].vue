@@ -38,7 +38,9 @@ async function transition(status: 'submitted' | 'confirmed') {
     await refresh()
   } catch (cause) {
     actionError.value =
-      cause instanceof ApiRequestError ? cause.message : 'Could not move the record. Try again.'
+      cause instanceof ApiRequestError
+        ? cause.message
+        : 'Could not move the record. Try again.'
   } finally {
     acting.value = false
   }
@@ -55,7 +57,11 @@ const statusColor: Record<string, 'success' | 'warning' | 'neutral'> = {
   <div>
     <PageHeader
       title="Financial record"
-      :description="record ? `${record.branch_name || 'No branch'} · ${record.month.slice(0, 7)}` : 'A month of treasurer capture.'"
+      :description="
+        record
+          ? `${record.branch_name || 'No branch'} · ${record.month.slice(0, 7)}`
+          : 'A month of treasurer capture.'
+      "
     >
       <template #actions>
         <UButton
@@ -93,7 +99,9 @@ const statusColor: Record<string, 'success' | 'warning' | 'neutral'> = {
         <dl class="grid gap-3 sm:grid-cols-2">
           <div>
             <dt class="text-xs uppercase tracking-wide text-gray-500">Income</dt>
-            <dd class="text-lg font-semibold">{{ amountsVisible ? formatMoney(record.income) : 'Hidden on this account' }}</dd>
+            <dd class="text-lg font-semibold">
+              {{ amountsVisible ? formatMoney(record.income) : 'Hidden on this account' }}
+            </dd>
           </div>
           <div>
             <dt class="text-xs uppercase tracking-wide text-gray-500">Currency</dt>
@@ -101,13 +109,27 @@ const statusColor: Record<string, 'success' | 'warning' | 'neutral'> = {
           </div>
           <div>
             <dt class="text-xs uppercase tracking-wide text-gray-500">Intervention</dt>
-            <dd class="text-lg font-semibold">{{ amountsVisible ? formatMoney(record.intervention) : 'Hidden on this account' }}</dd>
-            <p class="text-xs text-gray-500">Manual input, never derived (ADR-0008 R3).</p>
+            <dd class="text-lg font-semibold">
+              {{
+                amountsVisible
+                  ? formatMoney(record.intervention)
+                  : 'Hidden on this account'
+              }}
+            </dd>
+            <p class="text-xs text-gray-500">
+              Manual input, never derived (ADR-0008 R3).
+            </p>
           </div>
           <div>
             <dt class="text-xs uppercase tracking-wide text-gray-500">Faith City</dt>
-            <dd class="text-lg font-semibold">{{ amountsVisible ? formatMoney(record.faith_city) : 'Hidden on this account' }}</dd>
-            <p class="text-xs text-gray-500">Manual input, never derived (ADR-0008 R3).</p>
+            <dd class="text-lg font-semibold">
+              {{
+                amountsVisible ? formatMoney(record.faith_city) : 'Hidden on this account'
+              }}
+            </dd>
+            <p class="text-xs text-gray-500">
+              Manual input, never derived (ADR-0008 R3).
+            </p>
           </div>
         </dl>
 
@@ -122,13 +144,21 @@ const statusColor: Record<string, 'success' | 'warning' | 'neutral'> = {
         </template>
 
         <ol class="grid gap-2 text-sm">
-          <li><span class="font-medium">Submitted by:</span> {{ record.submitted_by ?? '—' }}</li>
-          <li><span class="font-medium">Confirmed by:</span> {{ record.confirmed_by ?? '—' }}</li>
-          <li><span class="font-medium">Updated:</span> {{ record.updated_at ?? '—' }}</li>
+          <li>
+            <span class="font-medium">Submitted by:</span>
+            {{ record.submitted_by ?? '—' }}
+          </li>
+          <li>
+            <span class="font-medium">Confirmed by:</span>
+            {{ record.confirmed_by ?? '—' }}
+          </li>
+          <li>
+            <span class="font-medium">Updated:</span> {{ record.updated_at ?? '—' }}
+          </li>
         </ol>
         <p class="mt-3 text-xs text-gray-500">
-          Submission and confirmation are audited: the actor is stamped on the
-          record and the Directus activity log holds the transition.
+          Submission and confirmation are audited: the actor is stamped on the record and
+          the Directus activity log holds the transition.
         </p>
 
         <UAlert

@@ -44,18 +44,22 @@ export default defineEventHandler(async (event) => {
     inbound_text?: unknown
   }>(event)
 
-  const contactHash = typeof body.contact_hash === 'string' ? body.contact_hash.trim() : ''
+  const contactHash =
+    typeof body.contact_hash === 'string' ? body.contact_hash.trim() : ''
   if (!contactHash) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'A contact hash is required (hash the number first; this route takes no raw phone)',
+      statusMessage:
+        'A contact hash is required (hash the number first; this route takes no raw phone)',
       data: { code: 'contact_hash_required' },
     })
   }
 
-  const channel = typeof body.channel === 'string' && (CHANNELS as readonly string[]).includes(body.channel)
-    ? (body.channel as (typeof CHANNELS)[number])
-    : null
+  const channel =
+    typeof body.channel === 'string' &&
+    (CHANNELS as readonly string[]).includes(body.channel)
+      ? (body.channel as (typeof CHANNELS)[number])
+      : null
   if (!channel) {
     throw createError({
       statusCode: 400,
@@ -65,24 +69,32 @@ export default defineEventHandler(async (event) => {
   }
 
   const reason: SuppressionReason =
-    typeof body.reason === 'string' && (REASONS as readonly string[]).includes(body.reason)
+    typeof body.reason === 'string' &&
+    (REASONS as readonly string[]).includes(body.reason)
       ? (body.reason as SuppressionReason)
       : 'opt_out_stop'
 
-  const inbound = typeof body.inbound_text === 'string' ? parseStopRequest(body.inbound_text) : null
+  const inbound =
+    typeof body.inbound_text === 'string' ? parseStopRequest(body.inbound_text) : null
   const storedChannel = suppressionChannelFor(channel, inbound?.allChannels ?? false)
 
-  const source = body.source === 'member_reply' || body.source === 'flow' || body.source === 'tick'
-    ? body.source
-    : 'staff_action'
+  const source =
+    body.source === 'member_reply' || body.source === 'flow' || body.source === 'tick'
+      ? body.source
+      : 'staff_action'
 
   try {
-    const row = await createItem<{ id: string }>(event, scope, HARDENING_COLLECTIONS.suppressions, {
-      contact_hash: contactHash,
-      channel: storedChannel,
-      reason,
-      source,
-    })
+    const row = await createItem<{ id: string }>(
+      event,
+      scope,
+      HARDENING_COLLECTIONS.suppressions,
+      {
+        contact_hash: contactHash,
+        channel: storedChannel,
+        reason,
+        source,
+      },
+    )
     return { suppressed: true, id: row.id, channel: storedChannel, reason, source }
   } catch (error) {
     throw createError({

@@ -45,7 +45,8 @@ export async function collectPeopleGroups(
       page,
     })
     for (const row of result.data) {
-      const key = groupBy === 'zone' ? (row.zone ?? 'unassigned') : (row.branch ?? 'unassigned')
+      const key =
+        groupBy === 'zone' ? (row.zone ?? 'unassigned') : (row.branch ?? 'unassigned')
       groups.set(String(key), (groups.get(String(key)) ?? 0) + 1)
     }
     if (result.data.length < 200) break
@@ -106,7 +107,12 @@ export async function collectPeopleCompare(
   scope: PortalScope,
   groupBy: 'branch' | 'zone',
   dataYear: number,
-): Promise<{ rows: PeopleCompareRow[]; current: number; prior: number; has_data: boolean }> {
+): Promise<{
+  rows: PeopleCompareRow[]
+  current: number
+  prior: number
+  has_data: boolean
+}> {
   const [current, prior] = await Promise.all([
     collectPeopleGroups(event, scope, groupBy),
     collectPriorYearGroups(event, scope, groupBy, dataYear),

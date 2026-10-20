@@ -4,7 +4,6 @@ import { BLESSING_TYPES } from '@afc/shared'
 import {
   branchNames,
   csvEscape,
-  getPortalScope,
   listItems,
   mergeFilters,
   requireCan,
@@ -227,7 +226,7 @@ export async function collectBlessings(
   // Chunked (200 per page) so memory grows with the filtered set, not with
   // an unbounded single page. Same bound as the welfare collector.
   const rows: Array<Record<string, unknown>> = []
-  let total = 0
+  let total: number
   let page = 1
   for (;;) {
     const result = await listItems<Record<string, unknown>>(event, scope, 'blessings', {

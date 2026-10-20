@@ -60,12 +60,15 @@ export default defineEventHandler(async (event) => {
   // inviter_* values is forgery -> 403, never silently overwritten.
   throwOnForgedInviterIdentity(body)
   const eventId = typeof body.event === 'string' ? body.event : ''
-  const inviteeName = typeof body.invitee_name === 'string' ? body.invitee_name.trim() : ''
+  const inviteeName =
+    typeof body.invitee_name === 'string' ? body.invitee_name.trim() : ''
   const phone = normalizeInvitePhone(body.invitee_phone)
   const channel = typeof body.channel_choice === 'string' ? body.channel_choice : 'auto'
-  const ageBand = typeof body.invitee_age_band === 'string' ? body.invitee_age_band : 'unknown'
+  const ageBand =
+    typeof body.invitee_age_band === 'string' ? body.invitee_age_band : 'unknown'
   const guardian = normalizeInvitePhone(body.guardian_phone)
-  const relationship = typeof body.invitee_relationship === 'string' ? body.invitee_relationship : null
+  const relationship =
+    typeof body.invitee_relationship === 'string' ? body.invitee_relationship : null
   // F7: note bound to 140 chars, no URLs/phone numbers, delimited render.
   const { note, error: noteError } = validateInviterNote(body.inviter_note)
   // F5: explicit guardian attestation for child/teen/unknown, staff-confirmable.
@@ -75,23 +78,29 @@ export default defineEventHandler(async (event) => {
   if (!eventId) fields.event = 'Choose an event to invite to'
   if (!inviteeName) fields.invitee_name = 'Enter the invitee name'
   if (!phone) fields.invitee_phone = 'Enter the invitee phone number'
-  else if (phone.replace(/\D/g, '').length < 7) fields.invitee_phone = 'That number looks too short'
-  if (!INVITE_CHANNELS.includes(channel as never)) fields.channel_choice = 'Pick WhatsApp, SMS or automatic'
-  if (!INVITE_AGE_BANDS.includes(ageBand as never)) fields.invitee_age_band = 'Pick an age band'
+  else if (phone.replace(/\D/g, '').length < 7)
+    fields.invitee_phone = 'That number looks too short'
+  if (!INVITE_CHANNELS.includes(channel as never))
+    fields.channel_choice = 'Pick WhatsApp, SMS or automatic'
+  if (!INVITE_AGE_BANDS.includes(ageBand as never))
+    fields.invitee_age_band = 'Pick an age band'
   if (relationship !== null && !INVITE_RELATIONSHIPS.includes(relationship as never)) {
     fields.invitee_relationship = 'Pick a relationship or leave it blank'
   }
   // F5: unknown defaults to the guardian path (never treated as adult).
   if (requiresGuardianBand(ageBand) && !guardian) {
-    fields.guardian_phone = 'A guardian number is required for a child, teen or unknown-age invitee'
+    fields.guardian_phone =
+      'A guardian number is required for a child, teen or unknown-age invitee'
   }
   if (isMinorBand(ageBand) && !guardianAttested) {
-    fields.guardian_attested = 'Confirm that a guardian agreed to this invitation so staff can verify it'
+    fields.guardian_attested =
+      'Confirm that a guardian agreed to this invitation so staff can verify it'
   }
   if (noteError) fields.inviter_note = noteError
   const inviterPerson = scope.session.user.personId
   if (!inviterPerson) {
-    fields.inviter = 'Your login is not linked to a member record yet; ask your branch admin to link it'
+    fields.inviter =
+      'Your login is not linked to a member record yet; ask your branch admin to link it'
   }
   if (Object.keys(fields).length > 0) throwInviteValidation(fields)
 
@@ -131,25 +140,31 @@ export default defineEventHandler(async (event) => {
 
   // STOP/opt-out: recorded as blocked_optout, never queued, no approval path.
   if (await isInviteSuppressed(event, scope, contactHash)) {
-    const blocked = await createItem<Record<string, unknown>>(event, scope, 'event_invites', {
-      event: eventId,
-      branch,
-      inviter_person: inviterPerson,
-      inviter_user: scope.session.user.id,
-      invitee_name: inviteeName,
-      invitee_phone: phone,
-      invitee_contact_hash: contactHash,
-      invitee_relationship: relationship,
-      invitee_age_band: ageBand,
-      guardian_phone: guardian || null,
-      channel_choice: channel,
-      consent_basis: 'inviter_vouched',
-      message_rendered: rendered,
-      variables_snapshot: variables,
-      status: 'blocked_optout',
-      approval_required: false,
-      blocked_reason: 'That number opted out of messages (STOP); staff cannot override an opt-out',
-    })
+    const blocked = await createItem<Record<string, unknown>>(
+      event,
+      scope,
+      'event_invites',
+      {
+        event: eventId,
+        branch,
+        inviter_person: inviterPerson,
+        inviter_user: scope.session.user.id,
+        invitee_name: inviteeName,
+        invitee_phone: phone,
+        invitee_contact_hash: contactHash,
+        invitee_relationship: relationship,
+        invitee_age_band: ageBand,
+        guardian_phone: guardian || null,
+        channel_choice: channel,
+        consent_basis: 'inviter_vouched',
+        message_rendered: rendered,
+        variables_snapshot: variables,
+        status: 'blocked_optout',
+        approval_required: false,
+        blocked_reason:
+          'That number opted out of messages (STOP); staff cannot override an opt-out',
+      },
+    )
     return { data: { ...blocked, id: String(blocked.id) } }
   }
 
@@ -171,11 +186,10 @@ export default defineEventHandler(async (event) => {
     status = 'blocked_rate_limit'
     approvalRequired = true
     blockedReason =
-        `Member invite limit reached: ${counts.sent24h} sent in the last 24h ` +
-        `(limit ${limits.daily}), ${counts.sent7d} in the last 7 days (limit ${limits.weekly}). ` +
-        `Your branch admin can approve this invite.`
-  }
-  else if (brief.invite_requires_approval) {
+      `Member invite limit reached: ${counts.sent24h} sent in the last 24h ` +
+      `(limit ${limits.daily}), ${counts.sent7d} in the last 7 days (limit ${limits.weekly}). ` +
+      `Your branch admin can approve this invite.`
+  } else if (brief.invite_requires_approval) {
     status = 'pending_approval'
     approvalRequired = true
     blockedReason = 'That event needs staff approval for invitations.'
@@ -202,8 +216,7 @@ export default defineEventHandler(async (event) => {
       approval_required: approvalRequired,
       blocked_reason: blockedReason,
     })
-  }
-  catch (error) {
+  } catch (error) {
     // No leaked quota on the handled path: a failed invite write releases
     // the claimed slots before the error propagates. Crash orphans (the
     // process dying between claim and release) waste quota in the fail-safe
@@ -216,8 +229,14 @@ export default defineEventHandler(async (event) => {
   // staff read the full row they just wrote.
   if (isMemberSession(scope)) {
     return {
-      data: redactInviteForMember({ ...(created as object), id: String(created.id) } as InviteRow),
+      data: redactInviteForMember({
+        ...(created as object),
+        id: String(created.id),
+      } as InviteRow),
     }
   }
-  return { data: { ...created, id: String(created.id) }, meta: { countsVerified: counts.countsVerified } }
+  return {
+    data: { ...created, id: String(created.id) },
+    meta: { countsVerified: counts.countsVerified },
+  }
 })

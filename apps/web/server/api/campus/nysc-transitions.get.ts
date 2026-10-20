@@ -1,8 +1,4 @@
-import {
-  getPortalScope,
-  listItems,
-  requireCan,
-} from '../../utils/portal'
+import { getPortalScope, listItems, requireCan } from '../../utils/portal'
 
 /**
  * GET /api/campus/nysc-transitions — the ratified NYSC graph (US-C5 AC3).

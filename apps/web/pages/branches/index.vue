@@ -82,7 +82,10 @@ function typeLabel(value: string): string {
             </UBadge>
           </div>
           <p class="mt-3 text-sm text-gray-600 dark:text-gray-300">
-            {{ [branch.city, branch.state].filter(Boolean).join(', ') || 'No address on file' }}
+            {{
+              [branch.city, branch.state].filter(Boolean).join(', ') ||
+              'No address on file'
+            }}
           </p>
         </NuxtLink>
       </div>

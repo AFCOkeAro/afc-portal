@@ -1,11 +1,9 @@
 <script setup lang="ts">
-import { COLLECTIONS } from '@afc/shared'
 import type { BranchSummary, HouseholdRow, Paginated } from '~/types/portal'
 
 definePageMeta({ middleware: 'staff' })
 
 const api = useApi()
-const permissions = usePermissions()
 const route = useRoute()
 const showForm = ref(false)
 const searchInput = ref('')

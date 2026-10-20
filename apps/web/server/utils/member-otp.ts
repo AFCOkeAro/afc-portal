@@ -15,30 +15,30 @@ import { directusFetch } from './directus'
  * parameter block; this file is the HTTP half. Nothing here issues a
  * usable session while the flag is off.
  *
-  * F1 parameters (AFC-478 verdict, mirrored from the migration header):
-  * 6-digit CSPRNG codes, expiry <= 10 min, salted-sha256 storage only
-  * (no plaintext column exists), single-use, <= 5 verify attempts per
-  * code, resend <= 3/hr per phone and <= 10/hr per IP, session bound
-  * server-side to exactly one member_person with lifetime <= 8h and
-  * member_access_expires_at re-checked on every request. Session lifetime
-  * note (AFC-512): 8h satisfies the <= 24h idle recommendation; the
-  * absolute ceiling is min(session expiry, member_access_expires_at)
-  * and deployments SHOULD set member_access_expires_at <= 7d so a
-  * session can never outlive a 7-day absolute bound.
-  * Enumeration resistance: the request path returns the identical
-  * generic message ("If this number is registered you will receive a
-  * code") with the same status whether the number is registered or not,
-  * malformed, throttled, or the write fails -- success and failure are
-  * indistinguishable by shape AND status, and the lookup/write errors
-  * below fail closed to the ack so no timing oracle is introduced by
-  * branching early (AFC-512 adversarial test pins registered vs
-  * unregistered shape + status identical).
-  * Device binding is explicitly DROPPED for v1; the sealed httpOnly
-  * session cookie is the bearer. SIM-swap is a recorded ACCEPTED RISK
-  * (owner: CTO/board): an OTP to a SIM-swapped number reaches the
-  * attacker, bounded by the member least-privilege scope (own record
-  * only, no people search, no finance/welfare, internals redacted --
-  * data-model-v4 S5 denials). Revisit if the role ever gains breadth.
+ * F1 parameters (AFC-478 verdict, mirrored from the migration header):
+ * 6-digit CSPRNG codes, expiry <= 10 min, salted-sha256 storage only
+ * (no plaintext column exists), single-use, <= 5 verify attempts per
+ * code, resend <= 3/hr per phone and <= 10/hr per IP, session bound
+ * server-side to exactly one member_person with lifetime <= 8h and
+ * member_access_expires_at re-checked on every request. Session lifetime
+ * note (AFC-512): 8h satisfies the <= 24h idle recommendation; the
+ * absolute ceiling is min(session expiry, member_access_expires_at)
+ * and deployments SHOULD set member_access_expires_at <= 7d so a
+ * session can never outlive a 7-day absolute bound.
+ * Enumeration resistance: the request path returns the identical
+ * generic message ("If this number is registered you will receive a
+ * code") with the same status whether the number is registered or not,
+ * malformed, throttled, or the write fails -- success and failure are
+ * indistinguishable by shape AND status, and the lookup/write errors
+ * below fail closed to the ack so no timing oracle is introduced by
+ * branching early (AFC-512 adversarial test pins registered vs
+ * unregistered shape + status identical).
+ * Device binding is explicitly DROPPED for v1; the sealed httpOnly
+ * session cookie is the bearer. SIM-swap is a recorded ACCEPTED RISK
+ * (owner: CTO/board): an OTP to a SIM-swapped number reaches the
+ * attacker, bounded by the member least-privilege scope (own record
+ * only, no people search, no finance/welfare, internals redacted --
+ * data-model-v4 S5 denials). Revisit if the role ever gains breadth.
  *
  * F2 rule (AFC-478 F2): on invite.create and any consent write,
  * inviter_user := session user and inviter_person := session

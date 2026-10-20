@@ -60,7 +60,15 @@ export const IMPORT_TEMPLATES: Record<ImportDomain, ImportTemplate> = {
       'female',
       'session_name',
     ],
-    example: ['OKE-ARO', '2025-10-05', 'sunday_service', 'adults', '95', '110', 'Sunday Service'],
+    example: [
+      'OKE-ARO',
+      '2025-10-05',
+      'sunday_service',
+      'adults',
+      '95',
+      '110',
+      'Sunday Service',
+    ],
   },
   blessings: {
     domain: 'blessings',
@@ -86,7 +94,15 @@ export const IMPORT_TEMPLATES: Record<ImportDomain, ImportTemplate> = {
       'status',
       'person_type',
     ],
-    example: ['OKE-ARO', 'Adaeze Okafor', '08031234567', 'adaeze@example.com', 'female', 'active', 'member'],
+    example: [
+      'OKE-ARO',
+      'Adaeze Okafor',
+      '08031234567',
+      'adaeze@example.com',
+      'female',
+      'active',
+      'member',
+    ],
   },
   finance: {
     domain: 'finance',
@@ -157,7 +173,10 @@ export function parseCsv(text: string): ParsedCsv {
   push()
   rows.push(row)
   // Drop trailing blank lines (a final newline yields one empty row).
-  while (rows.length > 0 && rows[rows.length - 1].every((cell) => cell.trim() === '')) {
+  while (
+    rows.length > 0 &&
+    (rows[rows.length - 1] ?? []).every((cell) => cell.trim() === '')
+  ) {
     rows.pop()
   }
   if (rows.length === 0) return { header: [], rows: [] }
@@ -246,7 +265,10 @@ function checkDate(value: string): string | null {
  * import is explicit, integrations-spec §9). Row numbers are 1-based over
  * data rows (header is row 0) so the report points at the file the user sees.
  */
-export function validateImportRows(domain: ImportDomain, parsed: ParsedCsv): ValidatedImport {
+export function validateImportRows(
+  domain: ImportDomain,
+  parsed: ParsedCsv,
+): ValidatedImport {
   const template = IMPORT_TEMPLATES[domain]
   const valid: ValidatedImport['valid'] = []
   const errors: RowError[] = []
@@ -289,26 +311,42 @@ export function validateImportRows(domain: ImportDomain, parsed: ParsedCsv): Val
       const dateError = checkDate(cell(values, 'service_date'))
       if (dateError) rowErrors.push(`service_date ${dateError}`)
       if (
-        !(ATTENDANCE_IMPORT_SERVICES as readonly string[]).includes(cell(values, 'service_type'))
+        !(ATTENDANCE_IMPORT_SERVICES as readonly string[]).includes(
+          cell(values, 'service_type'),
+        )
       ) {
-        rowErrors.push(`service_type must be one of ${ATTENDANCE_IMPORT_SERVICES.join(', ')}`)
+        rowErrors.push(
+          `service_type must be one of ${ATTENDANCE_IMPORT_SERVICES.join(', ')}`,
+        )
       }
-      if (!(ATTENDANCE_IMPORT_CATEGORIES as readonly string[]).includes(cell(values, 'category'))) {
-        rowErrors.push(`category must be one of ${ATTENDANCE_IMPORT_CATEGORIES.join(', ')}`)
+      if (
+        !(ATTENDANCE_IMPORT_CATEGORIES as readonly string[]).includes(
+          cell(values, 'category'),
+        )
+      ) {
+        rowErrors.push(
+          `category must be one of ${ATTENDANCE_IMPORT_CATEGORIES.join(', ')}`,
+        )
       }
       if (!isInt(cell(values, 'male'))) rowErrors.push('male must be a whole number >= 0')
-      if (!isInt(cell(values, 'female'))) rowErrors.push('female must be a whole number >= 0')
+      if (!isInt(cell(values, 'female')))
+        rowErrors.push('female must be a whole number >= 0')
     } else if (domain === 'blessings') {
       if (!branchCode) rowErrors.push('branch_code is required')
       const dateError = checkDate(cell(values, 'service_date'))
       if (dateError) rowErrors.push(`service_date ${dateError}`)
-      if (!(BLESSING_IMPORT_TYPES as readonly string[]).includes(cell(values, 'blessing_type'))) {
+      if (
+        !(BLESSING_IMPORT_TYPES as readonly string[]).includes(
+          cell(values, 'blessing_type'),
+        )
+      ) {
         rowErrors.push(`blessing_type must be one of ${BLESSING_IMPORT_TYPES.join(', ')}`)
       }
       if (cell(values, 'blessing_type') === 'other' && !cell(values, 'other_label')) {
         rowErrors.push('other_label is required when blessing_type is other')
       }
-      if (!isInt(cell(values, 'male_count'))) rowErrors.push('male_count must be a whole number >= 0')
+      if (!isInt(cell(values, 'male_count')))
+        rowErrors.push('male_count must be a whole number >= 0')
       if (!isInt(cell(values, 'female_count'))) {
         rowErrors.push('female_count must be a whole number >= 0')
       }
@@ -333,7 +371,8 @@ export function validateImportRows(domain: ImportDomain, parsed: ParsedCsv): Val
       if (!MONTH_RE.test(cell(values, 'month'))) {
         rowErrors.push('month must be the first of the month (YYYY-MM-01)')
       }
-      if (!isMoney(cell(values, 'income'))) rowErrors.push('income must be a non-negative amount')
+      if (!isMoney(cell(values, 'income')))
+        rowErrors.push('income must be a non-negative amount')
       if (cell(values, 'intervention') && !isMoney(cell(values, 'intervention'))) {
         rowErrors.push('intervention must be a non-negative amount')
       }
@@ -382,13 +421,20 @@ export function financeImportKey(values: Record<string, string>): string {
  * import table, which is what keeps the ledger migration out of the
  * personal-data approval path.
  */
-export async function personIdentityHash(values: Record<string, string>): Promise<string> {
+export async function personIdentityHash(
+  values: Record<string, string>,
+): Promise<string> {
   const name = (values.full_name ?? '').trim().toLowerCase().replace(/\s+/g, ' ')
   const phone = (values.phone ?? '').replace(/\D/g, '')
   const email = (values.email ?? '').trim().toLowerCase()
   const canonical = [name, phone, email].join('|')
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonical))
-  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('')
+  const digest = await crypto.subtle.digest(
+    'SHA-256',
+    new TextEncoder().encode(canonical),
+  )
+  return [...new Uint8Array(digest)]
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('')
 }
 
 export function personIdentityHashSync(values: Record<string, string>): string {

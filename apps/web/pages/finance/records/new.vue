@@ -90,32 +90,53 @@ async function submit() {
             :error="fieldErrors.income"
             required
           >
-            <UInput v-model="form.income" inputmode="decimal" placeholder="0.00" class="w-full" />
+            <UInput
+              v-model="form.income"
+              inputmode="decimal"
+              placeholder="0.00"
+              class="w-full"
+            />
           </UFormField>
 
           <div class="grid gap-4 sm:grid-cols-2">
-            <UFormField label="Intervention (₦)" name="intervention" :error="fieldErrors.intervention">
+            <UFormField
+              label="Intervention (₦)"
+              name="intervention"
+              :error="fieldErrors.intervention"
+            >
               <UInput
                 v-model="form.intervention"
                 inputmode="decimal"
                 placeholder="0.00"
                 class="w-full"
               />
-              <template #hint>Manual input, never derived from income (ADR-0008 R3).</template>
+              <template #hint
+                >Manual input, never derived from income (ADR-0008 R3).</template
+              >
             </UFormField>
-            <UFormField label="Faith City (₦)" name="faith_city" :error="fieldErrors.faith_city">
+            <UFormField
+              label="Faith City (₦)"
+              name="faith_city"
+              :error="fieldErrors.faith_city"
+            >
               <UInput
                 v-model="form.faith_city"
                 inputmode="decimal"
                 placeholder="0.00"
                 class="w-full"
               />
-              <template #hint>Manual input, never derived from income (ADR-0008 R3).</template>
+              <template #hint
+                >Manual input, never derived from income (ADR-0008 R3).</template
+              >
             </UFormField>
           </div>
 
           <UFormField label="Notes" name="notes" :error="fieldErrors.notes">
-            <UTextarea v-model="form.notes" class="w-full" placeholder="Anything the reviewer should know" />
+            <UTextarea
+              v-model="form.notes"
+              class="w-full"
+              placeholder="Anything the reviewer should know"
+            />
           </UFormField>
 
           <UAlert
@@ -127,8 +148,18 @@ async function submit() {
           />
 
           <div class="flex gap-2">
-            <UButton type="submit" label="Save draft" icon="i-lucide-save" :loading="saving" />
-            <UButton label="Back to records" color="neutral" variant="outline" to="/finance/records" />
+            <UButton
+              type="submit"
+              label="Save draft"
+              icon="i-lucide-save"
+              :loading="saving"
+            />
+            <UButton
+              label="Back to records"
+              color="neutral"
+              variant="outline"
+              to="/finance/records"
+            />
           </div>
         </form>
       </UCard>

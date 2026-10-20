@@ -1,9 +1,4 @@
-import {
-  getPortalScope,
-  listItems,
-  mergeFilters,
-  requireCan,
-} from '../../utils/portal'
+import { getPortalScope, listItems, mergeFilters, requireCan } from '../../utils/portal'
 import type { PortalScope } from '../../utils/portal'
 
 /**

@@ -101,10 +101,7 @@ export default defineEventHandler(async (event): Promise<PersonDetail> => {
           scope,
           'households',
           {
-            filter: mergeFilters(
-              { id: { _eq: householdId } },
-              scopeFilter(scope),
-            ),
+            filter: mergeFilters({ id: { _eq: householdId } }, scopeFilter(scope)),
             fields: ['id', 'name'],
             limit: 1,
           },
@@ -129,7 +126,9 @@ export default defineEventHandler(async (event): Promise<PersonDetail> => {
     ...new Set(
       memberships.data
         .map((link) => link.departments)
-        .filter((value): value is string => typeof value === 'string' && value.length > 0),
+        .filter(
+          (value): value is string => typeof value === 'string' && value.length > 0,
+        ),
     ),
   ]
   const membershipDepartments = new Map<string, string>()

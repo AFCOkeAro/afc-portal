@@ -7,15 +7,20 @@ const sections = [
   {
     to: '/campus/timetable',
     title: 'Timetable & facilitators',
-    description: 'Coaching programmes, weekly slots with clash flags, facilitator registration and call status (US-C1).',
+    description:
+      'Coaching programmes, weekly slots with clash flags, facilitator registration and call status (US-C1).',
     requires: { collection: COLLECTIONS.coachingTimetable, action: 'read' as const },
     icon: 'i-lucide-calendar-days',
   },
   {
     to: '/campus/attendance',
     title: 'Class attendance',
-    description: 'Mark attendance per class occurrence — re-marking updates the same row (US-C2).',
-    requires: { collection: COLLECTIONS.coachingClassAttendance, action: 'read' as const },
+    description:
+      'Mark attendance per class occurrence — re-marking updates the same row (US-C2).',
+    requires: {
+      collection: COLLECTIONS.coachingClassAttendance,
+      action: 'read' as const,
+    },
     icon: 'i-lucide-clipboard-check',
   },
   {
@@ -28,14 +33,16 @@ const sections = [
   {
     to: '/campus/results',
     title: 'WAEC / UTME / admission results',
-    description: 'Scores, aggregates and admission outcomes per student, per year (US-C3).',
+    description:
+      'Scores, aggregates and admission outcomes per student, per year (US-C3).',
     requires: { collection: COLLECTIONS.examResults, action: 'read' as const },
     icon: 'i-lucide-award',
   },
   {
     to: '/campus/students',
     title: 'Students, AFCF & NYSC',
-    description: 'Campus-care records: AFCF handshake, AFCMF link, support totals, level progression, check-ups and NYSC deployment (US-C4, US-C5).',
+    description:
+      'Campus-care records: AFCF handshake, AFCMF link, support totals, level progression, check-ups and NYSC deployment (US-C4, US-C5).',
     requires: { collection: COLLECTIONS.campusStudents, action: 'read' as const },
     icon: 'i-lucide-graduation-cap',
   },

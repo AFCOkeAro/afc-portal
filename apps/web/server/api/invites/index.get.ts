@@ -1,9 +1,4 @@
-import {
-  getPortalScope,
-  listItems,
-  mergeFilters,
-  scopeFilter,
-} from '../../utils/portal'
+import { getPortalScope, listItems, mergeFilters, scopeFilter } from '../../utils/portal'
 import {
   INVITE_FIELDS,
   INVITE_STATUSES,
@@ -29,9 +24,10 @@ export default defineEventHandler(async (event) => {
   const limit = Math.min(100, Math.max(1, Number(query.limit) || 25))
   const eventFilter = typeof query.event === 'string' ? query.event : undefined
   const inviter = typeof query.inviter === 'string' ? query.inviter : undefined
-  const status = typeof query.status === 'string' && INVITE_STATUSES.includes(query.status as never)
-    ? query.status
-    : undefined
+  const status =
+    typeof query.status === 'string' && INVITE_STATUSES.includes(query.status as never)
+      ? query.status
+      : undefined
   const from = typeof query.from === 'string' ? query.from : undefined
   const to = typeof query.to === 'string' ? query.to : undefined
   const branch = typeof query.branch === 'string' ? query.branch : undefined
@@ -58,7 +54,9 @@ export default defineEventHandler(async (event) => {
   })
 
   return {
-    data: result.data.map((row) => projectInviteRow(scope, caps, { ...row, id: String(row.id) })),
+    data: result.data.map((row) =>
+      projectInviteRow(scope, caps, { ...row, id: String(row.id) }),
+    ),
     meta: result.meta,
   }
 })

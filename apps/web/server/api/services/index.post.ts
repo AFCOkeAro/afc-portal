@@ -39,7 +39,12 @@ export default defineEventHandler(async (event) => {
 
   const visibleZones = await scopeZoneIds(event, scope)
   requireZoneInScope(scope, form.zone, visibleZones)
-  if (!scope.isArea && scope.zoneIds.length === 0 && form.zone && !visibleZones.includes(form.zone)) {
+  if (
+    !scope.isArea &&
+    scope.zoneIds.length === 0 &&
+    form.zone &&
+    !visibleZones.includes(form.zone)
+  ) {
     throw createError({
       statusCode: 403,
       statusMessage: 'That zone is outside your scope',

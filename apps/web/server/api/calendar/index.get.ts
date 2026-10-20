@@ -1,8 +1,6 @@
 import { calendarQuerySchema, combineCalendarFeed } from '@afc/shared'
 import type { CalendarItem } from '@afc/shared'
-import { getPortalScope } from '../../utils/portal'
-import { listItems } from '../../utils/portal'
-import { eventScopeFilter, scopeFilter } from '../../utils/portal'
+import { getPortalScope, eventScopeFilter, scopeFilter } from '../../utils/portal'
 import { logScopedQuery, tryListDomain } from '../../utils/office'
 
 /**

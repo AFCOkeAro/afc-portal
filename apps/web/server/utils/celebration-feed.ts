@@ -4,7 +4,6 @@ import { CELEBRATION_TYPES, combineCalendarFeed } from '@afc/shared'
 import {
   branchNames,
   csvEscape,
-  getPortalScope,
   listItems,
   mergeFilters,
   requireCan,

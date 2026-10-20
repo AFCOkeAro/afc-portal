@@ -26,10 +26,7 @@ export interface FinancialRecordRow {
 }
 
 export type ComputationStatus =
-  | 'formula_pending'
-  | 'calculated'
-  | 'submitted'
-  | 'confirmed'
+  'formula_pending' | 'calculated' | 'submitted' | 'confirmed'
 
 export interface WecaReturnRow {
   id: string

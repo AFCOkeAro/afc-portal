@@ -56,22 +56,20 @@ const computedVisible = computed(() =>
 )
 const canCreate = computed(() => permissions.can(COLLECTIONS.wecaReturns, 'create'))
 
-const records = await useAsyncData(
-  'weca-returns-records',
-  () =>
-    canCreate.value
-      ? api.get<Paginated<FinancialRecordRow>>('/api/finance/records', {
-          query: { limit: 200, status: 'all' },
-        })
-      : Promise.resolve(null),
+const records = await useAsyncData('weca-returns-records', () =>
+  canCreate.value
+    ? api.get<Paginated<FinancialRecordRow>>('/api/finance/records', {
+        query: { limit: 200, status: 'all' },
+      })
+    : Promise.resolve(null),
 )
 
 const recordOptions = computed(() => [
   { label: 'Choose a captured record', value: '' },
-  ...((records.data.value?.data ?? []).map((row) => ({
+  ...(records.data.value?.data ?? []).map((row) => ({
     label: `${row.branch_name ?? 'No branch'} · ${row.month.slice(0, 7)} (${row.status})`,
     value: row.id,
-  }))),
+  })),
 ])
 
 const openRecordId = ref('')
@@ -89,7 +87,9 @@ function formatMoney(value: string | null, isPending: boolean): string {
 
 async function openReturn() {
   openError.value = null
-  const chosen = (records.data.value?.data ?? []).find((row) => row.id === openRecordId.value)
+  const chosen = (records.data.value?.data ?? []).find(
+    (row) => row.id === openRecordId.value,
+  )
   if (!chosen) {
     openError.value = 'Choose a captured record first.'
     return
@@ -104,7 +104,9 @@ async function openReturn() {
     await navigateTo(`/finance/returns/${created.data.id}`)
   } catch (cause) {
     openError.value =
-      cause instanceof ApiRequestError ? cause.message : 'Could not open the return. Try again.'
+      cause instanceof ApiRequestError
+        ? cause.message
+        : 'Could not open the return. Try again.'
   } finally {
     opening.value = false
   }
@@ -148,12 +150,22 @@ const statusColor: Record<string, 'success' | 'warning' | 'neutral' | 'info'> = 
       <UCard class="mb-4">
         <h2 class="font-semibold">Open a return</h2>
         <p class="mt-1 text-sm text-gray-500">
-          Links a captured record to its period. The portal never computes: the
-          return stays pending until the effective formula version computes it.
+          Links a captured record to its period. The portal never computes: the return
+          stays pending until the effective formula version computes it.
         </p>
         <div class="mt-3 flex flex-col gap-2 sm:flex-row">
-          <USelect v-model="openRecordId" :items="recordOptions" class="w-full sm:max-w-md" aria-label="Captured record" />
-          <UButton label="Open return" icon="i-lucide-plus" :loading="opening" @click="openReturn" />
+          <USelect
+            v-model="openRecordId"
+            :items="recordOptions"
+            class="w-full sm:max-w-md"
+            aria-label="Captured record"
+          />
+          <UButton
+            label="Open return"
+            icon="i-lucide-plus"
+            :loading="opening"
+            @click="openReturn"
+          />
         </div>
         <UAlert
           v-if="openError"
@@ -169,14 +181,26 @@ const statusColor: Record<string, 'success' | 'warning' | 'neutral' | 'info'> = 
     <UCard>
       <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <UInput v-model="period" type="month" aria-label="Filter by period" />
-        <USelect v-model="computationStatus" :items="statusOptions" class="w-full" aria-label="Filter by state" />
-        <UInput v-model="branch" placeholder="Branch id (optional)" aria-label="Filter by branch" />
+        <USelect
+          v-model="computationStatus"
+          :items="statusOptions"
+          class="w-full"
+          aria-label="Filter by state"
+        />
+        <UInput
+          v-model="branch"
+          placeholder="Branch id (optional)"
+          aria-label="Filter by branch"
+        />
         <UButton
           label="Export CSV"
           icon="i-lucide-download"
           color="neutral"
           variant="outline"
-          :to="{ path: '/api/finance/returns/export.csv', query: period ? { period } : {} }"
+          :to="{
+            path: '/api/finance/returns/export.csv',
+            query: period ? { period } : {},
+          }"
         />
       </div>
 
@@ -202,7 +226,9 @@ const statusColor: Record<string, 'success' | 'warning' | 'neutral' | 'info'> = 
       <div v-else class="mt-4 overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
           <thead>
-            <tr class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+            <tr
+              class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400"
+            >
               <th class="px-3 py-2 font-medium">Branch</th>
               <th class="px-3 py-2 font-medium">Period</th>
               <th class="px-3 py-2 font-medium">State</th>
@@ -224,15 +250,27 @@ const statusColor: Record<string, 'success' | 'warning' | 'neutral' | 'info'> = 
                 {{ row.period }}
               </td>
               <td class="px-3 py-3">
-                <UBadge :color="statusColor[row.computation_status] ?? 'neutral'" variant="subtle">
-                  {{ row.computation_status === 'formula_pending' ? 'Pending board formula' : row.computation_status }}
+                <UBadge
+                  :color="statusColor[row.computation_status] ?? 'neutral'"
+                  variant="subtle"
+                >
+                  {{
+                    row.computation_status === 'formula_pending'
+                      ? 'Pending board formula'
+                      : row.computation_status
+                  }}
                 </UBadge>
               </td>
               <td class="px-3 py-3 font-mono text-xs text-gray-600 dark:text-gray-300">
                 {{ row.formula_version ?? '—' }}
               </td>
-              <td v-if="computedVisible" class="px-3 py-3 text-gray-600 dark:text-gray-300">
-                {{ formatMoney(row.total_due, row.computation_status === 'formula_pending') }}
+              <td
+                v-if="computedVisible"
+                class="px-3 py-3 text-gray-600 dark:text-gray-300"
+              >
+                {{
+                  formatMoney(row.total_due, row.computation_status === 'formula_pending')
+                }}
               </td>
               <td class="px-3 py-3 text-right">
                 <UButton
@@ -250,7 +288,12 @@ const statusColor: Record<string, 'success' | 'warning' | 'neutral' | 'info'> = 
 
       <div v-if="pageCount > 1" class="mt-4 flex items-center justify-between">
         <p class="text-sm text-gray-500">{{ total }} returns</p>
-        <UPagination v-model:page="page" :total="total" :page-count="limit" @update:page="refresh" />
+        <UPagination
+          v-model:page="page"
+          :total="total"
+          :page-count="limit"
+          @update:page="refresh"
+        />
       </div>
     </UCard>
   </div>

@@ -36,14 +36,14 @@ export default defineEventHandler(
     // Resolve the journey vocabulary server-side so the UI renders stage keys,
     // never bare uuids. A missing stages collection fails the journey cards,
     // not the whole page.
-    let journeyStageKey: string | null = null
+    let journeyStageKey: string | null
     let journeyStages: Array<{
       key: string
       name: string
       sequence: number
       requires_pack: boolean
       requires_visit_outcome: boolean
-    }> = []
+    }>
     try {
       const stages = await loadJourneyStages(event, scope)
       journeyStages = stages.map((stage) => ({

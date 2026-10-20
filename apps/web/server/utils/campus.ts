@@ -197,10 +197,7 @@ const LEVEL_ORDER = [
   'graduated',
 ] as const
 
-export function isLevelProgression(
-  from: string | null | undefined,
-  to: string,
-): boolean {
+export function isLevelProgression(from: string | null | undefined, to: string): boolean {
   if (!from) return true
   if (from === to) return true
   if (from === 'other' || to === 'other') return true
@@ -222,9 +219,7 @@ export async function campusStudentScopeFilter(
 ): Promise<Record<string, unknown> | undefined> {
   const visibleZones = scope.isArea ? [] : await scopeZoneIds(event, scope)
   requireZoneInScope(scope, filters.zone ?? null, visibleZones)
-  const resolvedBranch = filters.branch
-    ? resolveBranch(scope, filters.branch)
-    : undefined
+  const resolvedBranch = filters.branch ? resolveBranch(scope, filters.branch) : undefined
   return mergeFilters(
     filters.zone ? { zone: { _eq: filters.zone } } : undefined,
     resolvedBranch ? { branch: { _eq: resolvedBranch } } : undefined,
@@ -249,34 +244,26 @@ export async function coachingProgrammeScopeFilter(
 ): Promise<Record<string, unknown> | undefined> {
   const visibleZones = scope.isArea ? [] : await scopeZoneIds(event, scope)
   requireZoneInScope(scope, filters.zone ?? null, visibleZones)
-  const resolvedBranch = filters.branch
-    ? resolveBranch(scope, filters.branch)
-    : undefined
+  const resolvedBranch = filters.branch ? resolveBranch(scope, filters.branch) : undefined
   const requested = mergeFilters(
     filters.zone ? { zone: { _eq: filters.zone } } : undefined,
     resolvedBranch ? { branch: { _eq: resolvedBranch } } : undefined,
   )
   if (scope.isArea) return requested
   if (scope.zoneIds.length > 0) {
-    return mergeFilters(
-      requested,
-      {
-        _or: [
-          { zone: { _in: scope.zoneIds } },
-          { _and: [{ zone: { _null: true } }, { branch: { _null: true } }] },
-        ],
-      },
-    )
-  }
-  return mergeFilters(
-    requested,
-    {
+    return mergeFilters(requested, {
       _or: [
-        { branch: { _in: scope.branchIds } },
+        { zone: { _in: scope.zoneIds } },
         { _and: [{ zone: { _null: true } }, { branch: { _null: true } }] },
       ],
-    },
-  )
+    })
+  }
+  return mergeFilters(requested, {
+    _or: [
+      { branch: { _in: scope.branchIds } },
+      { _and: [{ zone: { _null: true } }, { branch: { _null: true } }] },
+    ],
+  })
 }
 
 /**
@@ -343,10 +330,7 @@ export function studentRelationScope(
   if (scope.zoneIds.length > 0) {
     return {
       [relation]: {
-        _or: [
-          { zone: { _in: scope.zoneIds } },
-          { branch: { _in: scope.branchIds } },
-        ],
+        _or: [{ zone: { _in: scope.zoneIds } }, { branch: { _in: scope.branchIds } }],
       },
     }
   }
@@ -374,10 +358,7 @@ export async function campusAttendanceScopeFilter(
   const sessionPart: Record<string, unknown> =
     ids.length > 0
       ? {
-          _or: [
-            { programme: { _in: ids } },
-            { timetable: { programme: { _in: ids } } },
-          ],
+          _or: [{ programme: { _in: ids } }, { timetable: { programme: { _in: ids } } }],
         }
       : { programme: { _eq: '__none__' } }
   const studentPaths = [
@@ -466,9 +447,7 @@ export async function assertStudentInScope(
     }
     return row
   }
-  const collection = identity.campus_student
-    ? '/items/campus_students'
-    : '/items/people'
+  const collection = identity.campus_student ? '/items/campus_students' : '/items/people'
   const id = identity.campus_student ?? identity.person
   const found = await directusFetch<{
     data: Array<Record<string, unknown>>
@@ -490,8 +469,7 @@ export async function assertStudentInScope(
     })
   })
   const row = found.data[0]
-  const inBranch =
-    row?.branch != null && scope.branchIds.includes(String(row.branch))
+  const inBranch = row?.branch != null && scope.branchIds.includes(String(row.branch))
   const inZone = row?.zone != null && scope.zoneIds.includes(String(row.zone))
   if (!inBranch && !inZone) {
     throw createError({
@@ -526,9 +504,8 @@ export async function assertPersonGuardian(
       data: { code: 'not_found' },
     })
   })
-  const row = (
-    found as unknown as { data: Record<string, unknown> }
-  ).data as Record<string, unknown> | undefined
+  const row = (found as unknown as { data: Record<string, unknown> }).data as
+    Record<string, unknown> | undefined
   // Directus single-item reads return `{ data: {...} }`; tolerate the list
   // shape as well so stubbed fetches in tests cannot slip through.
   const person =
@@ -667,7 +644,10 @@ export async function assertNyscTransition(
     throw createError({
       statusCode: 400,
       statusMessage: `NYSC cannot move from ${from} to ${to}`,
-      data: { code: 'invalid_nysc_transition', fields: { nysc_status: `Cannot move from ${from} to ${to}` } },
+      data: {
+        code: 'invalid_nysc_transition',
+        fields: { nysc_status: `Cannot move from ${from} to ${to}` },
+      },
     })
   }
 }
@@ -725,9 +705,7 @@ export function stripSupportMany(
   return stripHiddenMany(scope, 'campus_financial_support', rows)
 }
 
-export function progressToCsv(
-  rows: Array<Record<string, unknown>>,
-): string[][] {
+export function progressToCsv(rows: Array<Record<string, unknown>>): string[][] {
   return [
     ['programme', 'student', 'assessment', 'score', 'max_score', 'date', 'remarks'],
     ...rows.map((row) => [

@@ -24,7 +24,8 @@ export default defineEventHandler(async (event) => {
   requireInviteCap(caps, 'read', 'read event invitations')
 
   const id = getRouterParam(event, 'id')
-  if (!id) throw createError({ statusCode: 400, statusMessage: 'An invite id is required' })
+  if (!id)
+    throw createError({ statusCode: 400, statusMessage: 'An invite id is required' })
 
   const row = await findScopedItem<InviteRow>(event, scope, 'event_invites', id, {
     fields: INVITE_FIELDS,

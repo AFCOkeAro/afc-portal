@@ -111,8 +111,8 @@ const branchOptions = computed(() => [
 
     <UCard>
       <p class="text-xs text-gray-500 dark:text-gray-400">
-        Reports carry counts only. Case descriptions and outcome notes never
-        enter this payload or its export (data-model §10.1).
+        Reports carry counts only. Case descriptions and outcome notes never enter this
+        payload or its export (data-model §10.1).
       </p>
       <div class="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <USelect v-model="status" :items="statusOptions" class="w-full" />
@@ -158,7 +158,10 @@ const branchOptions = computed(() => [
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-            <tr v-for="group in groups" :key="`${group.status}|${group.category}|${group.priority}`">
+            <tr
+              v-for="group in groups"
+              :key="`${group.status}|${group.category}|${group.priority}`"
+            >
               <td class="px-3 py-3 capitalize">{{ group.status.replace(/_/g, ' ') }}</td>
               <td class="px-3 py-3 capitalize">{{ group.category }}</td>
               <td class="px-3 py-3 capitalize">{{ group.priority }}</td>

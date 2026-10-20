@@ -1,8 +1,4 @@
-import {
-  findScopedItem,
-  getPortalScope,
-  requireCan,
-} from '../../../../utils/portal'
+import { findScopedItem, getPortalScope, requireCan } from '../../../../utils/portal'
 
 /**
  * Campaign run report reads (AFC-527, US-C2, wireframes v3 screen 12).
@@ -53,8 +49,10 @@ export default defineEventHandler(async (event) => {
 
   const id = getRouterParam(event, 'id')
   const runId = getRouterParam(event, 'runId')
-  if (!id) throw createError({ statusCode: 400, statusMessage: 'A campaign id is required' })
-  if (!runId) throw createError({ statusCode: 400, statusMessage: 'A run id is required' })
+  if (!id)
+    throw createError({ statusCode: 400, statusMessage: 'A campaign id is required' })
+  if (!runId)
+    throw createError({ statusCode: 400, statusMessage: 'A run id is required' })
 
   // The campaign read is the scope gate: a branch session that cannot read
   // the campaign cannot read its runs either.
@@ -68,8 +66,8 @@ export default defineEventHandler(async (event) => {
       scope: scope.isArea
         ? undefined
         : {
-          _or: [{ branch: { _in: scope.branchIds } }, { branch: { _null: true } }],
-        },
+            _or: [{ branch: { _in: scope.branchIds } }, { branch: { _null: true } }],
+          },
     },
   )
 

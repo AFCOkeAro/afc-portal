@@ -5,9 +5,8 @@ definePageMeta({ middleware: ['staff', 'finance'] })
 
 const api = useApi()
 
-const { data, pending, error } = await useAsyncData(
-  'weca-formulas',
-  () => api.get<{ data: WecaFormulaRow[] }>('/api/finance/formulas'),
+const { data, pending, error } = await useAsyncData('weca-formulas', () =>
+  api.get<{ data: WecaFormulaRow[] }>('/api/finance/formulas'),
 )
 
 const versions = computed(() => data.value?.data ?? [])

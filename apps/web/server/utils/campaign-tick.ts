@@ -158,7 +158,7 @@ export function shiftQuietHours(scheduled: Date, operationalEssential: boolean):
 export function tickHold(
   campaignStatus: string,
   channelEnabled: boolean,
-): { held: boolean, reason: ExclusionReason | null } {
+): { held: boolean; reason: ExclusionReason | null } {
   if (!channelEnabled) return { held: true, reason: 'channel_disabled' }
   if (campaignStatus === 'paused') return { held: true, reason: 'campaign_paused' }
   return { held: false, reason: null }
@@ -169,7 +169,7 @@ export function templateAllowed(
   channel: TickChannel,
   approvalStatus: string,
   providerTemplateId: string | null,
-): { allowed: boolean, reason: ExclusionReason | null } {
+): { allowed: boolean; reason: ExclusionReason | null } {
   if (channel === 'whatsapp') {
     if (approvalStatus !== 'approved' || !providerTemplateId?.trim()) {
       return { allowed: false, reason: 'template_not_approved' }
@@ -179,7 +179,10 @@ export function templateAllowed(
 }
 
 /** Weekly frequency cap (mirrors campaign_within_cap): marketing stays under the cap. */
-export function withinWeeklyCap(sendsThisWeek: number, cap: number = MARKETING_WEEKLY_CAP): boolean {
+export function withinWeeklyCap(
+  sendsThisWeek: number,
+  cap: number = MARKETING_WEEKLY_CAP,
+): boolean {
   if (!Number.isInteger(sendsThisWeek) || !Number.isInteger(cap)) {
     throw new Error('campaign tick: sent count and cap must both be integers')
   }
@@ -202,7 +205,7 @@ export function resolveAudienceScope(
   personBranchById: Record<string, string | null>,
   scopeBranchIds: string[],
   isAreaWide: boolean,
-): { inScope: string[], outOfScope: string[] } {
+): { inScope: string[]; outOfScope: string[] } {
   if (isAreaWide) return { inScope: [...personIds], outOfScope: [] }
   const scope = new Set(scopeBranchIds)
   const inScope: string[] = []
@@ -244,14 +247,18 @@ export function fallbackDue(
 }
 
 /** Fallback cap (mirrors campaign_fallback_allowed): at most one per 24h per family. */
-export function fallbackAllowed(lastFallbackAt: Date | null, now: Date = new Date()): boolean {
+export function fallbackAllowed(
+  lastFallbackAt: Date | null,
+  now: Date = new Date(),
+): boolean {
   if (!now) return false
   if (!lastFallbackAt) return true
   return now.getTime() >= lastFallbackAt.getTime() + 24 * 3_600_000
 }
 
 /** Per-campaign estimate: audience size times the channel unit cost. */
-export function estimateCost(audienceSize: number, unitCost: number): number {  if (audienceSize < 0 || unitCost < 0) {
+export function estimateCost(audienceSize: number, unitCost: number): number {
+  if (audienceSize < 0 || unitCost < 0) {
     throw new Error('campaign tick: audience and unit cost must be non-negative')
   }
   return audienceSize * unitCost
@@ -320,9 +327,12 @@ export const stubEmail: StubTransport = makeStubTransport('email')
 
 export function stubTransportFor(channel: TickChannel): StubTransport {
   switch (channel) {
-    case 'whatsapp': return stubWhatsapp
-    case 'sms': return stubSms
-    case 'email': return stubEmail
+    case 'whatsapp':
+      return stubWhatsapp
+    case 'sms':
+      return stubSms
+    case 'email':
+      return stubEmail
   }
 }
 
@@ -494,7 +504,7 @@ export function formatTickLog(metrics: TickMetrics): string {
  * Carries campaign/run ids and counts so staff can find the run; it never
  * carries message content, contact values or rendered text.
  */
-export function campaignAnomalyAlert(alert: TickAlert): { title: string, body: string } {
+export function campaignAnomalyAlert(alert: TickAlert): { title: string; body: string } {
   const counts = Object.entries(alert.counts)
     .map(([key, value]) => `${key}=${value}`)
     .join(' ')

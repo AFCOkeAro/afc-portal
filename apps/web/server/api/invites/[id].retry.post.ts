@@ -5,10 +5,7 @@ import {
   listItems,
   scopeFilter,
 } from '../../utils/portal'
-import {
-  inviteCapabilities,
-  requireInviteCap,
-} from '../../utils/event-invites'
+import { inviteCapabilities, requireInviteCap } from '../../utils/event-invites'
 import type { InviteRow } from '../../utils/event-invites'
 
 /**
@@ -24,7 +21,8 @@ export default defineEventHandler(async (event) => {
   requireInviteCap(caps, 'retry', 'retry event invitations')
 
   const id = getRouterParam(event, 'id')
-  if (!id) throw createError({ statusCode: 400, statusMessage: 'An invite id is required' })
+  if (!id)
+    throw createError({ statusCode: 400, statusMessage: 'An invite id is required' })
 
   const row = await findScopedItem<InviteRow>(event, scope, 'event_invites', id, {
     scope: scopeFilter(scope),
@@ -71,16 +69,21 @@ export default defineEventHandler(async (event) => {
   void _br
   void _ca
 
-  const created = await createItem<Record<string, unknown>>(event, scope, 'event_invites', {
-    ...copyable,
-    communication: null,
-    recipient: null,
-    status: 'queued',
-    approval_required: false,
-    approved_by: null,
-    approved_at: null,
-    blocked_reason: null,
-    retry_of: id,
-  })
+  const created = await createItem<Record<string, unknown>>(
+    event,
+    scope,
+    'event_invites',
+    {
+      ...copyable,
+      communication: null,
+      recipient: null,
+      status: 'queued',
+      approval_required: false,
+      approved_by: null,
+      approved_at: null,
+      blocked_reason: null,
+      retry_of: id,
+    },
+  )
   return { data: { ...created, id: String(created.id) }, meta: { retried: true } }
 })

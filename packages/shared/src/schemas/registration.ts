@@ -88,8 +88,7 @@ export const registrationFormSchema = z
     // for consent purposes -- the draft confirmation must carry an
     // age-band reality check rather than assuming adult.
     const isUnknownWithoutAdultProof =
-      form.age_group === 'unknown' &&
-      (form.date_of_birth === undefined || isMinorByDate)
+      form.age_group === 'unknown' && (form.date_of_birth === undefined || isMinorByDate)
 
     // A declared child age group plus an adult DOB is a contradiction, and a
     // contradiction here decides whether consent was collected. Refuse it

@@ -138,11 +138,7 @@ export default defineEventHandler(async (event) => {
       fields: COACHING_ATTENDANCE_FIELDS.join(','),
       limit: 1,
       filter: {
-        _and: [
-          sessionFilter,
-          identityFilter,
-          { class_date: { _eq: form.class_date } },
-        ],
+        _and: [sessionFilter, identityFilter, { class_date: { _eq: form.class_date } }],
       },
     },
   })

@@ -1,11 +1,6 @@
 <script setup lang="ts">
 import { BLESSING_TYPES, COLLECTIONS } from '@afc/shared'
-import type {
-  BlessingBreakdownRow,
-  BlessingRow,
-  BranchSummary,
-  Paginated,
-} from '~/types/portal'
+import type { BlessingBreakdownRow, BlessingRow, BranchSummary } from '~/types/portal'
 
 definePageMeta({ middleware: 'staff' })
 

@@ -45,7 +45,10 @@ const exportHref = computed(() => {
 
 const { data, pending, error } = await useAsyncData(
   'finance-summary',
-  () => api.get<{ data: FinanceSummaryWithCompare }>('/api/finance/summary', { query: query.value }),
+  () =>
+    api.get<{ data: FinanceSummaryWithCompare }>('/api/finance/summary', {
+      query: query.value,
+    }),
   { watch: [query] },
 )
 
@@ -139,24 +142,40 @@ const statusColor: Record<string, 'success' | 'warning' | 'neutral' | 'info'> = 
         </template>
         <dl class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           <div>
-            <dt class="text-xs uppercase tracking-wide text-gray-500">Ministerial Fund</dt>
-            <dd class="text-lg font-semibold">{{ formatMoney(summary.mf_total, false) }}</dd>
+            <dt class="text-xs uppercase tracking-wide text-gray-500">
+              Ministerial Fund
+            </dt>
+            <dd class="text-lg font-semibold">
+              {{ formatMoney(summary.mf_total, false) }}
+            </dd>
           </div>
           <div>
             <dt class="text-xs uppercase tracking-wide text-gray-500">Intervention</dt>
-            <dd class="text-lg font-semibold">{{ formatMoney(summary.intervention_total, false) }}</dd>
+            <dd class="text-lg font-semibold">
+              {{ formatMoney(summary.intervention_total, false) }}
+            </dd>
           </div>
           <div>
             <dt class="text-xs uppercase tracking-wide text-gray-500">Faith City</dt>
-            <dd class="text-lg font-semibold">{{ formatMoney(summary.faith_city_total, false) }}</dd>
+            <dd class="text-lg font-semibold">
+              {{ formatMoney(summary.faith_city_total, false) }}
+            </dd>
           </div>
           <div>
-            <dt class="text-xs uppercase tracking-wide text-gray-500">Area 5% retained</dt>
-            <dd class="text-lg font-semibold">{{ formatMoney(summary.area_retained_total, false) }}</dd>
+            <dt class="text-xs uppercase tracking-wide text-gray-500">
+              Area 5% retained
+            </dt>
+            <dd class="text-lg font-semibold">
+              {{ formatMoney(summary.area_retained_total, false) }}
+            </dd>
           </div>
           <div>
-            <dt class="text-xs uppercase tracking-wide text-gray-500">Savings 5% retained</dt>
-            <dd class="text-lg font-semibold">{{ formatMoney(summary.savings_retained_total, false) }}</dd>
+            <dt class="text-xs uppercase tracking-wide text-gray-500">
+              Savings 5% retained
+            </dt>
+            <dd class="text-lg font-semibold">
+              {{ formatMoney(summary.savings_retained_total, false) }}
+            </dd>
           </div>
         </dl>
       </UCard>
@@ -173,7 +192,9 @@ const statusColor: Record<string, 'success' | 'warning' | 'neutral' | 'info'> = 
         <div v-else class="overflow-x-auto">
           <table class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
             <thead>
-              <tr class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+              <tr
+                class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400"
+              >
                 <th class="px-3 py-2 font-medium">Branch</th>
                 <th class="px-3 py-2 font-medium">State</th>
                 <th class="px-3 py-2 font-medium">MF</th>
@@ -192,21 +213,42 @@ const statusColor: Record<string, 'success' | 'warning' | 'neutral' | 'info'> = 
                   {{ line.branch_name || line.branch }}
                 </td>
                 <td class="px-3 py-3">
-                  <UBadge :color="statusColor[line.computation_status] ?? 'neutral'" variant="subtle">
-                    {{ line.computation_status === 'formula_pending' ? 'Pending board formula' : line.computation_status }}
+                  <UBadge
+                    :color="statusColor[line.computation_status] ?? 'neutral'"
+                    variant="subtle"
+                  >
+                    {{
+                      line.computation_status === 'formula_pending'
+                        ? 'Pending board formula'
+                        : line.computation_status
+                    }}
                   </UBadge>
                 </td>
                 <td class="px-3 py-3 text-gray-600 dark:text-gray-300">
-                  {{ formatMoney(line.mf, line.computation_status === 'formula_pending') }}
+                  {{
+                    formatMoney(line.mf, line.computation_status === 'formula_pending')
+                  }}
                 </td>
                 <td class="px-3 py-3 text-gray-600 dark:text-gray-300">
-                  {{ formatMoney(line.intervention, line.computation_status === 'formula_pending') }}
+                  {{
+                    formatMoney(
+                      line.intervention,
+                      line.computation_status === 'formula_pending',
+                    )
+                  }}
                 </td>
                 <td class="px-3 py-3 text-gray-600 dark:text-gray-300">
-                  {{ formatMoney(line.faith_city, line.computation_status === 'formula_pending') }}
+                  {{
+                    formatMoney(
+                      line.faith_city,
+                      line.computation_status === 'formula_pending',
+                    )
+                  }}
                 </td>
                 <td class="px-3 py-3 font-semibold text-gray-900 dark:text-white">
-                  {{ formatMoney(line.total, line.computation_status === 'formula_pending') }}
+                  {{
+                    formatMoney(line.total, line.computation_status === 'formula_pending')
+                  }}
                 </td>
               </tr>
             </tbody>

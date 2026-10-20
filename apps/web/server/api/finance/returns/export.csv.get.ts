@@ -78,9 +78,30 @@ export default defineEventHandler(async (event): Promise<string> => {
   if (compare) {
     rows.push(
       [],
-      ['section', 'period', 'branches', 'pending', 'remittance_total', 'delta_remittance'],
-      ['current', summary.period, String(summary.branches), String(summary.pending), summary.remittance_total ?? '', ''],
-      ['prior', compare.period, String(compare.branches), String(compare.pending), compare.remittance_total ?? '', ''],
+      [
+        'section',
+        'period',
+        'branches',
+        'pending',
+        'remittance_total',
+        'delta_remittance',
+      ],
+      [
+        'current',
+        summary.period,
+        String(summary.branches),
+        String(summary.pending),
+        summary.remittance_total ?? '',
+        '',
+      ],
+      [
+        'prior',
+        compare.period,
+        String(compare.branches),
+        String(compare.pending),
+        compare.remittance_total ?? '',
+        '',
+      ],
       ['delta', '', '', '', '', compare.delta_remittance ?? ''],
     )
   }

@@ -32,12 +32,15 @@ export default defineEventHandler(async (event) => {
   // F2 (AFC-512 S8): preview accepts no inviter_* fields either.
   throwOnForgedInviterIdentity(body)
   const eventId = typeof body.event === 'string' ? body.event : ''
-  const inviteeName = typeof body.invitee_name === 'string' ? body.invitee_name.trim() : ''
+  const inviteeName =
+    typeof body.invitee_name === 'string' ? body.invitee_name.trim() : ''
   const phone = normalizeInvitePhone(body.invitee_phone)
   const channel = typeof body.channel_choice === 'string' ? body.channel_choice : 'auto'
-  const ageBand = typeof body.invitee_age_band === 'string' ? body.invitee_age_band : 'unknown'
+  const ageBand =
+    typeof body.invitee_age_band === 'string' ? body.invitee_age_band : 'unknown'
   const guardian = normalizeInvitePhone(body.guardian_phone)
-  const relationship = typeof body.invitee_relationship === 'string' ? body.invitee_relationship : null
+  const relationship =
+    typeof body.invitee_relationship === 'string' ? body.invitee_relationship : null
   const { note, error: noteError } = validateInviterNote(body.inviter_note)
   const guardianAttested = body.guardian_attested === true
 
@@ -45,18 +48,23 @@ export default defineEventHandler(async (event) => {
   if (!eventId) fields.event = 'Choose an event to invite to'
   if (!inviteeName) fields.invitee_name = 'Enter the invitee name'
   if (!phone) fields.invitee_phone = 'Enter the invitee phone number'
-  else if (phone.replace(/\D/g, '').length < 7) fields.invitee_phone = 'That number looks too short'
-  if (!INVITE_CHANNELS.includes(channel as never)) fields.channel_choice = 'Pick WhatsApp, SMS or automatic'
-  if (!INVITE_AGE_BANDS.includes(ageBand as never)) fields.invitee_age_band = 'Pick an age band'
+  else if (phone.replace(/\D/g, '').length < 7)
+    fields.invitee_phone = 'That number looks too short'
+  if (!INVITE_CHANNELS.includes(channel as never))
+    fields.channel_choice = 'Pick WhatsApp, SMS or automatic'
+  if (!INVITE_AGE_BANDS.includes(ageBand as never))
+    fields.invitee_age_band = 'Pick an age band'
   if (relationship !== null && !INVITE_RELATIONSHIPS.includes(relationship as never)) {
     fields.invitee_relationship = 'Pick a relationship or leave it blank'
   }
   // F5: unknown defaults to the guardian path.
   if (requiresGuardianBand(ageBand) && !guardian) {
-    fields.guardian_phone = 'A guardian number is required for a child, teen or unknown-age invitee'
+    fields.guardian_phone =
+      'A guardian number is required for a child, teen or unknown-age invitee'
   }
   if (isMinorBand(ageBand) && !guardianAttested) {
-    fields.guardian_attested = 'Confirm that a guardian agreed to this invitation so staff can verify it'
+    fields.guardian_attested =
+      'Confirm that a guardian agreed to this invitation so staff can verify it'
   }
   if (noteError) fields.inviter_note = noteError
   if (Object.keys(fields).length > 0) throwInviteValidation(fields)

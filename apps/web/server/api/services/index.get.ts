@@ -48,9 +48,12 @@ export default defineEventHandler(async (event) => {
   const query = getQuery(event)
   const page = Math.max(1, Number(query.page) || 1)
   const limit = Math.min(100, Math.max(1, Number(query.limit) || 25))
-  const branch = typeof query.branch === 'string' && query.branch.length > 0 ? query.branch : undefined
-  const zone = typeof query.zone === 'string' && query.zone.length > 0 ? query.zone : undefined
-  const status = typeof query.status === 'string' && query.status.length > 0 ? query.status : undefined
+  const branch =
+    typeof query.branch === 'string' && query.branch.length > 0 ? query.branch : undefined
+  const zone =
+    typeof query.zone === 'string' && query.zone.length > 0 ? query.zone : undefined
+  const status =
+    typeof query.status === 'string' && query.status.length > 0 ? query.status : undefined
   const serviceType =
     typeof query.service_type === 'string' && query.service_type.length > 0
       ? query.service_type

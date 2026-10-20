@@ -1,6 +1,12 @@
 import { searchQuerySchema } from '@afc/shared'
-import { can, getPortalScope, listItems, throwValidation } from '../../utils/portal'
-import { eventScopeFilter, scopeFilter } from '../../utils/portal'
+import {
+  can,
+  getPortalScope,
+  listItems,
+  throwValidation,
+  eventScopeFilter,
+  scopeFilter,
+} from '../../utils/portal'
 import { logScopedQuery } from '../../utils/office'
 
 /**

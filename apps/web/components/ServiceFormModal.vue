@@ -128,12 +128,24 @@ async function submit(): Promise<void> {
         </div>
 
         <UFormField label="Theme" :error="fieldErrors.theme">
-          <UInput v-model="form.theme" class="w-full" placeholder="For example: Grace for the journey" />
+          <UInput
+            v-model="form.theme"
+            class="w-full"
+            placeholder="For example: Grace for the journey"
+          />
         </UFormField>
 
         <div class="grid gap-4 sm:grid-cols-2">
-          <UFormField label="Expected attendance" :error="fieldErrors.expected_attendance">
-            <UInput v-model="form.expected_attendance" type="number" min="0" class="w-full" />
+          <UFormField
+            label="Expected attendance"
+            :error="fieldErrors.expected_attendance"
+          >
+            <UInput
+              v-model="form.expected_attendance"
+              type="number"
+              min="0"
+              class="w-full"
+            />
           </UFormField>
           <UFormField label="Status" :error="fieldErrors.status">
             <USelect v-model="form.status" :items="statusOptions" class="w-full" />
@@ -141,7 +153,11 @@ async function submit(): Promise<void> {
         </div>
 
         <UFormField label="Notes" :error="fieldErrors.notes">
-          <UTextarea v-model="form.notes" class="w-full" placeholder="Optional planning notes" />
+          <UTextarea
+            v-model="form.notes"
+            class="w-full"
+            placeholder="Optional planning notes"
+          />
         </UFormField>
       </form>
     </template>

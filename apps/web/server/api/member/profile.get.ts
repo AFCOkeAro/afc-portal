@@ -63,7 +63,12 @@ export default defineEventHandler(async (event) => {
   // D1 (AFC-526): the access time-box is live-read for the session user on
   // every request and fails closed (lookup failure -> 401). A lapsed
   // time-box answers 401 on the next read despite a live cookie.
-  await requireLiveMemberSession(event, session.user.id, Date.parse(session.expiresAt), Date.now())
+  await requireLiveMemberSession(
+    event,
+    session.user.id,
+    Date.parse(session.expiresAt),
+    Date.now(),
+  )
 
   const person = await directusFetch<{ data: Record<string, unknown> }>(
     event,

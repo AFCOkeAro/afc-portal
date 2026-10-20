@@ -27,7 +27,8 @@ export default defineEventHandler(async (event): Promise<ZoneSummary[]> => {
   requireCan(scope, 'zones', 'read')
 
   const query = getQuery(event)
-  const area = typeof query.area === 'string' && query.area.length > 0 ? query.area : undefined
+  const area =
+    typeof query.area === 'string' && query.area.length > 0 ? query.area : undefined
 
   const visibleZones = scope.isArea ? null : await scopeZoneIds(event, scope)
 

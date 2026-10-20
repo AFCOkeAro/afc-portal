@@ -1,6 +1,5 @@
-import { getPortalScope } from '../../utils/portal'
+import { getPortalScope, csvResponse, requireCan } from '../../utils/portal'
 import { buildFunnelForScope } from '../../utils/visitor-journey'
-import { csvResponse, requireCan } from '../../utils/portal'
 
 export default defineEventHandler(async (event) => {
   const scope = await getPortalScope(event)

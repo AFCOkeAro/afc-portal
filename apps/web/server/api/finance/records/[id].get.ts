@@ -30,7 +30,8 @@ export default defineEventHandler(async (event) => {
   requireCan(scope, 'branch_financial_records', 'read')
 
   const id = getRouterParam(event, 'id')
-  if (!id) throw createError({ statusCode: 400, statusMessage: 'A record id is required' })
+  if (!id)
+    throw createError({ statusCode: 400, statusMessage: 'A record id is required' })
 
   const row = await findScopedItem<Record<string, unknown>>(
     event,

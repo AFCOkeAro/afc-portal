@@ -1,7 +1,4 @@
-import {
-  COACHING_TIMETABLE_FIELDS,
-  programmeChildFilter,
-} from '../../../utils/campus'
+import { COACHING_TIMETABLE_FIELDS, programmeChildFilter } from '../../../utils/campus'
 import {
   getPortalScope,
   listItems,

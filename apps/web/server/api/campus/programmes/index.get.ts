@@ -2,11 +2,7 @@ import {
   COACHING_PROGRAMME_FIELDS,
   coachingProgrammeScopeFilter,
 } from '../../../utils/campus'
-import {
-  getPortalScope,
-  listItems,
-  requireCan,
-} from '../../../utils/portal'
+import { getPortalScope, listItems, requireCan } from '../../../utils/portal'
 
 /**
  * GET /api/campus/programmes?branch=&zone=&exam=&status=

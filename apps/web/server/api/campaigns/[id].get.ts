@@ -73,7 +73,8 @@ export default defineEventHandler(async (event) => {
   requireCan(scope, 'communications', 'read')
 
   const id = getRouterParam(event, 'id')
-  if (!id) throw createError({ statusCode: 400, statusMessage: 'A campaign id is required' })
+  if (!id)
+    throw createError({ statusCode: 400, statusMessage: 'A campaign id is required' })
 
   const campaign = await findScopedItem<Record<string, unknown>>(
     event,
@@ -95,14 +96,22 @@ export default defineEventHandler(async (event) => {
 
   // Channel keys + template approval state for the US-C1 AC4 gate display.
   // Small tables, fetched once; unknown ids stay visible as ids, never hidden.
-  const channelIds = [...new Set(steps.data.map((s: Record<string, unknown>) => String(s.channel)).filter(Boolean))]
-  const channelById = new Map<string, { key: string, enabled: boolean }>()
+  const channelIds = [
+    ...new Set(
+      steps.data.map((s: Record<string, unknown>) => String(s.channel)).filter(Boolean),
+    ),
+  ]
+  const channelById = new Map<string, { key: string; enabled: boolean }>()
   if (channelIds.length > 0) {
     const channels = await listItems<Record<string, unknown>>(
       event,
       scope,
       'communication_channels',
-      { filter: { id: { _in: channelIds } }, fields: ['id', 'key', 'enabled'], limit: -1 },
+      {
+        filter: { id: { _in: channelIds } },
+        fields: ['id', 'key', 'enabled'],
+        limit: -1,
+      },
     )
     for (const channel of channels.data) {
       channelById.set(String(channel.id), {
@@ -112,8 +121,18 @@ export default defineEventHandler(async (event) => {
     }
   }
 
-  const templateIds = [...new Set(steps.data.map((s: Record<string, unknown>) => s.template).filter(Boolean).map(String))]
-  const templateById = new Map<string, { key: string, approval_status: string, provider_template_id: string | null }>()
+  const templateIds = [
+    ...new Set(
+      steps.data
+        .map((s: Record<string, unknown>) => s.template)
+        .filter(Boolean)
+        .map(String),
+    ),
+  ]
+  const templateById = new Map<
+    string,
+    { key: string; approval_status: string; provider_template_id: string | null }
+  >()
   if (templateIds.length > 0) {
     const templates = await listItems<Record<string, unknown>>(
       event,
@@ -149,34 +168,43 @@ export default defineEventHandler(async (event) => {
       id: String(campaign.id),
       steps: steps.data.map((step: Record<string, unknown>) => {
         const channelId = String(step.channel)
-        const templateId = step.template === null || step.template === undefined
-          ? null
-          : String(step.template)
+        const templateId =
+          step.template === null || step.template === undefined
+            ? null
+            : String(step.template)
         return {
           ...(step as Record<string, unknown>),
           id: String(step.id),
           channel_key: channelById.get(channelId)?.key ?? channelId,
           channel_enabled: channelById.get(channelId)?.enabled ?? null,
-          template_key: templateId === null ? null : (templateById.get(templateId)?.key ?? templateId),
-          template_approval_status: templateId === null
-            ? null
-            : (templateById.get(templateId)?.approval_status ?? 'unknown'),
-          template_provider_id: templateId === null
-            ? null
-            : (templateById.get(templateId)?.provider_template_id ?? null),
+          template_key:
+            templateId === null
+              ? null
+              : (templateById.get(templateId)?.key ?? templateId),
+          template_approval_status:
+            templateId === null
+              ? null
+              : (templateById.get(templateId)?.approval_status ?? 'unknown'),
+          template_provider_id:
+            templateId === null
+              ? null
+              : (templateById.get(templateId)?.provider_template_id ?? null),
         }
       }),
-      runs: runs.data.map((run: Record<string, unknown>) => ({ ...(run as Record<string, unknown>), id: String(run.id) })),
+      runs: runs.data.map((run: Record<string, unknown>) => ({
+        ...(run as Record<string, unknown>),
+        id: String(run.id),
+      })),
       consent_gate_preview: latest
         ? {
-          has_run: true,
-          run_id: String(latest.id),
-          window_start: (latest.window_start as string | null) ?? null,
-          audience_size: Number(latest.audience_size ?? 0),
-          eligible_count: Number(latest.eligible_count ?? 0),
-          excluded_count: Number(latest.excluded_count ?? 0),
-          excluded_reasons: (latest.excluded_reasons as Record<string, number>) ?? {},
-        }
+            has_run: true,
+            run_id: String(latest.id),
+            window_start: (latest.window_start as string | null) ?? null,
+            audience_size: Number(latest.audience_size ?? 0),
+            eligible_count: Number(latest.eligible_count ?? 0),
+            excluded_count: Number(latest.excluded_count ?? 0),
+            excluded_reasons: (latest.excluded_reasons as Record<string, number>) ?? {},
+          }
         : { has_run: false as const },
     },
   }

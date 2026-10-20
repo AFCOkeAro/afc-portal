@@ -51,9 +51,8 @@ interface RunReport {
   notes: string | null
 }
 
-const { data, pending, error } = await useAsyncData(
-  `campaign-run-${runId}`,
-  () => api.get<{ data: RunReport }>(`/api/campaigns/${id}/runs/${runId}`),
+const { data, pending, error } = await useAsyncData(`campaign-run-${runId}`, () =>
+  api.get<{ data: RunReport }>(`/api/campaigns/${id}/runs/${runId}`),
 )
 
 const run = computed(() => data.value?.data ?? null)
@@ -62,15 +61,43 @@ const counters = computed(() => {
   const report = run.value
   if (!report) return []
   return [
-    { label: 'Audience', value: String(report.audience_size), hint: 'Resolved before consent' },
-    { label: 'Eligible', value: String(report.eligible_count), hint: 'Passed consent and caps' },
-    { label: 'Excluded', value: String(report.excluded_count), hint: 'Blocked with a reason' },
+    {
+      label: 'Audience',
+      value: String(report.audience_size),
+      hint: 'Resolved before consent',
+    },
+    {
+      label: 'Eligible',
+      value: String(report.eligible_count),
+      hint: 'Passed consent and caps',
+    },
+    {
+      label: 'Excluded',
+      value: String(report.excluded_count),
+      hint: 'Blocked with a reason',
+    },
     { label: 'Queued', value: String(report.queued_count), hint: 'Held by the tick' },
     { label: 'Sent', value: String(report.sent_count), hint: 'Handed to the provider' },
-    { label: 'Delivered', value: String(report.delivered_count), hint: 'Provider confirmed' },
-    { label: 'Read', value: String(report.read_count), hint: 'Read receipt, where supplied' },
-    { label: 'Failed', value: String(report.failed_count), hint: 'Redacted error on the log' },
-    { label: 'Opted out', value: String(report.opted_out_count), hint: 'STOP recorded permanently' },
+    {
+      label: 'Delivered',
+      value: String(report.delivered_count),
+      hint: 'Provider confirmed',
+    },
+    {
+      label: 'Read',
+      value: String(report.read_count),
+      hint: 'Read receipt, where supplied',
+    },
+    {
+      label: 'Failed',
+      value: String(report.failed_count),
+      hint: 'Redacted error on the log',
+    },
+    {
+      label: 'Opted out',
+      value: String(report.opted_out_count),
+      hint: 'STOP recorded permanently',
+    },
   ]
 })
 </script>
@@ -129,14 +156,42 @@ const counters = computed(() => {
           <h2 class="text-base font-semibold" tabindex="-1">Run detail</h2>
         </template>
         <dl class="grid gap-3 text-sm sm:grid-cols-2">
-          <div class="flex justify-between gap-4"><dt class="text-gray-500">Campaign</dt><dd class="font-mono">{{ run.campaign_key }}</dd></div>
-          <div class="flex justify-between gap-4"><dt class="text-gray-500">Step</dt><dd>{{ run.step_name ?? '—' }}</dd></div>
-          <div class="flex justify-between gap-4"><dt class="text-gray-500">Status</dt><dd><UBadge color="neutral" variant="subtle">{{ run.status }}</UBadge></dd></div>
-          <div class="flex justify-between gap-4"><dt class="text-gray-500">Trigger</dt><dd>{{ run.trigger }}</dd></div>
-          <div class="flex justify-between gap-4"><dt class="text-gray-500">Window</dt><dd>{{ run.window_start ?? '—' }} → {{ run.window_end ?? '—' }}</dd></div>
-          <div class="flex justify-between gap-4"><dt class="text-gray-500">Estimated cost</dt><dd class="tabular-nums">{{ run.estimated_cost ?? '—' }} {{ run.currency }}</dd></div>
-          <div class="flex justify-between gap-4"><dt class="text-gray-500">Actual cost</dt><dd class="tabular-nums">{{ run.actual_cost ?? '—' }} {{ run.currency }}</dd></div>
-          <div class="flex justify-between gap-4"><dt class="text-gray-500">Worker run</dt><dd class="font-mono">{{ run.worker_run_id ?? '—' }}</dd></div>
+          <div class="flex justify-between gap-4">
+            <dt class="text-gray-500">Campaign</dt>
+            <dd class="font-mono">{{ run.campaign_key }}</dd>
+          </div>
+          <div class="flex justify-between gap-4">
+            <dt class="text-gray-500">Step</dt>
+            <dd>{{ run.step_name ?? '—' }}</dd>
+          </div>
+          <div class="flex justify-between gap-4">
+            <dt class="text-gray-500">Status</dt>
+            <dd>
+              <UBadge color="neutral" variant="subtle">{{ run.status }}</UBadge>
+            </dd>
+          </div>
+          <div class="flex justify-between gap-4">
+            <dt class="text-gray-500">Trigger</dt>
+            <dd>{{ run.trigger }}</dd>
+          </div>
+          <div class="flex justify-between gap-4">
+            <dt class="text-gray-500">Window</dt>
+            <dd>{{ run.window_start ?? '—' }} → {{ run.window_end ?? '—' }}</dd>
+          </div>
+          <div class="flex justify-between gap-4">
+            <dt class="text-gray-500">Estimated cost</dt>
+            <dd class="tabular-nums">
+              {{ run.estimated_cost ?? '—' }} {{ run.currency }}
+            </dd>
+          </div>
+          <div class="flex justify-between gap-4">
+            <dt class="text-gray-500">Actual cost</dt>
+            <dd class="tabular-nums">{{ run.actual_cost ?? '—' }} {{ run.currency }}</dd>
+          </div>
+          <div class="flex justify-between gap-4">
+            <dt class="text-gray-500">Worker run</dt>
+            <dd class="font-mono">{{ run.worker_run_id ?? '—' }}</dd>
+          </div>
         </dl>
         <div v-if="Object.keys(run.excluded_reasons).length > 0" class="mt-4">
           <h3 class="text-sm font-semibold">Excluded by reason</h3>

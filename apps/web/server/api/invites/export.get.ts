@@ -26,9 +26,10 @@ export default defineEventHandler(async (event) => {
   const query = getQuery(event)
   const eventFilter = typeof query.event === 'string' ? query.event : undefined
   const inviter = typeof query.inviter === 'string' ? query.inviter : undefined
-  const status = typeof query.status === 'string' && INVITE_STATUSES.includes(query.status as never)
-    ? query.status
-    : undefined
+  const status =
+    typeof query.status === 'string' && INVITE_STATUSES.includes(query.status as never)
+      ? query.status
+      : undefined
   const branch = typeof query.branch === 'string' ? query.branch : undefined
 
   const result = await listItems<InviteRow>(event, scope, 'event_invites', {
@@ -45,9 +46,19 @@ export default defineEventHandler(async (event) => {
   })
 
   const header = [
-    'id', 'event', 'branch', 'inviter_user', 'invitee_name', 'invitee_phone',
-    'invitee_age_band', 'channel_choice', 'status', 'approval_required',
-    'blocked_reason', 'retry_of', 'created_at',
+    'id',
+    'event',
+    'branch',
+    'inviter_user',
+    'invitee_name',
+    'invitee_phone',
+    'invitee_age_band',
+    'channel_choice',
+    'status',
+    'approval_required',
+    'blocked_reason',
+    'retry_of',
+    'created_at',
   ]
   const rows: string[][] = [header]
   for (const row of result.data) {

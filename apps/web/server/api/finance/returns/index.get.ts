@@ -50,30 +50,27 @@ export default defineEventHandler(async (event) => {
   const period = typeof query.period === 'string' ? query.period : undefined
   const status = typeof query.status === 'string' ? query.status : undefined
 
-  const result = await listItems<Record<string, unknown>>(
-    event,
-    scope,
-    'weca_returns',
-    {
-      filter: mergeFilters(
-        branch ? { branch: { _eq: branch } } : undefined,
-        period ? { period: { _eq: period } } : undefined,
-        status && status !== 'all' ? { computation_status: { _eq: status } } : undefined,
-        scopeFilter(scope),
-      ),
-      fields: visibleFields(scope, 'weca_returns', RETURN_FIELDS),
-      sort: '-period',
-      page,
-      limit,
-    },
-  )
+  const result = await listItems<Record<string, unknown>>(event, scope, 'weca_returns', {
+    filter: mergeFilters(
+      branch ? { branch: { _eq: branch } } : undefined,
+      period ? { period: { _eq: period } } : undefined,
+      status && status !== 'all' ? { computation_status: { _eq: status } } : undefined,
+      scopeFilter(scope),
+    ),
+    fields: visibleFields(scope, 'weca_returns', RETURN_FIELDS),
+    sort: '-period',
+    page,
+    limit,
+  })
 
   const names = await branchNames(event, scope)
   const recordIds = [
     ...new Set(
       result.data
         .map((row) => row.financial_record)
-        .filter((value): value is string => typeof value === 'string' && value.length > 0),
+        .filter(
+          (value): value is string => typeof value === 'string' && value.length > 0,
+        ),
     ),
   ]
   const months = new Map<string, string>()

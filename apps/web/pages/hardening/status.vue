@@ -22,13 +22,14 @@ interface HardeningStatus {
   pending_migration_0015: boolean
 }
 
-const { data, pending, error, refresh } = await useAsyncData(
-  'hardening-status',
-  () => api.get<HardeningStatus>('/api/hardening/status'),
+const { data, pending, error, refresh } = await useAsyncData('hardening-status', () =>
+  api.get<HardeningStatus>('/api/hardening/status'),
 )
 
 const canPause = computed(() => permissions.can(COLLECTIONS.communications, 'create'))
-const canPauseAll = computed(() => data.value?.can_publish_rates === true && canPause.value)
+const canPauseAll = computed(
+  () => data.value?.can_publish_rates === true && canPause.value,
+)
 const pausing = ref(false)
 const pauseError = ref<string | null>(null)
 const pauseResult = ref<{
@@ -105,12 +106,16 @@ async function pauseAll(): Promise<void> {
         />
         <StatCard
           label="Tick SLO share"
-          :value="data.tick_slo_ratio === null ? 'unknown' : `${Math.round(data.tick_slo_ratio * 100)}%`"
+          :value="
+            data.tick_slo_ratio === null
+              ? 'unknown'
+              : `${Math.round(data.tick_slo_ratio * 100)}%`
+          "
           hint="Due steps beginning within 5 min"
         />
         <StatCard
           label="Checks reporting"
-          :value="`${data.checks.filter((c) => c.ok !== null).length}/${data.checks.length}`"
+          :value="`${data.checks.filter((c: HardeningCheck) => c.ok !== null).length}/${data.checks.length}`"
           hint="Latest outcome per check key"
         />
       </div>
@@ -122,7 +127,9 @@ async function pauseAll(): Promise<void> {
         <div class="overflow-x-auto">
           <table class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
             <thead>
-              <tr class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+              <tr
+                class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400"
+              >
                 <th class="px-3 py-2 font-medium">Check</th>
                 <th class="px-3 py-2 font-medium">Outcome</th>
                 <th class="px-3 py-2 font-medium">Detail</th>
@@ -134,14 +141,20 @@ async function pauseAll(): Promise<void> {
                 <td class="px-3 py-2 font-medium">{{ check.key }}</td>
                 <td class="px-3 py-2">
                   <UBadge
-                    :color="check.ok === null ? 'neutral' : check.ok ? 'success' : 'error'"
+                    :color="
+                      check.ok === null ? 'neutral' : check.ok ? 'success' : 'error'
+                    "
                     variant="subtle"
                   >
                     {{ check.ok === null ? 'pending' : check.ok ? 'ok' : 'red' }}
                   </UBadge>
                 </td>
-                <td class="px-3 py-2 text-gray-600 dark:text-gray-300">{{ check.detail ?? '—' }}</td>
-                <td class="px-3 py-2 text-gray-600 dark:text-gray-300">{{ check.recorded_at ?? '—' }}</td>
+                <td class="px-3 py-2 text-gray-600 dark:text-gray-300">
+                  {{ check.detail ?? '—' }}
+                </td>
+                <td class="px-3 py-2 text-gray-600 dark:text-gray-300">
+                  {{ check.recorded_at ?? '—' }}
+                </td>
               </tr>
             </tbody>
           </table>
@@ -154,9 +167,9 @@ async function pauseAll(): Promise<void> {
             <h2 class="font-semibold">Pause-all (single action)</h2>
           </template>
           <p class="text-sm text-gray-600 dark:text-gray-300">
-            Pauses every active campaign and, when asked, disables the channel.
-            Held rows are kept and resume from <code>next_step_at</code> — nothing is deleted.
-            Logs <code>pause_drill</code> and returns the staff-channel announcement.
+            Pauses every active campaign and, when asked, disables the channel. Held rows
+            are kept and resume from <code>next_step_at</code> — nothing is deleted. Logs
+            <code>pause_drill</code> and returns the staff-channel announcement.
           </p>
           <div class="mt-3 grid gap-3 sm:grid-cols-[1fr_auto]">
             <UInput v-model="reason" aria-label="Pause reason" class="w-full" />

@@ -42,7 +42,9 @@ async function transition(status: 'submitted' | 'confirmed') {
     await refresh()
   } catch (cause) {
     actionError.value =
-      cause instanceof ApiRequestError ? cause.message : 'Could not move the return. Try again.'
+      cause instanceof ApiRequestError
+        ? cause.message
+        : 'Could not move the return. Try again.'
   } finally {
     acting.value = false
   }
@@ -60,7 +62,11 @@ const statusColor: Record<string, 'success' | 'warning' | 'neutral' | 'info'> = 
   <div>
     <PageHeader
       title="WECA return"
-      :description="row ? `${row.branch_name || 'No branch'} · ${row.period}` : 'One branch period under the board formula.'"
+      :description="
+        row
+          ? `${row.branch_name || 'No branch'} · ${row.period}`
+          : 'One branch period under the board formula.'
+      "
     >
       <template #actions>
         <UButton
@@ -89,8 +95,15 @@ const statusColor: Record<string, 'success' | 'warning' | 'neutral' | 'info'> = 
         <template #header>
           <div class="flex items-center justify-between">
             <h2 class="font-semibold">Computed lines</h2>
-            <UBadge :color="statusColor[row.computation_status] ?? 'neutral'" variant="subtle">
-              {{ row.computation_status === 'formula_pending' ? 'Pending board formula' : row.computation_status }}
+            <UBadge
+              :color="statusColor[row.computation_status] ?? 'neutral'"
+              variant="subtle"
+            >
+              {{
+                row.computation_status === 'formula_pending'
+                  ? 'Pending board formula'
+                  : row.computation_status
+              }}
             </UBadge>
           </div>
         </template>
@@ -106,17 +119,23 @@ const statusColor: Record<string, 'success' | 'warning' | 'neutral' | 'info'> = 
 
         <dl v-if="computedVisible" class="grid gap-3 sm:grid-cols-2">
           <div>
-            <dt class="text-xs uppercase tracking-wide text-gray-500">Ministerial Fund</dt>
+            <dt class="text-xs uppercase tracking-wide text-gray-500">
+              Ministerial Fund
+            </dt>
             <dd class="text-lg font-semibold">{{ formatMoney(row.computed_mf) }}</dd>
           </div>
           <div>
             <dt class="text-xs uppercase tracking-wide text-gray-500">Intervention</dt>
-            <dd class="text-lg font-semibold">{{ formatMoney(row.computed_intervention) }}</dd>
+            <dd class="text-lg font-semibold">
+              {{ formatMoney(row.computed_intervention) }}
+            </dd>
             <p class="text-xs text-gray-500">Copied from capture, never derived.</p>
           </div>
           <div>
             <dt class="text-xs uppercase tracking-wide text-gray-500">Faith City</dt>
-            <dd class="text-lg font-semibold">{{ formatMoney(row.computed_faith_city) }}</dd>
+            <dd class="text-lg font-semibold">
+              {{ formatMoney(row.computed_faith_city) }}
+            </dd>
             <p class="text-xs text-gray-500">Copied from capture, never derived.</p>
           </div>
           <div>
@@ -125,16 +144,21 @@ const statusColor: Record<string, 'success' | 'warning' | 'neutral' | 'info'> = 
             <p class="text-xs text-gray-500">MF + intervention + Faith City.</p>
           </div>
           <div>
-            <dt class="text-xs uppercase tracking-wide text-gray-500">Area 5% (retained)</dt>
+            <dt class="text-xs uppercase tracking-wide text-gray-500">
+              Area 5% (retained)
+            </dt>
             <dd class="text-lg font-semibold">{{ formatMoney(row.computed_area) }}</dd>
           </div>
           <div>
-            <dt class="text-xs uppercase tracking-wide text-gray-500">Savings 5% (retained)</dt>
+            <dt class="text-xs uppercase tracking-wide text-gray-500">
+              Savings 5% (retained)
+            </dt>
             <dd class="text-lg font-semibold">{{ formatMoney(row.computed_savings) }}</dd>
           </div>
         </dl>
         <p v-else class="text-sm text-gray-500">
-          Computed amounts are limited to area administrators and above (data-model §11.1).
+          Computed amounts are limited to area administrators and above (data-model
+          §11.1).
         </p>
         <p class="mt-4 text-xs text-gray-500">
           Area and savings lines are retained, never remitted (ADR-0008 R2).
@@ -147,10 +171,19 @@ const statusColor: Record<string, 'success' | 'warning' | 'neutral' | 'info'> = 
         </template>
 
         <ol class="grid gap-2 text-sm">
-          <li><span class="font-medium">Formula:</span> {{ row.formula_version ?? 'none yet' }}</li>
-          <li><span class="font-medium">Captured:</span> {{ row.record_month ?? '—' }}</li>
-          <li><span class="font-medium">Submitted:</span> {{ row.submitted_at ?? '—' }}</li>
-          <li><span class="font-medium">Confirmed:</span> {{ row.confirmed_at ?? '—' }}</li>
+          <li>
+            <span class="font-medium">Formula:</span>
+            {{ row.formula_version ?? 'none yet' }}
+          </li>
+          <li>
+            <span class="font-medium">Captured:</span> {{ row.record_month ?? '—' }}
+          </li>
+          <li>
+            <span class="font-medium">Submitted:</span> {{ row.submitted_at ?? '—' }}
+          </li>
+          <li>
+            <span class="font-medium">Confirmed:</span> {{ row.confirmed_at ?? '—' }}
+          </li>
         </ol>
         <p class="mt-3 text-xs text-gray-500">
           Submission and confirmation are audited through the Directus activity log.
@@ -184,7 +217,10 @@ const statusColor: Record<string, 'success' | 'warning' | 'neutral' | 'info'> = 
             <p v-if="isPending" class="text-sm text-gray-500">
               Returns submit once the formula computes them.
             </p>
-            <p v-if="row.computation_status === 'confirmed'" class="text-sm text-gray-500">
+            <p
+              v-if="row.computation_status === 'confirmed'"
+              class="text-sm text-gray-500"
+            >
               Confirmed returns cannot move again.
             </p>
           </div>

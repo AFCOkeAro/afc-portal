@@ -67,7 +67,11 @@ export async function collectWelfareAggregate(
   // Chunked (200 per page) so memory grows with the filtered set, not with
   // an unbounded single page. Welfare volumes are small; the loop still
   // bounds each request the same way the attendance collector does.
-  const rows: Array<{ status: string | null; category: string | null; priority: string | null }> = []
+  const rows: Array<{
+    status: string | null
+    category: string | null
+    priority: string | null
+  }> = []
   let page = 1
   for (;;) {
     const result = await listItems<{
@@ -86,7 +90,10 @@ export async function collectWelfareAggregate(
     page += 1
   }
 
-  const groups = new Map<string, { status: string; category: string; priority: string; count: number }>()
+  const groups = new Map<
+    string,
+    { status: string; category: string; priority: string; count: number }
+  >()
   for (const row of rows) {
     const key = `${row.status ?? 'open'}|${row.category ?? 'other'}|${row.priority ?? 'normal'}`
     const existing = groups.get(key)

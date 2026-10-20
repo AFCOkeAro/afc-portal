@@ -64,18 +64,16 @@ export default defineEventHandler(async (event) => {
   )
 
   const names = await branchNames(event, scope)
-  const rows = stripHiddenMany(
-    scope,
-    'branch_financial_records',
-    result.data,
-  ).map((row) => {
-    const record = row as unknown as FinancialRecordRow
-    return {
-      ...record,
-      id: String(record.id),
-      branch_name: record.branch ? (names.get(String(record.branch)) ?? null) : null,
-    }
-  })
+  const rows = stripHiddenMany(scope, 'branch_financial_records', result.data).map(
+    (row) => {
+      const record = row as unknown as FinancialRecordRow
+      return {
+        ...record,
+        id: String(record.id),
+        branch_name: record.branch ? (names.get(String(record.branch)) ?? null) : null,
+      }
+    },
+  )
 
   return { data: rows, meta: result.meta }
 })

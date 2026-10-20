@@ -50,11 +50,16 @@ async function latestPerKey(
 ): Promise<{ rows: Partial<Record<MonitorCheckKey, MonitorRow>>; pending: boolean }> {
   const rows = {} as Partial<Record<MonitorCheckKey, MonitorRow>>
   try {
-    const result = await listItems<MonitorRow>(event, scope, HARDENING_COLLECTIONS.monitorChecks, {
-      fields: ['id', 'check_key', 'ok', 'detail', 'recorded_at'],
-      sort: '-recorded_at',
-      limit: 50,
-    })
+    const result = await listItems<MonitorRow>(
+      event,
+      scope,
+      HARDENING_COLLECTIONS.monitorChecks,
+      {
+        fields: ['id', 'check_key', 'ok', 'detail', 'recorded_at'],
+        sort: '-recorded_at',
+        limit: 50,
+      },
+    )
     for (const row of result.data) {
       if (!rows[row.check_key]) rows[row.check_key] = row
     }
@@ -73,11 +78,16 @@ export default defineEventHandler(async (event) => {
   let rates: RateRow[] | null = null
   let ratesPending = false
   try {
-    const result = await listItems<RateRow>(event, scope, HARDENING_COLLECTIONS.costRates, {
-      fields: ['channel', 'unit_cost', 'currency', 'effective_from'],
-      sort: 'channel',
-      limit: 10,
-    })
+    const result = await listItems<RateRow>(
+      event,
+      scope,
+      HARDENING_COLLECTIONS.costRates,
+      {
+        fields: ['channel', 'unit_cost', 'currency', 'effective_from'],
+        sort: 'channel',
+        limit: 10,
+      },
+    )
     rates = result.data
   } catch {
     ratesPending = true
@@ -86,7 +96,7 @@ export default defineEventHandler(async (event) => {
   // Queue depth: due-but-unprocessed enrollments. The campaign tables belong
   // to slice 4c (0006); when they are absent the depth is unknown, not zero
   // — reporting zero would claim the tick is idle when it may not exist.
-  let queueDepth: number | null = null
+  let queueDepth: number | null
   try {
     queueDepth = await countItems(event, scope, 'campaign_enrollments', {
       state: { _eq: 'active' },
@@ -99,11 +109,16 @@ export default defineEventHandler(async (event) => {
   // Tick SLO share over the recent tick_slo checks (pass ratio, not a guess).
   let sloRatio: number | null = null
   try {
-    const result = await listItems<MonitorRow>(event, scope, HARDENING_COLLECTIONS.monitorChecks, {
-      filter: { check_key: { _eq: 'tick_slo' } },
-      fields: ['ok'],
-      limit: 100,
-    })
+    const result = await listItems<MonitorRow>(
+      event,
+      scope,
+      HARDENING_COLLECTIONS.monitorChecks,
+      {
+        filter: { check_key: { _eq: 'tick_slo' } },
+        fields: ['ok'],
+        limit: 100,
+      },
+    )
     if (result.data.length > 0) {
       const met = result.data.filter((row) => row.ok).length
       sloRatio = tickSloRatio(met, result.data.length)

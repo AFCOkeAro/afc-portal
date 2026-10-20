@@ -52,7 +52,10 @@ const query = computed(() => ({
 
 const { data, pending, error, refresh } = await useAsyncData(
   'campus-results',
-  () => api.get<{ data: ResultRow[]; meta: { total: number } }>('/api/campus/results', { query: query.value }),
+  () =>
+    api.get<{ data: ResultRow[]; meta: { total: number } }>('/api/campus/results', {
+      query: query.value,
+    }),
   { watch: [query] },
 )
 
@@ -120,7 +123,10 @@ async function saveResult() {
 
     <PermissionGate :collection="COLLECTIONS.examResults" action="create">
       <UCard class="mt-4">
-        <form class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" @submit.prevent="saveResult">
+        <form
+          class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3"
+          @submit.prevent="saveResult"
+        >
           <UFormField label="Campus student id" required>
             <UInput
               v-model="form.campus_student"
@@ -136,7 +142,11 @@ async function saveResult() {
             <UInput v-model="form.exam_year" inputmode="numeric" class="w-full" />
           </UFormField>
           <UFormField label="Aggregate">
-            <UInput v-model="form.aggregate" placeholder="e.g. 287, 5 distinctions" class="w-full" />
+            <UInput
+              v-model="form.aggregate"
+              placeholder="e.g. 287, 5 distinctions"
+              class="w-full"
+            />
           </UFormField>
           <UFormField label="Status">
             <USelect v-model="form.status" :items="statusOptions" class="w-full" />
@@ -185,7 +195,9 @@ async function saveResult() {
       <div v-else class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
           <thead>
-            <tr class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+            <tr
+              class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400"
+            >
               <th class="px-3 py-2 font-medium">Exam</th>
               <th class="px-3 py-2 font-medium">Year</th>
               <th class="px-3 py-2 font-medium">Scores / aggregate</th>

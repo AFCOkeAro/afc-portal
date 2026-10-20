@@ -32,7 +32,8 @@ export default defineEventHandler(async (event): Promise<BscSummary[]> => {
   requireCan(scope, 'bible_study_centres', 'read')
 
   const query = getQuery(event)
-  const zone = typeof query.zone === 'string' && query.zone.length > 0 ? query.zone : undefined
+  const zone =
+    typeof query.zone === 'string' && query.zone.length > 0 ? query.zone : undefined
   const branch =
     typeof query.branch === 'string' && query.branch.length > 0 ? query.branch : undefined
 

@@ -53,11 +53,7 @@ export default defineEventHandler(async (event) => {
   if (!parsed.success) throwValidation(parsed.error)
   const form = parsed.data
 
-  if (
-    form.start_time &&
-    form.end_time &&
-    form.start_time >= form.end_time
-  ) {
+  if (form.start_time && form.end_time && form.start_time >= form.end_time) {
     throw createError({
       statusCode: 400,
       statusMessage: 'End time must be after start time',
@@ -111,8 +107,7 @@ export default defineEventHandler(async (event) => {
       day_of_week: typeof row.day_of_week === 'string' ? row.day_of_week : null,
       start_time: typeof row.start_time === 'string' ? row.start_time : null,
       end_time: typeof row.end_time === 'string' ? row.end_time : null,
-      facilitator:
-        row.facilitator == null ? null : String(row.facilitator),
+      facilitator: row.facilitator == null ? null : String(row.facilitator),
       location: typeof row.location === 'string' ? row.location : null,
     })),
   )
@@ -140,7 +135,10 @@ export default defineEventHandler(async (event) => {
   return {
     data: { ...created, id: String(created.id) },
     meta: {
-      clashes: clashes.map((slot) => slot.id).filter(Boolean).map(String),
+      clashes: clashes
+        .map((slot) => slot.id)
+        .filter(Boolean)
+        .map(String),
       clash_count: clashes.length,
     },
   }

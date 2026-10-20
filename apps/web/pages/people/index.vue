@@ -1,11 +1,6 @@
 <script setup lang="ts">
 import { COLLECTIONS } from '@afc/shared'
-import type {
-  BranchSummary,
-  DepartmentRow,
-  Paginated,
-  PersonRow,
-} from '~/types/portal'
+import type { BranchSummary, DepartmentRow, Paginated, PersonRow } from '~/types/portal'
 
 definePageMeta({ middleware: 'staff' })
 
@@ -25,7 +20,9 @@ const membership = ref(queryParam('membership_status') ?? 'all')
 const department = ref(queryParam('department') ?? 'all')
 const status = ref(queryParam('status') ?? 'active')
 const compare = ref(queryParam('compare_prior_year') === 'true')
-const groupBy = ref<'branch' | 'zone'>(queryParam('group_by') === 'zone' ? 'zone' : 'branch')
+const groupBy = ref<'branch' | 'zone'>(
+  queryParam('group_by') === 'zone' ? 'zone' : 'branch',
+)
 const dataYear = ref(queryParam('data_year') ?? String(new Date().getFullYear() - 1))
 const page = ref(1)
 const limit = 25
@@ -214,14 +211,24 @@ function fullName(person: PersonRow): string {
           />
         </UFormField>
         <UFormField v-if="compare" label="Prior-year snapshot (YYYY)">
-          <UInput v-model="dataYear" inputmode="numeric" class="w-full" aria-label="Prior-year snapshot" />
+          <UInput
+            v-model="dataYear"
+            inputmode="numeric"
+            class="w-full"
+            aria-label="Prior-year snapshot"
+          />
         </UFormField>
       </div>
 
       <div v-if="compare" class="mt-4">
         <div class="flex items-center justify-between">
           <h2 class="text-base font-semibold">
-            Prior-year compare · {{ compareTotals ? `${compareTotals.current} now vs ${compareTotals.prior} in ${dataYear}` : `snapshot ${dataYear}` }}
+            Prior-year compare ·
+            {{
+              compareTotals
+                ? `${compareTotals.current} now vs ${compareTotals.prior} in ${dataYear}`
+                : `snapshot ${dataYear}`
+            }}
           </h2>
           <UButton
             :to="compareCsvHref"
@@ -239,7 +246,9 @@ function fullName(person: PersonRow): string {
         <div v-else-if="compareRows.length > 0" class="mt-2 overflow-x-auto">
           <table class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
             <thead>
-              <tr class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+              <tr
+                class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400"
+              >
                 <th class="px-3 py-2 font-medium">Group</th>
                 <th class="px-3 py-2 font-medium">Current</th>
                 <th class="px-3 py-2 font-medium">Prior ({{ dataYear }})</th>

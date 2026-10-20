@@ -43,21 +43,22 @@ const statusFilter = ref('all')
 
 const { data, pending, error, refresh } = await useAsyncData(
   'campaigns-catalogue',
-  () => api.get<{ data: CampaignRow[] }>('/api/campaigns', {
-    query: statusFilter.value === 'all' ? {} : { status: statusFilter.value },
-  }),
+  () =>
+    api.get<{ data: CampaignRow[] }>('/api/campaigns', {
+      query: statusFilter.value === 'all' ? {} : { status: statusFilter.value },
+    }),
   { watch: [statusFilter] },
 )
 
 const rows = computed(() => data.value?.data ?? [])
 
-const canPauseAll = computed(
-  () => permissions.can(COLLECTIONS.communications, 'create'),
-)
+const canPauseAll = computed(() => permissions.can(COLLECTIONS.communications, 'create'))
 const pausing = ref(false)
 const pauseError = ref('')
 const pauseDone = ref('')
-const pauseReason = ref('suspected wrong template — pause-all from the campaign catalogue (AFC-527)')
+const pauseReason = ref(
+  'suspected wrong template — pause-all from the campaign catalogue (AFC-527)',
+)
 
 const statusOptions = [
   { label: 'Any status', value: 'all' },
@@ -79,10 +80,10 @@ async function pauseAll(): Promise<void> {
   pauseError.value = ''
   pauseDone.value = ''
   try {
-    const result = await api.post<{ paused: number, pause_drill_check_id: string | null }>(
-      '/api/hardening/pause-all',
-      { reason: pauseReason.value },
-    )
+    const result = await api.post<{
+      paused: number
+      pause_drill_check_id: string | null
+    }>('/api/hardening/pause-all', { reason: pauseReason.value })
     pauseDone.value = `Paused ${result.paused} campaign(s) within one tick; rows held, drill check ${result.pause_drill_check_id ?? 'unlogged'}.`
     await refresh()
   } catch (cause) {
@@ -114,7 +115,9 @@ async function pauseAll(): Promise<void> {
     <PermissionGate :collection="COLLECTIONS.communications" action="create">
       <UCard v-if="canPauseAll" class="mb-4 border-red-200 dark:border-red-900">
         <template #header>
-          <h2 class="text-base font-semibold" tabindex="-1">Kill switch — pause all automation</h2>
+          <h2 class="text-base font-semibold" tabindex="-1">
+            Kill switch — pause all automation
+          </h2>
         </template>
         <p class="text-sm text-gray-600 dark:text-gray-300">
           Pauses every active campaign and logs the drill with actor, reason and scope.
@@ -183,7 +186,9 @@ async function pauseAll(): Promise<void> {
       <div v-else class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
           <thead>
-            <tr class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+            <tr
+              class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400"
+            >
               <th class="px-3 py-2 font-medium">Campaign</th>
               <th class="px-3 py-2 font-medium">Type</th>
               <th class="px-3 py-2 font-medium">Consent</th>
@@ -195,7 +200,10 @@ async function pauseAll(): Promise<void> {
           <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
             <tr v-for="row in rows" :key="row.id">
               <td class="px-3 py-2">
-                <NuxtLink :to="`/campaigns/${row.id}`" class="font-medium text-teal-700 underline dark:text-teal-300">
+                <NuxtLink
+                  :to="`/campaigns/${row.id}`"
+                  class="font-medium text-teal-700 underline dark:text-teal-300"
+                >
                   {{ row.name }}
                 </NuxtLink>
                 <p class="text-xs text-gray-500">{{ row.key }}</p>
@@ -203,13 +211,15 @@ async function pauseAll(): Promise<void> {
               <td class="px-3 py-2">{{ row.campaign_type }}</td>
               <td class="px-3 py-2">{{ row.consent_policy.replaceAll('_', ' ') }}</td>
               <td class="px-3 py-2">
-                <UBadge :color="statusColor(row.status)" variant="subtle">{{ row.status }}</UBadge>
+                <UBadge :color="statusColor(row.status)" variant="subtle">{{
+                  row.status
+                }}</UBadge>
               </td>
               <td class="px-3 py-2 tabular-nums">{{ row.step_count }}</td>
               <td class="px-3 py-2 text-gray-600 dark:text-gray-300">
                 <span v-if="row.last_run">
-                  {{ row.last_run.status }} · sent {{ row.last_run.sent_count }} ·
-                  failed {{ row.last_run.failed_count }}
+                  {{ row.last_run.status }} · sent {{ row.last_run.sent_count }} · failed
+                  {{ row.last_run.failed_count }}
                 </span>
                 <span v-else>—</span>
               </td>

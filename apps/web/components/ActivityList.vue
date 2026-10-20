@@ -27,7 +27,10 @@ function formatDateTime(value: string | null): string {
     :title="emptyTitle"
     :description="emptyDescription"
   />
-  <ol v-else class="relative space-y-4 border-l border-gray-200 pl-6 dark:border-gray-800">
+  <ol
+    v-else
+    class="relative space-y-4 border-l border-gray-200 pl-6 dark:border-gray-800"
+  >
     <li v-for="item in items" :key="item.id" class="relative">
       <span
         class="absolute -left-[31px] flex size-6 items-center justify-center rounded-full bg-white ring-1 ring-gray-200 dark:bg-gray-900 dark:ring-gray-700"

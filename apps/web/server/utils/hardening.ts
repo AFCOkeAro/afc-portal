@@ -36,11 +36,7 @@ export const HARDENING_COLLECTIONS = {
 export type SuppressionChannel = 'whatsapp' | 'sms' | 'email' | 'all'
 
 export type SuppressionReason =
-  | 'opt_out_stop'
-  | 'consent_withdrawn'
-  | 'dnc'
-  | 'invalid_contact'
-  | 'over_cap_abuse'
+  'opt_out_stop' | 'consent_withdrawn' | 'dnc' | 'invalid_contact' | 'over_cap_abuse'
 
 export type SuppressionSource = 'member_reply' | 'staff_action' | 'flow' | 'tick'
 
@@ -125,7 +121,9 @@ export function estimateRunCost(audienceSize: number, unitCost: number | null): 
     throw new Error('hardening: audience size must be a non-negative integer')
   }
   if (unitCost === null) {
-    throw new Error('hardening: unit cost is unset (procurement has not set the rate card)')
+    throw new Error(
+      'hardening: unit cost is unset (procurement has not set the rate card)',
+    )
   }
   if (!(unitCost >= 0)) {
     throw new Error('hardening: unit cost must be non-negative')
@@ -194,7 +192,9 @@ export function validateDuplicateDecision(input: {
     throw new Error(`hardening: unknown duplicate status ${input.status}`)
   }
   if (!input.decidedBy || !input.reason || input.reason.trim() === '') {
-    throw new Error('hardening: a merge/keep-separate decision needs a decider and a reason')
+    throw new Error(
+      'hardening: a merge/keep-separate decision needs a decider and a reason',
+    )
   }
 }
 
@@ -242,7 +242,11 @@ export function tickSloPassing(met: number, total: number): boolean | null {
 export type QueueDepthState = 'ok' | 'warn' | 'exceeded'
 
 /** Queue-depth triage for due-but-unprocessed enrollments. */
-export function queueDepthState(depth: number, warnAt: number, exceedAt: number): QueueDepthState {
+export function queueDepthState(
+  depth: number,
+  warnAt: number,
+  exceedAt: number,
+): QueueDepthState {
   if (!Number.isInteger(depth) || depth < 0) {
     throw new Error('hardening: queue depth must be a non-negative integer')
   }

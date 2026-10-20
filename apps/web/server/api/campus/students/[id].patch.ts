@@ -94,10 +94,7 @@ export default defineEventHandler(async (event) => {
 
   if (
     form.level &&
-    !isLevelProgression(
-      typeof row.level === 'string' ? row.level : null,
-      form.level,
-    )
+    !isLevelProgression(typeof row.level === 'string' ? row.level : null, form.level)
   ) {
     throw createError({
       statusCode: 400,

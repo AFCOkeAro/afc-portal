@@ -42,15 +42,32 @@ export default defineEventHandler(async (event): Promise<string> => {
   }
 
   const body = blessingsToCsv(rows)
-  const compare = await collectBlessingsCompare(event, scope, filters, { total, breakdown })
+  const compare = await collectBlessingsCompare(event, scope, filters, {
+    total,
+    breakdown,
+  })
   if (compare) {
     const male = breakdown.reduce((sum, line) => sum + line.male, 0)
     const female = breakdown.reduce((sum, line) => sum + line.female, 0)
     body.push(
       [],
       ['section', 'from', 'to', 'male', 'female', 'total'],
-      ['current', filters.date_from ?? '', filters.date_to ?? '', String(male), String(female), String(total)],
-      ['prior', compare.from, compare.to, String(compare.male), String(compare.female), String(compare.total)],
+      [
+        'current',
+        filters.date_from ?? '',
+        filters.date_to ?? '',
+        String(male),
+        String(female),
+        String(total),
+      ],
+      [
+        'prior',
+        compare.from,
+        compare.to,
+        String(compare.male),
+        String(compare.female),
+        String(compare.total),
+      ],
       ['delta', '', '', '', '', String(compare.delta_total)],
     )
   }

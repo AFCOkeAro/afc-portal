@@ -73,17 +73,26 @@ interface CampaignDetail {
   steps: CampaignStep[]
   runs: CampaignRun[]
   consent_gate_preview:
-    | { has_run: true, run_id: string, window_start: string | null, audience_size: number, eligible_count: number, excluded_count: number, excluded_reasons: Record<string, number> }
+    | {
+        has_run: true
+        run_id: string
+        window_start: string | null
+        audience_size: number
+        eligible_count: number
+        excluded_count: number
+        excluded_reasons: Record<string, number>
+      }
     | { has_run: false }
 }
 
-const { data, pending, error, refresh } = await useAsyncData(
-  `campaign-${id}`,
-  () => api.get<{ data: CampaignDetail }>(`/api/campaigns/${id}`),
+const { data, pending, error, refresh } = await useAsyncData(`campaign-${id}`, () =>
+  api.get<{ data: CampaignDetail }>(`/api/campaigns/${id}`),
 )
 
 const campaign = computed(() => data.value?.data ?? null)
-const preview = computed(() => campaign.value?.consent_gate_preview ?? { has_run: false as const })
+const preview = computed(
+  () => campaign.value?.consent_gate_preview ?? { has_run: false as const },
+)
 
 const sections = [
   { id: 'overview', label: 'Overview' },
@@ -158,13 +167,44 @@ function statusColor(status: string): 'success' | 'warning' | 'neutral' | 'error
             <h2 class="text-base font-semibold" tabindex="-1">Overview</h2>
           </template>
           <dl class="grid gap-3 text-sm sm:grid-cols-2">
-            <div class="flex justify-between gap-4"><dt class="text-gray-500">Key</dt><dd class="font-mono">{{ campaign.key }}</dd></div>
-            <div class="flex justify-between gap-4"><dt class="text-gray-500">Status</dt><dd><UBadge :color="statusColor(campaign.status)" variant="subtle">{{ campaign.status }}</UBadge></dd></div>
-            <div class="flex justify-between gap-4"><dt class="text-gray-500">Type</dt><dd>{{ campaign.campaign_type }}</dd></div>
-            <div class="flex justify-between gap-4"><dt class="text-gray-500">Consent policy</dt><dd>{{ campaign.consent_policy.replaceAll('_', ' ') }}</dd></div>
-            <div class="flex justify-between gap-4"><dt class="text-gray-500">Weekly cap per person</dt><dd class="tabular-nums">{{ campaign.max_sends_per_person_per_week }}</dd></div>
-            <div class="flex justify-between gap-4"><dt class="text-gray-500">SMS fallback after</dt><dd class="tabular-nums">{{ campaign.fallback_sms_after_hours }}h</dd></div>
-            <div class="flex justify-between gap-4"><dt class="text-gray-500">Quiet-hours override</dt><dd>{{ campaign.quiet_hours_override ? 'operational-essential only' : 'no — held to 08:00' }}</dd></div>
+            <div class="flex justify-between gap-4">
+              <dt class="text-gray-500">Key</dt>
+              <dd class="font-mono">{{ campaign.key }}</dd>
+            </div>
+            <div class="flex justify-between gap-4">
+              <dt class="text-gray-500">Status</dt>
+              <dd>
+                <UBadge :color="statusColor(campaign.status)" variant="subtle">{{
+                  campaign.status
+                }}</UBadge>
+              </dd>
+            </div>
+            <div class="flex justify-between gap-4">
+              <dt class="text-gray-500">Type</dt>
+              <dd>{{ campaign.campaign_type }}</dd>
+            </div>
+            <div class="flex justify-between gap-4">
+              <dt class="text-gray-500">Consent policy</dt>
+              <dd>{{ campaign.consent_policy.replaceAll('_', ' ') }}</dd>
+            </div>
+            <div class="flex justify-between gap-4">
+              <dt class="text-gray-500">Weekly cap per person</dt>
+              <dd class="tabular-nums">{{ campaign.max_sends_per_person_per_week }}</dd>
+            </div>
+            <div class="flex justify-between gap-4">
+              <dt class="text-gray-500">SMS fallback after</dt>
+              <dd class="tabular-nums">{{ campaign.fallback_sms_after_hours }}h</dd>
+            </div>
+            <div class="flex justify-between gap-4">
+              <dt class="text-gray-500">Quiet-hours override</dt>
+              <dd>
+                {{
+                  campaign.quiet_hours_override
+                    ? 'operational-essential only'
+                    : 'no — held to 08:00'
+                }}
+              </dd>
+            </div>
           </dl>
         </UCard>
       </section>
@@ -173,7 +213,9 @@ function statusColor(status: string): 'success' | 'warning' | 'neutral' | 'error
         <h2 class="sr-only" tabindex="-1">Audience and consent gate</h2>
         <UCard>
           <template #header>
-            <h2 class="text-base font-semibold" tabindex="-1">Audience and consent-gate preview</h2>
+            <h2 class="text-base font-semibold" tabindex="-1">
+              Audience and consent-gate preview
+            </h2>
           </template>
           <div v-if="preview.has_run === false">
             <p class="text-sm text-gray-600 dark:text-gray-300">
@@ -182,11 +224,28 @@ function statusColor(status: string): 'success' | 'warning' | 'neutral' | 'error
             </p>
           </div>
           <div v-else class="grid gap-4 sm:grid-cols-3">
-            <StatCard label="Audience" :value="String(preview.audience_size)" hint="Resolved before consent" />
-            <StatCard label="Eligible" :value="String(preview.eligible_count)" hint="Passed consent and caps" />
-            <StatCard label="Excluded" :value="String(preview.excluded_count)" hint="Blocked with a reason" />
+            <StatCard
+              label="Audience"
+              :value="String(preview.audience_size)"
+              hint="Resolved before consent"
+            />
+            <StatCard
+              label="Eligible"
+              :value="String(preview.eligible_count)"
+              hint="Passed consent and caps"
+            />
+            <StatCard
+              label="Excluded"
+              :value="String(preview.excluded_count)"
+              hint="Blocked with a reason"
+            />
           </div>
-          <div v-if="preview.has_run === true && Object.keys(preview.excluded_reasons).length > 0" class="mt-4">
+          <div
+            v-if="
+              preview.has_run === true && Object.keys(preview.excluded_reasons).length > 0
+            "
+            class="mt-4"
+          >
             <h3 class="text-sm font-semibold">Exclusion reasons</h3>
             <ul class="mt-1 list-disc pl-5 text-sm text-gray-600 dark:text-gray-300">
               <li v-for="(count, reason) in preview.excluded_reasons" :key="reason">
@@ -201,16 +260,26 @@ function statusColor(status: string): 'success' | 'warning' | 'neutral' | 'error
         <h2 class="sr-only" tabindex="-1">Steps</h2>
         <UCard>
           <template #header>
-            <h2 class="text-base font-semibold" tabindex="-1">Steps ({{ campaign.steps.length }})</h2>
+            <h2 class="text-base font-semibold" tabindex="-1">
+              Steps ({{ campaign.steps.length }})
+            </h2>
           </template>
-          <p v-if="campaign.steps.length === 0" class="text-sm text-gray-600 dark:text-gray-300">
+          <p
+            v-if="campaign.steps.length === 0"
+            class="text-sm text-gray-600 dark:text-gray-300"
+          >
             No steps configured yet. Steps are board config written through the reviewed
-            template gate — a WhatsApp step cannot run until its template is provider-approved.
+            template gate — a WhatsApp step cannot run until its template is
+            provider-approved.
           </p>
           <div v-else class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
+            <table
+              class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800"
+            >
               <thead>
-                <tr class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                <tr
+                  class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400"
+                >
                   <th class="px-3 py-2 font-medium">#</th>
                   <th class="px-3 py-2 font-medium">Step</th>
                   <th class="px-3 py-2 font-medium">Delay</th>
@@ -223,26 +292,45 @@ function statusColor(status: string): 'success' | 'warning' | 'neutral' | 'error
                 <tr v-for="step in campaign.steps" :key="step.id">
                   <td class="px-3 py-2 tabular-nums">{{ step.sequence }}</td>
                   <td class="px-3 py-2 font-medium">{{ step.name }}</td>
-                  <td class="px-3 py-2">{{ step.delay_type }}{{ step.delay_value ? ` (${step.delay_value})` : '' }}</td>
                   <td class="px-3 py-2">
-                    {{ step.channel_key }}
-                    <UBadge v-if="step.channel_enabled === false" color="error" variant="subtle">disabled</UBadge>
+                    {{ step.delay_type
+                    }}{{ step.delay_value ? ` (${step.delay_value})` : '' }}
                   </td>
                   <td class="px-3 py-2">
-                    <span v-if="step.template_key">{{ step.template_key }} · {{ step.template_approval_status }}</span>
+                    {{ step.channel_key }}
+                    <UBadge
+                      v-if="step.channel_enabled === false"
+                      color="error"
+                      variant="subtle"
+                      >disabled</UBadge
+                    >
+                  </td>
+                  <td class="px-3 py-2">
+                    <span v-if="step.template_key"
+                      >{{ step.template_key }} · {{ step.template_approval_status }}</span
+                    >
                     <span v-else class="text-gray-500">body override</span>
                   </td>
                   <td class="px-3 py-2 text-xs text-gray-600 dark:text-gray-300">
-                    {{ [step.is_entry_step ? 'entry' : '', step.is_fallback_step ? 'fallback' : '', step.is_terminal ? 'terminal' : '', step.active ? '' : 'inactive'].filter(Boolean).join(' · ') || '—' }}
+                    {{
+                      [
+                        step.is_entry_step ? 'entry' : '',
+                        step.is_fallback_step ? 'fallback' : '',
+                        step.is_terminal ? 'terminal' : '',
+                        step.active ? '' : 'inactive',
+                      ]
+                        .filter(Boolean)
+                        .join(' · ') || '—'
+                    }}
                   </td>
                 </tr>
               </tbody>
             </table>
           </div>
           <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">
-            Send-test is not offered on this page (AFC-538 finding 2, owner CTO):
-            the wireframe test button is deferred until a sandboxed single-recipient
-            send with approval is scoped as its own story. No test send leaves this page.
+            Send-test is not offered on this page (AFC-538 finding 2, owner CTO): the
+            wireframe test button is deferred until a sandboxed single-recipient send with
+            approval is scoped as its own story. No test send leaves this page.
           </p>
         </UCard>
       </section>
@@ -251,18 +339,35 @@ function statusColor(status: string): 'success' | 'warning' | 'neutral' | 'error
         <h2 class="sr-only" tabindex="-1">Runs</h2>
         <UCard>
           <template #header>
-            <h2 class="text-base font-semibold" tabindex="-1">Runs ({{ campaign.runs.length }})</h2>
+            <h2 class="text-base font-semibold" tabindex="-1">
+              Runs ({{ campaign.runs.length }})
+            </h2>
           </template>
-          <p v-if="campaign.runs.length === 0" class="text-sm text-gray-600 dark:text-gray-300">
+          <p
+            v-if="campaign.runs.length === 0"
+            class="text-sm text-gray-600 dark:text-gray-300"
+          >
             No runs yet.
           </p>
           <ul v-else class="divide-y divide-gray-100 dark:divide-gray-800">
-            <li v-for="run in campaign.runs" :key="run.id" class="flex flex-wrap items-center gap-3 py-2">
-              <NuxtLink :to="`/campaigns/${campaign.id}/runs/${run.id}`" class="text-sm font-medium text-teal-700 underline dark:text-teal-300">
+            <li
+              v-for="run in campaign.runs"
+              :key="run.id"
+              class="flex flex-wrap items-center gap-3 py-2"
+            >
+              <NuxtLink
+                :to="`/campaigns/${campaign.id}/runs/${run.id}`"
+                class="text-sm font-medium text-teal-700 underline dark:text-teal-300"
+              >
                 {{ run.window_start ?? run.id }}
               </NuxtLink>
-              <UBadge :color="statusColor(run.status)" variant="subtle">{{ run.status }}</UBadge>
-              <span class="text-xs text-gray-500">sent {{ run.sent_count }} · delivered {{ run.delivered_count }} · failed {{ run.failed_count }}</span>
+              <UBadge :color="statusColor(run.status)" variant="subtle">{{
+                run.status
+              }}</UBadge>
+              <span class="text-xs text-gray-500"
+                >sent {{ run.sent_count }} · delivered {{ run.delivered_count }} · failed
+                {{ run.failed_count }}</span
+              >
             </li>
           </ul>
         </UCard>

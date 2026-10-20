@@ -49,7 +49,7 @@ export default defineEventHandler(async (event) => {
     })
   })
 
-  let support_total: number | null = null
+  let support_total: number | null
   if (scope.hiddenFields.campus_financial_support?.includes('amount')) {
     support_total = null
   } else {

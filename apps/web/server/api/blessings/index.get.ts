@@ -26,7 +26,10 @@ export default defineEventHandler(async (event) => {
 
   const filters = blessingReportFilters(event)
   const { rows, total, breakdown } = await collectBlessings(event, scope, filters)
-  const compare = await collectBlessingsCompare(event, scope, filters, { total, breakdown })
+  const compare = await collectBlessingsCompare(event, scope, filters, {
+    total,
+    breakdown,
+  })
 
   // The collector reads the whole filtered set (the export and roll-ups need
   // it); the list route paginates the window. Same rows, same order.

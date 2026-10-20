@@ -57,8 +57,7 @@ export default defineEventHandler(async (event) => {
     const found = studentRow.data[0]
     const inBranch =
       found?.branch != null && scope.branchIds.includes(String(found.branch))
-    const inZone =
-      found?.zone != null && scope.zoneIds.includes(String(found.zone))
+    const inZone = found?.zone != null && scope.zoneIds.includes(String(found.zone))
     if (!inBranch && !inZone) {
       throw createError({
         statusCode: 404,

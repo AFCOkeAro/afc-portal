@@ -36,12 +36,10 @@ const { data, pending, error, refresh } = await useAsyncData(
   () => api.get<{ data: StudentDetail }>(`/api/campus/students/${id.value}`),
 )
 
-const support = await useAsyncData(
-  'campus-student-support',
-  () =>
-    api.get<{ data: SupportRow[] }>(`/api/campus/support`, {
-      query: { student: id.value, limit: 100 },
-    }),
+const support = await useAsyncData('campus-student-support', () =>
+  api.get<{ data: SupportRow[] }>(`/api/campus/support`, {
+    query: { student: id.value, limit: 100 },
+  }),
 )
 
 const row = computed(() => data.value?.data ?? null)
@@ -92,11 +90,13 @@ async function saveChanges() {
     const body: Record<string, unknown> = {}
     if (form.level) body.level = form.level
     if (form.graduation_year !== '') body.graduation_year = Number(form.graduation_year)
-    if (form.afcf_handshake_status) body.afcf_handshake_status = form.afcf_handshake_status
+    if (form.afcf_handshake_status)
+      body.afcf_handshake_status = form.afcf_handshake_status
     body.afcmf_linked = form.afcmf_linked
     if (form.nysc_status) body.nysc_status = form.nysc_status
     if (form.nysc_deployment !== '') body.nysc_deployment = form.nysc_deployment || null
-    if (form.next_checkup_date !== '') body.next_checkup_date = form.next_checkup_date || null
+    if (form.next_checkup_date !== '')
+      body.next_checkup_date = form.next_checkup_date || null
     if (form.status) body.status = form.status
     if (form.notes !== '') body.notes = form.notes || null
     await api.patch(`/api/campus/students/${id.value}`, body)
@@ -159,7 +159,9 @@ async function saveChanges() {
             </dd>
           </div>
           <div>
-            <dt class="text-xs uppercase tracking-wide text-gray-500">Support total (disbursed)</dt>
+            <dt class="text-xs uppercase tracking-wide text-gray-500">
+              Support total (disbursed)
+            </dt>
             <dd class="mt-1 text-sm">
               {{ row.support_total == null ? 'Hidden for your role' : row.support_total }}
             </dd>
@@ -184,7 +186,17 @@ async function saveChanges() {
             <UFormField label="Level (never regresses)">
               <USelect
                 v-model="form.level"
-                :items="optionItems(['freshman', 'sophomore', 'junior', 'senior', 'final_year', 'graduated', 'other'])"
+                :items="
+                  optionItems([
+                    'freshman',
+                    'sophomore',
+                    'junior',
+                    'senior',
+                    'final_year',
+                    'graduated',
+                    'other',
+                  ])
+                "
                 class="w-full"
               />
             </UFormField>
@@ -199,19 +211,40 @@ async function saveChanges() {
             <UFormField label="AFCF handshake">
               <USelect
                 v-model="form.afcf_handshake_status"
-                :items="optionItems(['not_contacted', 'contacted', 'connected', 'active', 'declined'])"
+                :items="
+                  optionItems([
+                    'not_contacted',
+                    'contacted',
+                    'connected',
+                    'active',
+                    'declined',
+                  ])
+                "
                 class="w-full"
               />
             </UFormField>
             <UFormField label="NYSC status (graph-validated)">
               <USelect
                 v-model="form.nysc_status"
-                :items="optionItems(['not_deployed', 'waiting_callup', 'deployed', 'serving', 'completed', 'exempt'])"
+                :items="
+                  optionItems([
+                    'not_deployed',
+                    'waiting_callup',
+                    'deployed',
+                    'serving',
+                    'completed',
+                    'exempt',
+                  ])
+                "
                 class="w-full"
               />
             </UFormField>
             <UFormField label="NYSC deployment">
-              <UInput v-model="form.nysc_deployment" placeholder="State / camp / PPA" class="w-full" />
+              <UInput
+                v-model="form.nysc_deployment"
+                placeholder="State / camp / PPA"
+                class="w-full"
+              />
             </UFormField>
             <UFormField label="Next check-up date">
               <UInput v-model="form.next_checkup_date" type="date" class="w-full" />
@@ -250,7 +283,8 @@ async function saveChanges() {
       <UCard class="mt-4">
         <h2 class="font-semibold">Financial support</h2>
         <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-          proposed → approved → disbursed. Amounts stay hidden outside the coordinator read set.
+          proposed → approved → disbursed. Amounts stay hidden outside the coordinator
+          read set.
         </p>
         <div v-if="supportRows.length === 0" class="mt-3 text-sm text-gray-500">
           No support records for this student yet.
@@ -258,7 +292,9 @@ async function saveChanges() {
         <div v-else class="mt-3 overflow-x-auto">
           <table class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
             <thead>
-              <tr class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+              <tr
+                class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400"
+              >
                 <th class="px-3 py-2 font-medium">Date</th>
                 <th class="px-3 py-2 font-medium">Amount</th>
                 <th class="px-3 py-2 font-medium">Term</th>

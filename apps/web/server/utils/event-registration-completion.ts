@@ -160,8 +160,8 @@ export function groupMemberKey(
   eventId: string,
   groupCode: string,
   member: {
-    registrant_first_name: unknown
-    registrant_last_name: unknown
+    registrant_first_name?: unknown
+    registrant_last_name?: unknown
     email?: unknown
     phone?: unknown
   },
@@ -187,8 +187,8 @@ export function splitGroupReplay(
   eventId: string,
   groupCode: string,
   members: Array<{
-    registrant_first_name: unknown
-    registrant_last_name: unknown
+    registrant_first_name?: unknown
+    registrant_last_name?: unknown
     email?: unknown
     phone?: unknown
   }>,

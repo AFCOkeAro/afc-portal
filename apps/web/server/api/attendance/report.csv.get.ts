@@ -80,8 +80,20 @@ export default defineEventHandler(async (event): Promise<string> => {
     rows.push(
       [],
       ['section', 'from', 'to', 'sessions', 'total'],
-      ['current', report.filters.from, report.filters.to, String(aggregate.sessions), String(currentTotal)],
-      ['prior', report.compare.from, report.compare.to, String(prior.sessions), String(priorTotal)],
+      [
+        'current',
+        report.filters.from,
+        report.filters.to,
+        String(aggregate.sessions),
+        String(currentTotal),
+      ],
+      [
+        'prior',
+        report.compare.from,
+        report.compare.to,
+        String(prior.sessions),
+        String(priorTotal),
+      ],
       ['delta', '', '', '', String(currentTotal - priorTotal)],
     )
   }

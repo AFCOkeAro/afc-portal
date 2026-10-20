@@ -1,9 +1,5 @@
 import type { WecaFormulaRow } from '../../../../types/finance'
-import {
-  getPortalScope,
-  listItems,
-  requireCan,
-} from '../../../utils/portal'
+import { getPortalScope, listItems, requireCan } from '../../../utils/portal'
 
 /**
  * GET /api/finance/formulas — the board-ratified formula schedule (AFC-475).

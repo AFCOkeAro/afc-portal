@@ -1,7 +1,4 @@
-import {
-  COACHING_FACILITATOR_FIELDS,
-  programmeChildFilter,
-} from '../../../utils/campus'
+import { COACHING_FACILITATOR_FIELDS, programmeChildFilter } from '../../../utils/campus'
 import {
   getPortalScope,
   listItems,

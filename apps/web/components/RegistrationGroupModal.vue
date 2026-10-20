@@ -67,7 +67,7 @@ async function submit(): Promise<void> {
   fieldErrors.value = {}
   const errors: Record<string, string> = {}
   if (!groupCode.value.trim()) errors.group_code = 'Give this group submission a code'
-  members.forEach((member, index) => {
+  members.forEach((member: GroupMember, index: number) => {
     if (!member.registrant_first_name.trim()) {
       errors[`members.${index}.registrant_first_name`] = 'First name is required'
     }
@@ -87,7 +87,7 @@ async function submit(): Promise<void> {
       meta: { created: number; skipped: number; total: number }
     }>(`/api/events/${props.eventId}/group-registrations`, {
       group_code: groupCode.value.trim(),
-      members: members.map((member) => ({
+      members: members.map((member: GroupMember) => ({
         registrant_first_name: member.registrant_first_name.trim(),
         registrant_last_name: member.registrant_last_name.trim(),
         phone: member.phone.trim() || undefined,

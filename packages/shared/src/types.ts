@@ -472,13 +472,7 @@ export interface WelfareCase {
   branch: string | null
   person: string | null
   category:
-    | 'medical'
-    | 'financial'
-    | 'food'
-    | 'housing'
-    | 'bereavement'
-    | 'education'
-    | 'other'
+    'medical' | 'financial' | 'food' | 'housing' | 'bereavement' | 'education' | 'other'
   priority: 'low' | 'medium' | 'normal' | 'high' | 'urgent' | null
   status: 'open' | 'in_progress' | 'pending_approval' | 'resolved' | 'closed' | null
   /** Confidentiality scope (data-model §6.1, AFC-472): branch or area. */

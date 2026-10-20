@@ -45,10 +45,10 @@ const form = reactive({
 
 const programmeOptions = computed(() => [
   { label: 'Choose a programme', value: '' },
-  ...((programmes.data.value?.data ?? []).map((row) => ({
+  ...(programmes.data.value?.data ?? []).map((row) => ({
     label: `${row.name} (${row.exam.toUpperCase()}${row.year ? ` ${row.year}` : ''})`,
     value: row.id,
-  }))),
+  })),
 ])
 
 const dayOptions = [
@@ -150,11 +150,7 @@ async function saveSlot() {
           />
         </UFormField>
         <UFormField label="Day">
-          <USelect
-            v-model="form.day_of_week"
-            :items="formDayOptions"
-            class="w-full"
-          />
+          <USelect v-model="form.day_of_week" :items="formDayOptions" class="w-full" />
         </UFormField>
         <UFormField label="Start (HH:MM)">
           <UInput v-model="form.start_time" placeholder="09:00" class="w-full" />
@@ -163,11 +159,7 @@ async function saveSlot() {
           <UInput v-model="form.end_time" placeholder="12:00" class="w-full" />
         </UFormField>
         <UFormField label="Location" class="sm:col-span-2">
-          <UInput
-            v-model="form.location"
-            placeholder="Oke-Aro hall"
-            class="w-full"
-          />
+          <UInput v-model="form.location" placeholder="Oke-Aro hall" class="w-full" />
         </UFormField>
         <div class="flex gap-2 sm:col-span-2">
           <UButton type="submit" label="Save slot" :loading="saving" />
@@ -231,7 +223,9 @@ async function saveSlot() {
       <div v-else class="mt-4 overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
           <thead>
-            <tr class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+            <tr
+              class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400"
+            >
               <th class="px-3 py-2 font-medium">Subject</th>
               <th class="px-3 py-2 font-medium">Day</th>
               <th class="px-3 py-2 font-medium">Time</th>

@@ -25,7 +25,8 @@ export default defineEventHandler(async (event) => {
   requireCan(scope, 'sunday_services', 'update')
 
   const id = getRouterParam(event, 'id')
-  if (!id) throw createError({ statusCode: 400, statusMessage: 'A service id is required' })
+  if (!id)
+    throw createError({ statusCode: 400, statusMessage: 'A service id is required' })
 
   const existing = await findScopedItem<Record<string, unknown>>(
     event,
@@ -72,7 +73,8 @@ export default defineEventHandler(async (event) => {
     }
     patch.preacher = form.preacher ?? null
   }
-  if (form.expected_attendance !== undefined) patch.expected_attendance = form.expected_attendance ?? null
+  if (form.expected_attendance !== undefined)
+    patch.expected_attendance = form.expected_attendance ?? null
   if (form.status !== undefined) patch.status = form.status
   if (form.notes !== undefined) patch.notes = form.notes ?? null
 

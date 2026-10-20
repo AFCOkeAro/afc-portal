@@ -38,28 +38,20 @@ export default defineEventHandler(async (event) => {
   // student (campus_student xor person) branch/zone via a relational
   // filter. The Directus policy remains the enforcement point; this keeps
   // the portal read inside the same boundary.
-  const scopeFilter = campusOutcomeScopeFilter(scope, [
-    'campus_student',
-    'person',
-  ])
+  const scopeFilter = campusOutcomeScopeFilter(scope, ['campus_student', 'person'])
 
-  const result = await listItems<Record<string, unknown>>(
-    event,
-    scope,
-    'exam_results',
-    {
-      filter: mergeFilters(
-        scopeFilter,
-        exam ? { exam: { _eq: exam } } : undefined,
-        examYear ? { exam_year: { _eq: Number(examYear) } } : undefined,
-        student ? { campus_student: { _eq: student } } : undefined,
-      ),
-      fields: EXAM_RESULT_FIELDS,
-      sort: '-exam_year',
-      page,
-      limit,
-    },
-  )
+  const result = await listItems<Record<string, unknown>>(event, scope, 'exam_results', {
+    filter: mergeFilters(
+      scopeFilter,
+      exam ? { exam: { _eq: exam } } : undefined,
+      examYear ? { exam_year: { _eq: Number(examYear) } } : undefined,
+      student ? { campus_student: { _eq: student } } : undefined,
+    ),
+    fields: EXAM_RESULT_FIELDS,
+    sort: '-exam_year',
+    page,
+    limit,
+  })
 
   return {
     data: stripResults(scope, result.data),

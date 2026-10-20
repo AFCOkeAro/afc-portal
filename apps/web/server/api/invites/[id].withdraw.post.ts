@@ -25,7 +25,8 @@ export default defineEventHandler(async (event) => {
   requireInviteCap(caps, 'read', 'withdraw event invitations')
 
   const id = getRouterParam(event, 'id')
-  if (!id) throw createError({ statusCode: 400, statusMessage: 'An invite id is required' })
+  if (!id)
+    throw createError({ statusCode: 400, statusMessage: 'An invite id is required' })
 
   const row = await findScopedItem<InviteRow>(event, scope, 'event_invites', id, {
     fields: ['id', 'status', 'inviter_user'],
@@ -42,9 +43,16 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const updated = await updateItem<Record<string, unknown>>(event, scope, 'event_invites', id, {
-    status: 'withdrawn',
-    blocked_reason: 'Withdrawn at the inviter/staff request; the number is blocked for this invite',
-  })
+  const updated = await updateItem<Record<string, unknown>>(
+    event,
+    scope,
+    'event_invites',
+    id,
+    {
+      status: 'withdrawn',
+      blocked_reason:
+        'Withdrawn at the inviter/staff request; the number is blocked for this invite',
+    },
+  )
   return { data: { ...updated, id: String(updated.id) } }
 })

@@ -1,8 +1,5 @@
 import { z } from 'zod'
-import {
-  assertPersonGuardian,
-  campusStudentScopeFilter,
-} from '../../../utils/campus'
+import { assertPersonGuardian, campusStudentScopeFilter } from '../../../utils/campus'
 import {
   createItem,
   getPortalScope,

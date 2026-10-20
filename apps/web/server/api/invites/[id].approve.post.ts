@@ -4,10 +4,7 @@ import {
   scopeFilter,
   updateItem,
 } from '../../utils/portal'
-import {
-  inviteCapabilities,
-  requireInviteCap,
-} from '../../utils/event-invites'
+import { inviteCapabilities, requireInviteCap } from '../../utils/event-invites'
 import type { InviteRow } from '../../utils/event-invites'
 
 /**
@@ -24,7 +21,8 @@ export default defineEventHandler(async (event) => {
   requireInviteCap(caps, 'approve', 'approve event invitations')
 
   const id = getRouterParam(event, 'id')
-  if (!id) throw createError({ statusCode: 400, statusMessage: 'An invite id is required' })
+  if (!id)
+    throw createError({ statusCode: 400, statusMessage: 'An invite id is required' })
 
   const row = await findScopedItem<InviteRow>(event, scope, 'event_invites', id, {
     fields: ['id', 'status', 'approval_required', 'branch', 'inviter_user'],
@@ -34,7 +32,8 @@ export default defineEventHandler(async (event) => {
   if (row.status === 'blocked_optout') {
     throw createError({
       statusCode: 403,
-      statusMessage: 'Opt-outs are permanent; staff cannot re-approve a suppressed number',
+      statusMessage:
+        'Opt-outs are permanent; staff cannot re-approve a suppressed number',
       data: { code: 'optout_not_overridable' },
     })
   }
@@ -46,13 +45,19 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const updated = await updateItem<Record<string, unknown>>(event, scope, 'event_invites', id, {
-    status: 'queued',
-    approval_required: false,
-    approved_by: scope.session.user.id,
-    approved_at: new Date().toISOString(),
-    blocked_reason: null,
-  })
+  const updated = await updateItem<Record<string, unknown>>(
+    event,
+    scope,
+    'event_invites',
+    id,
+    {
+      status: 'queued',
+      approval_required: false,
+      approved_by: scope.session.user.id,
+      approved_at: new Date().toISOString(),
+      blocked_reason: null,
+    },
+  )
 
   return { data: { ...updated, id: String(updated.id) } }
 })

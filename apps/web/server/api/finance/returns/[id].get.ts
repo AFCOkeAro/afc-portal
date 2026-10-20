@@ -34,7 +34,8 @@ export default defineEventHandler(async (event) => {
   requireCan(scope, 'weca_returns', 'read')
 
   const id = getRouterParam(event, 'id')
-  if (!id) throw createError({ statusCode: 400, statusMessage: 'A return id is required' })
+  if (!id)
+    throw createError({ statusCode: 400, statusMessage: 'A return id is required' })
 
   const row = await findScopedItem<Record<string, unknown>>(
     event,

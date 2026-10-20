@@ -51,9 +51,8 @@ interface LogDetail {
   } | null
 }
 
-const { data, pending, error } = await useAsyncData(
-  `delivery-log-${id}`,
-  () => api.get<LogDetail>(`/api/communications/${id}`),
+const { data, pending, error } = await useAsyncData(`delivery-log-${id}`, () =>
+  api.get<LogDetail>(`/api/communications/${id}`),
 )
 
 const log = computed(() => data.value ?? null)
@@ -95,14 +94,40 @@ const log = computed(() => data.value ?? null)
           <h2 class="text-base font-semibold" tabindex="-1">Message header</h2>
         </template>
         <dl class="grid gap-3 text-sm sm:grid-cols-2">
-          <div class="flex justify-between gap-4"><dt class="text-gray-500">Source</dt><dd>{{ log.source_kind }}</dd></div>
-          <div class="flex justify-between gap-4"><dt class="text-gray-500">Status</dt><dd><UBadge color="neutral" variant="subtle">{{ log.status }}</UBadge></dd></div>
-          <div class="flex justify-between gap-4"><dt class="text-gray-500">Branch</dt><dd>{{ log.branch_name ?? 'area-wide' }}</dd></div>
-          <div class="flex justify-between gap-4"><dt class="text-gray-500">Consent policy</dt><dd>{{ log.consent_policy ?? '—' }}</dd></div>
-          <div class="flex justify-between gap-4"><dt class="text-gray-500">Campaign</dt><dd class="font-mono">{{ log.campaign ?? '—' }}</dd></div>
-          <div class="flex justify-between gap-4"><dt class="text-gray-500">Event invite</dt><dd class="font-mono">{{ log.event_invite ?? '—' }}</dd></div>
-          <div class="flex justify-between gap-4"><dt class="text-gray-500">Estimated cost</dt><dd class="tabular-nums">{{ log.estimated_cost ?? '—' }}</dd></div>
-          <div class="flex justify-between gap-4"><dt class="text-gray-500">Created</dt><dd>{{ log.created_at }}</dd></div>
+          <div class="flex justify-between gap-4">
+            <dt class="text-gray-500">Source</dt>
+            <dd>{{ log.source_kind }}</dd>
+          </div>
+          <div class="flex justify-between gap-4">
+            <dt class="text-gray-500">Status</dt>
+            <dd>
+              <UBadge color="neutral" variant="subtle">{{ log.status }}</UBadge>
+            </dd>
+          </div>
+          <div class="flex justify-between gap-4">
+            <dt class="text-gray-500">Branch</dt>
+            <dd>{{ log.branch_name ?? 'area-wide' }}</dd>
+          </div>
+          <div class="flex justify-between gap-4">
+            <dt class="text-gray-500">Consent policy</dt>
+            <dd>{{ log.consent_policy ?? '—' }}</dd>
+          </div>
+          <div class="flex justify-between gap-4">
+            <dt class="text-gray-500">Campaign</dt>
+            <dd class="font-mono">{{ log.campaign ?? '—' }}</dd>
+          </div>
+          <div class="flex justify-between gap-4">
+            <dt class="text-gray-500">Event invite</dt>
+            <dd class="font-mono">{{ log.event_invite ?? '—' }}</dd>
+          </div>
+          <div class="flex justify-between gap-4">
+            <dt class="text-gray-500">Estimated cost</dt>
+            <dd class="tabular-nums">{{ log.estimated_cost ?? '—' }}</dd>
+          </div>
+          <div class="flex justify-between gap-4">
+            <dt class="text-gray-500">Created</dt>
+            <dd>{{ log.created_at }}</dd>
+          </div>
         </dl>
       </UCard>
 
@@ -112,16 +137,25 @@ const log = computed(() => data.value ?? null)
             Recipients ({{ log.recipient_counts?.total ?? 'withheld' }})
           </h2>
         </template>
-        <p v-if="log.recipients === null" class="text-sm text-gray-600 dark:text-gray-300">
-          Recipient rows are withheld for this role — the header above is the complete view.
+        <p
+          v-if="log.recipients === null"
+          class="text-sm text-gray-600 dark:text-gray-300"
+        >
+          Recipient rows are withheld for this role — the header above is the complete
+          view.
         </p>
-        <p v-else-if="log.recipients.length === 0" class="text-sm text-gray-600 dark:text-gray-300">
+        <p
+          v-else-if="log.recipients.length === 0"
+          class="text-sm text-gray-600 dark:text-gray-300"
+        >
           No recipients.
         </p>
         <div v-else class="overflow-x-auto">
           <table class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
             <thead>
-              <tr class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+              <tr
+                class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400"
+              >
                 <th class="px-3 py-2 font-medium">Channel</th>
                 <th class="px-3 py-2 font-medium">Status</th>
                 <th class="px-3 py-2 font-medium">Consent basis</th>
@@ -140,7 +174,8 @@ const log = computed(() => data.value ?? null)
                   {{ recipient.exclusion_reason ?? recipient.error_detail ?? '—' }}
                 </td>
                 <td class="px-3 py-2 text-xs text-gray-600 dark:text-gray-300">
-                  {{ recipient.sent_at ?? '—' }} → {{ recipient.delivered_at ?? '—' }} → {{ recipient.read_at ?? '—' }}
+                  {{ recipient.sent_at ?? '—' }} → {{ recipient.delivered_at ?? '—' }} →
+                  {{ recipient.read_at ?? '—' }}
                 </td>
               </tr>
             </tbody>

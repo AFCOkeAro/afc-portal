@@ -32,7 +32,11 @@ export default defineEventHandler(async (event) => {
       data: { code: 'cost_owner_area_admin' },
     })
   }
-  const body = await readBody<{ channel?: unknown; unit_cost?: unknown; currency?: unknown }>(event)
+  const body = await readBody<{
+    channel?: unknown
+    unit_cost?: unknown
+    currency?: unknown
+  }>(event)
   const channel = typeof body.channel === 'string' ? body.channel : ''
   if (!(COST_CHANNELS as readonly string[]).includes(channel)) {
     throw createError({
@@ -54,11 +58,16 @@ export default defineEventHandler(async (event) => {
     })
   }
   try {
-    const row = await createItem<{ id: string }>(event, scope, HARDENING_COLLECTIONS.costRates, {
-      channel,
-      unit_cost: unitCost,
-      currency,
-    })
+    const row = await createItem<{ id: string }>(
+      event,
+      scope,
+      HARDENING_COLLECTIONS.costRates,
+      {
+        channel,
+        unit_cost: unitCost,
+        currency,
+      },
+    )
     return { published: true, id: row.id, channel, unit_cost: unitCost, currency }
   } catch (error) {
     throw createError({

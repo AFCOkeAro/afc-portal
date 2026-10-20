@@ -30,8 +30,7 @@ const resultFormSchema = z
   })
   .refine(
     (form) =>
-      form.exam !== 'admission' ||
-      (form.status !== 'passed' && form.status !== 'failed'),
+      form.exam !== 'admission' || (form.status !== 'passed' && form.status !== 'failed'),
     { message: 'Admission results use admitted/not admitted', path: ['status'] },
   )
   .refine(

@@ -200,7 +200,13 @@ export async function scopeZoneIds(
       },
     },
   )
-  return [...new Set(rows.data.map((row) => row.zone).filter((z): z is string => typeof z === 'string' && z.length > 0))]
+  return [
+    ...new Set(
+      rows.data
+        .map((row) => row.zone)
+        .filter((z): z is string => typeof z === 'string' && z.length > 0),
+    ),
+  ]
 }
 
 /**

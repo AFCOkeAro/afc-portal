@@ -38,7 +38,10 @@ const query = computed(() => ({
 
 const { data, pending, error, refresh } = await useAsyncData(
   'campus-progress',
-  () => api.get<{ data: ProgressRow[]; meta: { total: number } }>('/api/campus/progress', { query: query.value }),
+  () =>
+    api.get<{ data: ProgressRow[]; meta: { total: number } }>('/api/campus/progress', {
+      query: query.value,
+    }),
   { watch: [query] },
 )
 
@@ -99,33 +102,40 @@ async function saveProgress() {
     <UCard class="mt-4">
       <div class="grid gap-3 sm:grid-cols-2">
         <UFormField label="Programme id">
-          <UInput
-            v-model="programme"
-            placeholder="Programme UUID"
-            class="w-full"
-          />
+          <UInput v-model="programme" placeholder="Programme UUID" class="w-full" />
         </UFormField>
         <UFormField label="Campus student id (optional)">
-          <UInput
-            v-model="student"
-            placeholder="Student UUID"
-            class="w-full"
-          />
+          <UInput v-model="student" placeholder="Student UUID" class="w-full" />
         </UFormField>
       </div>
     </UCard>
 
     <PermissionGate :collection="COLLECTIONS.coachingProgress" action="create">
       <UCard class="mt-4">
-        <form class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" @submit.prevent="saveProgress">
+        <form
+          class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3"
+          @submit.prevent="saveProgress"
+        >
           <UFormField label="Assessment">
             <UInput v-model="form.assessment" placeholder="Mock UTME 1" class="w-full" />
           </UFormField>
           <UFormField label="Score">
-            <UInput v-model="form.score" type="number" min="0" step="any" class="w-full" />
+            <UInput
+              v-model="form.score"
+              type="number"
+              min="0"
+              step="any"
+              class="w-full"
+            />
           </UFormField>
           <UFormField label="Max score">
-            <UInput v-model="form.max_score" type="number" min="0" step="any" class="w-full" />
+            <UInput
+              v-model="form.max_score"
+              type="number"
+              min="0"
+              step="any"
+              class="w-full"
+            />
           </UFormField>
           <UFormField label="Date">
             <UInput v-model="form.progress_date" type="date" class="w-full" />
@@ -134,7 +144,12 @@ async function saveProgress() {
             <UInput v-model="form.remarks" class="w-full" />
           </UFormField>
           <div class="flex items-end">
-            <UButton type="submit" label="Record" :loading="saving" :disabled="!programme || !student" />
+            <UButton
+              type="submit"
+              label="Record"
+              :loading="saving"
+              :disabled="!programme || !student"
+            />
           </div>
           <UAlert
             v-if="formError"
@@ -170,7 +185,9 @@ async function saveProgress() {
       <div v-else class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
           <thead>
-            <tr class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+            <tr
+              class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400"
+            >
               <th class="px-3 py-2 font-medium">Date</th>
               <th class="px-3 py-2 font-medium">Assessment</th>
               <th class="px-3 py-2 font-medium">Score</th>
@@ -186,7 +203,8 @@ async function saveProgress() {
               <td class="px-3 py-3">{{ row.progress_date ?? '—' }}</td>
               <td class="px-3 py-3">{{ row.assessment ?? '—' }}</td>
               <td class="px-3 py-3">
-                {{ row.score ?? '—' }}{{ row.max_score != null ? ` / ${row.max_score}` : '' }}
+                {{ row.score ?? '—'
+                }}{{ row.max_score != null ? ` / ${row.max_score}` : '' }}
               </td>
               <td class="px-3 py-3">{{ row.remarks ?? '—' }}</td>
             </tr>

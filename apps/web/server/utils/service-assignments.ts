@@ -1,10 +1,5 @@
 import type { H3Event } from 'h3'
-import {
-  findScopedItem,
-  getPortalScope,
-  listItems,
-  type PortalScope,
-} from './portal'
+import { findScopedItem, listItems, type PortalScope } from './portal'
 
 /**
  * Department-head guard for the roster (AFC-473, expansion §10 + §11 row
@@ -55,5 +50,3 @@ export async function requireDeptScopeForPerson(
     })
   }
 }
-
-

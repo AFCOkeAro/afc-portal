@@ -32,13 +32,18 @@ const query = computed(() => ({
 
 const { data, pending, error, refresh } = await useAsyncData(
   'campus-attendance',
-  () => api.get<{ data: Mark[]; meta: { total: number } }>('/api/campus/attendance', { query: query.value }),
+  () =>
+    api.get<{ data: Mark[]; meta: { total: number } }>('/api/campus/attendance', {
+      query: query.value,
+    }),
   { watch: [query] },
 )
 
 const marks = computed(() => data.value?.data ?? [])
 const total = computed(() => data.value?.meta.total ?? 0)
-const presentCount = computed(() => marks.value.filter((mark: Mark) => mark.present).length)
+const presentCount = computed(
+  () => marks.value.filter((mark: Mark) => mark.present).length,
+)
 
 async function saveMark() {
   saving.value = true
@@ -79,18 +84,10 @@ async function saveMark() {
       <UCard class="mt-4">
         <form class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5" @submit.prevent="saveMark">
           <UFormField label="Programme id">
-            <UInput
-              v-model="programme"
-              placeholder="Programme UUID"
-              class="w-full"
-            />
+            <UInput v-model="programme" placeholder="Programme UUID" class="w-full" />
           </UFormField>
           <UFormField label="Timetable slot id (optional)">
-            <UInput
-              v-model="timetable"
-              placeholder="Slot UUID"
-              class="w-full"
-            />
+            <UInput v-model="timetable" placeholder="Slot UUID" class="w-full" />
           </UFormField>
           <UFormField label="Class date" required>
             <UInput v-model="classDate" type="date" required class="w-full" />
@@ -163,7 +160,9 @@ async function saveMark() {
       <div v-else class="mt-4 overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
           <thead>
-            <tr class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+            <tr
+              class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400"
+            >
               <th class="px-3 py-2 font-medium">Date</th>
               <th class="px-3 py-2 font-medium">Student</th>
               <th class="px-3 py-2 font-medium">Present</th>

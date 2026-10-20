@@ -1,5 +1,9 @@
 import type { H3Event } from 'h3'
-import type { FinanceSummary, FinanceSummaryLine, WecaReturnRow } from '../../types/finance'
+import type {
+  FinanceSummary,
+  FinanceSummaryLine,
+  WecaReturnRow,
+} from '../../types/finance'
 import {
   branchNames,
   listItems,
@@ -69,17 +73,12 @@ export async function collectFinanceSummary(
     'total_due',
   )
 
-  const result = await listItems<Record<string, unknown>>(
-    event,
-    scope,
-    'weca_returns',
-    {
-      filter: mergeFilters({ period: { _eq: period } }, scopeFilter(scope)),
-      fields: visibleFields(scope, 'weca_returns', RETURN_FIELDS),
-      sort: 'branch',
-      limit: MAX_SUMMARY_ROWS,
-    },
-  )
+  const result = await listItems<Record<string, unknown>>(event, scope, 'weca_returns', {
+    filter: mergeFilters({ period: { _eq: period } }, scopeFilter(scope)),
+    fields: visibleFields(scope, 'weca_returns', RETURN_FIELDS),
+    sort: 'branch',
+    limit: MAX_SUMMARY_ROWS,
+  })
 
   if (result.meta.total > MAX_SUMMARY_ROWS) {
     throw createError({

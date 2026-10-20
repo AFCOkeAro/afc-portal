@@ -23,7 +23,8 @@ export default defineEventHandler(async (event) => {
   requireCan(scope, 'service_assignments', 'create')
 
   const id = getRouterParam(event, 'id')
-  if (!id) throw createError({ statusCode: 400, statusMessage: 'A service id is required' })
+  if (!id)
+    throw createError({ statusCode: 400, statusMessage: 'A service id is required' })
 
   const service = await findScopedItem<Record<string, unknown>>(
     event,
@@ -47,7 +48,10 @@ export default defineEventHandler(async (event) => {
     throw createError({
       statusCode: 400,
       statusMessage: 'The roster body must name this service',
-      data: { code: 'validation_error', fields: { service: 'Must match the service in the path' } },
+      data: {
+        code: 'validation_error',
+        fields: { service: 'Must match the service in the path' },
+      },
     })
   }
 

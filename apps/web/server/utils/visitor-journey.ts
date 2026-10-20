@@ -147,7 +147,7 @@ export async function validateWelfareOfficer(
       data: { code: 'officer_branch_required' },
     })
   }
-  let user: { person?: string | null } | null = null
+  let user: { person?: string | null } | null
   try {
     const response = await directusFetch<{ data: { person?: string | null } }>(
       event,
@@ -172,7 +172,7 @@ export async function validateWelfareOfficer(
       data: { code: 'officer_not_verifiable' },
     })
   }
-  let appointments: Array<{ id: string | number }> = []
+  let appointments: Array<{ id: string | number }>
   try {
     const result = await listItems<{ id: string | number }>(
       event,

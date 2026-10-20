@@ -1,4 +1,5 @@
 import {
+  cell,
   IMPORT_DOMAINS,
   MAX_IMPORT_BYTES,
   MAX_IMPORT_ROWS,
@@ -87,7 +88,12 @@ async function writeLedger(
   items: Array<Record<string, unknown>>,
 ): Promise<{ batchId: string | null; ledger: string }> {
   try {
-    const created = await createItem<{ id: string }>(event, scope, 'prior_year_imports', batch)
+    const created = await createItem<{ id: string }>(
+      event,
+      scope,
+      'prior_year_imports',
+      batch,
+    )
     for (const item of items) {
       try {
         await createItem(event, scope, 'prior_year_import_items', {
@@ -123,7 +129,8 @@ export default defineEventHandler(async (event) => {
   if (typeof csv !== 'string' || csv.trim() === '') {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Send the CSV file as the request body (text/csv) or as JSON { "csv": "..." }',
+      statusMessage:
+        'Send the CSV file as the request body (text/csv) or as JSON { "csv": "..." }',
       data: { code: 'csv_required' },
     })
   }
@@ -144,23 +151,38 @@ export default defineEventHandler(async (event) => {
   const items: Array<Record<string, unknown>> = []
 
   const codes = valid.map(({ values }) => {
-    const template = { attendance: 'branch_code', blessings: 'branch_code', people: 'branch_code', finance: 'branch_code' } as const
-    return values[template[domain]]
+    const template = {
+      attendance: 'branch_code',
+      blessings: 'branch_code',
+      people: 'branch_code',
+      finance: 'branch_code',
+    } as const
+    return values[template[domain]] ?? ''
   })
   const branches = await branchIdsByCode(event, scope, codes)
   const dataYears = new Set<number>()
 
   for (const { row, values } of valid) {
-    const code = values.branch_code.toUpperCase()
+    const code = cell(values, 'branch_code').toUpperCase()
     const branch = branches.get(code)
     if (!branch) {
       rowErrors.push({ row, errors: [`unknown branch_code: ${values.branch_code}`] })
-      items.push({ row_number: row, natural_key: code, status: 'error', error: 'unknown branch_code' })
+      items.push({
+        row_number: row,
+        natural_key: code,
+        status: 'error',
+        error: 'unknown branch_code',
+      })
       continue
     }
     if (!branchInScope(scope, branch.id)) {
       rowErrors.push({ row, errors: ['that branch is outside your scope'] })
-      items.push({ row_number: row, natural_key: code, status: 'error', error: 'branch_out_of_scope' })
+      items.push({
+        row_number: row,
+        natural_key: code,
+        status: 'error',
+        error: 'branch_out_of_scope',
+      })
       continue
     }
     const year = dataYearOf(domain, values)
@@ -171,36 +193,71 @@ export default defineEventHandler(async (event) => {
         if (outcome === 'imported') imported += 1
         else if (outcome === 'updated') updated += 1
         else skipped += 1
-        items.push({ row_number: row, natural_key: `${code}|${values.month}`, status: outcome, data_year: year, target_collection: 'branch_financial_records' })
+        items.push({
+          row_number: row,
+          natural_key: `${code}|${values.month}`,
+          status: outcome,
+          data_year: year,
+          target_collection: 'branch_financial_records',
+        })
       } else if (domain === 'blessings') {
         const outcome = await upsertBlessing(event, scope, branch.id, branch.zone, values)
         if (outcome === 'imported') imported += 1
         else if (outcome === 'updated') updated += 1
         else skipped += 1
-        items.push({ row_number: row, natural_key: `${code}|${values.service_date}|${values.blessing_type}`, status: outcome, data_year: year, target_collection: 'blessings' })
+        items.push({
+          row_number: row,
+          natural_key: `${code}|${values.service_date}|${values.blessing_type}`,
+          status: outcome,
+          data_year: year,
+          target_collection: 'blessings',
+        })
       } else if (domain === 'attendance') {
-        const outcome = await upsertAttendance(event, scope, branch.id, branch.zone, values)
+        const outcome = await upsertAttendance(
+          event,
+          scope,
+          branch.id,
+          branch.zone,
+          values,
+        )
         if (outcome === 'imported') imported += 1
         else if (outcome === 'updated') updated += 1
         else skipped += 1
-        items.push({ row_number: row, natural_key: `${code}|${values.service_date}|${values.service_type}|${values.category}`, status: outcome, data_year: year, target_collection: 'attendance_counts' })
+        items.push({
+          row_number: row,
+          natural_key: `${code}|${values.service_date}|${values.service_type}|${values.category}`,
+          status: outcome,
+          data_year: year,
+          target_collection: 'attendance_counts',
+        })
       } else {
         const outcome = await upsertPerson(event, scope, branch.id, values)
         if (outcome === 'imported') imported += 1
         else skipped += 1
         const identity = await personIdentityHash(values)
-        items.push({ row_number: row, natural_key: identity, status: outcome, data_year: year, target_collection: 'people' })
+        items.push({
+          row_number: row,
+          natural_key: identity,
+          status: outcome,
+          data_year: year,
+          target_collection: 'people',
+        })
       }
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : 'insert failed'
       rowErrors.push({ row, errors: [message] })
-      items.push({ row_number: row, natural_key: code, status: 'error', error: message.slice(0, 500) })
+      items.push({
+        row_number: row,
+        natural_key: code,
+        status: 'error',
+        error: message.slice(0, 500),
+      })
     }
   }
 
   const summary: ImportSummary = {
     domain,
-    data_year: dataYears.size === 1 ? [...dataYears][0] : null,
+    data_year: dataYears.size === 1 ? ([...dataYears][0] ?? null) : null,
     received: parsed.rows.length,
     imported,
     updated,
@@ -208,19 +265,24 @@ export default defineEventHandler(async (event) => {
     errors: rowErrors,
   }
 
-  const { batchId, ledger } = await writeLedger(event, scope, {
-    domain,
-    source: 'import',
-    data_year: summary.data_year,
-    filename: null,
-    received_rows: summary.received,
-    imported_rows: imported,
-    updated_rows: updated,
-    skipped_rows: skipped,
-    error_rows: rowErrors.length,
-    imported_by: scope.session.user.id,
-    status: rowErrors.length === 0 ? 'committed' : 'partial',
-  }, items.map((item) => ({ ...item, source: 'import' })))
+  const { batchId, ledger } = await writeLedger(
+    event,
+    scope,
+    {
+      domain,
+      source: 'import',
+      data_year: summary.data_year,
+      filename: null,
+      received_rows: summary.received,
+      imported_rows: imported,
+      updated_rows: updated,
+      skipped_rows: skipped,
+      error_rows: rowErrors.length,
+      imported_by: scope.session.user.id,
+      status: rowErrors.length === 0 ? 'committed' : 'partial',
+    },
+    items.map((item) => ({ ...item, source: 'import' })),
+  )
 
   return { ...summary, import_id: batchId, ledger }
 })
@@ -233,11 +295,19 @@ async function upsertFinance(
   branchId: string,
   values: Record<string, string>,
 ): Promise<Outcome> {
-  const existing = await listItems<Record<string, unknown>>(event, scope, 'branch_financial_records', {
-    filter: mergeFilters({ branch: { _eq: branchId } }, { month: { _eq: values.month } }),
-    fields: ['id', 'income', 'intervention', 'faith_city', 'currency', 'status'],
-    limit: 1,
-  })
+  const existing = await listItems<Record<string, unknown>>(
+    event,
+    scope,
+    'branch_financial_records',
+    {
+      filter: mergeFilters(
+        { branch: { _eq: branchId } },
+        { month: { _eq: values.month } },
+      ),
+      fields: ['id', 'income', 'intervention', 'faith_city', 'currency', 'status'],
+      limit: 1,
+    },
+  )
   const body = {
     branch: branchId,
     month: values.month,
@@ -248,14 +318,19 @@ async function upsertFinance(
   }
   const row = existing.data[0]
   if (!row) {
-    const created = await createItem<{ id: string }>(event, scope, 'branch_financial_records', body)
+    const created = await createItem<{ id: string }>(
+      event,
+      scope,
+      'branch_financial_records',
+      body,
+    )
     // The computed return follows the existing engine: a pending row the
     // weca.calculate Flow (or weca_compute_return) settles. No arithmetic here.
     try {
       await createItem(event, scope, 'weca_returns', {
         branch: branchId,
         financial_record: created.id,
-        period: values.month.slice(0, 7),
+        period: cell(values, 'month').slice(0, 7),
         computation_status: 'formula_pending',
       })
     } catch {
@@ -323,40 +398,55 @@ async function upsertAttendance(
   zoneId: string | null,
   values: Record<string, string>,
 ): Promise<Outcome> {
-  const sessions = await listItems<Record<string, unknown>>(event, scope, 'attendance_sessions', {
-    filter: mergeFilters(
-      { branch: { _eq: branchId } },
-      { session_date: { _eq: values.service_date } },
-      { service_type: { _eq: values.service_type } },
-    ),
-    fields: ['id'],
-    limit: 1,
-  })
+  const sessions = await listItems<Record<string, unknown>>(
+    event,
+    scope,
+    'attendance_sessions',
+    {
+      filter: mergeFilters(
+        { branch: { _eq: branchId } },
+        { session_date: { _eq: values.service_date } },
+        { service_type: { _eq: values.service_type } },
+      ),
+      fields: ['id'],
+      limit: 1,
+    },
+  )
   let sessionId = sessions.data[0] ? String(sessions.data[0].id) : null
   if (!sessionId) {
-    const created = await createItem<{ id: string }>(event, scope, 'attendance_sessions', {
-      branch: branchId,
-      zone: zoneId,
-      session_date: values.service_date,
-      service_type: values.service_type,
-      session_name: values.session_name || `Imported ${values.service_date}`,
-      status: 'recorded',
-      idempotency_key: `import:${branchId}:${values.service_date}:${values.service_type}`,
-    })
+    const created = await createItem<{ id: string }>(
+      event,
+      scope,
+      'attendance_sessions',
+      {
+        branch: branchId,
+        zone: zoneId,
+        session_date: values.service_date,
+        service_type: values.service_type,
+        session_name: values.session_name || `Imported ${values.service_date}`,
+        status: 'recorded',
+        idempotency_key: `import:${branchId}:${values.service_date}:${values.service_type}`,
+      },
+    )
     sessionId = String(created.id)
   }
   let outcome: Outcome = 'skipped'
   for (const sex of ['male', 'female'] as const) {
     const count = Number(sex === 'male' ? values.male : values.female)
-    const existing = await listItems<Record<string, unknown>>(event, scope, 'attendance_counts', {
-      filter: mergeFilters(
-        { session: { _eq: sessionId } },
-        { category: { _eq: values.category } },
-        { sex: { _eq: sex } },
-      ),
-      fields: ['id', 'count'],
-      limit: 1,
-    })
+    const existing = await listItems<Record<string, unknown>>(
+      event,
+      scope,
+      'attendance_counts',
+      {
+        filter: mergeFilters(
+          { session: { _eq: sessionId } },
+          { category: { _eq: values.category } },
+          { sex: { _eq: sex } },
+        ),
+        fields: ['id', 'count'],
+        limit: 1,
+      },
+    )
     const row = existing.data[0]
     if (!row) {
       await createItem(event, scope, 'attendance_counts', {
