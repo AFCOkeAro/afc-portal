@@ -8,6 +8,7 @@ import {
   mergeFilters,
   requireCan,
   scopeFilter,
+  throwStoreUnavailable,
 } from '../../utils/portal'
 
 const DEPARTMENT_FIELDS = [
@@ -52,40 +53,51 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const result = await listItems<Record<string, unknown>>(event, scope, 'departments', {
-    filter: mergeFilters(
-      status ? { status: { _eq: status } } : undefined,
-      departmentType ? { department_type: { _eq: departmentType } } : undefined,
-      // An explicit branch narrows to that branch only (area-wide rows have
-      // no branch, so they drop out of a narrowed view by construction).
-      branch ? { branch: { _eq: branch } } : departmentScopeFilter(scope),
-    ),
-    fields: DEPARTMENT_FIELDS,
-    sort: 'name',
-    limit: -1,
-    search: search || undefined,
-  })
-
-  const ids = result.data.map((row) => String(row.id))
+  // AFC-566: the two reads below hit 0020 collections. A missing table and
+  // a missing read grant both arrive as DirectusAuthError, which without a
+  // mapping is a bare 500 — throw the named store error instead so the UI
+  // can explain it. Deliberate 4xx (scope 404s, Directus-mapped client
+  // errors) pass through untouched; only an unreadable store is renamed.
+  // The people/branch enrichment after this block stays outside the try so a
+  // snapshot-table failure never masquerades as pending 0020.
+  let result: { data: Record<string, unknown>[] }
   const counts = new Map<string, number>()
-  if (ids.length > 0) {
-    const links = await listItems<{ id: string | number; departments: string | null }>(
-      event,
-      scope,
-      'people_departments',
-      {
+  try {
+    result = await listItems<Record<string, unknown>>(event, scope, 'departments', {
+      filter: mergeFilters(
+        status ? { status: { _eq: status } } : undefined,
+        departmentType ? { department_type: { _eq: departmentType } } : undefined,
+        // An explicit branch narrows to that branch only (area-wide rows have
+        // no branch, so they drop out of a narrowed view by construction).
+        branch ? { branch: { _eq: branch } } : departmentScopeFilter(scope),
+      ),
+      fields: DEPARTMENT_FIELDS,
+      sort: 'name',
+      limit: -1,
+      search: search || undefined,
+    })
+
+    const ids = result.data.map((row) => String(row.id))
+    if (ids.length > 0) {
+      const links = await listItems<{
+        id: string | number
+        departments: string | null
+      }>(event, scope, 'people_departments', {
         filter: {
           _and: [{ departments: { _in: ids } }, { status: { _eq: 'active' } }],
         },
         fields: ['id', 'departments'],
         limit: -1,
-      },
-    )
-    for (const link of links.data) {
-      if (!link.departments) continue
-      const key = String(link.departments)
-      counts.set(key, (counts.get(key) ?? 0) + 1)
+      })
+      for (const link of links.data) {
+        if (!link.departments) continue
+        const key = String(link.departments)
+        counts.set(key, (counts.get(key) ?? 0) + 1)
+      }
     }
+  } catch (error) {
+    if ((error as { statusCode?: number })?.statusCode) throw error
+    throwStoreUnavailable(error, 'department_store', '0020')
   }
 
   const leaderIds = [

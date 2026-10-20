@@ -9,6 +9,7 @@ import {
   mergeFilters,
   requireCan,
   scopeFilter,
+  throwStoreUnavailable,
 } from '../../utils/portal'
 
 const DEPARTMENT_FIELDS = [
@@ -64,27 +65,45 @@ export default defineEventHandler(async (event): Promise<DepartmentDetail> => {
   // Area-wide departments carry a null branch, so the default branch-scoped
   // predicate would hide them from branch staff. The explicit _or keeps the
   // area-wide visibility grant (data-model §2.2) without leaking foreign rows.
-  const department = await findScopedItem<Record<string, unknown>>(
-    event,
-    scope,
-    'departments',
-    id,
-    { fields: DEPARTMENT_FIELDS, scope: departmentScopeFilter(scope) },
-  )
+  // AFC-566: core reads hit 0020 collections — map a missing/unreadable
+  // store to the named error, never a bare 500. Deliberate 4xx (scope 404s)
+  // pass through; people/branch enrichment below stays outside the try.
+  let department: Record<string, unknown>
+  let links: {
+    data: {
+      id: string | number
+      people: string | null
+      role: string | null
+      joined_at: string | null
+      status: string | null
+    }[]
+  }
+  try {
+    department = await findScopedItem<Record<string, unknown>>(
+      event,
+      scope,
+      'departments',
+      id,
+      { fields: DEPARTMENT_FIELDS, scope: departmentScopeFilter(scope) },
+    )
 
-  const links = await listItems<{
-    id: string | number
-    people: string | null
-    role: string | null
-    joined_at: string | null
-    status: string | null
-  }>(event, scope, 'people_departments', {
-    filter: {
-      _and: [{ departments: { _eq: id } }, { status: { _eq: 'active' } }],
-    },
-    fields: ['id', 'people', 'role', 'joined_at', 'status'],
-    limit: -1,
-  })
+    links = await listItems<{
+      id: string | number
+      people: string | null
+      role: string | null
+      joined_at: string | null
+      status: string | null
+    }>(event, scope, 'people_departments', {
+      filter: {
+        _and: [{ departments: { _eq: id } }, { status: { _eq: 'active' } }],
+      },
+      fields: ['id', 'people', 'role', 'joined_at', 'status'],
+      limit: -1,
+    })
+  } catch (error) {
+    if ((error as { statusCode?: number })?.statusCode) throw error
+    throwStoreUnavailable(error, 'department_store', '0020')
+  }
 
   const personIds = [
     ...new Set(
