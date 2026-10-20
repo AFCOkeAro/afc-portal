@@ -278,6 +278,63 @@ export async function collectBlessings(
   return { rows: typed, total, breakdown }
 }
 
+export interface BlessingCompare {
+  from: string
+  to: string
+  total: number
+  male: number
+  female: number
+  has_data: boolean
+  delta_total: number
+}
+
+function shiftYear(date: string, delta: number): string {
+  const parsed = new Date(`${date}T00:00:00Z`)
+  parsed.setUTCFullYear(parsed.getUTCFullYear() + delta)
+  return parsed.toISOString().slice(0, 10)
+}
+
+/**
+ * Prior-year compare (AFC-485, US-A4). Re-runs the same scoped collection
+ * over the same predicate shifted one year back and returns side-by-side
+ * totals plus the delta — the blessings analogue of the attendance
+ * `compare_prior_year` toggle (attendance-report.ts). Same grouping as the
+ * report (branch|zone via the scope filter, blessing_type breakdown, service
+ * date bucket); permission scope is identical because it is the same
+ * collector with the same scope.
+ */
+export async function collectBlessingsCompare(
+  event: H3Event,
+  scope: PortalScope,
+  filters: BlessingReportFilters,
+  current: { total: number; breakdown: BlessingBreakdown[] },
+): Promise<BlessingCompare | null> {
+  const query = getQuery(event)
+  const raw = query.compare_prior_year
+  const wantsCompare = raw === true || raw === 'true' || raw === '1'
+  if (!wantsCompare) return null
+  const to = filters.date_to ?? todayIso()
+  const { from, to: end } = blessingPeriodRange(filters.period, filters.date_from, to)
+  const prior = await collectBlessings(event, scope, {
+    ...filters,
+    date_from: shiftYear(from, -1),
+    date_to: shiftYear(end, -1),
+    page: 1,
+    limit: 200,
+  })
+  const male = prior.breakdown.reduce((sum, line) => sum + line.male, 0)
+  const female = prior.breakdown.reduce((sum, line) => sum + line.female, 0)
+  return {
+    from: shiftYear(from, -1),
+    to: shiftYear(end, -1),
+    total: prior.total,
+    male,
+    female,
+    has_data: prior.rows.length > 0,
+    delta_total: current.total - prior.total,
+  }
+}
+
 /** CSV body (US-B2 AC2): branch, zone, service, date, type, male, female, total. */
 export function blessingsToCsv(rows: BlessingRow[]): string[][] {
   const serviceOf = (row: BlessingRow): string =>

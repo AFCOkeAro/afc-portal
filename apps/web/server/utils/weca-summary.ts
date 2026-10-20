@@ -160,3 +160,54 @@ export async function collectFinanceSummary(
     lines,
   }
 }
+
+function shiftPeriodYear(period: string, delta: number): string {
+  const year = Number(period.slice(0, 4)) + delta
+  return `${String(year).padStart(4, '0')}${period.slice(4)}`
+}
+
+export interface FinanceCompare {
+  period: string
+  remittance_total: string | null
+  pending: number
+  branches: number
+  delta_remittance: string | null
+  has_data: boolean
+}
+
+/**
+ * Prior-year finance compare (AFC-485, US-A4). Re-runs the same board-sheet
+ * collector over the same month one year back and returns the side-by-side
+ * remittance with a delta — the finance analogue of the attendance toggle.
+ * Same period shape, same scope (the collector enforces both), same
+ * pending-not-zero rule: a pending prior side contributes nothing and the
+ * delta is null rather than a fabricated figure.
+ */
+export async function collectFinanceCompare(
+  event: H3Event,
+  scope: PortalScope,
+  period: string,
+  current: FinanceSummary,
+): Promise<FinanceCompare | null> {
+  const query = getQuery(event)
+  const raw = query.compare_prior_year ?? query.compare
+  const wantsCompare = raw === true || raw === 'true' || raw === '1'
+  if (!wantsCompare) return null
+  const priorPeriod = shiftPeriodYear(period, -1)
+  const prior = await collectFinanceSummary(event, scope, priorPeriod)
+  const toNumber = (value: string | null): number | null =>
+    value === null ? null : Number(value)
+  const currentTotal = toNumber(current.remittance_total)
+  const priorTotal = toNumber(prior.remittance_total)
+  return {
+    period: priorPeriod,
+    remittance_total: prior.remittance_total,
+    pending: prior.pending,
+    branches: prior.branches,
+    delta_remittance:
+      currentTotal !== null && priorTotal !== null
+        ? (currentTotal - priorTotal).toFixed(2)
+        : null,
+    has_data: prior.lines.length > 0,
+  }
+}

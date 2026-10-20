@@ -60,6 +60,32 @@ export default defineEventHandler(async (event): Promise<string> => {
     ]),
   ]
 
+  // Compare views stream the same query (AFC-485, US-A4): when the report was
+  // asked for the prior-year side, the export carries it as a second section
+  // with a delta line, so the file and the toggled page cannot disagree.
+  const rawCompare = getQuery(event).compare_prior_year
+  const wantsCompare = rawCompare === true || rawCompare === 'true' || rawCompare === '1'
+  if (wantsCompare && report.compare) {
+    const prior = await collectSplitAggregate(event, scope, {
+      groupBy: report.filters.group_by,
+      sessionType: report.filters.session_type ?? undefined,
+      branch: report.filters.branch,
+      zone: report.filters.zone,
+      from: report.compare.from,
+      to: report.compare.to,
+      period: report.filters.period,
+    })
+    const currentTotal = aggregate.rows.reduce((sum, row) => sum + row.total, 0)
+    const priorTotal = prior.rows.reduce((sum, row) => sum + row.total, 0)
+    rows.push(
+      [],
+      ['section', 'from', 'to', 'sessions', 'total'],
+      ['current', report.filters.from, report.filters.to, String(aggregate.sessions), String(currentTotal)],
+      ['prior', report.compare.from, report.compare.to, String(prior.sessions), String(priorTotal)],
+      ['delta', '', '', '', String(currentTotal - priorTotal)],
+    )
+  }
+
   return csvResponse(
     event,
     `attendance-report-${report.filters.from}-to-${report.filters.to}.csv`,

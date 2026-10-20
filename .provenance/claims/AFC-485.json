@@ -1,0 +1,12 @@
+{
+  "issue": "AFC-485",
+  "authorAgentId": "7b4aae3b-0da5-4de2-a1d8-4737943ef561",
+  "claimedAt": "2026-10-20T00:00:00+01:00",
+  "paths": [
+    "services/directus/schema/migrations/20261020_0014_prior_year.sql",
+    "services/directus/schema/migrations/rollback/20261020_0014_prior_year.down.sql",
+    "tests/db/81_prior_year_import.sql",
+    ".provenance/claims/AFC-485.json"
+  ],
+  "basis": "Slice 5c prior-year import ledger (parent AFC-465, ADR-0010 decision 3, prd-expansion s.9.2, data-model-expansion s.13). Migration 0014 creates prior_year_imports (batch: domain, source always import, data_year, counts, imported_by) + prior_year_import_items (per-row natural key, branch/zone scope copy, target link, status, error); UNIQUE (import, natural_key); items RESTRICT their batch; down script refuses while either table holds rows. No PII column exists on either table by design (people keys are SHA-256 identity hashes in natural_key; suite 81.7 pins the absence), which keeps the ledger out of the personal-data approval path, but it is filed as compliance path regardless. Grants: directus_app SELECT both tables, INSERT/UPDATE operational columns only, NO DELETE; source is server-set (absent from write lists); no roles minted (ADR-0002). Suite 81 pins tables, rerun, finance/returns/attendance re-import idempotency (zero new rows, corrections converge), ledger UNIQUE-per-batch + RESTRICT, no-PII, app ceiling, rollback refusal. Non-compliance-path halves committed alongside under the same issue (import routes, compare views, Flow JSON, web contract 23/23 green) need no claim. Verified this heartbeat: tests/web/prior-year-import.contract.mjs 23/23 pass; retention-literal gate clean on all touched paths; suite 81 NOT executed here (no postgres client in this environment) -- must run in CI/DB harness before clearance. This claim carries no Reviewed-by trailer: the migration is UNREVIEWED and is raised to MediaTech (CTO) for R2 review -- there is no independent security reviewer on this team (board declined the seat on cost), so a CTO review is a recorded degradation, not independent review."
+}

@@ -1,0 +1,65 @@
+{
+  "name": "prior_year.import",
+  "description": "Prior-year CSV import (AFC-485, data-model-expansion §13). Validate + insert, idempotent. Triggered by a CSV upload; the Nuxt route POST /api/imports/:domain is the executor (ADR-0010 decision 4: no new service — the Flow documents the job, the route runs it).",
+  "trigger": {
+    "type": "manual",
+    "scope": ["area_admin", "super_admin", "branch_admin"],
+    "input": {
+      "domain": "attendance | blessings | people | finance",
+      "csv": "file text (<= 2MB, <= 5000 rows)",
+      "filename": "optional original name for the ledger"
+    }
+  },
+  "steps": [
+    {
+      "id": "validate",
+      "name": "Validate rows",
+      "action": "route:POST /api/imports/:domain (parse + validateImportRows)",
+      "on": "header must match the domain template exactly; per-row rules per prior-year-import.ts",
+      "failure": "400 with per-row error report; nothing is written (header errors) or only valid rows proceed (row errors, reported explicitly as partial)"
+    },
+    {
+      "id": "scope",
+      "name": "Permission scope",
+      "action": "getPortalScope + requireCan(create) + branch/zone intersection",
+      "on": "fail-closed: unknown branch_code is a row error; out-of-scope branch is a row error, never a silent skip",
+      "failure": "403 for unscoped sessions; row-level errors otherwise"
+    },
+    {
+      "id": "upsert",
+      "name": "Idempotent insert",
+      "action": "read-then-write on the domain natural key",
+      "keys": {
+        "attendance": "(branch, session_date, service_type) session + (session, category, sex) counts",
+        "blessings": "(branch, service_date, blessing_type, other_label)",
+        "people": "identity hash (email/phone exact match; creates only, never overwrites PII)",
+        "finance": "(branch, month); weca_returns found-or-created as formula_pending for weca.calculate"
+      },
+      "outcome": "imported | updated | skipped per row; re-import yields zero new rows (suite 81)"
+    },
+    {
+      "id": "ledger",
+      "name": "Record provenance",
+      "action": "insert prior_year_imports batch (source=import, data_year, counts, imported_by) + prior_year_import_items rows (natural_key, target link, status)",
+      "on": "ledger tables missing (pre-0014) must not fail the import: response reports ledger=pending_migration_0014",
+      "failure": "tolerated; the per-row report is the source of truth for the caller"
+    },
+    {
+      "id": "notify",
+      "name": "Report",
+      "action": "return { received, imported, updated, skipped, errors[], import_id, ledger }",
+      "on": "caller shows the per-row error report; partial imports are explicit and reversible by batch (reviewed migrator step, never app DELETE)"
+    }
+  ],
+  "compareViews": {
+    "attendance": "GET /api/attendance/report?compare_prior_year=true (+ report.csv streams the same query with the prior section)",
+    "blessings": "GET /api/blessings?compare_prior_year=true (+ reports.csv streams the same query with the prior section)",
+    "finance": "GET /api/finance/summary?period=YYYY-MM&compare_prior_year=true (same month one year back + delta)",
+    "people": "GET /api/people/compare?group_by=branch|zone&data_year=YYYY (+ compare.csv streams the same grouping)"
+  },
+  "notes": [
+    "Retention/consent automation reuses the ADR-0009 runtime; this Flow adds no new service, secret, or dependency.",
+    "The ledger stores no raw PII: people items carry only the SHA-256 identity hash.",
+    "Adding source columns to the domain tables is deferred to a CTO-approved follow-up (personal-data approval path)."
+  ]
+}
