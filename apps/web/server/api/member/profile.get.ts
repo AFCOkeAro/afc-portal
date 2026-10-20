@@ -15,6 +15,13 @@ import type { PortalScope } from '../../utils/portal'
  * DISABLED behind the AFC-478 hard gate: answers 503 member_otp_disabled
  * unless NUXT_MEMBER_OTP_ENABLED=true (re-review verdict + CTO approval).
  *
+ * Gate ordering (AFC-527 QA finding 3, documented not weakened): the 503
+ * fires before auth/role checks, even for staff sessions that would
+ * otherwise 403. This is intentional — the disabled surface reveals
+ * nothing (no session-oracle difference between staff and anonymous),
+ * and member-scoping takes over only after enablement. Do not reorder
+ * to return 403 first.
+ *
  * Scope contract (data-model-v4 §5 + §5.1):
  * - Member sessions only (role === 'member'); staff sessions get 403 --
  *   this surface is the member's own record, not a staff lookup.
