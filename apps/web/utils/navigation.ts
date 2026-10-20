@@ -35,6 +35,20 @@ export const NAVIGATION: readonly NavigationItem[] = [
     inSidebar: true,
   },
   {
+    label: 'Households',
+    to: '/households',
+    icon: 'i-lucide-house',
+    requires: ['households', 'read'],
+    inSidebar: true,
+  },
+  {
+    label: 'Departments',
+    to: '/departments',
+    icon: 'i-lucide-network',
+    requires: ['departments', 'read'],
+    inSidebar: true,
+  },
+  {
     label: 'Events',
     to: '/events',
     icon: 'i-lucide-calendar-days',

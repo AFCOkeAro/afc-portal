@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import { COLLECTIONS } from '@afc/shared'
-import type { BranchSummary, Paginated, PersonRow } from '~/types/portal'
+import type {
+  BranchSummary,
+  DepartmentRow,
+  Paginated,
+  PersonRow,
+} from '~/types/portal'
 
 definePageMeta({ middleware: 'staff' })
 
@@ -17,6 +22,7 @@ function queryParam(name: string): string | null {
 }
 const branch = ref(queryParam('branch') ?? 'all')
 const membership = ref(queryParam('membership_status') ?? 'all')
+const department = ref(queryParam('department') ?? 'all')
 const status = ref(queryParam('status') ?? 'active')
 const page = ref(1)
 const limit = 25
@@ -29,7 +35,7 @@ watch(searchInput, (value: string) => {
   }, 300)
 })
 
-watch([branch, membership, status, search], () => {
+watch([branch, membership, department, status, search], () => {
   page.value = 1
 })
 
@@ -39,6 +45,7 @@ const query = computed(() => ({
   ...(search.value ? { search: search.value } : {}),
   ...(branch.value !== 'all' ? { branch: branch.value } : {}),
   ...(membership.value !== 'all' ? { membership_status: membership.value } : {}),
+  ...(department.value !== 'all' ? { department: department.value } : {}),
   status: status.value,
 }))
 
@@ -55,6 +62,18 @@ const pageCount = computed(() => Math.max(1, Math.ceil(total.value / limit)))
 const branches = await useAsyncData('people-branches', () =>
   api.get<BranchSummary[]>('/api/branches'),
 )
+
+const departments = await useAsyncData('people-departments', () =>
+  api.get<{ data: DepartmentRow[] }>('/api/departments'),
+)
+
+const departmentOptions = computed(() => [
+  { label: 'Any department', value: 'all' },
+  ...(departments.data.value?.data ?? []).map((row) => ({
+    label: row.branch_name ? `${row.name} (${row.branch_name})` : row.name,
+    value: row.id,
+  })),
+])
 
 const branchOptions = computed(() => [
   { label: 'All branches', value: 'all' },
@@ -119,7 +138,7 @@ function fullName(person: PersonRow): string {
     />
 
     <UCard>
-      <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <UInput
           v-model="searchInput"
           icon="i-lucide-search"
@@ -128,6 +147,7 @@ function fullName(person: PersonRow): string {
         />
         <USelect v-model="branch" :items="branchOptions" class="w-full" />
         <USelect v-model="membership" :items="membershipOptions" class="w-full" />
+        <USelect v-model="department" :items="departmentOptions" class="w-full" />
         <USelect v-model="status" :items="statusOptions" class="w-full" />
       </div>
 

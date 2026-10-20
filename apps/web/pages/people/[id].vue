@@ -216,7 +216,16 @@ async function toggleStatus(): Promise<void> {
             <dl class="space-y-3 text-sm">
               <div class="flex justify-between gap-4">
                 <dt class="text-gray-500 dark:text-gray-400">Household</dt>
-                <dd class="text-right">{{ person.household || '—' }}</dd>
+                <dd class="text-right">
+                  <NuxtLink
+                    v-if="person.household"
+                    :to="`/households/${person.household}`"
+                    class="text-primary-600 hover:underline dark:text-primary-400"
+                  >
+                    {{ person.household_name || 'Open household' }}
+                  </NuxtLink>
+                  <span v-else>—</span>
+                </dd>
               </div>
               <div class="flex justify-between gap-4">
                 <dt class="text-gray-500 dark:text-gray-400">Guardian</dt>
@@ -333,12 +342,35 @@ async function toggleStatus(): Promise<void> {
           <template #header>
             <div class="flex items-center justify-between">
               <h2 class="text-base font-semibold" tabindex="-1">Leadership</h2>
+              <span class="text-xs text-gray-500 dark:text-gray-400">
+                {{ person.departments.length }} assignment{{
+                  person.departments.length === 1 ? '' : 's'
+                }}
+              </span>
             </div>
           </template>
           <EmptyState
-            title="Leadership assignments appear here"
-            description="Department and position assignments for this person render here once the hierarchy endpoints from AFC-461a land. Gated on departments:read so volunteers never see it."
+            v-if="person.departments.length === 0"
+            title="No department assignments"
+            description="Department membership for this person will appear here. Gated on departments:read so volunteers never see it."
           />
+          <ul v-else class="divide-y divide-gray-100 dark:divide-gray-800">
+            <li
+              v-for="membership in person.departments"
+              :key="membership.id"
+              class="flex items-center justify-between gap-3 py-2"
+            >
+              <NuxtLink
+                :to="`/departments/${membership.id}`"
+                class="text-sm font-medium text-gray-900 hover:text-primary-600 dark:text-white"
+              >
+                {{ membership.name }}
+              </NuxtLink>
+              <span class="text-xs capitalize text-gray-500 dark:text-gray-400">
+                {{ membership.role }}
+              </span>
+            </li>
+          </ul>
         </UCard>
       </section>
 

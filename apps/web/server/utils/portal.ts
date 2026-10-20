@@ -232,6 +232,19 @@ export function eventScopeFilter(scope: PortalScope): Filter {
   }
 }
 
+/**
+ * Departments may be area-wide (branch is null, data-model §2.2), so a branch
+ * user sees their own branches' departments plus the area-wide ones. Same
+ * shape as `eventScopeFilter`: the null branch is a visibility grant, not a
+ * scope hole — out-of-scope branches still never match.
+ */
+export function departmentScopeFilter(scope: PortalScope): Filter {
+  if (scope.isArea) return {}
+  return {
+    _or: [{ branch: { _in: scope.branchIds } }, { branch: { _null: true } }],
+  }
+}
+
 export function mergeFilters(...filters: Array<Filter | undefined>): Filter | undefined {
   const active = filters.filter((filter): filter is Filter =>
     Boolean(filter && Object.keys(filter).length > 0),

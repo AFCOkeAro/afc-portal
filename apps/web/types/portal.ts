@@ -1,8 +1,11 @@
 import type {
   AttendanceRecord,
   AttendanceSession,
+  Branch,
+  Department,
   EventRecord,
   EventRegistration,
+  Household,
   Person,
   Visitor,
   WelfareCase,
@@ -33,6 +36,58 @@ export interface PersonTimelineItem {
 
 export interface PersonDetail extends PersonRow {
   timeline: PersonTimelineItem[]
+  household_name: string | null
+  departments: PersonDepartmentMembership[]
+}
+
+export interface PersonDepartmentMembership {
+  id: string
+  name: string
+  role: string
+  joined_at: string | null
+}
+
+export interface HouseholdRow extends Household {
+  branch_name: string | null
+  member_count: number
+}
+
+export interface HouseholdMemberRow {
+  id: string
+  display_name: string
+  gender: string
+  is_minor: boolean | null
+  phone: string | null
+  membership_status: string
+  status: string
+  age: number | null
+  is_head: boolean
+}
+
+export interface HouseholdDetail extends HouseholdRow {
+  head_name: string | null
+  members: HouseholdMemberRow[]
+}
+
+export interface DepartmentRow extends Department {
+  branch_name: string | null
+  leader_name: string | null
+  member_count: number
+}
+
+export interface DepartmentMemberRow {
+  id: string
+  display_name: string
+  role: string
+  phone: string | null
+  branch_name: string | null
+  membership_status: string
+  status: string
+  joined_at: string | null
+}
+
+export interface DepartmentDetail extends DepartmentRow {
+  members: DepartmentMemberRow[]
 }
 
 export interface RegistrationRow extends EventRegistration {

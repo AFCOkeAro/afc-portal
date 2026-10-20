@@ -1,5 +1,7 @@
 export * from './attendance-split'
 export * from './common'
+export * from './department'
+export * from './household'
 export * from './operations'
 export * from './person'
 export * from './registration'

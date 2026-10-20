@@ -224,12 +224,11 @@ describe('shell structure', () => {
     )
   })
 
-  it('zone / area / BSC / household stubs exist behind gates', () => {
+  it('zone / area / BSC stubs exist behind gates', () => {
     for (const file of [
       'apps/web/pages/zones/[id].vue',
       'apps/web/pages/areas/[id].vue',
       'apps/web/pages/bscs/[id].vue',
-      'apps/web/pages/households/[id].vue',
     ]) {
       assert.ok(existsSync(path.join(root, file)), `${file} must exist`)
       const src = read(file)
@@ -242,12 +241,30 @@ describe('shell structure', () => {
     for (const file of [
       'apps/web/pages/zones/[id].vue',
       'apps/web/pages/areas/[id].vue',
-      'apps/web/pages/households/[id].vue',
     ]) {
       assert.ok(
         read(file).includes('welfareCases'),
         `${file} must gate welfare on capability`,
       )
     }
+  })
+
+  it('household detail is a real page, not a stub (AFC-469)', () => {
+    // AFC-469 replaces the AFC-461b household stub with the staff detail:
+    // overview, members and contact sections behind capabilities, with
+    // member link/unlink needing both the household and the person grants.
+    // Welfare has no household link (cases attach to person/branch), so the
+    // stub's welfare gate is gone with the stub.
+    const file = 'apps/web/pages/households/[id].vue'
+    assert.ok(existsSync(path.join(root, file)), `${file} must exist`)
+    const src = read(file)
+    assert.ok(src.includes('SectionNav'), 'must use the shell')
+    assert.ok(
+      src.includes('permissions.can(COLLECTIONS.'),
+      'must gate sections on capabilities, never role names',
+    )
+    assert.ok(src.includes('household'), 'must render household data, not a stub')
+    assert.ok(src.includes('members'), 'must render the member list')
+    assert.doesNotMatch(src, /stub/i, 'must not describe itself as a stub')
   })
 })

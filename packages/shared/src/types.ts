@@ -213,6 +213,9 @@ export interface Household {
   phone: string | null
   primary_contact: string | null
   notes: string | null
+  /** Couples' wedding date (data-model-expansion §4.1). */
+  wedding_date: string | null
+  status: 'active' | 'archived'
 }
 
 export interface EventRecord {
