@@ -7,6 +7,7 @@ import {
   getPortalScope,
   listItems,
   requireCan,
+  throwStoreUnavailable,
   visibleFields,
 } from '../../../utils/portal'
 
@@ -49,21 +50,31 @@ export default defineEventHandler(async (event): Promise<string> => {
   if (!id)
     throw createError({ statusCode: 400, statusMessage: 'An event id is required' })
 
-  const eventRow = await findScopedItem<Record<string, unknown>>(
-    event,
-    scope,
-    'events',
-    id,
-    { fields: ['id', 'title'], scope: eventScopeFilter(scope) },
-  )
+  // AFC-566: both reads hit 0021 registers. Unreadable store → named
+  // error, never a bare 500; deliberate 4xx pass through untouched.
+  let eventRow: Record<string, unknown>
+  let result: { data: RegistrationRow[] }
+  let fields: string[]
+  try {
+    eventRow = await findScopedItem<Record<string, unknown>>(
+      event,
+      scope,
+      'events',
+      id,
+      { fields: ['id', 'title'], scope: eventScopeFilter(scope) },
+    )
 
-  const fields = visibleFields(scope, 'event_registrations', FIELDS)
-  const result = await listItems<RegistrationRow>(event, scope, 'event_registrations', {
-    filter: { event: { _eq: id } },
-    fields,
-    sort: 'registrant_last_name,registrant_first_name',
-    limit: -1,
-  })
+    fields = visibleFields(scope, 'event_registrations', FIELDS)
+    result = await listItems<RegistrationRow>(event, scope, 'event_registrations', {
+      filter: { event: { _eq: id } },
+      fields,
+      sort: 'registrant_last_name,registrant_first_name',
+      limit: -1,
+    })
+  } catch (error) {
+    if ((error as { statusCode?: number })?.statusCode) throw error
+    throwStoreUnavailable(error, 'event_store', '0021')
+  }
 
   const medicalVisible =
     can(scope, 'event_registrations', 'read') && fields.includes('medical_notes')

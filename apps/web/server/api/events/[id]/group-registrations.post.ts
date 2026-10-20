@@ -12,6 +12,7 @@ import {
   listItems,
   requireCan,
   resolveBranch,
+  throwStoreUnavailable,
 } from '../../../utils/portal'
 
 /** Smallest defensible batch cap: keeps one request inside Directus limits. */
@@ -45,13 +46,23 @@ export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
   if (!id)
     throw createError({ statusCode: 400, statusMessage: 'An event id is required' })
-  const eventRow = await findScopedItem<Record<string, unknown>>(
-    event,
-    scope,
-    'events',
-    id,
-    { fields: ['id', 'branch'], scope: eventScopeFilter(scope) },
-  )
+  // AFC-566: scope-gate + idempotency read below hit 0021 registers.
+  // Unreadable store → named error, never a bare 500; deliberate 4xx
+  // (scope 404s, validation) pass through. The create loop below keeps
+  // its own group_partial_failure 502, which also passes through.
+  let eventRow: Record<string, unknown>
+  try {
+    eventRow = await findScopedItem<Record<string, unknown>>(
+      event,
+      scope,
+      'events',
+      id,
+      { fields: ['id', 'branch'], scope: eventScopeFilter(scope) },
+    )
+  } catch (error) {
+    if ((error as { statusCode?: number })?.statusCode) throw error
+    throwStoreUnavailable(error, 'event_store', '0021')
+  }
 
   const body = ((await readBody(event)) ?? {}) as Record<string, unknown>
   const groupCode = String(body.group_code ?? '').trim()
@@ -100,16 +111,22 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const existing = await listItems<Record<string, unknown>>(
-    event,
-    scope,
-    'event_registrations',
-    {
-      filter: { event: { _eq: id } },
-      fields: ['registrant_first_name', 'registrant_last_name', 'email', 'phone'],
-      limit: -1,
-    },
-  )
+  let existing: { data: Record<string, unknown>[] }
+  try {
+    existing = await listItems<Record<string, unknown>>(
+      event,
+      scope,
+      'event_registrations',
+      {
+        filter: { event: { _eq: id } },
+        fields: ['registrant_first_name', 'registrant_last_name', 'email', 'phone'],
+        limit: -1,
+      },
+    )
+  } catch (error) {
+    if ((error as { statusCode?: number })?.statusCode) throw error
+    throwStoreUnavailable(error, 'event_store', '0021')
+  }
   const existingKeys = new Set(
     existing.data.map((row) => groupMemberKey(id, groupCode, row)),
   )

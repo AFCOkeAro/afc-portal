@@ -10,6 +10,7 @@ import {
   createItem,
   requireCan,
   resolveBranch,
+  throwStoreUnavailable,
   throwValidation,
 } from '../../../utils/portal'
 
@@ -32,13 +33,22 @@ export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
   if (!id)
     throw createError({ statusCode: 400, statusMessage: 'An event id is required' })
-  const eventRow = await findScopedItem<Record<string, unknown>>(
-    event,
-    scope,
-    'events',
-    id,
-    { fields: ['id', 'branch'], scope: eventScopeFilter(scope) },
-  )
+  // AFC-566: scope-gate + create below hit 0021 registers. Unreadable
+  // store → named error, never a bare 500; deliberate 4xx (scope 404s,
+  // forbidden fields, validation) pass through.
+  let eventRow: Record<string, unknown>
+  try {
+    eventRow = await findScopedItem<Record<string, unknown>>(
+      event,
+      scope,
+      'events',
+      id,
+      { fields: ['id', 'branch'], scope: eventScopeFilter(scope) },
+    )
+  } catch (error) {
+    if ((error as { statusCode?: number })?.statusCode) throw error
+    throwStoreUnavailable(error, 'event_store', '0021')
+  }
 
   const body = ((await readBody(event)) ?? {}) as Record<string, unknown>
   for (const forbidden of STAFF_CREATE_FORBIDDEN_FIELDS) {
@@ -54,15 +64,20 @@ export default defineEventHandler(async (event) => {
   const parsed = registrationFormSchema.safeParse({ ...body, event: id })
   if (!parsed.success) throwValidation(parsed.error)
   const branch = resolveBranch(scope, parsed.data.branch, { allowAreaWide: true })
-  const created = await createItem<Record<string, unknown>>(
-    event,
-    scope,
-    'event_registrations',
-    {
-      ...toStaffPayload(parsed.data),
-      event: id,
-      branch: branch ?? eventRow.branch ?? null,
-    },
-  )
-  return { data: { ...created, id: String(created.id) } }
+  try {
+    const created = await createItem<Record<string, unknown>>(
+      event,
+      scope,
+      'event_registrations',
+      {
+        ...toStaffPayload(parsed.data),
+        event: id,
+        branch: branch ?? eventRow.branch ?? null,
+      },
+    )
+    return { data: { ...created, id: String(created.id) } }
+  } catch (error) {
+    if ((error as { statusCode?: number })?.statusCode) throw error
+    throwStoreUnavailable(error, 'event_store', '0021')
+  }
 })
