@@ -19,6 +19,8 @@ const CASE_FIELDS = [
   'category',
   'priority',
   'status',
+  'confidentiality',
+  'title',
   'amount_requested',
   'amount_assisted',
   'assigned_to',
@@ -41,6 +43,8 @@ export default defineEventHandler(async (event) => {
   const status = typeof query.status === 'string' ? query.status : 'open'
   const category = typeof query.category === 'string' ? query.category : undefined
   const priority = typeof query.priority === 'string' ? query.priority : undefined
+  const confidentiality =
+    typeof query.confidentiality === 'string' ? query.confidentiality : undefined
 
   const statusFilter =
     status === 'all'
@@ -55,6 +59,7 @@ export default defineEventHandler(async (event) => {
       branch ? { branch: { _eq: branch } } : undefined,
       category ? { category: { _eq: category } } : undefined,
       priority ? { priority: { _eq: priority } } : undefined,
+      confidentiality ? { confidentiality: { _eq: confidentiality } } : undefined,
       scopeFilter(scope),
     ),
     fields: visibleFields(scope, 'welfare_cases', CASE_FIELDS),

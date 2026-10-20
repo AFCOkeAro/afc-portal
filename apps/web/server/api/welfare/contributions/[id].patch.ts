@@ -50,10 +50,13 @@ export default defineEventHandler(async (event) => {
     },
   )
 
+  const statusSummary = `Contribution marked ${status}`
   await createItem(event, scope, 'welfare_case_events', {
     case: contribution.data.case,
     event_type: 'contribution_status',
-    summary: `Contribution marked ${status}`,
+    detail: statusSummary,
+    summary: statusSummary,
+    actor_user: scope.session.user.id,
     actor: scope.session.user.id,
     created_at: now,
   })

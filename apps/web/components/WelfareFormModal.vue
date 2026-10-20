@@ -38,6 +38,7 @@ function empty() {
     category: 'other',
     priority: 'normal',
     status: 'open',
+    confidentiality: 'branch',
     amount_requested: '',
     amount_assisted: '',
     assigned_to: '',
@@ -51,6 +52,8 @@ const form = reactive(empty())
 const categoryOptions = [
   { label: 'Medical', value: 'medical' },
   { label: 'Financial', value: 'financial' },
+  { label: 'Food', value: 'food' },
+  { label: 'Housing', value: 'housing' },
   { label: 'Bereavement', value: 'bereavement' },
   { label: 'Education', value: 'education' },
   { label: 'Other', value: 'other' },
@@ -58,9 +61,15 @@ const categoryOptions = [
 
 const priorityOptions = [
   { label: 'Low', value: 'low' },
+  { label: 'Medium', value: 'medium' },
   { label: 'Normal', value: 'normal' },
   { label: 'High', value: 'high' },
   { label: 'Urgent', value: 'urgent' },
+]
+
+const confidentialityOptions = [
+  { label: 'Branch', value: 'branch' },
+  { label: 'Area', value: 'area' },
 ]
 
 const statusOptions = [
@@ -100,6 +109,7 @@ watch(
         category: row.category,
         priority: row.priority ?? 'normal',
         status: row.status ?? 'open',
+        confidentiality: row.confidentiality ?? 'branch',
         amount_requested: row.amount_requested ?? '',
         amount_assisted: row.amount_assisted ?? '',
         assigned_to: row.assigned_to ?? '',
@@ -190,6 +200,18 @@ async function submit(): Promise<void> {
             <USelect v-model="form.person" :items="personOptions" class="w-full" />
           </UFormField>
         </div>
+
+        <UFormField
+          label="Confidentiality"
+          hint="Branch cases stay with the branch team; area cases are visible area-wide."
+          :error="fieldErrors.confidentiality"
+        >
+          <USelect
+            v-model="form.confidentiality"
+            :items="confidentialityOptions"
+            class="w-full"
+          />
+        </UFormField>
 
         <div class="grid gap-4 sm:grid-cols-3">
           <UFormField label="Category" :error="fieldErrors.category">

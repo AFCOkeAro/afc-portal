@@ -49,10 +49,13 @@ export default defineEventHandler(async (event) => {
     },
   )
 
+  const contributionSummary = `${form.contribution_type} contribution recorded${amount ? ` (${amount})` : ''}`
   await createItem(event, scope, 'welfare_case_events', {
     case: id,
-    event_type: 'contribution',
-    summary: `${form.contribution_type} contribution recorded${amount ? ` (${amount})` : ''}`,
+    event_type: 'contribution_added',
+    detail: contributionSummary,
+    summary: contributionSummary,
+    actor_user: scope.session.user.id,
     actor: scope.session.user.id,
     created_at: now,
   })

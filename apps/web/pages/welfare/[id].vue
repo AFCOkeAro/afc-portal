@@ -12,8 +12,16 @@ const showEdit = ref(false)
 const showContribution = ref(false)
 const savingStatus = ref(false)
 const savingContribution = ref(false)
+const savingNote = ref(false)
+const showNoteForm = ref(false)
 const actionError = ref('')
 const contributionError = ref('')
+const noteError = ref('')
+
+const note = reactive({
+  detail: '',
+  body: '',
+})
 
 const contribution = reactive({
   contribution_type: 'cash',
@@ -138,6 +146,62 @@ async function setContributionStatus(
       (cause as { message?: string }).message ?? 'Could not update that contribution'
   }
 }
+
+async function addNote(): Promise<void> {
+  noteError.value = ''
+  savingNote.value = true
+  try {
+    await api.post(`/api/welfare/${id}/notes`, {
+      detail: note.detail || undefined,
+      body: note.body || undefined,
+    })
+    Object.assign(note, { detail: '', body: '' })
+    showNoteForm.value = false
+    await refresh()
+  } catch (cause) {
+    noteError.value =
+      (cause as { message?: string }).message ?? 'Could not save that note'
+  } finally {
+    savingNote.value = false
+  }
+}
+
+const auth = useAuth()
+
+async function takeCase(): Promise<void> {
+  actionError.value = ''
+  try {
+    const session = await auth.ensureSession()
+    const me = session?.user.id
+    if (!me) {
+      actionError.value = 'Your session has ended. Sign in again.'
+      return
+    }
+    await api.patch(`/api/welfare/${id}`, { assigned_to: me })
+    await refresh()
+  } catch (cause) {
+    actionError.value =
+      (cause as { message?: string }).message ?? 'Could not update the assignment'
+  }
+}
+
+async function unassignCase(): Promise<void> {
+  actionError.value = ''
+  try {
+    await api.patch(`/api/welfare/${id}`, { assigned_to: null })
+    await refresh()
+  } catch (cause) {
+    actionError.value =
+      (cause as { message?: string }).message ?? 'Could not update the assignment'
+  }
+}
+
+const notes = computed(
+  () => welfareCase.value?.events.filter((item) => item.event_type === 'note') ?? [],
+)
+const trail = computed(
+  () => welfareCase.value?.events.filter((item) => item.event_type !== 'note') ?? [],
+)
 </script>
 
 <template>
@@ -171,6 +235,12 @@ async function setContributionStatus(
         :description="`${welfareCase.category} · ${welfareCase.branch_name || 'No branch'} · opened ${formatDate(welfareCase.opened_at)}`"
       >
         <template #actions>
+          <UBadge
+            :color="welfareCase.confidentiality === 'area' ? 'info' : 'neutral'"
+            variant="subtle"
+          >
+            {{ welfareCase.confidentiality ?? 'branch' }}
+          </UBadge>
           <PermissionGate :collection="COLLECTIONS.welfareCases" action="update">
             <UButton label="Edit case" icon="i-lucide-pencil" @click="showEdit = true" />
           </PermissionGate>
@@ -216,6 +286,26 @@ async function setContributionStatus(
             <div class="flex justify-between gap-3">
               <dt class="text-gray-500 dark:text-gray-400">Assigned to</dt>
               <dd>{{ welfareCase.assigned_to || 'Unassigned' }}</dd>
+            </div>
+            <div
+              v-if="canUpdate"
+              class="flex flex-wrap gap-2 border-t border-gray-100 pt-3 dark:border-gray-800"
+            >
+              <UButton
+                v-if="!welfareCase.assigned_to"
+                size="xs"
+                variant="outline"
+                label="Take case"
+                @click="takeCase"
+              />
+              <UButton
+                v-else
+                size="xs"
+                color="neutral"
+                variant="ghost"
+                label="Unassign"
+                @click="unassignCase"
+              />
             </div>
             <div class="flex justify-between gap-3">
               <dt class="text-gray-500 dark:text-gray-400">Priority</dt>
@@ -418,15 +508,92 @@ async function setContributionStatus(
 
       <UCard class="mt-6">
         <template #header>
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <h2 class="text-base font-semibold">Case notes</h2>
+            <div class="flex items-center gap-2">
+              <span class="text-xs text-gray-500 dark:text-gray-400"
+                >{{ notes.length }} notes</span
+              >
+              <UButton
+                size="xs"
+                variant="outline"
+                label="Add note"
+                icon="i-lucide-plus"
+                @click="showNoteForm = !showNoteForm"
+              />
+            </div>
+          </div>
+        </template>
+
+        <form
+          v-if="showNoteForm"
+          class="mb-4 space-y-3 rounded-lg border border-gray-200 p-4 dark:border-gray-800"
+          @submit.prevent="addNote"
+        >
+          <UAlert
+            v-if="noteError"
+            color="error"
+            variant="subtle"
+            :description="noteError"
+          />
+          <UFormField label="Summary">
+            <UInput
+              v-model="note.detail"
+              class="w-full"
+              placeholder="One line for the timeline"
+            />
+          </UFormField>
+          <UFormField label="Note">
+            <UTextarea
+              v-model="note.body"
+              :rows="4"
+              class="w-full"
+              placeholder="Freeform case note"
+            />
+          </UFormField>
+          <UButton type="submit" label="Save note" :loading="savingNote" />
+        </form>
+
+        <EmptyState
+          v-if="notes.length === 0"
+          title="No notes yet"
+          description="Pastoral visits and observations recorded here stay on the audit trail."
+        />
+        <ol
+          v-else
+          class="relative space-y-4 border-l border-gray-200 pl-6 dark:border-gray-800"
+        >
+          <li v-for="item in notes" :key="item.id" class="relative">
+            <span
+              class="absolute -left-[31px] flex size-6 items-center justify-center rounded-full bg-white ring-1 ring-gray-200 dark:bg-gray-900 dark:ring-gray-700"
+            >
+              <UIcon name="i-lucide-notebook-pen" class="size-3 text-gray-500" />
+            </span>
+            <p class="text-sm font-medium">{{ item.summary }}</p>
+            <p
+              v-if="item.body"
+              class="mt-1 whitespace-pre-line text-sm text-gray-600 dark:text-gray-300"
+            >
+              {{ item.body }}
+            </p>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              note · {{ formatDateTime(item.created_at) }}
+            </p>
+          </li>
+        </ol>
+      </UCard>
+
+      <UCard class="mt-6">
+        <template #header>
           <div class="flex items-center justify-between">
             <h2 class="text-base font-semibold">Case trail</h2>
             <span class="text-xs text-gray-500 dark:text-gray-400"
-              >{{ welfareCase.events.length }} entries</span
+              >{{ trail.length }} entries</span
             >
           </div>
         </template>
         <EmptyState
-          v-if="welfareCase.events.length === 0"
+          v-if="trail.length === 0"
           title="No case activity yet"
           description="Status changes and contributions will be recorded here."
         />
@@ -434,7 +601,7 @@ async function setContributionStatus(
           v-else
           class="relative space-y-4 border-l border-gray-200 pl-6 dark:border-gray-800"
         >
-          <li v-for="item in welfareCase.events" :key="item.id" class="relative">
+          <li v-for="item in trail" :key="item.id" class="relative">
             <span
               class="absolute -left-[31px] flex size-6 items-center justify-center rounded-full bg-white ring-1 ring-gray-200 dark:bg-gray-900 dark:ring-gray-700"
             >

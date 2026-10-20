@@ -22,7 +22,7 @@ export default defineEventHandler(async (event) => {
     scope,
     'welfare_cases',
     id,
-    { fields: ['id', 'case_ref', 'status', 'closed_at'] },
+    { fields: ['id', 'case_ref', 'status', 'assigned_to', 'closed_at'] },
   )
 
   const body = (await readBody(event)) as Record<string, unknown>
@@ -42,8 +42,36 @@ export default defineEventHandler(async (event) => {
     )
     await createItem(event, scope, 'welfare_case_events', {
       case: id,
-      event_type: 'status',
+      event_type: 'status_changed',
+      detail: `Status changed to ${status.replace(/_/g, ' ')}`,
       summary: `Status changed to ${status.replace(/_/g, ' ')}`,
+      actor_user: scope.session.user.id,
+      actor: scope.session.user.id,
+      created_at: now,
+    })
+    return { data: updated }
+  }
+
+  // Assignment-only change (case detail "assign" action): scoped to the case,
+  // audit actor auto-set. Kept distinct from the full-form update below so an
+  // assignment never rewrites restricted fields it cannot read.
+  if (
+    Object.keys(body).length === 1 &&
+    Object.prototype.hasOwnProperty.call(body, 'assigned_to')
+  ) {
+    const updated = await updateItem<Record<string, unknown>>(
+      event,
+      scope,
+      'welfare_cases',
+      id,
+      { assigned_to: (body.assigned_to as string) || null },
+    )
+    await createItem(event, scope, 'welfare_case_events', {
+      case: id,
+      event_type: 'assigned',
+      detail: 'Case assigned',
+      summary: 'Case assigned',
+      actor_user: scope.session.user.id,
       actor: scope.session.user.id,
       created_at: now,
     })
@@ -62,6 +90,10 @@ export default defineEventHandler(async (event) => {
     await findScopedItem(event, scope, 'people', form.person, { fields: ['id'] })
   }
 
+  const assignedChanged =
+    (body.assigned_to ?? null) !== (existing.assigned_to ?? null)
+  const statusChanged = form.status !== existing.status
+
   const updated = await updateItem<Record<string, unknown>>(
     event,
     scope,
@@ -74,6 +106,8 @@ export default defineEventHandler(async (event) => {
       category: form.category,
       priority: form.priority,
       status: form.status,
+      confidentiality: form.confidentiality,
+      title: form.title ?? null,
       amount_requested: form.amount_requested,
       amount_assisted: form.amount_assisted,
       assigned_to: form.assigned_to ?? null,
@@ -83,10 +117,22 @@ export default defineEventHandler(async (event) => {
     },
   )
 
+  // Every mutation leaves its audit row: status changes and assignments get
+  // their own event types so the timeline reads as a trail, not a log of
+  // "updated".
+  const auditType = statusChanged ? 'status_changed' : assignedChanged ? 'assigned' : 'updated'
+  const auditSummary =
+    auditType === 'status_changed'
+      ? `Status changed to ${form.status.replace(/_/g, ' ')}`
+      : auditType === 'assigned'
+        ? 'Case assigned'
+        : `Case ${form.case_ref} updated`
   await createItem(event, scope, 'welfare_case_events', {
     case: id,
-    event_type: 'updated',
-    summary: `Case ${form.case_ref} updated`,
+    event_type: auditType,
+    detail: auditSummary,
+    summary: auditSummary,
+    actor_user: scope.session.user.id,
     actor: scope.session.user.id,
     created_at: now,
   })

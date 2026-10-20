@@ -22,6 +22,8 @@ const CASE_FIELDS = [
   'category',
   'priority',
   'status',
+  'confidentiality',
+  'title',
   'amount_requested',
   'amount_assisted',
   'assigned_to',
@@ -30,6 +32,34 @@ const CASE_FIELDS = [
   'opened_at',
   'closed_at',
 ]
+
+// Directus field transition (AFC-472): the §6.3 names are detail/body/
+// actor_user; the live collection still carries summary/actor. Reads request
+// both and map spec-first, so the timeline works before and after the
+// Directus collection gains the new columns. Writes carry both shapes.
+const EVENT_FIELDS = [
+  'id',
+  'case',
+  'event_type',
+  'detail',
+  'body',
+  'summary',
+  'actor_user',
+  'actor',
+  'created_at',
+]
+
+interface WelfareEventRow {
+  id: string | number
+  case: string
+  event_type: string
+  detail?: string | null
+  body?: string | null
+  summary?: string | null
+  actor_user?: string | null
+  actor?: string | null
+  created_at: string | null
+}
 
 export default defineEventHandler(async (event): Promise<WelfareDetail> => {
   const scope = await getPortalScope(event)
@@ -99,15 +129,21 @@ export default defineEventHandler(async (event): Promise<WelfareDetail> => {
 
   let events: WelfareEvent[] = []
   if (can(scope, 'welfare_case_events', 'read')) {
-    const result = await listItems<WelfareEvent>(event, scope, 'welfare_case_events', {
+    const result = await listItems<WelfareEventRow>(event, scope, 'welfare_case_events', {
       filter: { case: { _eq: id } },
-      fields: ['id', 'case', 'event_type', 'summary', 'actor', 'created_at'],
+      fields: EVENT_FIELDS,
       sort: '-created_at',
       limit: -1,
     })
     events = result.data.map((welfareEvent) => ({
-      ...welfareEvent,
       id: String(welfareEvent.id),
+      case: String(welfareEvent.case),
+      event_type: welfareEvent.event_type,
+      summary: welfareEvent.detail ?? welfareEvent.summary ?? '',
+      body: welfareEvent.body ?? null,
+      detail: welfareEvent.detail ?? welfareEvent.summary ?? null,
+      actor: welfareEvent.actor_user ?? welfareEvent.actor ?? null,
+      created_at: welfareEvent.created_at,
     }))
   }
 

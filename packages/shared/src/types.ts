@@ -324,6 +324,66 @@ export interface AttendanceRecord {
   recorded_at: string | null
 }
 
+/**
+ * Sunday service header (data-model §4.3, AFC-473). `zone` is denorm via
+ * branch (Flow services.denorm); `total_attendance` is copied from the
+ * linked attendance session by Flow services.total, never hand-edited.
+ * `service_type` is the §4.3 service set, not the §3.1 session set.
+ */
+export interface SundayService {
+  id: string
+  branch: string
+  zone: string | null
+  service_date: string
+  service_time: string | null
+  service_type: 'sunday' | 'midweek' | 'special' | 'camp'
+  theme: string | null
+  preacher: string | null
+  expected_attendance: number | null
+  total_attendance: number | null
+  status: 'planned' | 'completed'
+  notes: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+/**
+ * Roster row (data-model §4.4, AFC-473). `branch` is denorm from the
+ * service for §10 scoping.
+ */
+export interface ServiceAssignment {
+  id: string
+  service: string
+  person: string
+  role:
+    | 'worship_leader'
+    | 'preacher'
+    | 'usher'
+    | 'media'
+    | 'sound'
+    | 'children'
+    | 'welcome'
+    | 'prayer'
+    | 'offering'
+    | 'communion'
+  branch: string | null
+  status: 'invited' | 'confirmed' | 'declined'
+  notes: string | null
+  created_by: string | null
+  created_at: string
+}
+
+/** Explicit service audit (AFC-473; welfare_case_events precedent). */
+export interface SundayServiceEvent {
+  id: string
+  service: string
+  event_type: 'created' | 'assigned' | 'status_changed' | 'note'
+  detail: string | null
+  actor_user: string | null
+  created_at: string
+}
+
 export type VisitorStatus = 'new' | 'follow_up' | 'converted' | 'closed' | 'declined'
 
 /**
@@ -411,9 +471,19 @@ export interface WelfareCase {
   case_ref: string
   branch: string | null
   person: string | null
-  category: 'medical' | 'financial' | 'bereavement' | 'education' | 'other'
-  priority: 'low' | 'normal' | 'high' | 'urgent' | null
-  status: 'open' | 'in_progress' | 'resolved' | 'closed' | null
+  category:
+    | 'medical'
+    | 'financial'
+    | 'food'
+    | 'housing'
+    | 'bereavement'
+    | 'education'
+    | 'other'
+  priority: 'low' | 'medium' | 'normal' | 'high' | 'urgent' | null
+  status: 'open' | 'in_progress' | 'pending_approval' | 'resolved' | 'closed' | null
+  /** Confidentiality scope (data-model §6.1, AFC-472): branch or area. */
+  confidentiality: 'branch' | 'area' | null
+  title: string | null
   amount_requested: string | null
   amount_assisted: string | null
   assigned_to: string | null
@@ -423,6 +493,30 @@ export interface WelfareCase {
   outcome_notes: string | null
   opened_at: string | null
   closed_at: string | null
+}
+
+/**
+ * Welfare audit row (data-model §6.3, AFC-472). `detail` is the short
+ * timeline summary; `body` the nullable freeform note text. `actor_user`
+ * is the audit actor (auto-set to the session user by the portal routes).
+ */
+export interface WelfareCaseEvent {
+  id: string
+  case: string
+  event_type:
+    | 'created'
+    | 'status_changed'
+    | 'status'
+    | 'updated'
+    | 'assigned'
+    | 'note'
+    | 'contribution_added'
+    | 'contribution'
+    | 'contribution_status'
+  detail: string | null
+  body: string | null
+  actor_user: string | null
+  created_at: string | null
 }
 
 /** Directus user row projected onto the custom fields from data-model §7.1. */

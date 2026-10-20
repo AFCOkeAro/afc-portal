@@ -7,6 +7,9 @@ import type {
   EventRegistration,
   Household,
   Person,
+  ServiceAssignment,
+  SundayService,
+  SundayServiceEvent,
   Visitor,
   WelfareCase,
 } from '@afc/shared'
@@ -132,6 +135,21 @@ export interface AttendanceSessionRow extends AttendanceSession {
   records_count: number
 }
 
+export interface ServiceRow extends SundayService {
+  branch_name: string | null
+}
+
+export interface ServiceAssignmentRow extends ServiceAssignment {
+  person_name: string | null
+}
+
+export interface ServiceDetail extends ServiceRow {
+  preacher_name: string | null
+  assignments: ServiceAssignmentRow[]
+  assignment_count: number
+  events: SundayServiceEvent[]
+}
+
 export interface AttendanceDetail extends AttendanceSessionRow {
   records: (AttendanceRecord & { person_name: string | null })[]
 }
@@ -159,8 +177,34 @@ export interface WelfareEvent {
   case: string
   event_type: string
   summary: string
+  /** Freeform note text (AFC-472); null for non-note audit rows. */
+  body: string | null
+  /** Short summary under the spec field name; mirrors summary. */
+  detail: string | null
   actor: string | null
   created_at: string | null
+}
+
+export interface WelfareReportGroup {
+  status: string
+  category: string
+  priority: string
+  count: number
+}
+
+export interface WelfareReport {
+  groups: WelfareReportGroup[]
+  totals: {
+    cases: number
+    open: number
+  }
+  filters: {
+    branch: string | null
+    confidentiality: string | null
+    status: string | null
+    category: string | null
+    priority: string | null
+  }
 }
 
 export interface WelfareCaseRow extends WelfareCase {
