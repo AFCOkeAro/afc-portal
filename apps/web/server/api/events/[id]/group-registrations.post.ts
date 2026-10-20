@@ -27,12 +27,11 @@ const MAX_GROUP_MEMBERS = 50
  * with the same keys creates zero new rows and answers with the original
  * rows instead.
  *
- * `group_code` persistence note: `event_registrations` has no `group_code`
- * column in the ratified data-model, so the code is validated and echoed
- * in the response meta but not stored on the rows — adding the column is a
- * migration on a personal-data table and needs the CTO (escalated on the
- * issue thread). Idempotency does not depend on the column: it is computed
- * from the stored name+contact fields at request time.
+ * `group_code` persistence: `event_registrations.group_code` (nullable
+ * text, <=64 chars, data-model.md §3.2, migration 20261020_0017) stores
+ * the validated code on every created row. The S4 group-record page
+ * queries by (event, group_code) and the idempotency key has stored
+ * ground truth instead of a request-echoed value.
  *
  * Sequential creates are not a DB transaction (Directus REST has none), so
  * a mid-batch failure returns the ids already written; retrying the same
@@ -90,6 +89,7 @@ export default defineEventHandler(async (event) => {
       ...toStaffPayload(parsed.data),
       event: id,
       branch: branch ?? eventRow.branch ?? null,
+      group_code: groupCode,
     })
   })
   if (Object.keys(memberErrors).length > 0) {

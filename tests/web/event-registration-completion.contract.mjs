@@ -394,11 +394,11 @@ describe('group route: validate-all-first, idempotent retry, honest partial fail
     assert.match(src, /skipped/)
   })
 
-  it('does not persist a group_code column the data-model does not have', () => {
-    assert.doesNotMatch(codeOf(HELPER), /group_code/)
+  it('persists the validated group_code on every created row', () => {
+    assert.match(src, /group_code: groupCode/)
     assert.match(
       read('apps/web/server/api/events/[id]/group-registrations.post.ts'),
-      /has no `group_code`\n \* column/,
+      /event_registrations\.group_code/,
     )
   })
 
