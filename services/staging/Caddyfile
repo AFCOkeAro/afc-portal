@@ -4,9 +4,14 @@
 # cutover and follow docs/planning/infra-spec.md §4.
 #
 # Staging domain is afc-staging.bluespace.ng (board decision, AFC-383).
+# NOTE (AFC-561): the http:// prefix below is load-bearing, not stylistic. TLS
+# terminates at Cloudflare (Flexible mode); origin has never held a certificate.
+# A bare domain enables Caddy automatic-HTTPS and its port-80 redirect loops
+# back through Cloudflare (outage 2026-10-20). Do not remove the prefix
+# without terminating TLS at origin first.
 # To change it again: replace the site address on line 10 with the new domain.
 
-afc-staging.bluespace.ng {
+http://afc-staging.bluespace.ng {
 	encode gzip
 
 	reverse_proxy web:3000
