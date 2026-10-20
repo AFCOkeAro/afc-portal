@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { COLLECTIONS } from '@afc/shared'
+
 definePageMeta({ middleware: 'staff' })
 
 const api = useApi()
@@ -39,68 +41,126 @@ async function create() {
     error.value = (cause as { message?: string }).message ?? 'Could not record the matter'
   }
 }
+
+const matterTypeOptions = [
+  { label: 'Banns', value: 'banns' },
+  { label: 'Wedding', value: 'wedding' },
+  { label: 'Counselling', value: 'counselling' },
+  { label: 'Other', value: 'other' },
+]
+
+const rows = computed(() => data.value?.data ?? [])
 </script>
 
 <template>
-  <div class="mx-auto max-w-5xl px-4 py-8">
-    <div class="flex items-center justify-between">
-      <h1 class="text-2xl font-semibold">Marriage matters</h1>
-      <button
-        class="rounded bg-blue-600 px-3 py-1.5 text-white"
-        @click="showForm = !showForm"
-      >
-        Record matter
-      </button>
-    </div>
-    <div v-if="showForm" class="mt-4 rounded border p-4">
-      <div class="grid gap-2">
-        <input
-          v-model="form.person"
-          placeholder="Person id"
-          class="rounded border px-2 py-1"
-        />
-        <input
-          v-model="form.branch"
-          placeholder="Branch id"
-          class="rounded border px-2 py-1"
-        />
-        <select v-model="form.matter_type" class="rounded border px-2 py-1">
-          <option value="banns">Banns</option>
-          <option value="wedding">Wedding</option>
-          <option value="counselling">Counselling</option>
-          <option value="other">Other</option>
-        </select>
-        <input v-model="form.wedding_date" type="date" class="rounded border px-2 py-1" />
+  <div>
+    <PageHeader
+      title="Marriage matters"
+      description="Banns, weddings and counselling with an audit trail."
+    >
+      <template #actions>
+        <PermissionGate :collection="COLLECTIONS.marriageMatters" action="create">
+          <UButton
+            label="Record matter"
+            icon="i-lucide-plus"
+            @click="showForm = !showForm"
+          />
+        </PermissionGate>
+      </template>
+    </PageHeader>
+
+    <UCard v-if="showForm" class="mb-4">
+      <template #header>
+        <h2 class="font-semibold">New matter</h2>
+      </template>
+      <div class="grid gap-3 sm:grid-cols-2">
+        <UFormField label="Person id">
+          <UInput v-model="form.person" class="w-full" placeholder="Person id" />
+        </UFormField>
+        <UFormField label="Branch id">
+          <UInput v-model="form.branch" class="w-full" placeholder="Branch id" />
+        </UFormField>
+        <UFormField label="Matter type">
+          <USelect v-model="form.matter_type" :items="matterTypeOptions" class="w-full" />
+        </UFormField>
+        <UFormField label="Wedding date">
+          <UInput v-model="form.wedding_date" type="date" class="w-full" />
+        </UFormField>
+        <UFormField label="Notes" class="sm:col-span-2">
+          <UTextarea v-model="form.notes" class="w-full" placeholder="Notes" />
+        </UFormField>
       </div>
-      <p v-if="error" class="mt-2 text-sm text-red-600">{{ error }}</p>
-      <button class="mt-2 rounded bg-blue-600 px-3 py-1.5 text-white" @click="create">
-        Save
-      </button>
-    </div>
-    <p v-if="pending" class="mt-4">Loading…</p>
-    <table v-else class="mt-4 w-full text-sm">
-      <thead>
-        <tr class="text-left">
-          <th>Person</th>
-          <th>Type</th>
-          <th>Wedding</th>
-          <th>Status</th>
-          <th />
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="row in data?.data ?? []" :key="String(row.id)" class="border-t">
-          <td class="py-2">{{ row.person }}</td>
-          <td>{{ row.matter_type }}</td>
-          <td>{{ row.wedding_date ?? '—' }}</td>
-          <td>{{ row.status }}</td>
-          <td>
-            <NuxtLink :to="`/marriage/${String(row.id)}`" class="text-blue-600"
-              >Open</NuxtLink
+      <UAlert
+        v-if="error"
+        class="mt-4"
+        color="error"
+        variant="subtle"
+        title="Could not record the matter"
+        :description="error"
+      />
+      <div class="mt-4">
+        <UButton label="Save" icon="i-lucide-check" @click="create" />
+      </div>
+    </UCard>
+
+    <UCard>
+      <div v-if="pending" class="flex justify-center py-10">
+        <UIcon name="i-lucide-loader-circle" class="size-6 animate-spin text-gray-400" />
+      </div>
+
+      <EmptyState
+        v-else-if="rows.length === 0"
+        title="No marriage matters yet"
+        description="Record the first banns, wedding or counselling matter."
+      >
+        <PermissionGate :collection="COLLECTIONS.marriageMatters" action="create">
+          <UButton class="mt-4" label="Record matter" @click="showForm = true" />
+        </PermissionGate>
+      </EmptyState>
+
+      <div v-else class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
+          <thead>
+            <tr
+              class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400"
             >
-          </td>
-        </tr>
-      </tbody>
-    </table>
+              <th class="px-3 py-2 font-medium">Person</th>
+              <th class="px-3 py-2 font-medium">Type</th>
+              <th class="px-3 py-2 font-medium">Wedding</th>
+              <th class="px-3 py-2 font-medium">Status</th>
+              <th class="px-3 py-2"><span class="sr-only">Open</span></th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+            <tr
+              v-for="row in rows"
+              :key="String(row.id)"
+              class="hover:bg-gray-50 dark:hover:bg-gray-900/60"
+            >
+              <td class="px-3 py-3 text-gray-600 dark:text-gray-300">{{ row.person }}</td>
+              <td class="px-3 py-3 capitalize text-gray-600 dark:text-gray-300">
+                {{ String(row.matter_type).replace(/_/g, ' ') }}
+              </td>
+              <td class="px-3 py-3 text-gray-600 dark:text-gray-300">
+                {{ row.wedding_date ?? '—' }}
+              </td>
+              <td class="px-3 py-3">
+                <UBadge color="neutral" variant="subtle">{{ row.status }}</UBadge>
+              </td>
+              <td class="px-3 py-3 text-right">
+                <UButton
+                  :to="`/marriage/${String(row.id)}`"
+                  color="neutral"
+                  variant="ghost"
+                  size="xs"
+                  icon="i-lucide-arrow-right"
+                  aria-label="Open marriage matter"
+                />
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </UCard>
   </div>
 </template>

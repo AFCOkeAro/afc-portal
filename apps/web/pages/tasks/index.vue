@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { isTaskOverdue } from '@afc/shared'
+import { COLLECTIONS, isTaskOverdue } from '@afc/shared'
 
 definePageMeta({ middleware: 'staff' })
 
@@ -55,95 +55,174 @@ async function create() {
     error.value = (cause as { message?: string }).message ?? 'Could not create the task'
   }
 }
+
+const statusOptions = [
+  { label: 'All statuses', value: 'all' },
+  { label: 'To do', value: 'todo' },
+  { label: 'In progress', value: 'in_progress' },
+  { label: 'Blocked', value: 'blocked' },
+  { label: 'Done', value: 'done' },
+]
+
+const priorityOptions = [
+  { label: 'Low', value: 'low' },
+  { label: 'Normal', value: 'normal' },
+  { label: 'High', value: 'high' },
+  { label: 'Urgent', value: 'urgent' },
+]
+
+const rows = computed(() => data.value?.data ?? [])
+
+function isOverdue(row: Record<string, unknown>): boolean {
+  return isTaskOverdue({
+    due_date: (row.due_date as string | null) ?? null,
+    status: String(row.status),
+  })
+}
 </script>
 
 <template>
-  <div class="mx-auto max-w-5xl px-4 py-8">
-    <div class="flex items-center justify-between">
-      <h1 class="text-2xl font-semibold">Tasks</h1>
-      <button
-        class="rounded bg-blue-600 px-3 py-1.5 text-white"
-        @click="showForm = !showForm"
-      >
-        New task
-      </button>
-    </div>
-    <div class="mt-4 flex gap-3 text-sm">
-      <label
-        >Status
-        <select v-model="status" class="rounded border px-2 py-1">
-          <option value="all">All</option>
-          <option value="todo">To do</option>
-          <option value="in_progress">In progress</option>
-          <option value="blocked">Blocked</option>
-          <option value="done">Done</option>
-        </select></label
-      >
-      <label><input v-model="mine" type="checkbox" /> Assigned to me</label>
-      <a href="/api/tasks/export.csv" class="rounded border px-2 py-1">Export CSV</a>
-    </div>
-    <div v-if="showForm" class="mt-4 rounded border p-4">
-      <div class="grid gap-2">
-        <input
-          v-model="form.title"
-          placeholder="Title"
-          class="rounded border px-2 py-1"
+  <div>
+    <PageHeader
+      title="Tasks"
+      description="Own-branch and assigned work with due dates and an audit trail."
+    >
+      <template #actions>
+        <UButton
+          to="/api/tasks/export.csv"
+          external
+          color="neutral"
+          variant="outline"
+          icon="i-lucide-download"
+          label="Export CSV"
         />
-        <input
-          v-model="form.assignee_user"
-          placeholder="Assignee user id"
-          class="rounded border px-2 py-1"
-        />
-        <input
-          v-model="form.assignee_person"
-          placeholder="Assignee person id"
-          class="rounded border px-2 py-1"
-        />
-        <input
-          v-model="form.branch"
-          placeholder="Branch id"
-          class="rounded border px-2 py-1"
-        />
-        <input v-model="form.due_date" type="date" class="rounded border px-2 py-1" />
+        <PermissionGate :collection="COLLECTIONS.tasks" action="create">
+          <UButton label="New task" icon="i-lucide-plus" @click="showForm = !showForm" />
+        </PermissionGate>
+      </template>
+    </PageHeader>
+
+    <UCard v-if="showForm" class="mb-4">
+      <template #header>
+        <h2 class="font-semibold">New task</h2>
+      </template>
+      <div class="grid gap-3 sm:grid-cols-2">
+        <UFormField label="Title" class="sm:col-span-2">
+          <UInput v-model="form.title" class="w-full" placeholder="Title" />
+        </UFormField>
+        <UFormField label="Assignee user id">
+          <UInput
+            v-model="form.assignee_user"
+            class="w-full"
+            placeholder="Assignee user id"
+          />
+        </UFormField>
+        <UFormField label="Assignee person id">
+          <UInput
+            v-model="form.assignee_person"
+            class="w-full"
+            placeholder="Assignee person id"
+          />
+        </UFormField>
+        <UFormField label="Branch id">
+          <UInput v-model="form.branch" class="w-full" placeholder="Branch id" />
+        </UFormField>
+        <UFormField label="Due date">
+          <UInput v-model="form.due_date" type="date" class="w-full" />
+        </UFormField>
+        <UFormField label="Priority" class="sm:col-span-2">
+          <USelect v-model="form.priority" :items="priorityOptions" class="w-full" />
+        </UFormField>
       </div>
-      <p v-if="error" class="mt-2 text-sm text-red-600">{{ error }}</p>
-      <button class="mt-2 rounded bg-blue-600 px-3 py-1.5 text-white" @click="create">
-        Save
-      </button>
-    </div>
-    <p v-if="pending" class="mt-4">Loading…</p>
-    <table v-else class="mt-4 w-full text-sm">
-      <thead>
-        <tr class="text-left">
-          <th>Title</th>
-          <th>Status</th>
-          <th>Due</th>
-          <th />
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="row in data?.data ?? []" :key="String(row.id)" class="border-t">
-          <td class="py-2 font-medium">{{ row.title }}</td>
-          <td>{{ row.status }}</td>
-          <td
-            :class="
-              isTaskOverdue({
-                due_date: (row.due_date as string | null) ?? null,
-                status: String(row.status),
-              })
-                ? 'font-semibold text-red-600'
-                : ''
-            "
-          >
-            {{ row.due_date ?? '—' }}
-          </td>
-          <td>
-            <NuxtLink :to="`/tasks/${String(row.id)}`" class="text-blue-600"
-              >Open</NuxtLink
+      <UAlert
+        v-if="error"
+        class="mt-4"
+        color="error"
+        variant="subtle"
+        title="Could not create the task"
+        :description="error"
+      />
+      <div class="mt-4">
+        <UButton label="Save" icon="i-lucide-check" @click="create" />
+      </div>
+    </UCard>
+
+    <UCard>
+      <div class="grid gap-3 sm:grid-cols-[220px_1fr]">
+        <USelect
+          v-model="status"
+          :items="statusOptions"
+          class="w-full"
+          aria-label="Filter by status"
+        />
+        <UCheckbox v-model="mine" label="Assigned to me" name="mine" />
+      </div>
+
+      <div v-if="pending" class="flex justify-center py-10">
+        <UIcon name="i-lucide-loader-circle" class="size-6 animate-spin text-gray-400" />
+      </div>
+
+      <EmptyState
+        v-else-if="rows.length === 0"
+        title="No tasks match these filters"
+        description="Create the first task for this scope."
+      >
+        <PermissionGate :collection="COLLECTIONS.tasks" action="create">
+          <UButton class="mt-4" label="New task" @click="showForm = true" />
+        </PermissionGate>
+      </EmptyState>
+
+      <div v-else class="mt-4 overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
+          <thead>
+            <tr
+              class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400"
             >
-          </td>
-        </tr>
-      </tbody>
-    </table>
+              <th class="px-3 py-2 font-medium">Title</th>
+              <th class="px-3 py-2 font-medium">Status</th>
+              <th class="px-3 py-2 font-medium">Due</th>
+              <th class="px-3 py-2"><span class="sr-only">Open</span></th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+            <tr
+              v-for="row in rows"
+              :key="String(row.id)"
+              class="hover:bg-gray-50 dark:hover:bg-gray-900/60"
+            >
+              <td class="px-3 py-3">
+                <NuxtLink
+                  :to="`/tasks/${String(row.id)}`"
+                  class="font-medium text-gray-900 hover:text-primary-600 dark:text-white"
+                >
+                  {{ row.title }}
+                </NuxtLink>
+              </td>
+              <td class="px-3 py-3">
+                <UBadge color="neutral" variant="subtle">{{ row.status }}</UBadge>
+              </td>
+              <td
+                class="px-3 py-3 text-gray-600 dark:text-gray-300"
+                :class="
+                  isOverdue(row) ? 'font-semibold text-red-600 dark:text-red-400' : ''
+                "
+              >
+                {{ row.due_date ?? '—' }}
+              </td>
+              <td class="px-3 py-3 text-right">
+                <UButton
+                  :to="`/tasks/${String(row.id)}`"
+                  color="neutral"
+                  variant="ghost"
+                  size="xs"
+                  icon="i-lucide-arrow-right"
+                  aria-label="Open task"
+                />
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </UCard>
   </div>
 </template>
