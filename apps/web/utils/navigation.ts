@@ -182,4 +182,7 @@ export const NAVIGATION: readonly NavigationItem[] = [
     label: 'Search',
     to: '/search',
     icon: 'i-lucide-search',
+    requires: ['people', 'read'],
+    inSidebar: true,
+  },
 ]
