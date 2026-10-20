@@ -1,3 +1,4 @@
+export * from './attendance-split'
 export * from './common'
 export * from './operations'
 export * from './person'
