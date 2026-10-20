@@ -27,6 +27,13 @@ export const COLLECTIONS = {
   welfareContributions: 'welfare_contributions',
   welfareCaseEvents: 'welfare_case_events',
   users: 'directus_users',
+  /**
+   * WECA finance (AFC-451, ADR-0007). Capture + computed returns under the
+   * board-ratified formula version. Finance scope only.
+   */
+  branchFinancialRecords: 'branch_financial_records',
+  wecaReturns: 'weca_returns',
+  wecaReturnFormulas: 'weca_return_formulas',
 } as const
 
 export type CollectionName = (typeof COLLECTIONS)[keyof typeof COLLECTIONS]

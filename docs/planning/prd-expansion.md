@@ -19,7 +19,7 @@ The board's [feature expansion](/AFC/issues/AFC-146#comment-91f61f28) turns the 
 | 2 | Attendance | Male/female split per category, per service type; weekly/monthly/quarterly/yearly/custom sort; CSV |
 | 3 | Blessings | Salvation, sanctification, Holy-Ghost baptism, reanointing, healing, other; same sort/export |
 | 4 | Households & people | Unified household map pin + wedding date; expanded person status, milestones, previous branches |
-| 5 | Financial records | Monthly per-branch records + WECA returns (formula pending) |
+| 5 | Financial records | Monthly per-branch records + WECA returns (formula v1, ADR-0007) |
 | 6 | Youth Care & Empowerment | Shared youth DB; celebrations & shout-outs; education/professional status |
 | 7 | Campus Care & WAEC/UTME | Coaching programmes, facilitators, progress, results, AFCF/AFCMF, NYSC |
 | 8 | Leadership & RBAC | Position registry + appointments; Area→Zone→Branch scopes; department heads; household access |
@@ -218,11 +218,11 @@ The AFC-147 `people` record gains:
 ## 5. Financial records & WECA returns
 
 ### 5.1 Requirements
-**Monthly financial records per branch** and **returns to WECA Headquarters**. Fields: branch, month, income, WECA contribution, 5% (savings and projects), intervention, Faith City. **The board will share the formula (dependency).**
+**Monthly financial records per branch** and **returns to WECA Headquarters**. Fields: branch, month, income, intervention, Faith City. **Formula v1 implemented per ADR-0007** (`weca_contribution` / `savings_projects_5pct` are computed lines, not captured inputs).
 
 ### 5.2 Approach
 - `branch_financial_records`: branch, month, income, weca_contribution, savings_projects_5pct, intervention, faith_city, other_income, other_expense, currency, status (`draft`, `submitted`, `confirmed`), submitted_by, notes.
-- `weca_returns`: header per `(branch, period)` with **computed fields that depend on the pending formula**, `formula_version`, status, generated_at, submitted_at. Until the formula arrives, the return is **modelled but the computed fields are nullable/flagged `formula_pending`** — nothing is auto-derived from a guessed formula.
+- `weca_returns`: header per `(branch, period)` with **computed fields under formula v1 (ADR-0007)**, `formula_version`, status, generated_at, submitted_at. A return for a period with no effective formula version stays **modelled with null computed fields flagged `formula_pending`** — nothing is auto-derived from a guessed formula.
 - Confirmation and submission are audited; the board formula is a **single versioned config** so recalculating history after the formula lands is a documented migration.
 
 ### 5.3 User stories
@@ -232,10 +232,10 @@ The AFC-147 `people` record gains:
 - AC2: One record per branch per month (upsert); editing is audited.
 - AC3: A branch admin cannot enter records for another branch.
 
-**US-F2 — Generate a WECA return (pending formula).** As an area admin, I want returns per branch so they can be submitted to WECA.
+**US-F2 — Generate a WECA return (formula v1 implemented, ADR-0007).** As an area admin, I want returns per branch so they can be submitted to WECA.
 - AC1: The return is created per branch/period with the input fields captured.
-- AC2: Formula-derived fields are shown as **"pending board formula"** and are not auto-filled.
-- AC3: When the board shares the formula, entering it as a versioned config recalculates returns and records the formula version used.
+- AC2: Formula-derived fields are computed under the effective versioned config; a period with no effective version shows **"pending board formula"** and is not auto-filled.
+- AC3: When the board revises the formula, entering it as a new versioned config recalculates returns and records the formula version used.
 
 **US-F3 — Export financial data.** As an area admin, I want a CSV of financial records and returns.
 - AC1: Export includes branch, month, all input fields, and formula-derived fields (or `pending`).
@@ -476,11 +476,11 @@ This supersedes PRD §5 and PRD-addendum §D where they conflict, for the expand
 | --- | --- | --- |
 | **MVP (P1–P2)** | Foundation (Directus+Postgres+auth+Nuxt); Area/Zone/Branch/BSC hierarchy + profiles; people & households (map pin, wedding date, milestones); attendance with **sex/category split** + CSV; events + registration + group registration; visitors; branch/area dashboards; RBAC Area→Zone→Branch + department heads; search. | Highest operational value; the hierarchy and attendance split are load-bearing for everything else. |
 | **P3 — Care & records** | Blessings records; Sunday School / AVS / Conference Centre; welfare (existing); youth profile fields + celebrations; office (tasks, minutes, transfers, marriage matters); calendar. | Extends records once the core hierarchy/attendance exist. |
-| **P4 — Finance & communications** | Financial records; **WECA returns (blocked on formula — modelled only until then)**; communications module (email → WhatsApp → SMS), integrations (Gravatar, Telegram, birthday webhook), reports. | Comms has provider lead time; finance is blocked on the board formula. |
+| **P4 — Finance & communications** | Financial records; **WECA returns (formula v1 implemented per ADR-0007)**; communications module (email → WhatsApp → SMS), integrations (Gravatar, Telegram, birthday webhook), reports. | Comms has provider lead time; finance computation landed with the board formula. |
 | **P5 — Campus care** | Coaching programmes, facilitators, timetable, attendance, progress, results, AFCF/AFCMF, financial support, NYSC, undergraduate progress. | Largest standalone domain; depends on youth/people being solid first. |
 | **P6 — Hardening & data** | Prior-year import/compare; retention/consent automation; cost reporting; dedupe; monitoring; training; runbooks. | Operational maturity. |
 
-**Dependency flag:** WECA returns stay **modelled but not auto-computed** until the board shares the formula. The financial input records (P4) can still ship; only the derived return is gated.
+**Dependency flag (cleared by ADR-0007):** WECA returns compute under formula v1 (`weca-2026-01`). Only a period with no effective formula version stays **modelled but not auto-computed** (`formula_pending`).
 
 ---
 
@@ -488,7 +488,7 @@ This supersedes PRD §5 and PRD-addendum §D where they conflict, for the expand
 
 | # | Question | Recommended default | Blocks |
 | --- | --- | --- | --- |
-| OQ-E1 | WECA returns formula | Model inputs now; compute returns when formula arrives; version the formula | WECA return computation |
+| OQ-E1 | WECA returns formula | Answered by ADR-0007 (board answer `cb89849b`): formula v1 `weca-2026-01` implemented; new versions supersede as rows | — (cleared) |
 | OQ-E2 | Service types and their attendance categories | Provide a configurable `service_type_definitions` list; seed with Sunday School, Elementary, Devotional, Youth Service, Revival Service, Sunday service | Attendance capture/reporting |
 | OQ-E3 | Is the area always "Lagos North", and is there one area only? | Single area; hierarchy supports more later | Hierarchy/reporting |
 | OQ-E4 | Zone↔branch mapping source of truth (who maintains it) | Area admin maintains zones/branches; imported on onboarding | Onboarding |

@@ -312,7 +312,7 @@ person, event_type (`transfer`, `department_change`, `status_change`, `appointme
 
 **Indexes:** `(branch, month)` unique; `zone`; `status`.
 
-### 5.2 `weca_returns` (flagged pending formula)
+### 5.2 `weca_returns` (formula v1 implemented per ADR-0007)
 | Field | Type | Notes |
 | --- | --- | --- |
 | id | uuid (PK) | |
@@ -327,7 +327,15 @@ person, event_type (`transfer`, `department_change`, `status_change`, `appointme
 | generated_by | M2O `directus_users` | |
 
 **Indexes:** `(branch, period)` unique; `computation_status`.
-**Dependency:** the board's formula is a versioned config (`weca_return_formulas`: version, effective_from, expression/json rules, notes). Until it is provided, `computation_status = formula_pending` and computed fields stay null. This satisfies "modeled but flagged pending" without guessing.
+**Implemented:** formula v1 per ADR-0007 (`weca-2026-01`, board answer `cb89849b`).
+`computation_status = formula_pending` with null computed fields remains the
+correct state for a period with no effective formula version -- it is no longer
+the state of every return. The board's formula is a versioned config
+(`weca_return_formulas`: version, effective_from, expression/json rules, notes);
+computing a return under a version records that version. Superseded input
+columns: `weca_contribution` / `savings_projects_5pct` from §5.1 are NOT
+captured -- MF and both 5% lines are computed, and the migration header records
+this deviation rather than storing two competing sources of truth.
 
 ---
 
