@@ -119,7 +119,19 @@ describe('calendar public feed — no-leak contract', () => {
     assert.match(src, /visibility:\s*{\s*_eq:\s*'public'\s*}/, 'public predicate server-side')
     assert.match(src, /status:\s*{\s*_eq:\s*'published'\s*}/, 'published predicate server-side')
     assert.match(src, /filter:\s*eventFilter/, 'event read carries the filter')
-    assert.match(src, /filter:\s*celebrationFilter/, 'celebration read carries the filter')
+  })
+
+  it('is events-only: celebrations never enter the public feed (CTO verdict)', () => {
+    assert.doesNotMatch(
+      codeOf(PUBLIC_ROUTE),
+      /celebration/,
+      'no celebration read, mapping, or type in the public route',
+    )
+    assert.doesNotMatch(
+      codeOf(PUBLIC_PAGE),
+      /celebration/,
+      'no celebration option on the public page',
+    )
   })
 
   it('reads an allowlisted field set — contact and internal columns never load', () => {

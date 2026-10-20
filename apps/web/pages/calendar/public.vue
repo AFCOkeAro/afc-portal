@@ -53,7 +53,6 @@ watch([view, focused, itemType], () => {
 const typeOptions = [
   { label: 'All types', value: 'all' },
   { label: 'Events', value: 'event' },
-  { label: 'Celebrations', value: 'celebration' },
 ]
 
 const rows = computed<CalendarViewItem[]>(() =>
@@ -74,7 +73,7 @@ const rows = computed<CalendarViewItem[]>(() =>
   <div>
     <PageHeader
       title="Calendar"
-      description="Published public events and celebrations. No account needed — to join an event, use the registration form."
+      description="Published public programmes and services. No account needed — to join an event, use the registration form."
     />
 
     <UCard>
