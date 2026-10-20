@@ -13,6 +13,12 @@
  * editor surface is the step list with its gate state, and activation stays
  * behind the bulk-threshold approval. Anchor sections per prd-addendum-v4
  * §1.4.
+ *
+ * AFC-538 finding 2 (owner: CTO MediaTech): the wireframe send-test button
+ * is deferred. No sandboxed single-recipient send exists on this page; if it
+ * is scoped later it needs its own story (single recipient + approval, no
+ * bulk path, consent-gated) and a SecurityEngineer review before any send
+ * endpoint ships.
  */
 
 definePageMeta({ middleware: 'staff' })
@@ -233,6 +239,11 @@ function statusColor(status: string): 'success' | 'warning' | 'neutral' | 'error
               </tbody>
             </table>
           </div>
+          <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">
+            Send-test is not offered on this page (AFC-538 finding 2, owner CTO):
+            the wireframe test button is deferred until a sandboxed single-recipient
+            send with approval is scoped as its own story. No test send leaves this page.
+          </p>
         </UCard>
       </section>
 

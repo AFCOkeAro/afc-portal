@@ -4,9 +4,14 @@ import type { CalendarItemType } from '@afc/shared'
 definePageMeta({ middleware: 'staff' })
 
 const api = useApi()
-const itemType = ref('all')
-const dateFrom = ref('')
-const dateTo = ref('')
+const route = useRoute()
+function queryParam(name: string): string {
+  const value = route.query[name]
+  return typeof value === 'string' ? value : ''
+}
+const itemType = ref(queryParam('item_type') || 'all')
+const dateFrom = ref(queryParam('date_from'))
+const dateTo = ref(queryParam('date_to'))
 
 const query = computed(() => ({
   ...(itemType.value !== 'all' ? { item_type: itemType.value as CalendarItemType } : {}),

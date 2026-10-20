@@ -12,6 +12,9 @@
  *   that and points at the branch admin instead of inventing a write path.
  *   (Stated choice: no new consent endpoint in this slice; consent writes
  *   arrive with the OTP member-role enablement.)
+ *   AFC-538 finding 4 (owner: CTO MediaTech): own-consent self-service has no
+ *   dedicated UI in this slice; tracked against the OTP member-role
+ *   enablement. Until then consent changes go via the branch admin.
  *
  * Member surface: no `staff` middleware. Anchor sections per
  * prd-addendum-v4 §1.4.

@@ -257,7 +257,7 @@ An invitee has not consented to anything. We send **one** message, because the i
 - AC4: Limit breaches are visible for approval.
 
 **US-E4 — Remind registrants.** As an event owner, I want registered invitees reminded before the event so that attendance is higher.
-- AC1: A `event_reminder` campaign sends T-24h and T-2h reminders with the live/location details to registrants who consented.
+- AC1: The `event_invitation` campaign sends T-24h and T-2h reminder steps with the live/location details to registrants who consented (AFC-538 finding 1: no separate `event_reminder` key exists; the seeds and data-model-v4 §4.1 carry the single `event_invitation` triggered key whose shape is "invite send + T-24h + T-2h reminders").
 - AC2: Invitees who have not consented get no reminder; their RSVP is handled by staff.
 
 ---

@@ -2,6 +2,16 @@
 import { CELEBRATION_TYPES, CELEBRATION_VISIBILITIES, COLLECTIONS } from '@afc/shared'
 import type { BranchSummary, CelebrationRow, Paginated } from '~/types/portal'
 
+/**
+ * Celebrations feed (AFC-538 finding 4, US-C4 AC1, owner: CTO MediaTech).
+ * The US-C4 7-day lookahead has no dedicated feed UI in this slice: the
+ * lookahead reads the existing unified calendar (/calendar) and the
+ * GET /api/celebrations/calendar window (date_from/date_to, approved +
+ * published only). The link below presets the next 7 days so preparation
+ * does not need a new endpoint or a new send path. A dedicated lookahead
+ * panel is tracked against the member-role enablement work, not built here.
+ */
+
 definePageMeta({ middleware: 'staff' })
 
 const api = useApi()
@@ -65,6 +75,15 @@ const csvHref = computed(() => {
   }
   return `/api/celebrations/reports.csv?${params.toString()}`
 })
+
+function isoDate(offsetDays: number): string {
+  const date = new Date()
+  date.setDate(date.getDate() + offsetDays)
+  return date.toISOString().slice(0, 10)
+}
+const lookaheadHref = computed(
+  () => `/calendar?item_type=celebration&date_from=${isoDate(0)}&date_to=${isoDate(7)}`,
+)
 
 const rows = computed(() => data.value?.data ?? [])
 const total = computed(() => data.value?.meta.total ?? 0)
@@ -142,6 +161,13 @@ function formatDate(value: string, recurring: boolean): string {
           variant="outline"
           icon="i-lucide-download"
           label="Export CSV"
+        />
+        <UButton
+          :to="lookaheadHref"
+          color="neutral"
+          variant="outline"
+          icon="i-lucide-calendar-days"
+          label="Next 7 days"
         />
         <PermissionGate :collection="COLLECTIONS.celebrations" action="create">
           <UButton

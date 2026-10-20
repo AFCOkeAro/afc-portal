@@ -6,8 +6,12 @@
  * excluded (by reason), queued, sent, delivered, read, failed, opted-out,
  * estimated/actual cost, plus the run notes stating which activity signals
  * were available (OQ-R5: `delivered` is the proxy when the provider supplies
- * no read receipts). Read-only; the single idempotent retry for failed
+ * no read receipts). Read-only; the single idempotent invite retry for failed
  * invite sends lives on the invites routes.
+ * AFC-538 finding 5 (owner: CTO MediaTech): link-only discoverability — the
+ * report links to the failed-invites queue where the existing retry route
+ * (POST /api/invites/:id/retry, failed-only, idempotent-once) is offered.
+ * No new send path is added here.
  */
 
 definePageMeta({ middleware: 'staff' })
@@ -85,6 +89,14 @@ const counters = computed(() => {
           icon="i-lucide-arrow-left"
           label="Campaign"
           :to="`/campaigns/${id}`"
+        />
+        <UButton
+          color="neutral"
+          variant="outline"
+          size="sm"
+          icon="i-lucide-rotate-ccw"
+          label="Failed invites — retry once"
+          to="/invites?status=failed"
         />
       </template>
     </PageHeader>

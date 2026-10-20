@@ -26,6 +26,22 @@ const { data: event, pending: eventPending, error: eventError } = await useAsync
   () => api.get<EventDetail>(`/api/events/${id}`),
 )
 
+/**
+ * AFC-538 finding 3 (owner: CTO MediaTech): live per-user quota read. The
+ * scoped GET /api/invites/quota returns the caller's own limits + rolling
+ * counts (advisory; the POST ledger claim stays authoritative). Falls back
+ * to the schema defaults (10/day, 50/week) when the read fails.
+ */
+const { data: quota } = await useAsyncData(
+  'event-invite-quota',
+  () => api.get<{ data: { daily_limit: number, weekly_limit: number, sent_day: number, sent_week: number, remaining_day: number, remaining_week: number, counts_verified: boolean } }>('/api/invites/quota'),
+)
+const quotaDaily = computed(() => quota.value?.data.daily_limit ?? 10)
+const quotaWeekly = computed(() => quota.value?.data.weekly_limit ?? 50)
+const quotaSentDay = computed(() => quota.value?.data.sent_day ?? null)
+const quotaSentWeek = computed(() => quota.value?.data.sent_week ?? null)
+const quotaStale = computed(() => quota.value ? quota.value.data.counts_verified === false : false)
+
 const inviteeName = ref('')
 const inviteePhone = ref('')
 const relationship = ref('friend')
@@ -303,11 +319,20 @@ async function confirmInvite(): Promise<void> {
           <template #header>
             <h2 class="text-base font-semibold" tabindex="-1">Daily and weekly limits</h2>
           </template>
-          <p class="text-sm text-gray-600 dark:text-gray-300">
-            Each member may send <strong>10 invitations per day and 50 per week</strong>.
-            Above the limit the invitation is held for your branch admin to approve —
-            nothing is sent silently. A number that replied STOP is never messaged again.
-          </p>
+            <p class="text-sm text-gray-600 dark:text-gray-300">
+              <span v-if="quotaSentDay !== null && quotaSentWeek !== null">
+                You have sent <strong class="tabular-nums">{{ quotaSentDay }}</strong> in the last 24h
+                (limit <strong class="tabular-nums">{{ quotaDaily }}</strong>) and
+                <strong class="tabular-nums">{{ quotaSentWeek }}</strong> in the last 7 days
+                (limit <strong class="tabular-nums">{{ quotaWeekly }}</strong>).
+                <span v-if="quotaStale">Counts could not be verified just now — the send-time check still applies.</span>
+              </span>
+              <span v-else>
+                Each member may send <strong>{{ quotaDaily }} invitations per day and {{ quotaWeekly }} per week</strong>.
+              </span>
+              Above the limit the invitation is held for your branch admin to approve —
+              nothing is sent silently. A number that replied STOP is never messaged again.
+            </p>
         </UCard>
       </section>
     </div>
