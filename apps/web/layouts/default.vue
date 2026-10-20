@@ -29,6 +29,53 @@ const sections = computed(() =>
   })).filter((section) => section.items.length > 0),
 )
 
+/**
+ * Collapsible sidebar state (AFC-565). All groups render collapsed on fresh
+ * load; the expanded set persists per browser in localStorage so users are
+ * not forced to re-expand on every navigation. SSR renders collapsed (empty
+ * set) and hydration restores the stored set on mount.
+ */
+const SIDEBAR_EXPANDED_KEY = 'afc:sidebar-expanded-v1'
+const expandedKeys = ref<string[]>([])
+
+function isExpanded(key: string): boolean {
+  return expandedKeys.value.includes(key)
+}
+
+function persistExpanded(): void {
+  try {
+    window.localStorage.setItem(
+      SIDEBAR_EXPANDED_KEY,
+      JSON.stringify(expandedKeys.value),
+    )
+  }
+  catch {
+    // Storage unavailable (private mode, disabled) — sidebar still works,
+    // state just resets to collapsed on next load.
+  }
+}
+
+function toggleSection(key: string): void {
+  expandedKeys.value = isExpanded(key)
+    ? expandedKeys.value.filter((k: string) => k !== key)
+    : [...expandedKeys.value, key]
+  persistExpanded()
+}
+
+onMounted(() => {
+  try {
+    const raw = window.localStorage.getItem(SIDEBAR_EXPANDED_KEY)
+    if (!raw)
+      return
+    const parsed: unknown = JSON.parse(raw)
+    if (Array.isArray(parsed))
+      expandedKeys.value = parsed.filter((k): k is string => typeof k === 'string')
+  }
+  catch {
+    expandedKeys.value = []
+  }
+})
+
 const initials = computed(() => {
   const name = user.value?.firstName?.trim()
   return name ? name.slice(0, 1).toUpperCase() : '?'
@@ -50,12 +97,25 @@ const initials = computed(() => {
 
       <nav aria-label="Portal sections" class="px-3 pb-4 lg:pb-0">
         <div v-for="section in sections" :key="section.key" class="mt-4 first:mt-1">
-          <p
-            class="px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400"
+          <button
+            type="button"
+            :aria-expanded="isExpanded(section.key) ? 'true' : 'false'"
+            :aria-controls="`sidebar-section-${section.key}`"
+            class="flex w-full items-center justify-between rounded-lg px-3 py-1 text-xs font-semibold uppercase tracking-wide text-gray-500 hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:text-gray-400 dark:hover:bg-gray-800"
+            @click="toggleSection(section.key)"
           >
-            {{ section.label }}
-          </p>
-          <ul class="space-y-1">
+            <span>{{ section.label }}</span>
+            <UIcon
+              name="i-lucide-chevron-down"
+              class="size-4 shrink-0 transition-transform"
+              :class="{ 'rotate-180': isExpanded(section.key) }"
+            />
+          </button>
+          <ul
+            v-if="isExpanded(section.key)"
+            :id="`sidebar-section-${section.key}`"
+            class="mt-1 space-y-1"
+          >
             <li v-for="item in section.items" :key="item.to">
               <NuxtLink
                 :to="item.to"
