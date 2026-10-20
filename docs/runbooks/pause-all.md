@@ -1,8 +1,24 @@
-# Pause-all procedure — AFC-486 (US-C5, ADR-0009 decision 4)
+# Pause-all procedure — AFC-486 (US-C5, ADR-0009 decision 4), single action AFC-525
 
 Owner: area admin. Effect window: one scheduler tick. This is the single
 action that stops a bad message reaching the congregation. No deploy, no
 secret, no new service.
+
+## Single action (acceptance)
+
+POST `/api/hardening/pause-all` with `{ "reason": "...", "disable_channels": false }`
+— or press **Pause all now** on `/hardening/status`. One call:
+
+1. pauses every `active` campaign (`status = paused`, `paused_at`, `paused_by`,
+   `pause_reason`);
+2. when `disable_channels: true` (optionally scoped by `channel`), disables
+   the channel(s) (`communication_channels.enabled = false`);
+3. logs `pause_drill` to `hardening_monitor_checks` (ok + ids/counts only);
+4. returns the staff-channel announcement (`hardeningAlert`: ids + counts
+   only, never message content).
+
+Area admin only (`pause_owner_area_admin` otherwise). The manual per-campaign
+/ per-channel steps below remain documented as what this route does.
 
 ## What "paused" means
 

@@ -25,17 +25,29 @@ const period = ref(queryParam('period') ?? 'monthly')
 const dateFrom = ref(queryParam('date_from') ?? '')
 const dateTo = ref(queryParam('date_to') ?? '')
 const sort = ref(queryParam('sort') ?? '-service_date')
+const compare = ref(queryParam('compare_prior_year') === 'true')
 const page = ref(1)
 const limit = 25
 
-watch([branch, zone, blessingType, period, dateFrom, dateTo, sort], () => {
+watch([branch, zone, blessingType, period, dateFrom, dateTo, sort, compare], () => {
   page.value = 1
 })
+
+interface BlessingsCompare {
+  from: string
+  to: string
+  total: number
+  male: number
+  female: number
+  has_data: boolean
+  delta_total: number
+}
 
 interface BlessingsResponse {
   data: BlessingRow[]
   meta: { total: number; page: number; limit: number }
   breakdown: BlessingBreakdownRow[]
+  compare: BlessingsCompare | null
 }
 
 const query = computed(() => ({
@@ -48,6 +60,7 @@ const query = computed(() => ({
   ...(dateFrom.value ? { date_from: dateFrom.value } : {}),
   ...(dateTo.value ? { date_to: dateTo.value } : {}),
   sort: sort.value,
+  ...(compare.value ? { compare_prior_year: 'true' } : {}),
 }))
 
 const { data, pending, error, refresh } = await useAsyncData(
@@ -158,7 +171,11 @@ function formatDate(value: string): string {
       <StatCard
         label="Total"
         :value="grandTotal"
-        :hint="`${total} records in this filter`"
+        :hint="
+          data?.compare?.has_data
+            ? `Prior year: ${data.compare.total} (${data.compare.from} to ${data.compare.to}, Δ ${data.compare.delta_total >= 0 ? '+' : ''}${data.compare.delta_total})`
+            : `${total} records in this filter`
+        "
       />
       <StatCard
         v-for="group in breakdown"
@@ -215,6 +232,9 @@ function formatDate(value: string): string {
           aria-label="Custom range end"
           :disabled="period !== 'custom'"
         />
+        <UFormField label="Compare with prior year">
+          <USwitch v-model="compare" />
+        </UFormField>
       </div>
 
       <UAlert

@@ -19,13 +19,38 @@ function queryParam(): string {
 
 const period = ref(queryParam())
 
+const compare = ref(route.query.compare_prior_year === 'true')
+
+interface FinanceCompare {
+  period: string
+  remittance_total: string | null
+  pending: number
+  branches: number
+  delta_remittance: string | null
+  has_data: boolean
+}
+
+type FinanceSummaryWithCompare = FinanceSummary & { compare: FinanceCompare | null }
+
+const query = computed(() => ({
+  period: period.value,
+  ...(compare.value ? { compare_prior_year: 'true' } : {}),
+}))
+
+const exportHref = computed(() => {
+  const params = new URLSearchParams({ period: period.value })
+  if (compare.value) params.set('compare_prior_year', 'true')
+  return `/api/finance/returns/export.csv?${params.toString()}`
+})
+
 const { data, pending, error } = await useAsyncData(
   'finance-summary',
-  () => api.get<{ data: FinanceSummary }>('/api/finance/summary', { query: { period: period.value } }),
-  { watch: [period] },
+  () => api.get<{ data: FinanceSummaryWithCompare }>('/api/finance/summary', { query: query.value }),
+  { watch: [query] },
 )
 
 const summary = computed(() => data.value?.data ?? null)
+const compareSide = computed(() => data.value?.data.compare ?? null)
 
 function formatMoney(value: string | null, isPending: boolean): string {
   if (value === null || value === undefined || value === '') {
@@ -51,14 +76,18 @@ const statusColor: Record<string, 'success' | 'warning' | 'neutral' | 'info'> = 
       description="The board sheet re-derived from normalized lines: MF + intervention + Faith City = total due. Area and savings are retained, never remitted."
     >
       <template #actions>
-        <div class="flex gap-2">
+        <div class="flex items-end gap-2">
           <UInput v-model="period" type="month" aria-label="Summary period" />
+          <UFormField label="Compare with prior year">
+            <USwitch v-model="compare" />
+          </UFormField>
           <UButton
             label="Export CSV"
             icon="i-lucide-download"
             color="neutral"
             variant="outline"
-            :to="{ path: '/api/finance/returns/export.csv', query: { period } }"
+            :to="exportHref"
+            external
           />
         </div>
       </template>
@@ -92,6 +121,11 @@ const statusColor: Record<string, 'success' | 'warning' | 'neutral' | 'info'> = 
         <StatCard
           label="Total remittance due"
           :value="formatMoney(summary.remittance_total, summary.pending > 0)"
+          :hint="
+            compareSide?.has_data
+              ? `Prior year (${compareSide.period}): ${formatMoney(compareSide.remittance_total, false)}${compareSide.delta_remittance !== null ? ` · Δ ₦${Number(compareSide.delta_remittance).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''}`
+              : undefined
+          "
         />
         <StatCard
           label="Formula versions"

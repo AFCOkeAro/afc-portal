@@ -24,6 +24,9 @@ const branch = ref(queryParam('branch') ?? 'all')
 const membership = ref(queryParam('membership_status') ?? 'all')
 const department = ref(queryParam('department') ?? 'all')
 const status = ref(queryParam('status') ?? 'active')
+const compare = ref(queryParam('compare_prior_year') === 'true')
+const groupBy = ref<'branch' | 'zone'>(queryParam('group_by') === 'zone' ? 'zone' : 'branch')
+const dataYear = ref(queryParam('data_year') ?? String(new Date().getFullYear() - 1))
 const page = ref(1)
 const limit = 25
 
@@ -37,6 +40,54 @@ watch(searchInput, (value: string) => {
 
 watch([branch, membership, department, status, search], () => {
   page.value = 1
+})
+
+interface PeopleCompareRow {
+  group: string
+  group_name: string | null
+  current: number
+  prior: number
+  delta: number
+}
+
+interface PeopleCompareResponse {
+  data: {
+    group_by: 'branch' | 'zone'
+    data_year: number
+    rows: PeopleCompareRow[]
+    totals: { current: number; prior: number }
+    has_data: boolean
+  }
+}
+
+const compareQuery = computed(() => ({
+  group_by: groupBy.value,
+  data_year: dataYear.value,
+  ...(compare.value ? { compare_prior_year: 'true' } : {}),
+}))
+
+const { data: compareData } = await useAsyncData(
+  'people-compare',
+  () => {
+    if (!compare.value) return Promise.resolve(null)
+    const year = Number(dataYear.value)
+    if (!Number.isInteger(year)) return Promise.resolve(null)
+    return api.get<PeopleCompareResponse>('/api/people/compare', {
+      query: { group_by: groupBy.value, data_year: dataYear.value },
+    })
+  },
+  { watch: [compare, compareQuery] },
+)
+
+const compareRows = computed(() => compareData.value?.data.rows ?? [])
+const compareTotals = computed(() => compareData.value?.data.totals ?? null)
+const compareHasData = computed(() => compareData.value?.data.has_data ?? false)
+const compareCsvHref = computed(() => {
+  const params = new URLSearchParams({
+    group_by: groupBy.value,
+    data_year: dataYear.value,
+  })
+  return `/api/people/compare.csv?${params.toString()}`
 })
 
 const query = computed(() => ({
@@ -149,6 +200,64 @@ function fullName(person: PersonRow): string {
         <USelect v-model="membership" :items="membershipOptions" class="w-full" />
         <USelect v-model="department" :items="departmentOptions" class="w-full" />
         <USelect v-model="status" :items="statusOptions" class="w-full" />
+        <UFormField label="Compare with prior year">
+          <USwitch v-model="compare" />
+        </UFormField>
+        <UFormField v-if="compare" label="Group by">
+          <USelect
+            v-model="groupBy"
+            :items="[
+              { label: 'By branch', value: 'branch' },
+              { label: 'By zone', value: 'zone' },
+            ]"
+            class="w-full"
+          />
+        </UFormField>
+        <UFormField v-if="compare" label="Prior-year snapshot (YYYY)">
+          <UInput v-model="dataYear" inputmode="numeric" class="w-full" aria-label="Prior-year snapshot" />
+        </UFormField>
+      </div>
+
+      <div v-if="compare" class="mt-4">
+        <div class="flex items-center justify-between">
+          <h2 class="text-base font-semibold">
+            Prior-year compare · {{ compareTotals ? `${compareTotals.current} now vs ${compareTotals.prior} in ${dataYear}` : `snapshot ${dataYear}` }}
+          </h2>
+          <UButton
+            :to="compareCsvHref"
+            external
+            color="neutral"
+            variant="outline"
+            size="sm"
+            icon="i-lucide-download"
+            label="Export compare CSV"
+          />
+        </div>
+        <p v-if="compareData && !compareHasData" class="mt-2 text-sm text-gray-500">
+          No prior-year snapshot for {{ dataYear }} yet — current headcounts only.
+        </p>
+        <div v-else-if="compareRows.length > 0" class="mt-2 overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
+            <thead>
+              <tr class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                <th class="px-3 py-2 font-medium">Group</th>
+                <th class="px-3 py-2 font-medium">Current</th>
+                <th class="px-3 py-2 font-medium">Prior ({{ dataYear }})</th>
+                <th class="px-3 py-2 font-medium">Delta</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+              <tr v-for="row in compareRows" :key="row.group">
+                <td class="px-3 py-2 font-medium">{{ row.group_name ?? row.group }}</td>
+                <td class="px-3 py-2 tabular-nums">{{ row.current }}</td>
+                <td class="px-3 py-2 tabular-nums">{{ row.prior }}</td>
+                <td class="px-3 py-2 font-semibold tabular-nums">
+                  {{ row.delta >= 0 ? `+${row.delta}` : row.delta }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <UAlert

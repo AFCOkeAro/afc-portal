@@ -1,5 +1,5 @@
 import { periodSchema } from '@afc/shared/weca'
-import { collectFinanceSummary } from '../../../utils/weca-summary'
+import { collectFinanceCompare, collectFinanceSummary } from '../../../utils/weca-summary'
 import { csvResponse, getPortalScope, requireCan } from '../../../utils/portal'
 
 /**
@@ -9,6 +9,10 @@ import { csvResponse, getPortalScope, requireCan } from '../../../utils/portal'
  * (§11.1); otherwise the cell reads `pending` for a formula-pending line or
  * `restricted` for a line the caller may not see amounts of. Nothing is
  * zero-filled: a pending line exports no figures at all.
+ *
+ * US-A4 compare (AFC-485): `compare_prior_year=true` appends the prior-year
+ * side (same month one year back) with a remittance delta, mirroring the
+ * blessings export.
  */
 const MAX_EXPORT_ROWS = 20000
 
@@ -69,6 +73,17 @@ export default defineEventHandler(async (event): Promise<string> => {
       ]
     }),
   ]
+
+  const compare = await collectFinanceCompare(event, scope, period, summary)
+  if (compare) {
+    rows.push(
+      [],
+      ['section', 'period', 'branches', 'pending', 'remittance_total', 'delta_remittance'],
+      ['current', summary.period, String(summary.branches), String(summary.pending), summary.remittance_total ?? '', ''],
+      ['prior', compare.period, String(compare.branches), String(compare.pending), compare.remittance_total ?? '', ''],
+      ['delta', '', '', '', '', compare.delta_remittance ?? ''],
+    )
+  }
 
   return csvResponse(event, `weca-returns-${period}.csv`, rows)
 })
