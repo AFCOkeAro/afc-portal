@@ -45,7 +45,9 @@ export interface WecaReturnRow {
   total_due: string | null
   generated_at: string | null
   submitted_at: string | null
+  submitted_by: string | null
   confirmed_at: string | null
+  confirmed_by: string | null
 }
 
 /**
