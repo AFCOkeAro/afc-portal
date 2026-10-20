@@ -9,6 +9,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./role-matrix": "./src/role-matrix.ts",
+    "./weca": "./src/schemas/weca.ts",
     "./package.json": "./package.json"
   },
   "files": [
