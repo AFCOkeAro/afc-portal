@@ -51,13 +51,18 @@ const cards = computed(() =>
     />
 
     <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      <StatCard
+      <NuxtLink
         v-for="card in cards"
         :key="card.to"
-        :label="card.label"
-        value="—"
-        :hint="`Not wired yet · ${card.label.toLowerCase()} collection`"
-      />
+        :to="card.to"
+        class="block rounded-lg transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500"
+      >
+        <StatCard
+          :label="card.label"
+          value="—"
+          :hint="`Not wired yet · ${card.label.toLowerCase()} collection`"
+        />
+      </NuxtLink>
     </div>
 
     <div class="mt-6 grid gap-6 xl:grid-cols-2">
