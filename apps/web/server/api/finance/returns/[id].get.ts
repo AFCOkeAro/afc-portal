@@ -25,7 +25,9 @@ const RETURN_FIELDS = [
   'total_due',
   'generated_at',
   'submitted_at',
+  'submitted_by',
   'confirmed_at',
+  'confirmed_by',
 ]
 
 /** GET /api/finance/returns/:id — one return with its lifecycle state. */

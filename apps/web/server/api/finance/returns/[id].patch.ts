@@ -26,13 +26,17 @@ const FABRICATED = [
  * PATCH /api/finance/returns/:id — submit or confirm a computed return.
  *
  * Status-only. `calculated → submitted → confirmed`, stamping
- * `submitted_at` / `confirmed_at` as the trail (Directus activity holds the
- * actor, per prd-expansion line 466). Two refusals:
+ * `submitted_at` / `submitted_by` and `confirmed_at` / `confirmed_by` as the
+ * first-class actor trail (AFC-544; the Directus activity log holds the same
+ * transition with its timestamp as backstop). The actor id comes from the
+ * server session, never the client body -- same source as the branch-records
+ * route. Two refusals:
  * - Submitting a `formula_pending` return is a 409: there is nothing computed
  *   to submit yet, only "pending board formula".
  * - Any body naming a computed field, the total, the version, or the raw
  *   status is a 403: the migration grant already withholds those columns
- *   from the app, and this route refuses to be the way around it.
+ *   from the app, and this route refuses to be the way around it. A body
+ *   naming an actor field is not status-only, so it is a 400.
  */
 export default defineEventHandler(async (event) => {
   const scope = await getPortalScope(event)
@@ -93,6 +97,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const stampField = next === 'submitted' ? 'submitted_at' : 'confirmed_at'
+  const actorField = next === 'submitted' ? 'submitted_by' : 'confirmed_by'
   const updated = await updateItem<Record<string, unknown>>(
     event,
     scope,
@@ -101,6 +106,7 @@ export default defineEventHandler(async (event) => {
     {
       computation_status: next,
       [stampField]: new Date().toISOString(),
+      [actorField]: scope.session.user.id,
     },
   )
   return { data: { ...updated, id: String((updated as Record<string, unknown>).id) } }
