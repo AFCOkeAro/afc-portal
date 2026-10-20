@@ -55,6 +55,38 @@ export const NAVIGATION: readonly NavigationItem[] = [
     requires: ['events', 'read'],
     inSidebar: true,
   },
+  // Slice 4 UI (AFC-527, wireframes v3 screens 8-12). Capability-gated, no
+  // role names (data-model §13 rule 7). The member entry resolves for staff
+  // today; the member role holds no matrix grant yet (track d, OTP-gated),
+  // so it resolves for members once the matrix gains the member row.
+  {
+    label: 'Invitations',
+    to: '/invites',
+    icon: 'i-lucide-mail-plus',
+    requires: ['events', 'read'],
+    inSidebar: true,
+  },
+  {
+    label: 'My invitations',
+    to: '/me/invitations',
+    icon: 'i-lucide-mail-open',
+    requires: ['events', 'read'],
+    inSidebar: true,
+  },
+  {
+    label: 'Campaigns',
+    to: '/campaigns',
+    icon: 'i-lucide-workflow',
+    requires: ['communications', 'read'],
+    inSidebar: true,
+  },
+  {
+    label: 'Delivery log',
+    to: '/communications',
+    icon: 'i-lucide-scroll-text',
+    requires: ['communications', 'read'],
+    inSidebar: true,
+  },
   {
     label: 'Attendance',
     to: '/attendance',
