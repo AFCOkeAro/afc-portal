@@ -112,6 +112,9 @@ export default defineEventHandler(async (event) => {
         guardian: undefined,
         consent_data: false,
         consent_media: false,
+        // AFC-476 added §4.2 fields to PersonForm; a converted visitor is
+        // not known to be an entrepreneur (toPersonPayload defaults false).
+        is_entrepreneur: false,
       }),
       is_minor: false,
       status: 'active',

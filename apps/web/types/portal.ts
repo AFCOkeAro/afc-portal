@@ -4,6 +4,8 @@ import type {
   Blessing,
   BlessingEvent,
   Branch,
+  Celebration,
+  CelebrationEvent,
   Department,
   EventRecord,
   EventRegistration,
@@ -14,6 +16,8 @@ import type {
   SundayServiceEvent,
   Visitor,
   WelfareCase,
+  YouthProfile,
+  YouthProfileEvent,
 } from '@afc/shared'
 
 export interface BranchSummary {
@@ -173,6 +177,31 @@ export interface BlessingBreakdownRow {
 
 export interface BlessingDetail extends BlessingRow {
   events: BlessingEvent[]
+}
+
+/** Youth directory row (AFC-476): the shared YouthProfile plus resolved names. */
+export interface YouthRow extends YouthProfile {
+  person_name: string | null
+  branch_name: string | null
+}
+
+export interface YouthDetail extends YouthRow {
+  person_is_minor: boolean | null
+  events: YouthProfileEvent[]
+  previous_branches: Array<Record<string, unknown>>
+  milestones: Array<Record<string, unknown>>
+}
+
+/** Celebrations feed row (AFC-476): the shared Celebration plus resolved names. */
+export interface CelebrationRow extends Celebration {
+  person_name: string | null
+  person_is_minor: boolean | null
+  branch_name: string | null
+  zone_name: string | null
+}
+
+export interface CelebrationDetail extends CelebrationRow {
+  events: CelebrationEvent[]
 }
 
 export interface AttendanceDetail extends AttendanceSessionRow {

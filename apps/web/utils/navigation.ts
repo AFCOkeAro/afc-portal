@@ -76,4 +76,18 @@ export const NAVIGATION: readonly NavigationItem[] = [
     requires: ['welfare_cases', 'read'],
     inSidebar: true,
   },
+  {
+    label: 'Youth',
+    to: '/youth',
+    icon: 'i-lucide-sparkles',
+    requires: ['youth_profiles', 'read'],
+    inSidebar: true,
+  },
+  {
+    label: 'Celebrations',
+    to: '/celebrations',
+    icon: 'i-lucide-party-popper',
+    requires: ['celebrations', 'read'],
+    inSidebar: true,
+  },
 ]

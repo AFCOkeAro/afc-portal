@@ -408,6 +408,66 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     volunteer: [R, 'own_branch'],
     none: [NONE, 'none'],
   },
+  // Youth profiles + celebrations (AFC-476, data-model-expansion §11):
+  // youth_profiles CRUD / CRUD / CRUD (zone) / CRUD (own) / CRU (youth dept)
+  // / R / R (own); celebrations CRUD / CRUD / CRUD (zone) / CRUD (own) /
+  // CRU (dept) / R / R (own) / R (public ones). `zone_admin` and the
+  // household role are not StaffRoles, so the zone column's grant and the
+  // household R (own) cell live in the Directus policy only; the cells
+  // below give the closest portal-role reading and never invent a wider
+  // grant. The audit trails are append-only in spirit (no D for any role --
+  // corrections are new rows). History tables follow the youth profile's
+  // grants: a reader of the profile reads its history.
+  [COLLECTIONS.youthProfiles]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [ALL, 'all'],
+    branch_admin: [ALL, 'own_branch', 'CRUD (own)'],
+    department_leader: [CRU, 'own_department', 'CRU (youth dept)'],
+    volunteer: [R, 'own_branch'],
+    none: [NONE, 'none'],
+  },
+  [COLLECTIONS.youthProfileEvents]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [R, 'all'],
+    branch_admin: [R, 'own_branch'],
+    department_leader: [R, 'assigned_departments', 'assigned'],
+    volunteer: [NONE, 'none'],
+    none: [NONE, 'none'],
+  },
+  [COLLECTIONS.celebrations]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [ALL, 'all'],
+    branch_admin: [ALL, 'own_branch', 'CRUD (own)'],
+    department_leader: [CRU, 'own_department', 'CRU (dept)'],
+    volunteer: [R, 'own_branch'],
+    // "R (public ones)": the public role reads celebrations whose visibility
+    // is public. It is the only read grant here, mirroring events.
+    none: [R, 'public_only'],
+  },
+  [COLLECTIONS.celebrationEvents]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [R, 'all'],
+    branch_admin: [R, 'own_branch'],
+    department_leader: [R, 'assigned_departments', 'assigned'],
+    volunteer: [NONE, 'none'],
+    none: [NONE, 'none'],
+  },
+  [COLLECTIONS.personPreviousBranches]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [ALL, 'all'],
+    branch_admin: [ALL, 'own_branch', 'CRUD (own)'],
+    department_leader: [CRU, 'own_department', 'CRU (youth dept)'],
+    volunteer: [R, 'own_branch'],
+    none: [NONE, 'none'],
+  },
+  [COLLECTIONS.personMilestones]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [ALL, 'all'],
+    branch_admin: [ALL, 'own_branch', 'CRUD (own)'],
+    department_leader: [CRU, 'own_department', 'CRU (youth dept)'],
+    volunteer: [R, 'own_branch'],
+    none: [NONE, 'none'],
+  },
 }
 
 /**
@@ -426,8 +486,28 @@ const FIELD_RESTRICTIONS: Readonly<
 > = {
   [COLLECTIONS.people]: {
     fields: ['safeguarding_flag', 'notes', 'date_of_birth'],
+    fields: ['safeguarding_flag', 'notes', 'date_of_birth', 'marriage_date'],
     roles: ['super_admin', 'area_admin', 'branch_admin'],
     note: 'designated safeguarding lead is not a staff_role; excluded',
+    note: 'designated safeguarding lead is not a staff_role; excluded. marriage_date joins the restricted set per expansion §11.1 (AFC-476).',
+  },
+  // Youth PII (AFC-476, least-privilege lens): a volunteer sees that a youth
+  // profile exists and its status, never the education/employment detail;
+  // the youth leader (department_leader) reads those fields for youth in
+  // their scope. The Directus policy withholds them record-level; this
+  // table is what the portal routes strip (visibleFields/stripHidden).
+  [COLLECTIONS.youthProfiles]: {
+    fields: [
+      'institution',
+      'course',
+      'professional_status',
+      'employment_status',
+      'education_level',
+      'study_level',
+      'youth_leadership_role',
+    ],
+    roles: ['super_admin', 'area_admin', 'branch_admin', 'department_leader'],
+    note: 'youth detail: youth leader reads own-scope youth (record-level, enforced in policy); volunteers and public never see PII',
   },
   [COLLECTIONS.eventRegistrations]: {
     fields: [

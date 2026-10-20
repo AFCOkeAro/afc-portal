@@ -79,6 +79,21 @@ export const COLLECTIONS = {
   sundaySchoolClasses: 'sunday_school_classes',
   avsCentres: 'avs_centres',
   campusInstitutions: 'campus_institutions',
+   * Youth profiles + celebrations (AFC-476, data-model-expansion §§6.1-6.2).
+   * `youthProfileEvents` / `celebrationEvents` are the explicit audit trails
+   * (created/updated/note; created/approved/published/archived/note),
+   * following the welfare_case_events precedent.
+   */
+  youthProfiles: 'youth_profiles',
+  youthProfileEvents: 'youth_profile_events',
+  celebrations: 'celebrations',
+  celebrationEvents: 'celebration_events',
+  /**
+   * Youth-relevant history (data-model-expansion §§4.3-4.4, AFC-476).
+   * Created by migration 0012 where no earlier migration owned them.
+   */
+  personPreviousBranches: 'person_previous_branches',
+  personMilestones: 'person_milestones',
 } as const
 
 export type CollectionName = (typeof COLLECTIONS)[keyof typeof COLLECTIONS]
@@ -97,6 +112,8 @@ export const NAVIGABLE_COLLECTIONS = [
   COLLECTIONS.attendanceSessions,
   COLLECTIONS.visitors,
   COLLECTIONS.welfareCases,
+  COLLECTIONS.youthProfiles,
+  COLLECTIONS.celebrations,
 ] as const satisfies readonly CollectionName[]
 
 export type NavigableCollection = (typeof NAVIGABLE_COLLECTIONS)[number]

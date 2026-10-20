@@ -11,6 +11,7 @@
  */
 import { z } from 'zod'
 import { dateSchema, optionalNote, optionalText, phoneSchema } from './common'
+import { personExtensionSchema } from './youth'
 
 const GENDERS = ['male', 'female', 'unspecified'] as const
 
@@ -56,6 +57,24 @@ export const personFormSchema = z.object({
   guardian: optionalText(36),
   consent_data: z.boolean().default(false),
   consent_media: z.boolean().default(false),
+  /**
+   * §4.2 additions (AFC-476, data-model-expansion §4.2). All optional, so
+   * rows written before the youth slice still parse. `status` is absent by
+   * design: the (active, archived) closure is a retention control (suite 63)
+   * and the expansion is withheld pending a CTO decision.
+   */
+  marital_status: personExtensionSchema.shape.marital_status,
+  marriage_date: personExtensionSchema.shape.marriage_date,
+  occupation: personExtensionSchema.shape.occupation,
+  employment_status: personExtensionSchema.shape.employment_status,
+  education_level: personExtensionSchema.shape.education_level,
+  institution: personExtensionSchema.shape.institution,
+  is_entrepreneur: z.boolean().default(false),
+  professional_status: personExtensionSchema.shape.professional_status,
+  is_youth: personExtensionSchema.shape.is_youth,
+  locality: personExtensionSchema.shape.locality,
+  sub_location: personExtensionSchema.shape.sub_location,
+  person_type: personExtensionSchema.shape.person_type,
 })
 export type PersonForm = z.infer<typeof personFormSchema>
 export type PersonFormInput = z.input<typeof personFormSchema>
@@ -118,5 +137,17 @@ export function toPersonPayload(form: PersonForm): Record<string, unknown> {
     consent_data: form.consent_data,
     consent_media: form.consent_media,
     consent_signed_at: form.consent_data ? new Date().toISOString() : null,
+    marital_status: form.marital_status ?? null,
+    marriage_date: form.marriage_date ?? null,
+    occupation: form.occupation ?? null,
+    employment_status: form.employment_status ?? null,
+    education_level: form.education_level ?? null,
+    institution: form.institution ?? null,
+    is_entrepreneur: form.is_entrepreneur ?? false,
+    professional_status: form.professional_status ?? null,
+    is_youth: form.is_youth ?? null,
+    locality: form.locality ?? null,
+    sub_location: form.sub_location ?? null,
+    person_type: form.person_type ?? null,
   }
 }
