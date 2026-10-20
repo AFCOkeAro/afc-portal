@@ -12,6 +12,7 @@ import type {
   Household,
   Person,
   ServiceAssignment,
+  SundaySchoolClass,
   SundayService,
   SundayServiceEvent,
   Visitor,
@@ -285,6 +286,40 @@ export interface DashboardAttendancePoint {
   branch_name: string | null
 }
 
+/** Sunday School class row (AFC-577): the shared class plus the resolved branch name. */
+export interface SundaySchoolClassRow extends SundaySchoolClass {
+  branch_name: string | null
+}
+
+/** Recent Sunday School attendance session (AFC-577): sessions are the only
+ * dated Sunday School records the model holds, so the widget shows recent
+ * sessions rather than a schedule that does not exist. */
+export interface DashboardSundaySession {
+  id: string
+  session_date: string
+  total: number
+  branch_name: string | null
+}
+
+/**
+ * One upcoming greeting (AFC-577). Birthday rows come from month/day matches
+ * on people.date_of_birth; celebration rows from the celebrations feed. The
+ * payload carries the occurrence date (YYYY-MM-DD) and a display name only --
+ * never a full date of birth, birth year, or age (people DOB is a §10.1
+ * restricted read).
+ */
+export interface DashboardCelebrationItem {
+  kind: 'celebration' | 'birthday'
+  id: string
+  name: string
+  label: string
+  /** Occurrence inside the next-30-day window (YYYY-MM-DD). */
+  date: string
+  branch_name: string | null
+  person_is_minor: boolean | null
+  href: string
+}
+
 export interface DashboardData {
   scope: {
     isArea: boolean
@@ -299,12 +334,40 @@ export interface DashboardData {
     attendancePrior: number
     openFollowUps: number
     openWelfare: number
+    households: number
+    unlinkedPeople: number
+    sundaySchoolClasses: number
+    sundaySchoolEnrolment: number
+    upcomingCelebrations: number
   }
   attendanceTrend: DashboardAttendancePoint[]
   upcomingEvents: EventRow[]
   followUps: VisitorRow[]
   welfareCases: WelfareCaseRow[]
   branches: BranchSummary[]
+  /** Family summary (AFC-577): folds the shared AFC-576 collector, so the
+   * figures match GET /api/people/summary exactly. Zeroed with
+   * households_visible false when the caller may not read households. */
+  family: {
+    households: number
+    avg_members: number
+    unlinked_people: number
+    households_visible: boolean
+  }
+  /** Sunday School summary (AFC-577): class count + total enrolment from
+   * sunday_school_classes plus recent sunday_school sessions. Visible only
+   * to roles with the sunday_school_classes read grant. */
+  sundaySchool: {
+    classes: number
+    enrolment: number
+    visible: boolean
+  }
+  sundaySchoolClasses: SundaySchoolClassRow[]
+  sundaySchoolSessions: DashboardSundaySession[]
+  /** Next-30-day greetings (AFC-577): staff-only, same scoping as visitor
+   * follow-ups. Empty unless the caller holds both the celebrations and the
+   * visitors read grants. */
+  upcomingCelebrations: DashboardCelebrationItem[]
 }
 
 export interface Paginated<T> {

@@ -24,6 +24,17 @@ const canAttendance = computed(() =>
 )
 const canEvents = computed(() => permissions.can(COLLECTIONS.events, 'read'))
 const canVisitors = computed(() => permissions.can(COLLECTIONS.visitors, 'read'))
+const canHouseholds = computed(() => permissions.can(COLLECTIONS.households, 'read'))
+const canSundaySchool = computed(() =>
+  permissions.can(COLLECTIONS.sundaySchoolClasses, 'read'),
+)
+/**
+ * Birthday/celebration visibility (AFC-577): staff-only, same scoping as
+ * visitor follow-ups. The section reuses the follow-ups grant (visitors
+ * read) rather than the celebrations grant so a volunteer -- who may read
+ * celebrations but never follow-ups -- sees no birthday content at all.
+ */
+const canCelebrations = computed(() => canVisitors.value)
 
 const sections = computed(() => [
   { id: 'overview', label: 'Overview' },
@@ -31,6 +42,9 @@ const sections = computed(() => [
   ...(canEvents.value ? [{ id: 'events', label: 'Events' }] : []),
   ...(canVisitors.value ? [{ id: 'follow-ups', label: 'Follow-ups' }] : []),
   ...(canWelfare.value ? [{ id: 'welfare-with-scope', label: 'Welfare' }] : []),
+  ...(canHouseholds.value ? [{ id: 'families', label: 'Families' }] : []),
+  ...(canSundaySchool.value ? [{ id: 'sunday-school', label: 'Sunday school' }] : []),
+  ...(canCelebrations.value ? [{ id: 'celebrations', label: 'Celebrations' }] : []),
 ])
 
 const attendanceChange = computed(() => {
@@ -156,6 +170,39 @@ function formatDate(value: string | null | undefined): string {
               label="Branches"
               :value="data.scope.branchCount"
               hint="Active branches in scope"
+            />
+          </NuxtLink>
+          <NuxtLink
+            v-if="canHouseholds"
+            to="/households"
+            class="block transition hover:-translate-y-0.5"
+          >
+            <StatCard
+              label="Households"
+              :value="data.metrics.households"
+              :hint="`Avg ${data.family.avg_members} members`"
+            />
+          </NuxtLink>
+          <NuxtLink
+            v-if="canSundaySchool"
+            to="/attendance"
+            class="block transition hover:-translate-y-0.5"
+          >
+            <StatCard
+              label="Sunday school"
+              :value="data.metrics.sundaySchoolClasses"
+              :hint="`${data.metrics.sundaySchoolEnrolment} enrolled`"
+            />
+          </NuxtLink>
+          <NuxtLink
+            v-if="canCelebrations"
+            to="/celebrations"
+            class="block transition hover:-translate-y-0.5"
+          >
+            <StatCard
+              label="Celebrations · 30 days"
+              :value="data.metrics.upcomingCelebrations"
+              hint="Birthdays and anniversaries"
             />
           </NuxtLink>
         </div>
@@ -318,6 +365,182 @@ function formatDate(value: string | null | undefined): string {
                 <UBadge color="warning" variant="subtle">{{
                   (welfareCase.status ?? 'open').replace(/_/g, ' ')
                 }}</UBadge>
+              </NuxtLink>
+            </li>
+          </ul>
+        </UCard>
+      </div>
+
+      <div v-if="canHouseholds || canSundaySchool" class="mt-6 grid gap-6 xl:grid-cols-2">
+        <UCard v-if="canHouseholds" id="families" class="scroll-mt-28">
+          <template #header>
+            <div class="flex items-center justify-between">
+              <h2 class="text-base font-semibold" tabindex="-1">Families</h2>
+              <UButton
+                to="/households"
+                color="neutral"
+                variant="ghost"
+                size="xs"
+                label="All"
+              />
+            </div>
+          </template>
+          <dl class="grid grid-cols-3 gap-2 text-center">
+            <div class="rounded-lg bg-gray-50 p-3 dark:bg-gray-900">
+              <dt class="text-xs text-gray-500 dark:text-gray-400">Households</dt>
+              <dd class="text-xl font-semibold tabular-nums">
+                {{ data.family.households }}
+              </dd>
+            </div>
+            <div class="rounded-lg bg-gray-50 p-3 dark:bg-gray-900">
+              <dt class="text-xs text-gray-500 dark:text-gray-400">Avg members</dt>
+              <dd class="text-xl font-semibold tabular-nums">
+                {{ data.family.avg_members }}
+              </dd>
+            </div>
+            <div class="rounded-lg bg-gray-50 p-3 dark:bg-gray-900">
+              <dt class="text-xs text-gray-500 dark:text-gray-400">Unlinked</dt>
+              <dd class="text-xl font-semibold tabular-nums">
+                {{ data.family.unlinked_people }}
+              </dd>
+            </div>
+          </dl>
+          <div class="mt-3 flex flex-wrap gap-2">
+            <UButton
+              to="/households"
+              color="neutral"
+              variant="outline"
+              size="xs"
+              label="Browse households"
+            />
+            <UButton
+              to="/people?household=unlinked"
+              color="neutral"
+              variant="outline"
+              size="xs"
+              label="Unlinked people"
+            />
+          </div>
+          <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">
+            Same figures as the people summary — scoped to your branches.
+          </p>
+        </UCard>
+
+        <UCard v-if="canSundaySchool" id="sunday-school" class="scroll-mt-28">
+          <template #header>
+            <div class="flex items-center justify-between">
+              <h2 class="text-base font-semibold" tabindex="-1">Sunday school</h2>
+              <UButton
+                to="/attendance"
+                color="neutral"
+                variant="ghost"
+                size="xs"
+                label="Sessions"
+              />
+            </div>
+          </template>
+          <dl class="grid grid-cols-2 gap-2 text-center">
+            <div class="rounded-lg bg-gray-50 p-3 dark:bg-gray-900">
+              <dt class="text-xs text-gray-500 dark:text-gray-400">Classes</dt>
+              <dd class="text-xl font-semibold tabular-nums">
+                {{ data.sundaySchool.classes }}
+              </dd>
+            </div>
+            <div class="rounded-lg bg-gray-50 p-3 dark:bg-gray-900">
+              <dt class="text-xs text-gray-500 dark:text-gray-400">Enrolled</dt>
+              <dd class="text-xl font-semibold tabular-nums">
+                {{ data.sundaySchool.enrolment }}
+              </dd>
+            </div>
+          </dl>
+          <EmptyState
+            v-if="
+              data.sundaySchoolClasses.length === 0 &&
+              data.sundaySchoolSessions.length === 0
+            "
+            title="No classes yet"
+            description="No active Sunday School classes in scope."
+          />
+          <ul v-else-if="data.sundaySchoolClasses.length > 0" class="mt-3 space-y-2">
+            <li
+              v-for="sundayClass in data.sundaySchoolClasses"
+              :key="sundayClass.id"
+              class="flex items-center justify-between gap-3 rounded-lg p-2 hover:bg-gray-50 dark:hover:bg-gray-900"
+            >
+              <div>
+                <p class="text-sm font-medium">{{ sundayClass.class_name }}</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400">
+                  {{ sundayClass.branch_name || 'Area class' }}
+                </p>
+              </div>
+              <span class="text-xs tabular-nums text-gray-500 dark:text-gray-400">
+                {{ sundayClass.students_count ?? 0 }} enrolled
+              </span>
+            </li>
+          </ul>
+          <ul
+            v-if="data.sundaySchoolSessions.length > 0"
+            class="mt-3 divide-y divide-gray-100 dark:divide-gray-800"
+          >
+            <li
+              v-for="session in data.sundaySchoolSessions"
+              :key="session.id"
+              class="py-2 first:pt-0 last:pb-0"
+            >
+              <NuxtLink
+                :to="`/attendance/${session.id}`"
+                class="flex items-center justify-between gap-3"
+              >
+                <p class="text-xs text-gray-500 dark:text-gray-400">
+                  {{ formatDate(session.session_date) }} ·
+                  {{ session.branch_name || 'No branch' }}
+                </p>
+                <span class="text-xs tabular-nums">{{ session.total }}</span>
+              </NuxtLink>
+            </li>
+          </ul>
+        </UCard>
+      </div>
+
+      <div v-if="canCelebrations" class="mt-6">
+        <UCard id="celebrations" class="scroll-mt-28">
+          <template #header>
+            <div class="flex items-center justify-between">
+              <h2 class="text-base font-semibold" tabindex="-1">
+                Upcoming birthdays &amp; anniversaries
+              </h2>
+              <UButton
+                to="/celebrations"
+                color="neutral"
+                variant="ghost"
+                size="xs"
+                label="All"
+              />
+            </div>
+          </template>
+          <EmptyState
+            v-if="data.upcomingCelebrations.length === 0"
+            title="Nothing in the next 30 days"
+            description="No birthdays or anniversaries fall inside the window."
+          />
+          <ul v-else class="divide-y divide-gray-100 dark:divide-gray-800">
+            <li
+              v-for="item in data.upcomingCelebrations"
+              :key="`${item.kind}-${item.id}-${item.date}`"
+              class="py-3 first:pt-0 last:pb-0"
+            >
+              <NuxtLink :to="item.href" class="flex items-start justify-between gap-3">
+                <div>
+                  <p class="text-sm font-medium">{{ item.name }}</p>
+                  <p class="text-xs text-gray-500 dark:text-gray-400">
+                    {{ item.label }} · {{ item.branch_name || 'No branch' }}
+                  </p>
+                </div>
+                <span
+                  class="whitespace-nowrap text-xs tabular-nums text-gray-500 dark:text-gray-400"
+                >
+                  {{ formatDate(item.date) }}
+                </span>
               </NuxtLink>
             </li>
           </ul>
