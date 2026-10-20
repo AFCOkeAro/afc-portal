@@ -6,7 +6,7 @@
 --   branch_financial_records -- captured treasurer inputs (audited per US-F1).
 --   weca_returns             -- computed returns.
 --   weca_return_formulas     -- the board-ratified formula config (re-seedable
---                               from ADR-0007, but the row history is gone).
+--                               from ADR-0008, but the row history is gone).
 --   weca_compute_return()    -- the R1-R4 arithmetic.
 --
 -- ORDER: refuse first (while any captured row exists), then function, then
@@ -39,7 +39,7 @@ BEGIN
   END IF;
 
   RAISE NOTICE
-    'weca rollback proceeding: no captured financial records, no computed returns. The weca-2026-01 formula row is still being destroyed -- re-seed it from ADR-0007 if the feature comes back.';
+    'weca rollback proceeding: no captured financial records, no computed returns. The weca-2026-01 formula row is still being destroyed -- re-seed it from ADR-0008 if the feature comes back.';
 END
 $$;
 

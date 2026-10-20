@@ -1,10 +1,10 @@
 -- tests/db/68_weca_returns.sql
 --
--- AFC-451 / ADR-0007. THE TEST THAT PROVES THE FORMULA PROMISE.
+-- AFC-451 / ADR-0008. THE TEST THAT PROVES THE FORMULA PROMISE.
 --
 -- The figures below are not invented fixtures: they are the board's own
 -- January 2026 Lagos North rows, verified against the workbook at the XML
--- level (formula cells, not display text) and ratified in ADR-0007. A test
+-- level (formula cells, not display text) and ratified in ADR-0008. A test
 -- that "computes" different numbers from the same income proves nothing
 -- unless the numbers it must produce are the board's.
 --

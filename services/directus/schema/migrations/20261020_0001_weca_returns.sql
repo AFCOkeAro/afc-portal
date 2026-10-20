@@ -1,12 +1,12 @@
 -- 20261020_0001_weca_returns.sql
 --
 -- WECA returns capture + formula v1 computation. AFC-451, spec authority
--- docs/adr/ADR-0007-weca-returns-formula-v1.md (board answer cb89849b).
+-- docs/adr/ADR-0008-weca-returns-formula-v1.md (board answer cb89849b).
 -- Finance scope only: no youth/camp identifiers appear in this file.
 --
 -- DEVIATION FROM docs/planning/data-model-expansion.md §5 (recorded, not silent):
 -- the doc's `weca_contribution` / `savings_projects_5pct` INPUT columns on
--- branch_financial_records are superseded. Per ADR-0007 R1-R3 the MF line and
+-- branch_financial_records are superseded. Per ADR-0008 R1-R3 the MF line and
 -- both 5% lines are COMPUTED from income, never captured, so storing them as
 -- inputs would fork the source of truth (a treasurer-typed MF beside a
 -- computed MF, with no rule for which one the remittance uses). The inputs are
@@ -21,7 +21,7 @@
 -- `incidents.branch_id` in 20261006_0001. The data-model migration that creates
 -- `branches` must ALTER these tables to add the FK; it must not fork them.
 --
--- CURRENCY v1: NGN only. ADR-0007 leaves conversion out of scope; the CHECK
+-- CURRENCY v1: NGN only. ADR-0008 leaves conversion out of scope; the CHECK
 -- below pins that so a multi-currency row cannot be stored and silently
 -- summed as naira.
 --
@@ -69,7 +69,7 @@ CREATE TABLE IF NOT EXISTS branch_financial_records (
                   CHECK (month = date_trunc('month', month)::date),
   -- Tithe & offering income E (NGN). One figure; decomposition is out of scope.
   income        numeric(14,2) NOT NULL CHECK (income >= 0),
-  -- Manual treasurer inputs, NOT derived (ADR-0007 R3/A1). Nullable in,
+  -- Manual treasurer inputs, NOT derived (ADR-0008 R3/A1). Nullable in,
   -- default 0 in the total.
   intervention  numeric(14,2) CHECK (intervention >= 0),
   faith_city    numeric(14,2) CHECK (faith_city >= 0),
@@ -85,13 +85,13 @@ CREATE TABLE IF NOT EXISTS branch_financial_records (
 );
 
 COMMENT ON TABLE branch_financial_records IS
-  'Per-branch monthly finance capture (ADR-0007). Inputs only: income, intervention, faith_city. MF and both 5% lines are computed on weca_returns, never stored here. branch has no FK until the data-model migration creates branches.';
+  'Per-branch monthly finance capture (ADR-0008). Inputs only: income, intervention, faith_city. MF and both 5% lines are computed on weca_returns, never stored here. branch has no FK until the data-model migration creates branches.';
 
 CREATE INDEX IF NOT EXISTS branch_financial_records_status_idx
   ON branch_financial_records (status);
 
 -- ---------------------------------------------------------------------------
--- 2. weca_return_formulas -- the versioned board config (ADR-0007 R5/A3).
+-- 2. weca_return_formulas -- the versioned board config (ADR-0008 R5/A3).
 --
 -- Rates and thresholds live in `rules`, never in a function body: a future
 -- board revision is a new version row, not a code deploy.
@@ -112,7 +112,7 @@ COMMENT ON TABLE weca_return_formulas IS
   'Board-ratified WECA formula versions. Config, not code: weca_compute_return reads the effective row; nothing hard-codes a rate. Versions are immutable -- supersede with a new row, never UPDATE.';
 
 -- SEED: the single board-ratified config, not a plausible default.
--- Source: ADR-0007 + board answer cb89849b (human-only resolver,
+-- Source: ADR-0008 + board answer cb89849b (human-only resolver,
 -- server-verified) on the January-September 2026 Lagos North workbook.
 -- No other version is seeded: with no effective row a return stays
 -- formula_pending with null computed fields (dark-ship precedent, 0004).
@@ -121,7 +121,7 @@ VALUES (
   'weca-2026-01',
   DATE '2026-01-01',
   '{"mf_low_min": 25000, "mf_high_min": 75000, "mf_low_rate": 0.10, "mf_high_rate": 0.20, "area_rate": 0.05, "savings_rate": 0.05}'::jsonb,
-  'Board-ratified formula v1 per ADR-0007 (answer cb89849b): MF bands 10%/20% at 25000/75000, area 5% + savings 5% retained (not remitted), intervention + Faith City manual inputs, total = MF + intervention + Faith City.'
+  'Board-ratified formula v1 per ADR-0008 (answer cb89849b): MF bands 10%/20% at 25000/75000, area 5% + savings 5% retained (not remitted), intervention + Faith City manual inputs, total = MF + intervention + Faith City.'
 )
 ON CONFLICT (version) DO NOTHING;
 
@@ -153,7 +153,7 @@ CREATE TABLE IF NOT EXISTS weca_returns (
 );
 
 COMMENT ON TABLE weca_returns IS
-  'Computed WECA return per (branch, period) (ADR-0007 R1-R5). computed_* stay NULL while computation_status = formula_pending. total_due = mf + intervention + faith_city; area/savings are stored but never remitted.';
+  'Computed WECA return per (branch, period) (ADR-0008 R1-R5). computed_* stay NULL while computation_status = formula_pending. total_due = mf + intervention + faith_city; area/savings are stored but never remitted.';
 
 CREATE INDEX IF NOT EXISTS weca_returns_status_idx
   ON weca_returns (computation_status);
@@ -168,7 +168,7 @@ CREATE INDEX IF NOT EXISTS weca_returns_status_idx
 -- only harness this repo runs. A Directus Flow or extension would add an
 -- unaudited runtime surface for zero new capability.
 --
--- CONFIG-DRIVEN (ADR-0007 A3): every rate and threshold below is read from the
+-- CONFIG-DRIVEN (ADR-0008 A3): every rate and threshold below is read from the
 -- effective weca_return_formulas row. The function body names only the KEY
 -- names, never a number; changing a number is a row change, and the 68 suite
 -- proves it by changing the row and watching the output move with no code change.
@@ -292,7 +292,7 @@ END
 $$;
 
 COMMENT ON FUNCTION weca_compute_return(uuid) IS
-  'ADR-0007 R1-R4. Reads rates/thresholds from the effective weca_return_formulas row (period-based); never hard-codes a number. No effective version -> formula_pending with nulls.';
+  'ADR-0008 R1-R4. Reads rates/thresholds from the effective weca_return_formulas row (period-based); never hard-codes a number. No effective version -> formula_pending with nulls.';
 
 -- ---------------------------------------------------------------------------
 -- 5. Least privilege (data-model-expansion.md §10, column 11.1).
