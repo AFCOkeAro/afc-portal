@@ -377,3 +377,98 @@ export interface PortalUserRecord {
   /** Multi-zone scope, Flow-synced (data-model-expansion §8.5). */
   zone_ids: string[]
 }
+
+/**
+ * Delivery log + consent (AFC-479, data-model-v4 §4.6-§4.7, ADR-0009).
+ * The single delivery-log header for every message: manual sends, campaign
+ * sends, invite sends and welcome-form sends all land here.
+ */
+export interface Communication {
+  id: string
+  source_kind: 'manual' | 'campaign' | 'invite' | 'welcome_form' | 'birthday_webhook'
+  campaign: string | null
+  campaign_step: string | null
+  campaign_run: string | null
+  event_invite: string | null
+  consent_policy: 'marketing_only' | 'operational_essential' | 'mixed' | null
+  branch: string | null
+  status: 'queued' | 'sending' | 'sent' | 'partial' | 'failed' | 'cancelled'
+  estimated_cost: string | null
+  created_by: string | null
+  created_at: string | null
+}
+
+export type ConsentBasis =
+  'explicit_opt_in' | 'guardian' | 'legitimate_interest' | 'inviter_vouched' | 'none'
+
+export type ExclusionReason =
+  | 'no_consent'
+  | 'minor_no_guardian_consent'
+  | 'opted_out'
+  | 'invalid_contact'
+  | 'dnc'
+  | 'over_cap'
+
+/**
+ * One row per recipient. A send state (queued/sent/delivered/read) always
+ * carries a real consent_basis; an excluded row carries basis 'none' plus an
+ * exclusion_reason. contact_value, error_detail and provider_message_id are
+ * restricted reads (data-model-v4 §5.1).
+ */
+export interface CommunicationRecipient {
+  id: string
+  communication: string
+  contact_value: string | null
+  contact_hash: string | null
+  channel: 'whatsapp' | 'sms' | 'email'
+  consent_basis: ConsentBasis
+  message_rendered: string | null
+  status: 'queued' | 'sent' | 'delivered' | 'read' | 'failed' | 'excluded'
+  exclusion_reason: ExclusionReason | null
+  provider_message_id: string | null
+  error_detail: string | null
+  sent_at: string | null
+  delivered_at: string | null
+  read_at: string | null
+  created_at: string | null
+}
+
+export interface MessageTemplate {
+  id: string
+  key: string
+  channel: 'whatsapp' | 'sms' | 'email'
+  category:
+    | 'marketing'
+    | 'operational'
+    | 'event_invitation'
+    | 'greeting'
+    | 'memory_verse'
+    | 'service_reminder'
+    | 'fallback'
+  rotation_key: string | null
+  approval_status: 'draft' | 'submitted' | 'pending_provider' | 'approved' | 'rejected'
+  provider_template_id: string | null
+  body: string
+  variables: string[]
+  active: boolean
+  branch: string | null
+}
+
+export interface ConsentRecord {
+  id: string
+  person: string | null
+  contact_hash: string | null
+  channel: 'whatsapp' | 'sms' | 'email'
+  granted: boolean
+  consent_type: 'channel' | 'marketing_invite'
+  basis:
+    | 'explicit_opt_in'
+    | 'guardian'
+    | 'legitimate_interest'
+    | 'inviter_vouched'
+    | 'not_applicable'
+  related_invite: string | null
+  method: 'paper' | 'digital' | 'verbal_recorded' | null
+  expires_at: string | null
+  captured_at: string | null
+}

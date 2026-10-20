@@ -20,6 +20,14 @@ export const COLLECTIONS = {
   eventRegistrations: 'event_registrations',
   attendanceSessions: 'attendance_sessions',
   attendanceRecords: 'attendance_records',
+  /**
+   * Attendance sex/category split (AFC-468, data-model-expansion §3).
+   * `serviceTypeDefinitions` is board config (capture renders its ordered
+   * category sets); `attendanceCounts` holds one row per
+   * (session, category, sex).
+   */
+  serviceTypeDefinitions: 'service_type_definitions',
+  attendanceCounts: 'attendance_counts',
   sundayServices: 'sunday_services',
   serviceAssignments: 'service_assignments',
   visitors: 'visitors',
@@ -27,6 +35,16 @@ export const COLLECTIONS = {
   welfareContributions: 'welfare_contributions',
   welfareCaseEvents: 'welfare_case_events',
   users: 'directus_users',
+  /**
+   * Delivery log + consent (AFC-479, data-model-v4 §4.6-§4.7, ADR-0009
+   * decisions 1-2). One log for every message: `communications` is the
+   * header, `communication_recipients` the per-recipient rows carrying the
+   * stored consent basis. No send path is enabled in this slice.
+   */
+  communications: 'communications',
+  communicationRecipients: 'communication_recipients',
+  messageTemplates: 'message_templates',
+  consentRecords: 'consent_records',
   /**
    * WECA finance (AFC-451, ADR-0008). Capture + computed returns under the
    * board-ratified formula version. Finance scope only.

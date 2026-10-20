@@ -195,6 +195,44 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     volunteer: [R, 'own_branch'],
     none: [NONE, 'none'],
   },
+  // Delivery log + consent (AFC-479, data-model-v4 §5, ADR-0009 decision 2).
+  // One log for every message; the matrix below is the UI contract only --
+  // enforcement stays in the Directus policy (data-model §9). Welfare-officer
+  // (assigned-only, redacted) and member (own invites, status only) are not
+  // StaffRoles, so their grants live in the Directus policy only; the cells
+  // below never invent a wider grant. No send path is enabled in this slice.
+  [COLLECTIONS.communications]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [ALL, 'all'],
+    branch_admin: [CRU, 'own_branch', 'own'],
+    department_leader: [R, 'assigned_branches'],
+    volunteer: [NONE, 'none'],
+    none: [NONE, 'none'],
+  },
+  [COLLECTIONS.communicationRecipients]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [R, 'all'],
+    branch_admin: [R, 'own_branch', 'own communications'],
+    department_leader: [NONE, 'none'],
+    volunteer: [NONE, 'none'],
+    none: [NONE, 'none'],
+  },
+  [COLLECTIONS.messageTemplates]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [ALL, 'all'],
+    branch_admin: [CRU, 'own_branch', 'own branch'],
+    department_leader: [R, 'assigned_branches'],
+    volunteer: [R, 'own_branch'],
+    none: [NONE, 'none'],
+  },
+  [COLLECTIONS.consentRecords]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [ALL, 'all'],
+    branch_admin: [CRU, 'own_branch', 'own people'],
+    department_leader: [NONE, 'none'],
+    volunteer: [NONE, 'none'],
+    none: [NONE, 'none'],
+  },
   [COLLECTIONS.branchFinancialRecords]: {
     // data-model-expansion §11: CRUD / CRUD / R (zone) / CRU (own).
     // `zone_admin` is not a StaffRole, so the zone column has no cell here;
@@ -291,6 +329,32 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     volunteer: [R, 'own_branch'],
     none: [NONE, 'none'],
   },
+  // Attendance split (AFC-468, data-model-expansion §11):
+  // attendance_counts CRUD / CRUD / CRUD (zone) / CRUD (own) / CRU (dept) /
+  // C/U (assigned). `zone_admin` is not a StaffRole, so the zone column has
+  // no cell here; that grant lives in the Directus policy only. Recorded, not
+  // invented.
+  [COLLECTIONS.attendanceCounts]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [ALL, 'all'],
+    branch_admin: [ALL, 'own_branch', 'CRUD (own)'],
+    department_leader: [CRU, 'own_department', 'CRU (dept)'],
+    volunteer: [CU, 'own_branch', 'C/U (assigned)'],
+    none: [NONE, 'none'],
+  },
+  [COLLECTIONS.serviceTypeDefinitions]: {
+    // Board config, not in the §11 table: the capture form reads it at every
+    // level, the board edits it at area level. Definitions are area-wide
+    // rows, so branch/zone scoping applies to sessions, never to the
+    // definition itself; the cells below grant reads accordingly and grant
+    // writes to area only.
+    super_admin: [ALL, 'all'],
+    area_admin: [CRU, 'all', 'board config'],
+    branch_admin: [R, 'all'],
+    department_leader: [R, 'assigned_branches'],
+    volunteer: [R, 'own_branch'],
+    none: [NONE, 'none'],
+  },
 }
 
 /**
@@ -331,6 +395,16 @@ const FIELD_RESTRICTIONS: Readonly<
     fields: ['branch_ids', 'department_ids'],
     roles: [],
     note: 'system/Flow only, no UI edit',
+  },
+  // Delivery-log internals (AFC-479, data-model-v4 §5.1). contact_value,
+  // error_detail and provider_message_id are staff-only reads (branch admin
+  // and above); every other role sees counts and statuses, never the contact
+  // or the provider detail. The Directus policy withholds them; this table is
+  // what the portal routes strip (visibleFields/stripHidden).
+  [COLLECTIONS.communicationRecipients]: {
+    fields: ['contact_value', 'error_detail', 'provider_message_id'],
+    roles: ['super_admin', 'area_admin', 'branch_admin'],
+    note: 'welfare officer sees assigned rows redacted; member sees own invite status only (both enforced in policy, hidden here)',
   },
   // data-model-expansion §11.1. "finance lead" is not a staff_role (same
   // precedent as safeguarding lead above): it grants no field here, which
