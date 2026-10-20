@@ -5,11 +5,17 @@ import type { AttendanceSessionRow, BranchSummary, Paginated } from '~/types/por
 definePageMeta({ middleware: 'staff' })
 
 const api = useApi()
+const route = useRoute()
 const showForm = ref(false)
 const searchInput = ref('')
 const search = ref('')
 const type = ref('all')
-const branch = ref('all')
+/** Drill-down contract: dashboard/branch pages link here with ?branch=. */
+function queryParam(name: string): string | null {
+  const value = route.query[name]
+  return typeof value === 'string' && value.length > 0 ? value : null
+}
+const branch = ref(queryParam('branch') ?? 'all')
 const page = ref(1)
 const limit = 25
 
@@ -79,6 +85,13 @@ function typeLabel(value: string): string {
       description="Sunday services, midweek, camps and department sessions."
     >
       <template #actions>
+        <UButton
+          to="/attendance/report"
+          color="neutral"
+          variant="outline"
+          icon="i-lucide-chart-column"
+          label="Reports"
+        />
         <PermissionGate :collection="COLLECTIONS.attendanceSessions" action="create">
           <UButton
             label="Capture headcount"

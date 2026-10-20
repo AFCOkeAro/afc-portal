@@ -6,12 +6,18 @@ definePageMeta({ middleware: 'staff' })
 
 const api = useApi()
 const permissions = usePermissions()
+const route = useRoute()
 const showForm = ref(false)
 const searchInput = ref('')
 const search = ref('')
-const branch = ref('all')
-const membership = ref('all')
-const status = ref('active')
+/** Drill-down contract: branch/profile pages link here with ?branch=&status=. */
+function queryParam(name: string): string | null {
+  const value = route.query[name]
+  return typeof value === 'string' && value.length > 0 ? value : null
+}
+const branch = ref(queryParam('branch') ?? 'all')
+const membership = ref(queryParam('membership_status') ?? 'all')
+const status = ref(queryParam('status') ?? 'active')
 const page = ref(1)
 const limit = 25
 

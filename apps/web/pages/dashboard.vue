@@ -11,7 +11,27 @@ const { data, pending, error, refresh } = await useAsyncData('dashboard', () =>
   api.get<DashboardData>('/api/dashboard'),
 )
 
+/**
+ * Dashboard anchors per prd-addendum-v4 §1 US-S2 + wireframes-v3 screen 2.
+ * Every section is capability-gated (a volunteer sees no welfare section) and
+ * every count drills into the filtered list that produced it (prd-expansion
+ * §1 analytics-with-drill-down). Branch totals are scope-filtered server-side,
+ * so a branch admin never sees cross-branch totals.
+ */
 const canWelfare = computed(() => permissions.can(COLLECTIONS.welfareCases, 'read'))
+const canAttendance = computed(() =>
+  permissions.can(COLLECTIONS.attendanceSessions, 'read'),
+)
+const canEvents = computed(() => permissions.can(COLLECTIONS.events, 'read'))
+const canVisitors = computed(() => permissions.can(COLLECTIONS.visitors, 'read'))
+
+const sections = computed(() => [
+  { id: 'overview', label: 'Overview' },
+  ...(canAttendance.value ? [{ id: 'attendance', label: 'Attendance' }] : []),
+  ...(canEvents.value ? [{ id: 'events', label: 'Events' }] : []),
+  ...(canVisitors.value ? [{ id: 'follow-ups', label: 'Follow-ups' }] : []),
+  ...(canWelfare.value ? [{ id: 'welfare-with-scope', label: 'Welfare' }] : []),
+])
 
 const attendanceChange = computed(() => {
   const current = data.value?.metrics.attendanceCurrent ?? 0
@@ -67,6 +87,8 @@ function formatDate(value: string | null | undefined): string {
       </template>
     </PageHeader>
 
+    <SectionNav v-if="data && !error" :sections="sections" />
+
     <UAlert
       v-if="error"
       color="error"
@@ -80,60 +102,67 @@ function formatDate(value: string | null | undefined): string {
     </div>
 
     <template v-else-if="data">
-      <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <NuxtLink to="/people" class="block transition hover:-translate-y-0.5">
-          <StatCard
-            label="People"
-            :value="data.metrics.people"
-            hint="Active records in scope"
-          />
-        </NuxtLink>
-        <NuxtLink to="/events" class="block transition hover:-translate-y-0.5">
-          <StatCard
-            label="Upcoming events"
-            :value="data.metrics.upcomingEvents"
-            :hint="`${data.metrics.upcomingRegistrations} registrations`"
-          />
-        </NuxtLink>
-        <NuxtLink to="/attendance" class="block transition hover:-translate-y-0.5">
-          <StatCard
-            label="Attendance · 30 days"
-            :value="data.metrics.attendanceCurrent"
-            :hint="attendanceChange"
-          />
-        </NuxtLink>
-        <NuxtLink to="/visitors" class="block transition hover:-translate-y-0.5">
-          <StatCard
-            label="Open follow-ups"
-            :value="data.metrics.openFollowUps"
-            hint="Visitors awaiting a next step"
-          />
-        </NuxtLink>
-      </div>
+      <section id="overview" class="scroll-mt-28">
+        <h2 class="sr-only" tabindex="-1">Overview</h2>
+        <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <NuxtLink to="/people" class="block transition hover:-translate-y-0.5">
+            <StatCard
+              label="People"
+              :value="data.metrics.people"
+              hint="Active records in scope"
+            />
+          </NuxtLink>
+          <NuxtLink to="/events" class="block transition hover:-translate-y-0.5">
+            <StatCard
+              label="Upcoming events"
+              :value="data.metrics.upcomingEvents"
+              :hint="`${data.metrics.upcomingRegistrations} registrations`"
+            />
+          </NuxtLink>
+          <NuxtLink to="/attendance" class="block transition hover:-translate-y-0.5">
+            <StatCard
+              label="Attendance · 30 days"
+              :value="data.metrics.attendanceCurrent"
+              :hint="attendanceChange"
+            />
+          </NuxtLink>
+          <NuxtLink
+            v-if="canVisitors"
+            to="/visitors?status=open"
+            class="block transition hover:-translate-y-0.5"
+          >
+            <StatCard
+              label="Open follow-ups"
+              :value="data.metrics.openFollowUps"
+              hint="Visitors awaiting a next step"
+            />
+          </NuxtLink>
+        </div>
 
-      <div class="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <NuxtLink
-          v-if="canWelfare"
-          to="/welfare"
-          class="block transition hover:-translate-y-0.5"
-        >
-          <StatCard
-            label="Open welfare"
-            :value="data.metrics.openWelfare"
-            hint="Open and in-progress cases"
-          />
-        </NuxtLink>
-        <NuxtLink to="/people?status=all" class="block transition hover:-translate-y-0.5">
-          <StatCard
-            label="Branches"
-            :value="data.scope.branchCount"
-            hint="Active branches in scope"
-          />
-        </NuxtLink>
-      </div>
+        <div class="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <NuxtLink
+            v-if="canWelfare"
+            to="/welfare?status=open"
+            class="block transition hover:-translate-y-0.5"
+          >
+            <StatCard
+              label="Open welfare"
+              :value="data.metrics.openWelfare"
+              hint="Open and in-progress cases"
+            />
+          </NuxtLink>
+          <NuxtLink to="/branches" class="block transition hover:-translate-y-0.5">
+            <StatCard
+              label="Branches"
+              :value="data.scope.branchCount"
+              hint="Active branches in scope"
+            />
+          </NuxtLink>
+        </div>
+      </section>
 
-      <div class="mt-6 grid gap-6 xl:grid-cols-3">
-        <UCard class="xl:col-span-2">
+      <div v-if="canAttendance || canEvents" class="mt-6 grid gap-6 xl:grid-cols-3">
+        <UCard v-if="canAttendance" id="attendance" class="scroll-mt-28 xl:col-span-2">
           <template #header>
             <div class="flex items-center justify-between">
               <h2 class="text-base font-semibold">Attendance trend</h2>
@@ -170,10 +199,10 @@ function formatDate(value: string | null | undefined): string {
           </div>
         </UCard>
 
-        <UCard>
+        <UCard v-if="canEvents" id="events" class="scroll-mt-28">
           <template #header>
             <div class="flex items-center justify-between">
-              <h2 class="text-base font-semibold">Next events</h2>
+              <h2 class="text-base font-semibold" tabindex="-1">Next events</h2>
               <UButton
                 to="/events"
                 color="neutral"
@@ -205,11 +234,11 @@ function formatDate(value: string | null | undefined): string {
         </UCard>
       </div>
 
-      <div class="mt-6 grid gap-6 xl:grid-cols-2">
-        <UCard>
+      <div v-if="canVisitors || canWelfare" class="mt-6 grid gap-6 xl:grid-cols-2">
+        <UCard v-if="canVisitors" id="follow-ups" class="scroll-mt-28">
           <template #header>
             <div class="flex items-center justify-between">
-              <h2 class="text-base font-semibold">Follow-ups</h2>
+              <h2 class="text-base font-semibold" tabindex="-1">Follow-ups</h2>
               <UButton
                 to="/visitors"
                 color="neutral"
@@ -251,10 +280,10 @@ function formatDate(value: string | null | undefined): string {
           </ul>
         </UCard>
 
-        <UCard v-if="canWelfare">
+        <UCard v-if="canWelfare" id="welfare-with-scope" class="scroll-mt-28">
           <template #header>
             <div class="flex items-center justify-between">
-              <h2 class="text-base font-semibold">Welfare cases</h2>
+              <h2 class="text-base font-semibold" tabindex="-1">Welfare cases</h2>
               <UButton
                 to="/welfare"
                 color="neutral"

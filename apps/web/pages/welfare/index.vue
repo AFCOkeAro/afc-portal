@@ -6,11 +6,17 @@ definePageMeta({ middleware: ['staff', 'welfare'] })
 
 const api = useApi()
 const permissions = usePermissions()
+const route = useRoute()
 const showForm = ref(false)
 const searchInput = ref('')
 const search = ref('')
-const status = ref('open')
-const branch = ref('all')
+/** Drill-down contract: dashboard/branch pages link here with ?status=&branch=. */
+function queryParam(name: string): string | null {
+  const value = route.query[name]
+  return typeof value === 'string' && value.length > 0 ? value : null
+}
+const status = ref(queryParam('status') ?? 'open')
+const branch = ref(queryParam('branch') ?? 'all')
 const category = ref('all')
 const priority = ref('all')
 const page = ref(1)
