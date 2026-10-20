@@ -17,6 +17,11 @@
 
 @import 'tailwindcss';
 
+/* Nuxt UI's theme variables and keyframes. The keyframes are not optional:
+ * Reka UI's presence watcher waits for `animationend` on `scale-out`; without
+ * them a closed dropdown or modal stays mounted and keeps the body locked. */
+@import '@nuxt/ui';
+
 @layer base {
   html {
     /* Respect the user's motion preference. The portal has no motion of its
