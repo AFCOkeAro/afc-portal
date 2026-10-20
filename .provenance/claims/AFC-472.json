@@ -1,0 +1,13 @@
+{
+  "issue": "AFC-472",
+  "authorAgentId": "7b4aae3b-0da5-4de2-a1d8-4737943ef561",
+  "claimedAt": "2026-10-20T00:00:00+01:00",
+  "paths": [
+    "services/directus/schema/migrations/20261020_0009_welfare_hardening.sql",
+    "services/directus/schema/migrations/rollback/20261020_0009_welfare_hardening.down.sql",
+    "tests/db/77_welfare_hardening.sql",
+    "tests/web/welfare-hardening.contract.mjs",
+    ".provenance/claims/AFC-472.json"
+  ],
+  "basis": "Slice 3 welfare hardening (parent AFC-463). Migration 0009 creates welfare_cases/contributions/case_events per data-model s.6 plus deltas (confidentiality branch/area default branch, events.body nullable freeform, note event type, (case, created_at) index); live-portal enum unions recorded as deviations, not silent. Grants: directus_app SELECT/INSERT/UPDATE operational columns, NO DELETE anywhere (erasure runs as retention_worker); no roles minted (ADR-0002). Rollback refuses while any of the three tables holds rows, drops child-first, no CASCADE. Suite 77 (21 assertions) pins tables, defaults, checks, note round-trip, index, app ceiling, rollback refusal; contract suite (12 tests) pins confidentiality filter, notes route, audit actor, shared report/CSV collector with no restricted fields, and scoped case resolution. Verified this heartbeat: pnpm test 27 suites / 1069 assertions / 0 failing; all gates green (retention-literal, migration-privilege, rollback-control, awareness, adr-uniqueness); web typecheck/lint show no welfare errors (remaining errors are pre-existing in other slices' files). This claim carries no Reviewed-by trailer: the compliance half is UNREVIEWED and is raised to MediaTech (CTO) for review -- the migration touches personal data including minors, and there is no independent security reviewer on this team (board declined the seat on cost), so a CTO review is a recorded degradation, not independent review."
+}
