@@ -1,0 +1,180 @@
+import { createItem, getPortalScope, resolveBranch } from '../../utils/portal'
+import {
+  INVITE_AGE_BANDS,
+  INVITE_CHANNELS,
+  INVITE_RELATIONSHIPS,
+  countInviterWindows,
+  hashInvitePhone,
+  inviteCapabilities,
+  isInviteSuppressed,
+  isMemberSession,
+  isMinorBand,
+  loadInviteEvent,
+  normalizeInvitePhone,
+  readMemberLimits,
+  redactInviteForMember,
+  renderInvitePreview,
+  requireInviteCap,
+  throwInviteValidation,
+} from '../../utils/event-invites'
+import type { InviteRow } from '../../utils/event-invites'
+
+/**
+ * Submit an invite (AFC-480, US-E1). Preview-then-confirm: the row is
+ * created WITH the rendered message + variables snapshot, so the DB never
+ * needs a later UPDATE of frozen columns. Outcomes:
+ *   suppressed number  -> created as blocked_optout (auditable, never queued)
+ *   over member limits -> created as blocked_rate_limit + approval_required
+ *   event-level approval flag -> pending_approval + approval_required
+ *   otherwise          -> queued (single send only; later messages need a
+ *                         real consent grant, §3.3 -- no drip).
+ * Minor without a guardian number is rejected at creation (400, and the DB
+ * CHECK pins it too). Staff cannot override an opt-out: blocked_optout rows
+ * have no approval path (approve route refuses them).
+ */
+export default defineEventHandler(async (event) => {
+  const scope = await getPortalScope(event)
+  const caps = inviteCapabilities(scope.role)
+  requireInviteCap(caps, 'create', 'submit event invitations')
+
+  const body = await readBody<Record<string, unknown>>(event)
+  const eventId = typeof body.event === 'string' ? body.event : ''
+  const inviteeName = typeof body.invitee_name === 'string' ? body.invitee_name.trim() : ''
+  const phone = normalizeInvitePhone(body.invitee_phone)
+  const channel = typeof body.channel_choice === 'string' ? body.channel_choice : 'auto'
+  const ageBand = typeof body.invitee_age_band === 'string' ? body.invitee_age_band : 'unknown'
+  const guardian = normalizeInvitePhone(body.guardian_phone)
+  const relationship = typeof body.invitee_relationship === 'string' ? body.invitee_relationship : null
+  const note = typeof body.inviter_note === 'string' ? body.inviter_note.trim().slice(0, 280) : ''
+
+  const fields: Record<string, string> = {}
+  if (!eventId) fields.event = 'Choose an event to invite to'
+  if (!inviteeName) fields.invitee_name = 'Enter the invitee name'
+  if (!phone) fields.invitee_phone = 'Enter the invitee phone number'
+  else if (phone.replace(/\D/g, '').length < 7) fields.invitee_phone = 'That number looks too short'
+  if (!INVITE_CHANNELS.includes(channel as never)) fields.channel_choice = 'Pick WhatsApp, SMS or automatic'
+  if (!INVITE_AGE_BANDS.includes(ageBand as never)) fields.invitee_age_band = 'Pick an age band'
+  if (relationship !== null && !INVITE_RELATIONSHIPS.includes(relationship as never)) {
+    fields.invitee_relationship = 'Pick a relationship or leave it blank'
+  }
+  if (isMinorBand(ageBand) && !guardian) {
+    fields.guardian_phone = 'A guardian number is required for a child or teen invitee'
+  }
+  const inviterPerson = scope.session.user.personId
+  if (!inviterPerson) {
+    fields.inviter = 'Your login is not linked to a member record yet; ask your branch admin to link it'
+  }
+  if (Object.keys(fields).length > 0) throwInviteValidation(fields)
+
+  const brief = await loadInviteEvent(event, scope, eventId)
+  if (!brief.invite_eligible) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'That event is not open for member invitations',
+      data: { code: 'event_not_invite_eligible' },
+    })
+  }
+  if (brief.visibility === 'branch' && !scope.isArea) {
+    const sameBranch = brief.branch !== null && scope.branchIds.includes(brief.branch)
+    if (!sameBranch) {
+      throw createError({
+        statusCode: 403,
+        statusMessage: 'Branch-private events need an inviter from the same branch',
+        data: { code: 'branch_private_requires_same_branch_inviter' },
+      })
+    }
+  }
+
+  const branch = resolveBranch(scope, brief.branch, { allowAreaWide: true })
+  const contactHash = hashInvitePhone(phone)
+  const inviterName = scope.session.user.firstName?.trim() || scope.session.user.email
+  const variables = {
+    invitee_name: inviteeName,
+    inviter_name: inviterName,
+    event_name: brief.title,
+    event_datetime: brief.start_at ?? 'date to be confirmed',
+    event_location: brief.location ?? '',
+    branch_name: '',
+    inviter_note: note,
+    rsvp_link: `/events/${brief.id}/register`,
+  }
+  const rendered = renderInvitePreview(variables)
+
+  // STOP/opt-out: recorded as blocked_optout, never queued, no approval path.
+  if (await isInviteSuppressed(event, scope, contactHash)) {
+    const blocked = await createItem<Record<string, unknown>>(event, scope, 'event_invites', {
+      event: eventId,
+      branch,
+      inviter_person: inviterPerson,
+      inviter_user: scope.session.user.id,
+      invitee_name: inviteeName,
+      invitee_phone: phone,
+      invitee_contact_hash: contactHash,
+      invitee_relationship: relationship,
+      invitee_age_band: ageBand,
+      guardian_phone: guardian || null,
+      channel_choice: channel,
+      consent_basis: 'inviter_vouched',
+      message_rendered: rendered,
+      variables_snapshot: variables,
+      status: 'blocked_optout',
+      approval_required: false,
+      blocked_reason: 'That number opted out of messages (STOP); staff cannot override an opt-out',
+    })
+    return { data: { ...blocked, id: String(blocked.id) } }
+  }
+
+  // Rolling member limits (10/day + 50/week defaults, per-member columns).
+  const inviterUserId = scope.session.user.id
+  const [counts, limits] = await Promise.all([
+    countInviterWindows(event, scope, inviterUserId),
+    readMemberLimits(event, scope, inviterUserId),
+  ])
+  const overLimit = counts.sent24h >= limits.daily || counts.sent7d >= limits.weekly
+
+  let status = 'queued'
+  let approvalRequired = false
+  let blockedReason: string | null = null
+  if (overLimit && counts.countsVerified) {
+    status = 'blocked_rate_limit'
+    approvalRequired = true
+    blockedReason =
+        `Member invite limit reached: ${counts.sent24h} sent in the last 24h ` +
+        `(limit ${limits.daily}), ${counts.sent7d} in the last 7 days (limit ${limits.weekly}). ` +
+        `Your branch admin can approve this invite.`
+  }
+  else if (brief.invite_requires_approval) {
+    status = 'pending_approval'
+    approvalRequired = true
+    blockedReason = 'That event needs staff approval for invitations.'
+  }
+
+  const created = await createItem<Record<string, unknown>>(event, scope, 'event_invites', {
+    event: eventId,
+    branch,
+    inviter_person: inviterPerson,
+    inviter_user: inviterUserId,
+    invitee_name: inviteeName,
+    invitee_phone: phone,
+    invitee_contact_hash: contactHash,
+    invitee_relationship: relationship,
+    invitee_age_band: ageBand,
+    guardian_phone: guardian || null,
+    channel_choice: channel,
+    consent_basis: 'inviter_vouched',
+    message_rendered: rendered,
+    variables_snapshot: variables,
+    status,
+    approval_required: approvalRequired,
+    blocked_reason: blockedReason,
+  })
+
+  // A member-shaped session (track d) reads back the redacted projection;
+  // staff read the full row they just wrote.
+  if (isMemberSession(scope)) {
+    return {
+      data: redactInviteForMember({ ...(created as object), id: String(created.id) } as InviteRow),
+    }
+  }
+  return { data: { ...created, id: String(created.id) }, meta: { countsVerified: counts.countsVerified } }
+})
