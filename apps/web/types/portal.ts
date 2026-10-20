@@ -34,6 +34,11 @@ export interface BranchSummary {
   area?: string | null
 }
 
+export interface BranchSectionWarning {
+  section: string
+  code: string
+}
+
 export interface BranchDetail extends Branch {
   people_count: number
   youth_count: number
@@ -50,6 +55,7 @@ export interface BranchDetail extends Branch {
   welfare_cases: WelfareCaseRow[]
   blessings_total: number
   blessings_breakdown: BlessingBreakdownRow[]
+  warnings: BranchSectionWarning[]
 }
 
 export interface PersonRow extends Person {

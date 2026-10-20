@@ -1,6 +1,7 @@
 import { blessingsRollup } from '../../utils/blessing-report'
 import type {
   BranchDetail,
+  BranchSectionWarning,
   DashboardAttendancePoint,
   EventRow,
   PersonRow,
@@ -118,6 +119,29 @@ function daysAgo(days: number): string {
   return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
 }
 
+interface SettledSection<T> {
+  value: T
+  warning?: BranchSectionWarning
+}
+
+// AFC-564: one failing section must not 500 the whole dashboard. Each section
+// settles independently: on failure the original error is logged server-side,
+// the section falls back to its empty value, and a named warning travels in
+// the response (same spirit as the 03c51fe named codes: degraded, never
+// silent). The branch lookup below stays outside: a branch that cannot load
+// is still 404/403, never a degraded 200.
+async function settleSection<T>(
+  section: string,
+  work: Promise<T>,
+  fallback: T,
+): Promise<SettledSection<T>> {
+  try {
+    return { value: await work }
+  } catch (error) {
+    console.error('branch detail section failed (' + section + ')', error)
+    return { value: fallback, warning: { section, code: section + '_unavailable' } }
+  }
+}
 export default defineEventHandler(async (event): Promise<BranchDetail> => {
   const scope = await getPortalScope(event)
   const id = getRouterParam(event, 'id')
@@ -138,95 +162,160 @@ export default defineEventHandler(async (event): Promise<BranchDetail> => {
   const now = new Date().toISOString()
 
   const [
-    people,
-    youth,
-    minors,
-    openFollowUps,
-    attendance,
-    events,
-    recentPeople,
-    followUps,
-    welfareCases,
-    blessings,
+    peopleResult,
+    youthResult,
+    minorsResult,
+    openFollowUpsResult,
+    attendanceResult,
+    eventsResult,
+    recentPeopleResult,
+    followUpsResult,
+    welfareCasesResult,
+    blessingsResult,
   ] = await Promise.all([
-    countItems(
-      event,
-      scope,
+    settleSection(
       'people',
-      mergeFilters({ status: { _eq: 'active' } }, branchFilter),
-    ),
-    countItems(
-      event,
-      scope,
-      'people',
-      mergeFilters({ membership_status: { _eq: 'youth' } }, branchFilter),
-    ),
-    countItems(
-      event,
-      scope,
-      'people',
-      mergeFilters({ is_minor: { _eq: true } }, branchFilter),
-    ),
-    countItems(
-      event,
-      scope,
-      'visitors',
-      mergeFilters({ status: { _in: ['new', 'follow_up'] } }, branchFilter),
-    ),
-    listItems<{
-      id: string | number
-      session_date: string
-      headcount_total: number | null
-      branch: string | null
-    }>(event, scope, 'attendance_sessions', {
-      filter: mergeFilters({ session_date: { _gte: daysAgo(84) } }, branchFilter),
-      fields: ['id', 'session_date', 'headcount_total', 'branch'],
-      sort: '-session_date',
-      limit: -1,
-    }),
-    listItems<EventRow>(event, scope, 'events', {
-      filter: mergeFilters(
-        {
-          start_at: { _gte: now },
-          status: { _eq: 'published' },
-          _or: [{ branch: { _eq: id } }, { branch: { _null: true } }],
-        },
-        scopeFilter(scope),
+      countItems(
+        event,
+        scope,
+        'people',
+        mergeFilters({ status: { _eq: 'active' } }, branchFilter),
       ),
-      fields: EVENT_FIELDS,
-      sort: 'start_at',
-      limit: 5,
-    }),
-    listItems<PersonRow>(event, scope, 'people', {
-      filter: mergeFilters({ status: { _eq: 'active' } }, branchFilter),
-      fields: PERSON_FIELDS,
-      sort: 'last_name,first_name',
-      limit: 8,
-    }),
-    listItems<VisitorRow>(event, scope, 'visitors', {
-      filter: mergeFilters({ status: { _in: ['new', 'follow_up'] } }, branchFilter),
-      fields: VISITOR_FIELDS,
-      sort: 'next_follow_up_date,visit_date',
-      limit: 5,
-    }),
-    can(scope, 'welfare_cases', 'read')
-      ? listItems<WelfareCaseRow>(event, scope, 'welfare_cases', {
-          filter: mergeFilters(
-            { status: { _in: ['open', 'in_progress'] } },
-            branchFilter,
-          ),
-          fields: WELFARE_FIELDS,
-          sort: '-opened_at',
-          limit: 5,
-        })
-      : Promise.resolve({ data: [], meta: { total: 0, page: 1, limit: 5 } }),
+      0,
+    ),
+    settleSection(
+      'youth',
+      countItems(
+        event,
+        scope,
+        'people',
+        mergeFilters({ membership_status: { _eq: 'youth' } }, branchFilter),
+      ),
+      0,
+    ),
+    settleSection(
+      'minors',
+      countItems(
+        event,
+        scope,
+        'people',
+        mergeFilters({ is_minor: { _eq: true } }, branchFilter),
+      ),
+      0,
+    ),
+    settleSection(
+      'openFollowUps',
+      countItems(
+        event,
+        scope,
+        'visitors',
+        mergeFilters({ status: { _in: ['new', 'follow_up'] } }, branchFilter),
+      ),
+      0,
+    ),
+    settleSection(
+      'attendance',
+      listItems<{
+        id: string | number
+        session_date: string
+        headcount_total: number | null
+        branch: string | null
+      }>(event, scope, 'attendance_sessions', {
+        filter: mergeFilters({ session_date: { _gte: daysAgo(84) } }, branchFilter),
+        fields: ['id', 'session_date', 'headcount_total', 'branch'],
+        sort: '-session_date',
+        limit: -1,
+      }),
+      { data: [], meta: { total: 0, page: 1, limit: -1 } },
+    ),
+    settleSection(
+      'events',
+      listItems<EventRow>(event, scope, 'events', {
+        filter: mergeFilters(
+          {
+            start_at: { _gte: now },
+            status: { _eq: 'published' },
+            _or: [{ branch: { _eq: id } }, { branch: { _null: true } }],
+          },
+          scopeFilter(scope),
+        ),
+        fields: EVENT_FIELDS,
+        sort: 'start_at',
+        limit: 5,
+      }),
+      { data: [], meta: { total: 0, page: 1, limit: 5 } },
+    ),
+    settleSection(
+      'recentPeople',
+      listItems<PersonRow>(event, scope, 'people', {
+        filter: mergeFilters({ status: { _eq: 'active' } }, branchFilter),
+        fields: PERSON_FIELDS,
+        sort: 'last_name,first_name',
+        limit: 8,
+      }),
+      { data: [], meta: { total: 0, page: 1, limit: 8 } },
+    ),
+    settleSection(
+      'followUps',
+      listItems<VisitorRow>(event, scope, 'visitors', {
+        filter: mergeFilters({ status: { _in: ['new', 'follow_up'] } }, branchFilter),
+        fields: VISITOR_FIELDS,
+        sort: 'next_follow_up_date,visit_date',
+        limit: 5,
+      }),
+      { data: [], meta: { total: 0, page: 1, limit: 5 } },
+    ),
+    settleSection(
+      'welfareCases',
+      can(scope, 'welfare_cases', 'read')
+        ? listItems<WelfareCaseRow>(event, scope, 'welfare_cases', {
+            filter: mergeFilters(
+              { status: { _in: ['open', 'in_progress'] } },
+              branchFilter,
+            ),
+            fields: WELFARE_FIELDS,
+            sort: '-opened_at',
+            limit: 5,
+          })
+        : Promise.resolve({ data: [], meta: { total: 0, page: 1, limit: 5 } }),
+      { data: [], meta: { total: 0, page: 1, limit: 5 } },
+    ),
     // Blessings breakdown (AFC-474, prd-expansion §1.1
     // analytics-with-drill-down): counts that link to the filtered list.
     // Gated on blessings:read; anything else renders zero, never foreign.
-    can(scope, 'blessings', 'read')
-      ? blessingsRollup(event, scope, { branch: id })
-      : Promise.resolve({ total: 0, breakdown: [] }),
+    settleSection(
+      'blessings',
+      can(scope, 'blessings', 'read')
+        ? blessingsRollup(event, scope, { branch: id })
+        : Promise.resolve({ total: 0, breakdown: [] }),
+      { total: 0, breakdown: [] },
+    ),
   ])
+  const warnings: BranchSectionWarning[] = []
+  for (const section of [
+    peopleResult,
+    youthResult,
+    minorsResult,
+    openFollowUpsResult,
+    attendanceResult,
+    eventsResult,
+    recentPeopleResult,
+    followUpsResult,
+    welfareCasesResult,
+    blessingsResult,
+  ]) {
+    if (section.warning) warnings.push(section.warning)
+  }
+  const people = peopleResult.value
+  const youth = youthResult.value
+  const minors = minorsResult.value
+  const openFollowUps = openFollowUpsResult.value
+  const attendance = attendanceResult.value
+  const events = eventsResult.value
+  const recentPeople = recentPeopleResult.value
+  const followUps = followUpsResult.value
+  const welfareCases = welfareCasesResult.value
+  const blessings = blessingsResult.value
 
   const names = await branchNames(event, scope)
   const lastSunday = attendance.data.find(
@@ -258,6 +347,7 @@ export default defineEventHandler(async (event): Promise<BranchDetail> => {
     attendance_trend: attendanceTrend,
     blessings_total: blessings.total,
     blessings_breakdown: blessings.breakdown,
+    warnings,
     recent_people: stripHiddenMany(
       scope,
       'people',
