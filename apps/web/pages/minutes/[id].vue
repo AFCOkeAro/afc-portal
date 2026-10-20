@@ -9,7 +9,12 @@ const id = String(route.params.id)
 const person = ref('')
 const error = ref('')
 
-const { data, pending, refresh } = await useAsyncData(`minutes-${id}`, () =>
+const {
+  data,
+  pending,
+  error: loadError,
+  refresh,
+} = await useAsyncData(`minutes-${id}`, () =>
   api.get<{
     data: Record<string, unknown>
     attendees: Record<string, unknown>[]
@@ -50,7 +55,15 @@ const attendees = computed(() => data.value?.attendees ?? [])
       </template>
     </PageHeader>
 
-    <div v-if="pending" class="flex justify-center py-10">
+    <UAlert
+      v-if="loadError"
+      color="error"
+      variant="subtle"
+      title="Could not load these minutes"
+      :description="loadError.message"
+    />
+
+    <div v-if="pending" class="mt-8 flex justify-center py-10">
       <UIcon name="i-lucide-loader-circle" class="size-6 animate-spin text-gray-400" />
     </div>
 
@@ -120,6 +133,7 @@ const attendees = computed(() => data.value?.attendees ?? [])
           class="mt-3"
           color="error"
           variant="subtle"
+          title="Could not add the attendee"
           :description="error"
         />
       </UCard>
@@ -135,8 +149,14 @@ const attendees = computed(() => data.value?.attendees ?? [])
             <span class="text-gray-400"> ({{ row.created_at }})</span>
           </li>
         </ul>
-        <p v-else class="text-sm text-gray-500">No audit rows.</p>
+        <p v-else class="text-sm text-gray-500 dark:text-gray-400">No audit rows.</p>
       </UCard>
     </div>
+
+    <EmptyState
+      v-else-if="!loadError"
+      title="Minutes not found"
+      description="They do not exist or are outside your scope."
+    />
   </div>
 </template>

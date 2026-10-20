@@ -38,7 +38,7 @@ const { data, pending, error } = await useAsyncData(`marriage-${id}`, () =>
       :description="error.message"
     />
 
-    <div v-if="pending" class="flex justify-center py-10">
+    <div v-if="pending" class="mt-8 flex justify-center py-10">
       <UIcon name="i-lucide-loader-circle" class="size-6 animate-spin text-gray-400" />
     </div>
 
@@ -82,8 +82,14 @@ const { data, pending, error } = await useAsyncData(`marriage-${id}`, () =>
             <span class="text-gray-400"> ({{ row.created_at }})</span>
           </li>
         </ul>
-        <p v-else class="text-sm text-gray-500">No audit rows.</p>
+        <p v-else class="text-sm text-gray-500 dark:text-gray-400">No audit rows.</p>
       </UCard>
     </div>
+
+    <EmptyState
+      v-else-if="!error"
+      title="Marriage matter not found"
+      description="It does not exist or is outside your scope."
+    />
   </div>
 </template>

@@ -8,7 +8,12 @@ const route = useRoute()
 const id = String(route.params.id)
 const error = ref('')
 
-const { data, pending, refresh } = await useAsyncData(`transfer-${id}`, () =>
+const {
+  data,
+  pending,
+  error: loadError,
+  refresh,
+} = await useAsyncData(`transfer-${id}`, () =>
   api.get<{ data: Record<string, unknown>; audit: Record<string, unknown>[] }>(
     `/api/transfers/${id}`,
   ),
@@ -44,7 +49,15 @@ async function setStatus(status: string) {
       </template>
     </PageHeader>
 
-    <div v-if="pending" class="flex justify-center py-10">
+    <UAlert
+      v-if="loadError"
+      color="error"
+      variant="subtle"
+      title="Could not load this transfer"
+      :description="loadError.message"
+    />
+
+    <div v-if="pending" class="mt-8 flex justify-center py-10">
       <UIcon name="i-lucide-loader-circle" class="size-6 animate-spin text-gray-400" />
     </div>
 
@@ -88,6 +101,7 @@ async function setStatus(status: string) {
           class="mb-3"
           color="error"
           variant="subtle"
+          title="Could not update the transfer"
           :description="error"
         />
         <PermissionGate :collection="COLLECTIONS.transfers" action="update">
@@ -126,8 +140,14 @@ async function setStatus(status: string) {
             <span class="text-gray-400"> ({{ row.created_at }})</span>
           </li>
         </ul>
-        <p v-else class="text-sm text-gray-500">No audit rows.</p>
+        <p v-else class="text-sm text-gray-500 dark:text-gray-400">No audit rows.</p>
       </UCard>
     </div>
+
+    <EmptyState
+      v-else-if="!loadError"
+      title="Transfer not found"
+      description="It does not exist or is outside your scope."
+    />
   </div>
 </template>

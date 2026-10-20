@@ -80,7 +80,7 @@ const total = computed(() =>
         :description="error"
       />
 
-      <div v-if="pending" class="flex justify-center py-10">
+      <div v-if="pending" class="mt-8 flex justify-center py-10">
         <UIcon name="i-lucide-loader-circle" class="size-6 animate-spin text-gray-400" />
       </div>
 

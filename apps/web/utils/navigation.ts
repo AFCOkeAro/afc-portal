@@ -29,7 +29,7 @@ export type NavigationGroup =
 
 export const NAVIGATION_GROUPS: readonly { key: NavigationGroup; label: string }[] = [
   { key: 'overview', label: 'Overview' },
-  { key: 'people', label: 'People and care' },
+  { key: 'people', label: 'People and Care' },
   { key: 'gatherings', label: 'Gatherings' },
   { key: 'communications', label: 'Communications' },
   { key: 'office', label: 'Office' },

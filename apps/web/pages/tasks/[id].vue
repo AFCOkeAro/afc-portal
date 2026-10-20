@@ -8,7 +8,12 @@ const route = useRoute()
 const id = String(route.params.id)
 const error = ref('')
 
-const { data, pending, refresh } = await useAsyncData(`task-${id}`, () =>
+const {
+  data,
+  pending,
+  error: loadError,
+  refresh,
+} = await useAsyncData(`task-${id}`, () =>
   api.get<{ data: Record<string, unknown>; audit: Record<string, unknown>[] }>(
     `/api/tasks/${id}`,
   ),
@@ -42,7 +47,15 @@ const title = computed(() => String(data.value?.data?.title ?? 'Task'))
       </template>
     </PageHeader>
 
-    <div v-if="pending" class="flex justify-center py-10">
+    <UAlert
+      v-if="loadError"
+      color="error"
+      variant="subtle"
+      title="Could not load this task"
+      :description="loadError.message"
+    />
+
+    <div v-if="pending" class="mt-8 flex justify-center py-10">
       <UIcon name="i-lucide-loader-circle" class="size-6 animate-spin text-gray-400" />
     </div>
 
@@ -82,6 +95,7 @@ const title = computed(() => String(data.value?.data?.title ?? 'Task'))
           class="mb-3"
           color="error"
           variant="subtle"
+          title="Could not update the task"
           :description="error"
         />
         <PermissionGate :collection="COLLECTIONS.tasks" action="update">
@@ -116,8 +130,14 @@ const title = computed(() => String(data.value?.data?.title ?? 'Task'))
             <span class="text-gray-400"> ({{ row.created_at }})</span>
           </li>
         </ul>
-        <p v-else class="text-sm text-gray-500">No audit rows.</p>
+        <p v-else class="text-sm text-gray-500 dark:text-gray-400">No audit rows.</p>
       </UCard>
     </div>
+
+    <EmptyState
+      v-else-if="!loadError"
+      title="Task not found"
+      description="It does not exist or is outside your scope."
+    />
   </div>
 </template>
