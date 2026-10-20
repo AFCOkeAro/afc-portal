@@ -229,6 +229,68 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     volunteer: [NONE, 'none'],
     none: [NONE, 'none'],
   },
+  // Hierarchy (AFC-461a, data-model-expansion §11). `zone_admin` is not a
+  // StaffRole, so the zone column's CRUD grant lives in the Directus policy
+  // only; the cells below give the closest portal-role reading and never
+  // invent a wider grant. Scopes use own_zone/assigned_zones (the zone
+  // analogue of own_branch/assigned_branches).
+  [COLLECTIONS.areas]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [RU, 'all', 'R/U (zone area)'],
+    branch_admin: [R, 'own_zone', 'R (own zone area)'],
+    department_leader: [R, 'assigned_branches'],
+    volunteer: [NONE, 'none'],
+    none: [NONE, 'none'],
+  },
+  [COLLECTIONS.zones]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [ALL, 'all'],
+    branch_admin: [R, 'own_zone', 'R (own zone)'],
+    department_leader: [R, 'assigned_branches'],
+    volunteer: [NONE, 'none'],
+    none: [NONE, 'none'],
+  },
+  [COLLECTIONS.bibleStudyCentres]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [ALL, 'all'],
+    branch_admin: [ALL, 'own_branch', 'CRUD (own)'],
+    department_leader: [R, 'assigned_branches'],
+    volunteer: [R, 'own_branch', 'assigned BSC'],
+    none: [NONE, 'none'],
+  },
+  [COLLECTIONS.conferenceCentres]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [ALL, 'all'],
+    branch_admin: [R, 'own_branch', 'R (own)'],
+    department_leader: [R, 'assigned_branches'],
+    volunteer: [R, 'own_branch'],
+    none: [NONE, 'none'],
+  },
+  [COLLECTIONS.sundaySchoolClasses]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [ALL, 'all'],
+    branch_admin: [ALL, 'own_branch', 'CRUD (own)'],
+    department_leader: [RU, 'own_department', 'R/U (own dept)'],
+    volunteer: [R, 'own_branch', 'R/U attendance via records'],
+    none: [NONE, 'none'],
+  },
+  [COLLECTIONS.avsCentres]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [ALL, 'all'],
+    branch_admin: [ALL, 'own_branch', 'CRUD (own)'],
+    department_leader: [R, 'assigned_branches', 'R (AVS dept via own dept only: policy)'],
+    volunteer: [R, 'own_branch'],
+    none: [NONE, 'none'],
+  },
+  [COLLECTIONS.campusInstitutions]: {
+    // Reference only in Slice 1; readable, never written from the portal.
+    super_admin: [R, 'all'],
+    area_admin: [R, 'all'],
+    branch_admin: [R, 'own_zone', 'R'],
+    department_leader: [R, 'assigned_branches'],
+    volunteer: [R, 'own_branch'],
+    none: [NONE, 'none'],
+  },
 }
 
 /**
@@ -322,23 +384,32 @@ export function hiddenFieldsForRole(role: StaffRole): Record<string, string[]> {
 }
 
 /**
- * data-model §9 rule 5: "a user with branch = null and staff_role != area_admin
- * sees nothing (fail-closed)". Super admin is the Directus built-in Admin role
- * and is not branch-scoped either, so it is exempt alongside area admin.
+ * data-model §9 rule 5, extended to hierarchy scopes (data-model-expansion
+ * §10): "a user with no scope values sees nothing (fail-closed)". Super admin
+ * is the Directus built-in Admin role and is not scoped either, so it is
+ * exempt alongside area admin. A zone grant counts as a scope exactly like a
+ * branch grant; absent scope fields (pre-hierarchy sessions) mean no grant at
+ * that level, never all.
  */
 export function isScopedSession(input: {
   staffRole: StaffRole
   branchId: string | null
+  zoneId?: string | null
+  zoneIds?: string[]
 }): boolean {
   if (input.staffRole === 'area_admin' || input.staffRole === 'super_admin') {
     return true
   }
-  return input.branchId !== null
+  if (input.branchId !== null) return true
+  if (input.zoneId != null) return true
+  return (input.zoneIds ?? []).length > 0
 }
 
 export function capabilitiesForRole(input: {
   staffRole: StaffRole
   branchId: string | null
+  zoneId?: string | null
+  zoneIds?: string[]
 }): CapabilitiesPayload {
   const grants = isScopedSession(input) ? grantsForRole(input.staffRole) : []
   return {

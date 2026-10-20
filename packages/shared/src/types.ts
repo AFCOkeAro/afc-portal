@@ -17,8 +17,27 @@ export interface Branch {
   name: string
   code: string
   slug: string | null
-  branch_type: 'area' | 'main' | 'branch' | 'satellite'
+  branch_type:
+    | 'area'
+    | 'main'
+    | 'branch'
+    | 'satellite'
+    | 'full_fledged'
+    | 'afwc'
+    | 'semi_formed'
+    | 'worship_centre'
+    | 'other'
   parent_branch: string | null
+  /** Hierarchy parent (data-model-expansion §2.3, required for new rows). */
+  zone: string | null
+  /** Denormalised via zone (Flow-maintained, hierarchy.denorm). */
+  area: string | null
+  type_label: 'FFC' | 'AFWC' | null
+  pastor: string | null
+  map_pin: Record<string, unknown> | null
+  outdoor_photo: string | null
+  year_founded: number | null
+  notable_history: string | null
   address: string | null
   city: string | null
   state: string | null
@@ -26,6 +45,112 @@ export interface Branch {
   email: string | null
   status: 'active' | 'inactive'
   sort: number | null
+}
+
+/** Area — top of the hierarchy (data-model-expansion §2.1). */
+export interface Area {
+  id: string
+  name: string
+  code: string
+  overseer: string | null
+  address: string | null
+  outdoor_photo: string | null
+  status: 'active' | 'inactive'
+  sort: number | null
+}
+
+/** Zone — six per area (data-model-expansion §2.2). */
+export interface Zone {
+  id: string
+  area: string
+  name: string
+  code: string
+  leader: string | null
+  address: string | null
+  outdoor_photo: string | null
+  year_started: number | null
+  status: 'active' | 'inactive'
+  sort: number | null
+}
+
+/** Bible Study Centre — a congregation under a parent branch (§2.4). */
+export interface BibleStudyCentre {
+  id: string
+  name: string
+  code: string
+  parent_branch: string
+  /** Denorm (Flow-maintained). */
+  zone: string | null
+  leader: string | null
+  location: string | null
+  address: string | null
+  property_type: 'church' | 'school' | 'warehouse' | 'other' | null
+  property_owner: string | null
+  year_founded: number | null
+  history: string | null
+  average_attendance: number | null
+  photo: string | null
+  status: 'active' | 'inactive'
+}
+
+/** Conference Centre — a large meeting venue (§2.5). */
+export interface ConferenceCentre {
+  id: string
+  name: string
+  code: string
+  zone: string | null
+  branch: string | null
+  location: string | null
+  address: string | null
+  leader: string | null
+  avs_count: number | null
+  elementary_count: number | null
+  year_started: number | null
+  headcount: number | null
+  photo: string | null
+  status: 'active' | 'inactive'
+}
+
+/** Sunday School class under a branch/zone (§2.6). */
+export interface SundaySchoolClass {
+  id: string
+  class_name: string
+  branch: string | null
+  /** Denorm (Flow-maintained). */
+  zone: string | null
+  teacher: string | null
+  students_count: number | null
+  status: 'active' | 'inactive'
+}
+
+/** AVS centre — a weekday/school-based outreach centre (§2.7). */
+export interface AvsCentre {
+  id: string
+  centre_name: string
+  branch: string
+  address: string | null
+  school_contact_name: string | null
+  school_contact_phone: string | null
+  contact_person: string | null
+  status: 'regular' | 'paused'
+  type: 'primary' | 'secondary' | 'others' | null
+  notes: string | null
+  photo: string | null
+}
+
+/**
+ * Campus institution reference only (data-model-expansion §7.1 lite).
+ * Full campus care stays in Slice 5; this row exists so a branch/zone page
+ * can name the institution without forking the student model.
+ */
+export interface CampusInstitution {
+  id: string
+  name: string
+  town: string | null
+  state: string | null
+  coordinator: string | null
+  notes: string | null
+  status: 'active' | 'inactive'
 }
 
 export interface Department {
@@ -81,6 +206,9 @@ export interface Household {
   id: string
   name: string | null
   branch: string | null
+  /** Denorm for scoping (data-model-expansion §4.1, Flow-maintained). */
+  zone: string | null
+  household_head: string | null
   address: string | null
   phone: string | null
   primary_contact: string | null
@@ -151,11 +279,25 @@ export interface EventRegistration {
 }
 
 export type AttendanceSessionType =
-  'sunday_service' | 'midweek' | 'event' | 'camp' | 'department'
+  | 'sunday_service'
+  | 'midweek'
+  | 'event'
+  | 'camp'
+  | 'department'
+  | 'sunday_school'
+  | 'elementary'
+  | 'devotional'
+  | 'youth_service'
+  | 'revival_service'
+  | 'special'
 
 export interface AttendanceSession {
   id: string
   branch: string | null
+  /** Denorm for scoping (data-model-expansion §3.2, Flow-maintained). */
+  zone: string | null
+  /** Nullable BSC-level service (data-model-expansion §3.2). */
+  bsc: string | null
   session_date: string
   session_type: AttendanceSessionType
   service: string | null
@@ -228,4 +370,10 @@ export interface PortalUserRecord {
   branch_ids: string[]
   department_ids: string[]
   person: string | null
+  /** Area scope (data-model-expansion §8.5). */
+  area: string | null
+  /** Single-zone scope (data-model-expansion §8.5). */
+  zone: string | null
+  /** Multi-zone scope, Flow-synced (data-model-expansion §8.5). */
+  zone_ids: string[]
 }

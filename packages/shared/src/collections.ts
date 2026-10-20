@@ -34,6 +34,18 @@ export const COLLECTIONS = {
   branchFinancialRecords: 'branch_financial_records',
   wecaReturns: 'weca_returns',
   wecaReturnFormulas: 'weca_return_formulas',
+  /**
+   * Organisation hierarchy (AFC-461a, data-model-expansion §2). Snake-case
+   * wire names match the Directus collection names. `campusInstitutions` is
+   * a reference only here; full campus care stays in Slice 5.
+   */
+  areas: 'areas',
+  zones: 'zones',
+  bibleStudyCentres: 'bible_study_centres',
+  conferenceCentres: 'conference_centres',
+  sundaySchoolClasses: 'sunday_school_classes',
+  avsCentres: 'avs_centres',
+  campusInstitutions: 'campus_institutions',
 } as const
 
 export type CollectionName = (typeof COLLECTIONS)[keyof typeof COLLECTIONS]

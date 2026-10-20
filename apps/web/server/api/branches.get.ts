@@ -1,11 +1,42 @@
 import type { BranchSummary } from '../../types/portal'
-import { getPortalScope, listItems, mergeFilters, scopeFilter } from '../utils/portal'
+import {
+  branchCollectionScope,
+  getPortalScope,
+  listItems,
+  mergeFilters,
+  requireCan,
+  requireZoneInScope,
+  scopeZoneIds,
+} from '../utils/portal'
 
+/**
+ * GET /api/branches?zone=&area=
+ *
+ * Hierarchy-scoped branch list (AFC-461a, data-model-expansion §10). Area
+ * staff see all active branches; zone staff see their zones' rows; branch
+ * staff see their own rows. Requested `zone`/`area` values are intersected
+ * with the scope predicate, so an out-of-scope request returns empty, never
+ * foreign rows; an explicitly out-of-scope `zone` is a 403 (fail-closed).
+ */
 export default defineEventHandler(async (event): Promise<BranchSummary[]> => {
   const scope = await getPortalScope(event)
+  requireCan(scope, 'branches', 'read')
+
+  const query = getQuery(event)
+  const zone = typeof query.zone === 'string' && query.zone.length > 0 ? query.zone : undefined
+  const area = typeof query.area === 'string' && query.area.length > 0 ? query.area : undefined
+
+  const visibleZones = scope.isArea ? [] : await scopeZoneIds(event, scope)
+  requireZoneInScope(scope, zone, visibleZones)
+
   const result = await listItems<BranchSummary>(event, scope, 'branches', {
-    filter: mergeFilters({ status: { _eq: 'active' } }, scopeFilter(scope)),
-    fields: ['id', 'name', 'code', 'branch_type', 'status'],
+    filter: mergeFilters(
+      { status: { _eq: 'active' } },
+      zone ? { zone: { _eq: zone } } : undefined,
+      area ? { area: { _eq: area } } : undefined,
+      branchCollectionScope(scope),
+    ),
+    fields: ['id', 'name', 'code', 'branch_type', 'type_label', 'zone', 'area', 'status'],
     sort: 'sort,name',
     limit: -1,
   })
