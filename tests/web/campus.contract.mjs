@@ -158,7 +158,7 @@ describe('campus — capability + scope contract', () => {
 
   it('cross-scope writes are 404, never rows', () => {
     for (const rel of [ROUTES.timetableCreate, ROUTES.facilitatorsCreate, ROUTES.attendanceMark, ROUTES.resultsCreate, ROUTES.supportCreate]) {
-      assert.match(codeOf(rel), /not_found/, `${rel} must 404 outside scope`)
+      assert.match(codeOf(rel), /not_found|assertStudentInScope/, `${rel} must 404 outside scope`)
     }
   })
 
@@ -202,6 +202,57 @@ describe('campus — capability + scope contract', () => {
   it('the progress CSV reads the shared collector (no drift)', () => {
     assert.match(codeOf(ROUTES.progressCsv), /collectCampusProgress/, 'CSV must share the list collector')
     assert.match(codeOf(ROUTES.report), /collectCampusProgress/, 'collector must exist')
+  })
+
+  it('attendance/progress writes intersect student scope (F1)', () => {
+    for (const rel of [ROUTES.attendanceMark, ROUTES.progressCreate]) {
+      assert.match(codeOf(rel), /assertStudentInScope/, `${rel} must resolve the student row in scope`)
+    }
+    // The student-scope helper itself 404s outside scope.
+    assert.match(codeOf(ROUTES.helpers), /That student was not found in your scope/, 'helper must 404 outside scope')
+  })
+
+  it('attendance list intersects session and student scope (F1, no union leak)', () => {
+    const src = codeOf(ROUTES.helpers)
+    assert.match(src, /campusAttendanceScopeFilter/, 'attendance filter must exist')
+    // Session side (programme OR slot programme) ANDed with the student side.
+    assert.match(src, /mergeFilters\(sessionPart,\s*studentPart\)/, 'attendance must AND session with student scope')
+    assert.doesNotMatch(
+      src.replace(/campusProgressScopeFilter[\s\S]*$/, ''),
+      /const paths = \[\.\.\.programmePaths, \.\.\.studentPaths\]/,
+      'attendance must not union programme and student paths',
+    )
+  })
+
+  it('progress list and CSV intersect programme and student scope (F1)', () => {
+    assert.match(codeOf(ROUTES.progressList), /campusProgressScopeFilter/, 'progress list must use the intersect filter')
+    assert.match(codeOf(ROUTES.report), /campusProgressScopeFilter/, 'CSV collector must use the intersect filter')
+    assert.match(codeOf(ROUTES.helpers), /mergeFilters\(programmePart,\s*studentPart\)/, 'progress must AND programme with student scope')
+  })
+
+  it('cross-branch fixture: area-wide programme never exposes another branch student (F1)', () => {
+    // Static fixture of the leak: an area-wide programme (null branch/zone)
+    // is in every branch session's visible set, so a predicate that ORs the
+    // programme side with the student side matches a branch-B student row
+    // for a branch-A caller. The fixed predicate ANDs them: the same row
+    // must be hidden (both sides required).
+    const helpers = codeOf(ROUTES.helpers)
+    const attendanceBody = helpers.slice(helpers.indexOf('campusAttendanceScopeFilter'))
+    assert.match(attendanceBody, /_or:\s*\[\s*\{\s*programme:/, 'session side stays an OR of direct/slot programme')
+    assert.match(attendanceBody, /studentRelationScope\(scope,\s*'campus_student'\)/, 'student side still scopes campus_student')
+    assert.match(attendanceBody, /studentRelationScope\(scope,\s*'person'\)/, 'student side still scopes person')
+    assert.match(attendanceBody, /mergeFilters\(sessionPart,\s*studentPart\)/, 'branch-A x branch-B x area-wide must hide (AND, not OR)')
+    for (const rel of [ROUTES.attendanceMark, ROUTES.progressCreate]) {
+      assert.match(codeOf(rel), /assertStudentInScope/, `${rel} must 404 branch-A x branch-B x area-wide`)
+    }
+  })
+
+  it('enrol and person-identity writes refuse minors without guardians (F2)', () => {
+    assert.match(codeOf(ROUTES.studentsCreate), /assertPersonGuardian/, 'enrol must check the linked person guardian')
+    for (const rel of [ROUTES.attendanceMark, ROUTES.progressCreate, ROUTES.resultsCreate]) {
+      assert.match(codeOf(rel), /assertPersonGuardian/, `${rel} must check the person-identity guardian`)
+    }
+    assert.match(codeOf(ROUTES.helpers), /A guardian is required for a person under 18/, 'helper must use the people-POST 400 shape')
   })
 })
 

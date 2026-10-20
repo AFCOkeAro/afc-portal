@@ -1,5 +1,8 @@
 import { z } from 'zod'
-import { campusStudentScopeFilter } from '../../../utils/campus'
+import {
+  assertPersonGuardian,
+  campusStudentScopeFilter,
+} from '../../../utils/campus'
 import {
   createItem,
   getPortalScope,
@@ -98,6 +101,10 @@ export default defineEventHandler(async (event) => {
   // Touch the predicate so an out-of-scope branch/zone combination fails
   // the same way the list route fails it (fail-closed, one rule).
   await campusStudentScopeFilter(event, scope, { branch, zone: form.zone })
+
+  // F2: enrol must not accept a bare minor person id — the linked person
+  // must exist and carry a guardian when under 18 (same 400 as people POST).
+  await assertPersonGuardian(event, scope, form.person)
 
   const now = new Date().toISOString()
   const created = await createItem<Record<string, unknown>>(

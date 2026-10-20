@@ -1,5 +1,7 @@
 import type { H3Event } from 'h3'
+import { directusFetch } from './directus'
 import {
+  ageFromDob,
   listItems,
   mergeFilters,
   requireZoneInScope,
@@ -352,11 +354,14 @@ export function studentRelationScope(
 }
 
 /**
- * Attendance scope (AFC-484, US-C2). Marks resolve through three paths:
- * the direct programme link, the slot's programme
- * (`timetable.programme`), or the student branch. The predicate is the
- * union of the paths the row may carry; a mark with none of them is
- * invisible to non-area sessions (fail-closed).
+ * Attendance scope (AFC-484, US-C2; AFC-524 F1). Marks carry both a session
+ * link (direct programme or slot programme) and a student identity
+ * (campus_student xor person). Both sides must be in scope: a visible
+ * programme alone never exposes another branch's student (area-wide
+ * programmes are visible everywhere, so a union would leak). The session
+ * side is an OR (direct or slot programme); the student side is an OR
+ * (campus_student or person branch); the two sides are ANDed. Fail-closed
+ * when either side is empty.
  */
 export async function campusAttendanceScopeFilter(
   event: H3Event,
@@ -364,21 +369,202 @@ export async function campusAttendanceScopeFilter(
 ): Promise<Record<string, unknown> | undefined> {
   if (scope.isArea) return undefined
   const ids = await visibleProgrammeIds(event, scope)
-  const programmePaths: Record<string, unknown>[] =
+  // Fail-closed: no visible programmes means no attendance rows, even when
+  // the student side would match.
+  const sessionPart: Record<string, unknown> =
     ids.length > 0
-      ? [
-          { programme: { _in: ids } },
-          { timetable: { programme: { _in: ids } } },
-        ]
-      : []
-  const studentPaths: Record<string, unknown>[] = [
+      ? {
+          _or: [
+            { programme: { _in: ids } },
+            { timetable: { programme: { _in: ids } } },
+          ],
+        }
+      : { programme: { _eq: '__none__' } }
+  const studentPaths = [
     studentRelationScope(scope, 'campus_student'),
     studentRelationScope(scope, 'person'),
   ].filter((path): path is Record<string, unknown> => Boolean(path))
-  const paths = [...programmePaths, ...studentPaths]
-  if (paths.length === 0) return { programme: { _eq: '__none__' } }
-  if (paths.length === 1) return paths[0]
-  return { _or: paths }
+  const studentPart: Record<string, unknown> =
+    studentPaths.length === 0
+      ? { id: { _eq: '__none__' } }
+      : studentPaths.length === 1
+        ? (studentPaths[0] as Record<string, unknown>)
+        : { _or: studentPaths }
+  return mergeFilters(sessionPart, studentPart)
+}
+
+/**
+ * Progress scope (AFC-524 F1). Progress rows always carry a programme AND a
+ * student identity, so both must be in scope (intersect, not union). An
+ * area-wide programme is visible to every branch, but the student side
+ * still confines the row to its branch/zone.
+ */
+export async function campusProgressScopeFilter(
+  event: H3Event,
+  scope: PortalScope,
+): Promise<Record<string, unknown> | undefined> {
+  if (scope.isArea) return undefined
+  const programmePart = await programmeChildFilter(event, scope)
+  const studentPaths = [
+    studentRelationScope(scope, 'campus_student'),
+    studentRelationScope(scope, 'person'),
+  ].filter((path): path is Record<string, unknown> => Boolean(path))
+  const studentPart: Record<string, unknown> | undefined =
+    studentPaths.length === 0
+      ? { id: { _eq: '__none__' } }
+      : studentPaths.length === 1
+        ? (studentPaths[0] as Record<string, unknown>)
+        : { _or: studentPaths }
+  return mergeFilters(programmePart, studentPart)
+}
+
+/**
+ * Write-path student scope (AFC-524 F1). Resolves the named student row and
+ * 404s when it sits outside the caller's branch/zone scope. Mirrors the
+ * results/support POST pattern: a non-area session may only write for a
+ * student it could list. People rows with no branch are fail-closed.
+ *
+ * Returns the student row (campus_students rows include the linked `person`
+ * for the F2 guardian check).
+ */
+export async function assertStudentInScope(
+  event: H3Event,
+  scope: PortalScope,
+  identity: { campus_student?: string | null; person?: string | null },
+): Promise<Record<string, unknown>> {
+  if (scope.isArea) {
+    const collection = identity.campus_student
+      ? '/items/campus_students'
+      : '/items/people'
+    const id = identity.campus_student ?? identity.person
+    const found = await directusFetch<{
+      data: Array<Record<string, unknown>>
+    }>(event, collection, {
+      accessToken: scope.token,
+      query: {
+        fields:
+          collection === '/items/campus_students'
+            ? 'id,branch,zone,person'
+            : 'id,branch,zone',
+        limit: 1,
+        filter: { id: { _eq: id } },
+      },
+    }).catch(() => {
+      throw createError({
+        statusCode: 404,
+        statusMessage: 'That student was not found in your scope',
+        data: { code: 'not_found' },
+      })
+    })
+    const row = found.data[0]
+    if (!row) {
+      throw createError({
+        statusCode: 404,
+        statusMessage: 'That student was not found in your scope',
+        data: { code: 'not_found' },
+      })
+    }
+    return row
+  }
+  const collection = identity.campus_student
+    ? '/items/campus_students'
+    : '/items/people'
+  const id = identity.campus_student ?? identity.person
+  const found = await directusFetch<{
+    data: Array<Record<string, unknown>>
+  }>(event, collection, {
+    accessToken: scope.token,
+    query: {
+      fields:
+        collection === '/items/campus_students'
+          ? 'id,branch,zone,person'
+          : 'id,branch,zone',
+      limit: 1,
+      filter: { id: { _eq: id } },
+    },
+  }).catch(() => {
+    throw createError({
+      statusCode: 404,
+      statusMessage: 'That student was not found in your scope',
+      data: { code: 'not_found' },
+    })
+  })
+  const row = found.data[0]
+  const inBranch =
+    row?.branch != null && scope.branchIds.includes(String(row.branch))
+  const inZone = row?.zone != null && scope.zoneIds.includes(String(row.zone))
+  if (!inBranch && !inZone) {
+    throw createError({
+      statusCode: 404,
+      statusMessage: 'That student was not found in your scope',
+      data: { code: 'not_found' },
+    })
+  }
+  return row
+}
+
+/**
+ * Safeguarding write guard (AFC-524 F2). Refuses a write that links a minor
+ * without a guardian, using the same 400 shape as POST /api/people. Reads
+ * the stored `is_minor`/`guardian`/`date_of_birth` so a stale `is_minor`
+ * flag cannot bypass the DOB check.
+ */
+export async function assertPersonGuardian(
+  event: H3Event,
+  scope: PortalScope,
+  personId: string,
+): Promise<void> {
+  const found = await directusFetch<{
+    data: Array<Record<string, unknown>>
+  }>(event, `/items/people/${personId}`, {
+    accessToken: scope.token,
+    query: { fields: 'id,is_minor,guardian,date_of_birth' },
+  }).catch(() => {
+    throw createError({
+      statusCode: 404,
+      statusMessage: 'That person was not found in your scope',
+      data: { code: 'not_found' },
+    })
+  })
+  const row = (
+    found as unknown as { data: Record<string, unknown> }
+  ).data as Record<string, unknown> | undefined
+  // Directus single-item reads return `{ data: {...} }`; tolerate the list
+  // shape as well so stubbed fetches in tests cannot slip through.
+  const person =
+    row && typeof row.id !== 'undefined'
+      ? row
+      : (found as unknown as { data: Array<Record<string, unknown>> }).data?.[0]
+  if (!person) {
+    throw createError({
+      statusCode: 404,
+      statusMessage: 'That person was not found in your scope',
+      data: { code: 'not_found' },
+    })
+  }
+  const guardian = person.guardian
+  if (guardian != null && String(guardian).length > 0) return
+  if (person.is_minor === true) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'A guardian is required for a person under 18',
+      data: {
+        code: 'validation_error',
+        fields: { guardian: 'Add a guardian before saving a minor' },
+      },
+    })
+  }
+  const age = ageFromDob(person.date_of_birth as string | null | undefined)
+  if (age !== null && age < 18) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'A guardian is required for a person under 18',
+      data: {
+        code: 'validation_error',
+        fields: { guardian: 'Add a guardian before saving a minor' },
+      },
+    })
+  }
 }
 
 /**

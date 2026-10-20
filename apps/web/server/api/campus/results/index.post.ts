@@ -1,6 +1,9 @@
 import { z } from 'zod'
-import { stripResult } from '../../../utils/campus'
-import { directusFetch } from '../../../utils/directus'
+import {
+  assertPersonGuardian,
+  assertStudentInScope,
+  stripResult,
+} from '../../../utils/campus'
 import {
   createItem,
   getPortalScope,
@@ -59,40 +62,21 @@ export default defineEventHandler(async (event) => {
   // Scope check against the student row itself: a non-area session may
   // only record results for a student whose branch/zone they hold. A
   // student with no branch (person-linked, unscoped) is fail-closed.
-  if (!scope.isArea) {
-    const studentRow = await directusFetch<{
-      data: Array<Record<string, unknown>>
-    }>(
-      event,
-      form.campus_student ? '/items/campus_students' : '/items/people',
-      {
-        accessToken: scope.token,
-        query: {
-          fields: 'id,branch,zone',
-          limit: 1,
-          filter: {
-            id: { _eq: form.campus_student ?? form.person },
-          },
-        },
-      },
-    ).catch(() => {
-      throw createError({
-        statusCode: 404,
-        statusMessage: 'That student was not found in your scope',
-        data: { code: 'not_found' },
-      })
-    })
-    const found = studentRow.data[0]
-    const inBranch =
-      found?.branch != null && scope.branchIds.includes(String(found.branch))
-    const inZone =
-      found?.zone != null && scope.zoneIds.includes(String(found.zone))
-    if (!inBranch && !inZone) {
-      throw createError({
-        statusCode: 404,
-        statusMessage: 'That student was not found in your scope',
-        data: { code: 'not_found' },
-      })
+  // F1: always resolve (area staff included) so the F2 guardian check has
+  // the linked person without a second fetch drifting from the scope read.
+  const studentRow = await assertStudentInScope(event, scope, {
+    campus_student: form.campus_student,
+    person: form.person,
+  })
+
+  // F2: person-identity writes (or the person behind a campus_student row)
+  // must not link a minor without a guardian.
+  if (form.person) {
+    await assertPersonGuardian(event, scope, form.person)
+  } else {
+    const linkedPerson = studentRow.person
+    if (linkedPerson != null && String(linkedPerson).length > 0) {
+      await assertPersonGuardian(event, scope, String(linkedPerson))
     }
   }
 

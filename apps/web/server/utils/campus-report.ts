@@ -1,7 +1,7 @@
 import type { H3Event } from 'h3'
 import {
+  campusProgressScopeFilter,
   COACHING_PROGRESS_FIELDS,
-  programmeChildFilter,
 } from './campus'
 import {
   listItems,
@@ -29,7 +29,8 @@ export async function collectCampusProgress(
 ): Promise<{ rows: Array<Record<string, unknown>>; total: number }> {
   requireCan(scope, 'coaching_progress', 'read')
 
-  const scopeFilter = await programmeChildFilter(event, scope)
+  // F1: same intersect as the list route — the CSV cannot drift wider.
+  const scopeFilter = await campusProgressScopeFilter(event, scope)
   const filter = mergeFilters(
     scopeFilter,
     filters.programme ? { programme: { _eq: filters.programme } } : undefined,

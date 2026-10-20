@@ -1,6 +1,6 @@
 import {
+  campusProgressScopeFilter,
   COACHING_PROGRESS_FIELDS,
-  programmeChildFilter,
 } from '../../../utils/campus'
 import {
   getPortalScope,
@@ -33,7 +33,9 @@ export default defineEventHandler(async (event) => {
   const page = Math.max(1, Number(query.page) || 1)
   const limit = Math.min(200, Math.max(1, Number(query.limit) || 50))
 
-  const scopeFilter = await programmeChildFilter(event, scope)
+  // F1: programme AND student scope (intersect) — an area-wide programme
+  // alone must not expose another branch's students.
+  const scopeFilter = await campusProgressScopeFilter(event, scope)
 
   const result = await listItems<Record<string, unknown>>(
     event,

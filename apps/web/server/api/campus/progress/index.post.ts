@@ -1,5 +1,9 @@
 import { z } from 'zod'
-import { visibleProgrammeIds } from '../../../utils/campus'
+import {
+  assertPersonGuardian,
+  assertStudentInScope,
+  visibleProgrammeIds,
+} from '../../../utils/campus'
 import {
   createItem,
   getPortalScope,
@@ -51,6 +55,24 @@ export default defineEventHandler(async (event) => {
         statusMessage: 'That programme was not found in your scope',
         data: { code: 'not_found' },
       })
+    }
+  }
+
+  // F1: intersect the student scope — an area-wide programme is visible
+  // everywhere, so the student row must also sit in the caller's scope.
+  const studentRow = await assertStudentInScope(event, scope, {
+    campus_student: form.campus_student,
+    person: form.person,
+  })
+
+  // F2: refuse a person-identity (or underlying linked person) minor
+  // without a guardian.
+  if (form.person) {
+    await assertPersonGuardian(event, scope, form.person)
+  } else {
+    const linkedPerson = studentRow.person
+    if (linkedPerson != null && String(linkedPerson).length > 0) {
+      await assertPersonGuardian(event, scope, String(linkedPerson))
     }
   }
 

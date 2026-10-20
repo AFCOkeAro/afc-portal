@@ -1,5 +1,7 @@
 import { z } from 'zod'
 import {
+  assertPersonGuardian,
+  assertStudentInScope,
   COACHING_ATTENDANCE_FIELDS,
   visibleProgrammeIds,
 } from '../../../utils/campus'
@@ -99,6 +101,25 @@ export default defineEventHandler(async (event) => {
         statusMessage: 'That programme was not found in your scope',
         data: { code: 'not_found' },
       })
+    }
+  }
+
+  // F1: the programme check alone is not enough — an area-wide programme
+  // is visible to every branch, so the student side must also be in scope
+  // (branch-A session x branch-B student x area-wide programme 404s).
+  const studentRow = await assertStudentInScope(event, scope, {
+    campus_student: form.campus_student,
+    person: form.person,
+  })
+
+  // F2: a person-identity mark (or the person behind a campus_student row)
+  // must not link a minor without a guardian.
+  if (form.person) {
+    await assertPersonGuardian(event, scope, form.person)
+  } else {
+    const linkedPerson = studentRow.person
+    if (linkedPerson != null && String(linkedPerson).length > 0) {
+      await assertPersonGuardian(event, scope, String(linkedPerson))
     }
   }
 
