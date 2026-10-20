@@ -1,8 +1,20 @@
 <script setup lang="ts">
 import { COLLECTIONS } from '@afc/shared'
+import { ApiRequestError } from '~/composables/useApi'
 import type { BranchSummary, EventDetail } from '~/types/portal'
 
 definePageMeta({ middleware: 'staff' })
+
+/** Header aggregates from GET /api/events/[id]/rollups (AFC-470 §5). */
+interface RegistrationRollups {
+  registered: number
+  confirmed: number
+  attended: number
+  expected: number
+  collected: number
+  outstanding: number
+  byStatus: Record<string, number>
+}
 
 const route = useRoute()
 const api = useApi()
@@ -12,6 +24,12 @@ const showEdit = ref(false)
 const showBlessingForm = ref(false)
 const savingStatus = ref(false)
 const actionError = ref('')
+const checkinTicket = ref('')
+const checkinName = ref('')
+const checkingIn = ref(false)
+const checkinMessage = ref('')
+const checkinIsError = ref(false)
+const rollups = ref<RegistrationRollups | null>(null)
 
 const {
   data: event,
@@ -31,6 +49,9 @@ const canRecordBlessings = computed(() =>
 )
 const canReadRegistrations = computed(() =>
   permissions.can(COLLECTIONS.eventRegistrations, 'read'),
+)
+const canUpdateRegistrations = computed(() =>
+  permissions.can(COLLECTIONS.eventRegistrations, 'update'),
 )
 const canExport = computed(
   () =>
@@ -85,6 +106,63 @@ async function setStatus(status: 'published' | 'closed' | 'cancelled'): Promise<
     savingStatus.value = false
   }
 }
+
+/**
+ * Revenue rollups (AFC-470 §5). Loaded client-side on mount so the read
+ * grant is evaluated after the capability list arrives; reloaded with the
+ * page after every check-in. A failure hides the cards rather than the
+ * page — the list underneath is the system of record.
+ */
+async function loadRollups(): Promise<void> {
+  if (!canReadRegistrations.value) {
+    rollups.value = null
+    return
+  }
+  try {
+    const result = await api.get<{ data: RegistrationRollups }>(
+      `/api/events/${id}/rollups`,
+    )
+    rollups.value = result.data
+  } catch {
+    rollups.value = null
+  }
+}
+
+/** Staff check-in by ticket code or name (AFC-470 §2). Exactly one query. */
+async function checkIn(): Promise<void> {
+  const ticket = checkinTicket.value.trim()
+  const name = checkinName.value.trim()
+  checkinMessage.value = ''
+  if ((ticket === '') === (name === '')) {
+    checkinIsError.value = true
+    checkinMessage.value = 'Enter either a ticket code or a name — not both.'
+    return
+  }
+  checkingIn.value = true
+  try {
+    const result = await api.post<{
+      data: Record<string, unknown>
+      meta: { already: boolean }
+    }>(`/api/events/${id}/check-in`, ticket !== '' ? { ticket_code: ticket } : { name })
+    checkinIsError.value = false
+    checkinMessage.value = result.meta.already
+      ? 'Already checked in — no change made.'
+      : 'Checked in and marked attended.'
+    checkinTicket.value = ''
+    checkinName.value = ''
+    await Promise.all([refresh(), loadRollups()])
+  } catch (cause) {
+    checkinIsError.value = true
+    checkinMessage.value =
+      cause instanceof ApiRequestError ? cause.message : 'Check-in failed.'
+  } finally {
+    checkingIn.value = false
+  }
+}
+
+onMounted(() => {
+  void loadRollups()
+})
 </script>
 
 <template>
@@ -163,6 +241,24 @@ async function setStatus(status: 'published' | 'closed' | 'cancelled'): Promise<
         />
         <StatCard label="Attended" :value="event.attended_count" hint="Marked attended" />
         <StatCard label="Status" :value="event.status" :hint="event.visibility" />
+      </div>
+
+      <div v-if="canReadRegistrations && rollups" class="mt-4 grid gap-4 sm:grid-cols-3">
+        <StatCard
+          label="Expected revenue"
+          :value="`${rollups.expected} ${event.currency ?? ''}`.trim()"
+          hint="Sum of amounts expected, excluding cancelled"
+        />
+        <StatCard
+          label="Collected"
+          :value="`${rollups.collected} ${event.currency ?? ''}`.trim()"
+          hint="Sum of amounts paid, excluding cancelled"
+        />
+        <StatCard
+          label="Outstanding"
+          :value="`${rollups.outstanding} ${event.currency ?? ''}`.trim()"
+          hint="Expected minus collected"
+        />
       </div>
 
       <div class="mt-6 grid gap-6 xl:grid-cols-3">
@@ -366,6 +462,42 @@ async function setStatus(status: 'published' | 'closed' | 'cancelled'): Promise<
             </tbody>
           </table>
         </div>
+      </UCard>
+
+      <UCard v-if="canUpdateRegistrations" class="mt-6">
+        <template #header><h2 class="text-base font-semibold">Check-in</h2></template>
+        <p class="mb-3 text-sm text-gray-500 dark:text-gray-400">
+          Find one registration by ticket code or by name and mark it attended. A name
+          must match exactly one registration — otherwise you are asked to refine it.
+        </p>
+        <div class="flex flex-col gap-2 sm:flex-row">
+          <UInput
+            v-model="checkinTicket"
+            placeholder="Ticket code"
+            class="font-mono"
+            :disabled="checkingIn"
+            @keyup.enter="checkIn()"
+          />
+          <UInput
+            v-model="checkinName"
+            placeholder="Registrant name"
+            :disabled="checkingIn"
+            @keyup.enter="checkIn()"
+          />
+          <UButton
+            label="Check in"
+            icon="i-lucide-check"
+            :loading="checkingIn"
+            @click="checkIn()"
+          />
+        </div>
+        <UAlert
+          v-if="checkinMessage"
+          class="mt-3"
+          :color="checkinIsError ? 'error' : 'success'"
+          variant="subtle"
+          :description="checkinMessage"
+        />
       </UCard>
 
       <UCard v-if="canBlessings" class="mt-6">

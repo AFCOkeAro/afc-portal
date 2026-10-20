@@ -422,3 +422,35 @@ describe('rollups route: aggregate query, same gates as the export', () => {
     assert.match(src, /visibleFields/)
   })
 })
+
+describe('detail page: revenue rollups and check-in wired to the new routes', () => {
+  const src = read('apps/web/pages/events/[id].vue')
+
+  it('consumes the rollups endpoint and renders expected/collected/outstanding', () => {
+    assert.match(src, /\/api\/events\/\$\{id\}\/rollups/)
+    assert.match(src, /Expected revenue/)
+    assert.match(src, /Outstanding/)
+    assert.match(src, /rollups\.expected/)
+    assert.match(src, /rollups\.collected/)
+    assert.match(src, /rollups\.outstanding/)
+  })
+
+  it('gates the revenue cards on the registrations read grant', () => {
+    assert.match(src, /canReadRegistrations && rollups/)
+  })
+
+  it('gates the check-in card on the update grant so ushers see it without the list', () => {
+    assert.match(src, /canUpdateRegistrations/)
+    assert.match(src, /eventRegistrations, 'update'/)
+  })
+
+  it('posts exactly one of ticket_code or name to the check-in route', () => {
+    assert.match(src, /\/api\/events\/\$\{id\}\/check-in/)
+    assert.match(src, /ticket_code: ticket/)
+    assert.match(src, /not both/)
+  })
+
+  it('reloads the list and the rollups after a successful check-in', () => {
+    assert.match(src, /refresh\(\), loadRollups\(\)/)
+  })
+})
