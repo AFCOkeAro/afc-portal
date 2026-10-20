@@ -44,12 +44,8 @@ function isExpanded(key: string): boolean {
 
 function persistExpanded(): void {
   try {
-    window.localStorage.setItem(
-      SIDEBAR_EXPANDED_KEY,
-      JSON.stringify(expandedKeys.value),
-    )
-  }
-  catch {
+    window.localStorage.setItem(SIDEBAR_EXPANDED_KEY, JSON.stringify(expandedKeys.value))
+  } catch {
     // Storage unavailable (private mode, disabled) — sidebar still works,
     // state just resets to collapsed on next load.
   }
@@ -65,13 +61,11 @@ function toggleSection(key: string): void {
 onMounted(() => {
   try {
     const raw = window.localStorage.getItem(SIDEBAR_EXPANDED_KEY)
-    if (!raw)
-      return
+    if (!raw) return
     const parsed: unknown = JSON.parse(raw)
     if (Array.isArray(parsed))
       expandedKeys.value = parsed.filter((k): k is string => typeof k === 'string')
-  }
-  catch {
+  } catch {
     expandedKeys.value = []
   }
 })
