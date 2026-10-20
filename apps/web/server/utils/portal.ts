@@ -1,7 +1,7 @@
 import type { H3Event } from 'h3'
 import type { AuthSession, PermissionAction, StaffRole } from '@afc/shared'
 import { grantsForRole, hiddenFieldsForRole } from '@afc/shared/role-matrix'
-import { directusFetch } from './directus'
+import { DirectusAuthError, directusFetch } from './directus'
 import { STUB_ACCESS_TOKEN, requireSession } from './session'
 
 /**
@@ -305,6 +305,33 @@ export interface ListOptions {
 export interface ListResult<T> {
   data: T[]
   meta: { total: number; page: number; limit: number }
+}
+
+/**
+ * Map a Directus read failure to a named, UI-explainable error instead of a
+ * bare 500 (AFC-550). A missing collection and a missing read grant both
+ * arrive as `DirectusAuthError` (Directus answers unknown collections with
+ * 403), so without this the route throws a plain Error and h3 renders 500.
+ * Anything else (bad field, unreachable host) is a 503 naming the migration
+ * that owns the store, matching the pause-all `pending_migration_*` codes.
+ */
+export function throwStoreUnavailable(
+  error: unknown,
+  store: string,
+  migration: string,
+): never {
+  if (error instanceof DirectusAuthError) {
+    throw createError({
+      statusCode: 403,
+      statusMessage: `The ${store} refused this read — sign in again or ask for read access`,
+      data: { code: `${store}_forbidden` },
+    })
+  }
+  throw createError({
+    statusCode: 503,
+    statusMessage: `The ${store} is unavailable (migration ${migration} not applied?)`,
+    data: { code: `pending_migration_${migration}`, cause: String(error) },
+  })
 }
 
 export async function listItems<T>(

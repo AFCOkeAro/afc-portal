@@ -4,6 +4,7 @@ import {
   listItems,
   mergeFilters,
   requireCan,
+  throwStoreUnavailable,
 } from '../../utils/portal'
 import type { PortalScope } from '../../utils/portal'
 import { CAMPAIGN_FIELDS } from './index.get'
@@ -76,26 +77,46 @@ export default defineEventHandler(async (event) => {
   if (!id)
     throw createError({ statusCode: 400, statusMessage: 'A campaign id is required' })
 
-  const campaign = await findScopedItem<Record<string, unknown>>(
-    event,
-    scope,
-    'campaigns',
-    id,
-    {
-      fields: CAMPAIGN_FIELDS,
-      scope: campaignScope(scope),
-    },
-  )
+  // AFC-550: the core reads hit 0006 collections. A missing table and a
+  // missing read grant both arrive as DirectusAuthError — map to the named
+  // store error instead of a bare 500.
+  let campaign: Record<string, unknown>
+  let steps: { data: Record<string, unknown>[] }
+  let runs: { data: Record<string, unknown>[] }
+  try {
+    campaign = await findScopedItem<Record<string, unknown>>(
+      event,
+      scope,
+      'campaigns',
+      id,
+      {
+        fields: CAMPAIGN_FIELDS,
+        scope: campaignScope(scope),
+      },
+    )
 
-  const steps = await listItems<Record<string, unknown>>(event, scope, 'campaign_steps', {
-    filter: { campaign: { _eq: id } },
-    fields: STEP_FIELDS,
-    sort: 'sequence',
-    limit: -1,
-  })
+    steps = await listItems<Record<string, unknown>>(event, scope, 'campaign_steps', {
+      filter: { campaign: { _eq: id } },
+      fields: STEP_FIELDS,
+      sort: 'sequence',
+      limit: -1,
+    })
+
+    runs = await listItems<Record<string, unknown>>(event, scope, 'campaign_runs', {
+      filter: { campaign: { _eq: id } },
+      fields: RUN_FIELDS,
+      sort: '-window_start',
+      limit: 20,
+    })
+  } catch (error) {
+    throwStoreUnavailable(error, 'campaign_store', '0006')
+  }
 
   // Channel keys + template approval state for the US-C1 AC4 gate display.
   // Small tables, fetched once; unknown ids stay visible as ids, never hidden.
+  // Stated choice (AFC-550): these two lookups are display enrichment only,
+  // so an unreadable collection degrades to the raw-id display instead of
+  // failing the whole detail — the core reads above still fail named.
   const channelIds = [
     ...new Set(
       steps.data.map((s: Record<string, unknown>) => String(s.channel)).filter(Boolean),
@@ -112,8 +133,8 @@ export default defineEventHandler(async (event) => {
         fields: ['id', 'key', 'enabled'],
         limit: -1,
       },
-    )
-    for (const channel of channels.data) {
+    ).catch(() => null)
+    for (const channel of channels?.data ?? []) {
       channelById.set(String(channel.id), {
         key: String(channel.key),
         enabled: channel.enabled === true,
@@ -143,8 +164,8 @@ export default defineEventHandler(async (event) => {
         fields: ['id', 'key', 'approval_status', 'provider_template_id'],
         limit: -1,
       },
-    )
-    for (const template of templates.data) {
+    ).catch(() => null)
+    for (const template of templates?.data ?? []) {
       templateById.set(String(template.id), {
         key: String(template.key),
         approval_status: String(template.approval_status),
@@ -152,13 +173,6 @@ export default defineEventHandler(async (event) => {
       })
     }
   }
-
-  const runs = await listItems<Record<string, unknown>>(event, scope, 'campaign_runs', {
-    filter: { campaign: { _eq: id } },
-    fields: RUN_FIELDS,
-    sort: '-window_start',
-    limit: 20,
-  })
 
   const latest = runs.data[0] as Record<string, unknown> | undefined
 

@@ -25,7 +25,10 @@ import path from 'node:path'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const read = (rel) => readFileSync(path.join(root, rel), 'utf8')
-const codeOf = (rel) => read(rel).replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*/g, '')
+const codeOf = (rel) =>
+  read(rel)
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\/\/.*/g, '')
 
 const EXPECTED_KEYS = [
   'whatsapp_sms_fallback',
@@ -115,9 +118,12 @@ describe('campaign run route: auditable report, own campaign only', () => {
   })
 
   it('gates scope through the campaign read first', () => {
-    const campaignAt = src.indexOf("findScopedItem")
+    const campaignAt = src.indexOf('findScopedItem')
     const runAt = src.indexOf('campaign_runs')
-    assert.ok(campaignAt >= 0 && runAt > campaignAt, 'campaign read precedes the run read')
+    assert.ok(
+      campaignAt >= 0 && runAt > campaignAt,
+      'campaign read precedes the run read',
+    )
   })
 
   it('refuses runs that belong to another campaign', () => {
@@ -156,6 +162,38 @@ describe('campaign run route: auditable report, own campaign only', () => {
     assert.doesNotMatch(src, /updateItem/)
     assert.doesNotMatch(src, /deleteItem/)
     assert.doesNotMatch(src, /internal\/send/)
+  })
+})
+
+describe('campaign routes: unreadable store fails named, never bare 500 (AFC-550)', () => {
+  const list = codeOf('apps/web/server/api/campaigns/index.get.ts')
+  const detail = codeOf('apps/web/server/api/campaigns/[id].get.ts')
+  const run = codeOf('apps/web/server/api/campaigns/[id]/runs/[runId].get.ts')
+  const portal = codeOf('apps/web/server/utils/portal.ts')
+
+  it('portal maps a refused read to 403 and a missing store to 503', () => {
+    assert.match(portal, /throwStoreUnavailable/)
+    assert.match(portal, /DirectusAuthError/)
+    assert.match(portal, /statusCode: 403/)
+    assert.match(portal, /statusCode: 503/)
+    assert.match(portal, /pending_migration_/)
+  })
+
+  it('catalogue wraps every 0006 read in the named store error', () => {
+    assert.match(list, /throwStoreUnavailable\(error, 'campaign_store', '0006'\)/)
+    assert.match(list, /catch \(error\)/)
+  })
+
+  it('detail wraps the core 0006 reads in the named store error', () => {
+    assert.match(detail, /throwStoreUnavailable\(error, 'campaign_store', '0006'\)/)
+  })
+
+  it('detail degrades channel/template enrichment instead of 500ing', () => {
+    assert.match(detail, /\.catch\(\(\) => null\)/)
+  })
+
+  it('run report wraps the campaign/run reads in the named store error', () => {
+    assert.match(run, /throwStoreUnavailable\(error, 'campaign_store', '0006'\)/)
   })
 })
 
