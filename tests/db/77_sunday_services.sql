@@ -83,9 +83,21 @@ BEGIN
   PERFORM test_support.assert_true(
     to_regclass('public.sunday_service_events') IS NOT NULL,
     'services', 'sunday_service_events exists');
+  -- AFC-566: attendance_sessions is no longer absent -- 20261020_0023
+  -- created the register, so the 0010 conditional blocks (zone/bsc/
+  -- service_type_def denorms + attendance_counts_session_fkey) land for
+  -- real on re-apply instead of skipping loudly. Pinned positively: the
+  -- sessions register exists with the denorm columns 0010 would have
+  -- added, proving 0010 met a real table, never a fork.
   PERFORM test_support.assert_true(
-    to_regclass('public.attendance_sessions') IS NULL,
-    'services', 'no attendance_sessions yet: the denorm stays conditional, not forked');
+    to_regclass('public.attendance_sessions') IS NOT NULL
+    AND EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_schema = 'public' AND table_name = 'attendance_sessions'
+                   AND column_name = 'zone')
+    AND EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_schema = 'public' AND table_name = 'attendance_sessions'
+                   AND column_name = 'service_type_def'),
+    'services', 'attendance_sessions is 0023-owned: 0010 denorms land, not forked');
 END $$;
 
 -- ---------------------------------------------------------------------------
@@ -205,9 +217,16 @@ BEGIN
     (SELECT branch::text FROM service_assignments WHERE id = 'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1'),
     (SELECT branch::text FROM sunday_services WHERE id = '11111111-1111-4111-8111-111111111111'),
     'services', 'assignment branch agrees with its service branch');
+  -- AFC-566: the sessions table is no longer absent (see 77.1) -- the
+  -- re-applied 0010 lands its denorms on the real 0023 register, and the
+  -- back-compat headcount columns stay exactly as 0023 created them (the
+  -- owning slice's shape, not a 0010 fork).
   PERFORM test_support.assert_true(
-    to_regclass('public.attendance_sessions') IS NULL,
-    'services', 'the sessions table is still absent: no fork, back-compat headcounts untouched');
+    EXISTS (SELECT 1 FROM information_schema.columns
+             WHERE table_schema = 'public' AND table_name = 'attendance_sessions'
+               AND column_name IN ('headcount_total', 'headcount_men',
+                 'headcount_women', 'headcount_children')),
+    'services', 'headcount columns ride the 0023 register (back-compat, untouched by 0010)');
 END $$;
 
 -- ---------------------------------------------------------------------------

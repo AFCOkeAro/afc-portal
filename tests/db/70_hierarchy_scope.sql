@@ -247,12 +247,48 @@ END $$;
 -- ---------------------------------------------------------------------------
 DO $$
 BEGIN
+  -- AFC-566: attendance_sessions is no longer absent -- 20261020_0023
+  -- created the register WITH the 0002/0010 denorm columns (zone, bsc,
+  -- service_type_def). The no-fork invariant is now pinned positively: the
+  -- table present carries the owning migration's full shape (route columns
+  -- 0002 would never create, e.g. session_name/idempotency_key), so 0002's
+  -- conditional ALTERs met a real register, never a fork of their own
+  -- making.
   PERFORM test_support.assert_true(
-    to_regclass('public.attendance_sessions') IS NULL,
-    'hierarchy', 'attendance_sessions is absent here: denorm lands with its own table, not a fork');
+    to_regclass('public.attendance_sessions') IS NOT NULL
+    AND EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_schema = 'public' AND table_name = 'attendance_sessions'
+                   AND column_name = 'session_name')
+    AND EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_schema = 'public' AND table_name = 'attendance_sessions'
+                   AND column_name = 'idempotency_key')
+    AND EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_schema = 'public' AND table_name = 'attendance_sessions'
+                   AND column_name = 'zone')
+    AND EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_schema = 'public' AND table_name = 'attendance_sessions'
+                   AND column_name = 'service_type_def'),
+    'hierarchy', 'attendance_sessions is 0023-owned with the full register shape (0002 met it, never forked it)');
+  -- AFC-566: households is no longer absent -- 20261020_0020 created the
+  -- register. The no-fork invariant is now pinned positively: the table
+  -- present carries the owning migration's full shape (route columns 0002
+  -- would never create, e.g. name/status), so 0002's conditional ALTERs
+  -- met a real register, not a fork of their own making.
   PERFORM test_support.assert_true(
-    to_regclass('public.households') IS NULL,
-    'hierarchy', 'households is absent here: denorm lands with its own table, not a fork');
+    to_regclass('public.households') IS NOT NULL
+    AND EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_schema = 'public' AND table_name = 'households'
+                   AND column_name = 'name')
+    AND EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_schema = 'public' AND table_name = 'households'
+                   AND column_name = 'status')
+    AND EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_schema = 'public' AND table_name = 'households'
+                   AND column_name = 'zone')
+    AND EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_schema = 'public' AND table_name = 'households'
+                   AND column_name = 'household_head'),
+    'hierarchy', 'households is 0020-owned with the full register shape (0002 met it, never forked it)');
   PERFORM test_support.assert_true(
     to_regclass('public.directus_users') IS NULL,
     'hierarchy', 'directus_users is absent here: scopes land in the Directus project, not a shadow table');

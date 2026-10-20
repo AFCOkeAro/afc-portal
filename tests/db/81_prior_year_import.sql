@@ -210,6 +210,15 @@ DECLARE
   v_before integer; v_after integer;
   v_session uuid := 'c1000000-0000-4000-8000-000000008105';
 BEGIN
+  -- AFC-566: 0023 created the real sessions register and closed the
+  -- attendance_counts_session_fkey merge, so counts need a real session.
+  -- Seeded here (idempotent), removed at the end of this section; the
+  -- import-idempotency half of this suite never depended on the session
+  -- being fake.
+  INSERT INTO attendance_sessions (id, session_date, session_type)
+    VALUES (v_session, DATE '2025-10-26', 'sunday_service')
+  ON CONFLICT (id) DO NOTHING;
+
   INSERT INTO attendance_counts (session, category, sex, count) VALUES
     (v_session, 'adults', 'male', 95),
     (v_session, 'adults', 'female', 110)
@@ -243,6 +252,12 @@ END $$;
 UPDATE attendance_counts SET count = 95
   WHERE session = 'c1000000-0000-4000-8000-000000008105'
     AND category = 'adults' AND sex = 'male';
+
+-- Fixture session + its counts go (AFC-566: the register stays, the rows
+-- don't -- suite 88's empty-rollback proof needs empty tables, and no
+-- later suite reads this throwaway session).
+DELETE FROM attendance_sessions
+  WHERE id = 'c1000000-0000-4000-8000-000000008105';
 
 -- ---------------------------------------------------------------------------
 -- 81.6  LEDGER IDEMPOTENCY. UNIQUE (import, natural_key): a duplicate item

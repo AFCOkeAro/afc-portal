@@ -101,20 +101,31 @@ END $$;
 -- ---------------------------------------------------------------------------
 DO $$
 DECLARE
-  v_event uuid := gen_random_uuid();
+  v_event uuid;
   v_long text := repeat('g', 65);
   v_max text := repeat('g', 64);
 BEGIN
+  -- AFC-566: 0021 created the real registers (event FK enforced, names NOT
+  -- NULL), so the probes run against a real throwaway event row created
+  -- here and removed in 84.5 -- the stub shape this suite stood up
+  -- pre-0021 needed neither. CHECK order is unchanged: the long code still
+  -- fails 23514, valid codes still pass.
+  IF to_regclass('public.events') IS NOT NULL THEN
+    INSERT INTO events (title, start_at, end_at)
+      VALUES ('Groupcode Probe Event', now(), now()) RETURNING id INTO v_event;
+  ELSE
+    v_event := gen_random_uuid();
+  END IF;
   PERFORM test_support.assert_raises(NULL,
-    'INSERT INTO event_registrations (event, group_code) VALUES (''' || v_event::text || ''', ''' || v_long || ''')',
+    'INSERT INTO event_registrations (event, registrant_first_name, registrant_last_name, group_code) VALUES (''' || v_event::text || ''', ''Long'', ''Code'', ''' || v_long || ''')',
     '23514', 'groupcode', 'a 65-char group_code is rejected at creation');
 
   PERFORM test_support.assert_not_raises(NULL,
-    'INSERT INTO event_registrations (event, group_code) VALUES (''' || v_event::text || ''', ''' || v_max || ''')',
+    'INSERT INTO event_registrations (event, registrant_first_name, registrant_last_name, group_code) VALUES (''' || v_event::text || ''', ''Max'', ''Code'', ''' || v_max || ''')',
     'groupcode', 'a 64-char group_code is accepted (probe, rolled back)');
 
   PERFORM test_support.assert_not_raises(NULL,
-    'INSERT INTO event_registrations (event, group_code) VALUES (''' || v_event::text || ''', NULL)',
+    'INSERT INTO event_registrations (event, registrant_first_name, registrant_last_name, group_code) VALUES (''' || v_event::text || ''', ''Null'', ''Code'', NULL)',
     'groupcode', 'NULL group_code is accepted -- pre-existing rows stay NULL (probe, rolled back)');
 END $$;
 
@@ -186,4 +197,12 @@ BEGIN
   ELSE
     RAISE NOTICE '84.5: real event_registrations present -- left in place with group_code.';
   END IF;
+
+  -- AFC-566: remove 84.3's throwaway event row (probes roll back; only the
+  -- event row persists). 84.4's rollback test already ran, so the drop is
+  -- safe here; registrations cascade with nothing to cascade (empty).
+  DELETE FROM events WHERE title = 'Groupcode Probe Event';
+  PERFORM test_support.assert_true(
+    (SELECT count(*) FROM events WHERE title = 'Groupcode Probe Event') = 0, 'groupcode',
+    'restore: 84.3 throwaway event removed (tree as found)');
 END $$;
