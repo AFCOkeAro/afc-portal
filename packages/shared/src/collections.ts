@@ -79,6 +79,25 @@ export const COLLECTIONS = {
   sundaySchoolClasses: 'sunday_school_classes',
   avsCentres: 'avs_centres',
   campusInstitutions: 'campus_institutions',
+  /**
+   * Office bundle (AFC-477, data-model-expansion §§9.1–9.7). `*Events` are
+   * the explicit per-domain audit trails (created/updated/status_changed/
+   * note), following the welfare_case_events precedent -- the portal route
+   * is the writer, the table is the trail.
+   */
+  transfers: 'transfers',
+  transferEvents: 'transfer_events',
+  marriageMatters: 'marriage_matters',
+  marriageMatterEvents: 'marriage_matter_events',
+  officeMinutes: 'office_minutes',
+  minutesAttendees: 'minutes_attendees',
+  officeMinuteEvents: 'office_minute_events',
+  tasks: 'tasks',
+  taskEvents: 'task_events',
+  announcements: 'announcements',
+  announcementEvents: 'announcement_events',
+  eventReferrals: 'event_referrals',
+  /**
    * Youth profiles + celebrations (AFC-476, data-model-expansion §§6.1-6.2).
    * `youthProfileEvents` / `celebrationEvents` are the explicit audit trails
    * (created/updated/note; created/approved/published/archived/note),

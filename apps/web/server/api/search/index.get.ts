@@ -45,7 +45,7 @@ export default defineEventHandler(async (event) => {
   const wanted = domain ? [domain] : [...DOMAINS]
   const results: Record<string, unknown[]> = {}
   for (const name of wanted) {
-    const collection = COLLECTION_FOR[name]
+    const collection = COLLECTION_FOR[name] ?? name
     if (!can(scope, collection, 'read')) {
       results[name] = []
       continue

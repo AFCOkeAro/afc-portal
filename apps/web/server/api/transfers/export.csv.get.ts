@@ -23,7 +23,7 @@ export default defineEventHandler(async (event) => {
   })
   const rows: string[][] = [
     [...TRANSFER_CSV_COLUMNS],
-    ...data.map((row) => TRANSFER_CSV_COLUMNS.map((column) => row[column])),
+    ...data.map((row) => TRANSFER_CSV_COLUMNS.map((column) => String(row[column] ?? ''))),
   ]
   return csvResponse(event, 'transfers.csv', rows)
 })
