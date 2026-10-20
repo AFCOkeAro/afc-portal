@@ -1,5 +1,6 @@
 import { createHash, randomInt, timingSafeEqual } from 'node:crypto'
 import type { H3Event } from 'h3'
+import { directusFetch } from './directus'
 
 /**
  * Member phone-OTP scaffolding (AFC-482, data-model-v4 §3.2 + §5 + §5.2,
@@ -134,6 +135,66 @@ export function isMemberSessionLive(
   if (now >= sessionExpiresAt) return false
   if (memberAccessExpiresAt !== null && now >= memberAccessExpiresAt) return false
   return true
+}
+
+/** 401 thrown when the per-request time-box re-check fails (D1, fail closed). */
+function throwMemberSessionExpired(): never {
+  throw createError({
+    statusCode: 401,
+    statusMessage: 'Your session has expired; request a new code',
+    data: { code: 'session_expired' },
+  })
+}
+
+/**
+ * D1 per-request access time-box re-check (AFC-526, AFC-513 D1).
+ *
+ * Live-reads `directus_users.member_access_expires_at` for the session user
+ * and returns it as epoch ms (null = no time-box set). FAILS CLOSED: a
+ * lookup failure or an unparsable value throws 401 session_expired, never a
+ * permissive null. Callers pass the live value into `isMemberSessionLive`
+ * (directly or via `requireLiveMemberSession` below) -- never a stale copy
+ * from issue time and never a null literal.
+ */
+export async function readMemberAccessExpiresAtMs(
+  event: H3Event,
+  userId: string,
+): Promise<number | null> {
+  let raw: unknown
+  try {
+    const row = await directusFetch<{
+      data: { member_access_expires_at: string | null }
+    }>(event, `/users/${encodeURIComponent(userId)}`, {
+      query: { fields: 'member_access_expires_at' },
+    })
+    raw = row?.data?.member_access_expires_at ?? null
+  } catch {
+    throwMemberSessionExpired()
+  }
+  if (raw === null || raw === undefined || raw === '') return null
+  const ms = Date.parse(String(raw))
+  if (Number.isNaN(ms)) throwMemberSessionExpired()
+  return ms
+}
+
+/**
+ * D1 gate every member-gated route calls after `requireSession`
+ * (profile.get.ts now; any future `api/member/*` route must call this same
+ * helper). Live-reads the access time-box for `userId` and throws 401
+ * `session_expired` when the cookie session is dead, the live time-box has
+ * lapsed, or the lookup itself failed -- a lapsed time-box answers 401 on
+ * the next read despite a live cookie.
+ */
+export async function requireLiveMemberSession(
+  event: H3Event,
+  userId: string,
+  sessionExpiresAtMs: number,
+  now: number = Date.now(),
+): Promise<void> {
+  const accessMs = await readMemberAccessExpiresAtMs(event, userId)
+  if (!isMemberSessionLive(sessionExpiresAtMs, accessMs, now)) {
+    throwMemberSessionExpired()
+  }
 }
 
 /**

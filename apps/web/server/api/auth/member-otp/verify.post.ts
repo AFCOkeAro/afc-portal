@@ -182,7 +182,10 @@ export default defineEventHandler(async (event) => {
         user_id: userId,
         member_person: memberPerson,
         issued_at: new Date(now).toISOString(),
-        expires_at: new Date(sessionExpiresAt).toISOString(),
+        // D2 (AFC-526): persist the min(session, access) value computed
+        // above, not the full 8h sessionExpiresAt, so the DB row, the
+        // cookie, and the per-request re-check agree.
+        expires_at: new Date(expiresAt).toISOString(),
       },
     })
   } catch {

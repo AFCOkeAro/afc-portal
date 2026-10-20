@@ -353,3 +353,80 @@ describe('member OTP: AFC-512 adversarial tests (F1)', () => {
     assert.ok(nuxtConfig.includes('memberOtpEnabled: false'), 'flag still defaults to false')
   })
 })
+
+describe('member OTP: AFC-526 D1 per-request time-box re-check', () => {
+  const util = read('apps/web/server/utils/member-otp.ts')
+  const profile = read('apps/web/server/api/member/profile.get.ts')
+  const profileCode = codeOf('apps/web/server/api/member/profile.get.ts')
+
+  it('the helper lives in utils/member-otp.ts for every member-gated route', () => {
+    assert.ok(util.includes('readMemberAccessExpiresAtMs'), 'live-read helper present')
+    assert.ok(util.includes('requireLiveMemberSession'), 'per-request gate present')
+  })
+
+  it('the helper live-reads directus_users.member_access_expires_at for the session user', () => {
+    assert.ok(util.includes('/users/'), 'reads the user row live')
+    assert.ok(util.includes('member_access_expires_at'), 'reads the access time-box field')
+    assert.ok(
+      profile.includes('requireLiveMemberSession(event, session.user.id'),
+      'profile passes the session user into the live re-check',
+    )
+  })
+
+  it('a lapsed time-box answers 401 on the next read despite a live cookie', () => {
+    assert.ok(
+      util.includes('requireLiveMemberSession'),
+      'the per-request gate exists',
+    )
+    assert.ok(profile.includes('requireLiveMemberSession'), 'profile calls it on every request')
+    assert.ok(profile.includes('session_expired') || util.includes('session_expired'), 'lapsed access answers session_expired')
+    assert.ok(
+      !profileCode.includes('isMemberSessionLive(Date.parse(session.expiresAt), null'),
+      'profile no longer passes a null literal for the access time-box',
+    )
+  })
+
+  it('a lookup failure fails closed to 401 (never a permissive null)', () => {
+    const helperAt = util.indexOf('readMemberAccessExpiresAtMs')
+    assert.ok(helperAt >= 0, 'helper found')
+    const helperBody = util.slice(helperAt, helperAt + 2000)
+    assert.ok(helperBody.includes('catch'), 'lookup errors are caught')
+    assert.ok(helperBody.includes('401'), 'lookup failure answers 401')
+    assert.ok(helperBody.includes('session_expired'), 'lookup failure names session_expired')
+  })
+
+  it('the live value feeds isMemberSessionLive (no stale issue-time copy)', () => {
+    const gateAt = util.indexOf('requireLiveMemberSession')
+    assert.ok(gateAt >= 0, 'gate found')
+    const gateBody = util.slice(gateAt, gateAt + 1500)
+    assert.ok(gateBody.includes('readMemberAccessExpiresAtMs'), 'gate live-reads first')
+    assert.ok(gateBody.includes('isMemberSessionLive'), 'gate passes the live value into isMemberSessionLive')
+  })
+})
+
+describe('member OTP: AFC-526 D2 session-row min expiry', () => {
+  const verify = read('apps/web/server/api/auth/member-otp/verify.post.ts')
+  const verifyCode = codeOf('apps/web/server/api/auth/member-otp/verify.post.ts')
+
+  it('the DB row persists min(session, access), so row, cookie and re-check agree', () => {
+    assert.ok(
+      verify.includes('expires_at: new Date(expiresAt).toISOString()'),
+      'member_sessions row persists the min(session, access) value',
+    )
+  })
+
+  it('the row never persists the full 8h sessionExpiresAt on its own', () => {
+    const rowAt = verify.indexOf('/items/member_sessions')
+    assert.ok(rowAt >= 0, 'session insert found')
+    const rowBody = verify.slice(rowAt, rowAt + 800)
+    assert.ok(!rowBody.includes('new Date(sessionExpiresAt)'), 'the insert body persists no bare sessionExpiresAt value')
+  })
+
+  it('access shorter than 8h lands in the row: the min is computed above the insert', () => {
+    const minAt = verifyCode.indexOf('Math.min(sessionExpiresAt, accessExpiresAt)')
+    const rowAt = verifyCode.indexOf('/items/member_sessions')
+    assert.ok(minAt >= 0, 'min(session, access) still computed')
+    assert.ok(rowAt >= 0, 'session insert still present')
+    assert.ok(minAt < rowAt, 'the min is computed before the row is written')
+  })
+})

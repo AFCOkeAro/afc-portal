@@ -1,13 +1,13 @@
 import { isMemberSession } from '../../utils/event-invites'
 import {
   isMemberOtpEnabled,
-  isMemberSessionLive,
+  requireLiveMemberSession,
   redactMemberPhone,
   throwMemberOtpDisabled,
 } from '../../utils/member-otp'
 import { directusFetch } from '../../utils/directus'
 import { requireSession } from '../../utils/session'
-import { getPortalScope } from '../../utils/portal'
+import type { PortalScope } from '../../utils/portal'
 
 /**
  * Read the member's own profile (AFC-482, track d self-service).
@@ -29,8 +29,14 @@ import { getPortalScope } from '../../utils/portal'
 export default defineEventHandler(async (event) => {
   if (!isMemberOtpEnabled(event)) throwMemberOtpDisabled()
 
-  const scope = await getPortalScope(event)
-  if (!isMemberSession(scope)) {
+  // Member-only surface: identity comes from the session, never from a
+  // query parameter and never from staff branch scoping (getPortalScope
+  // rejects scopeless sessions, which every member session is -- so member
+  // routes read the session directly). isMemberSession only reads
+  // scope.role, so a minimal role shim keeps the shared check without
+  // pulling staff scoping into the member path.
+  const { session } = await requireSession(event)
+  if (!isMemberSession({ role: session.user.staffRole } as PortalScope)) {
     throw createError({
       statusCode: 403,
       statusMessage: 'This profile surface is for member sessions only',
@@ -38,7 +44,6 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const { session } = await requireSession(event)
   const personId = session.user.personId
   if (!personId) {
     throw createError({
@@ -48,13 +53,10 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  if (!isMemberSessionLive(Date.parse(session.expiresAt), null, Date.now())) {
-    throw createError({
-      statusCode: 401,
-      statusMessage: 'Your session has expired; request a new code',
-      data: { code: 'session_expired' },
-    })
-  }
+  // D1 (AFC-526): the access time-box is live-read for the session user on
+  // every request and fails closed (lookup failure -> 401). A lapsed
+  // time-box answers 401 on the next read despite a live cookie.
+  await requireLiveMemberSession(event, session.user.id, Date.parse(session.expiresAt), Date.now())
 
   const person = await directusFetch<{ data: Record<string, unknown> }>(
     event,
