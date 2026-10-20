@@ -49,6 +49,10 @@ export default defineEventHandler(async (event) => {
   const branch = typeof query.branch === 'string' ? query.branch : undefined
   const membershipStatus =
     typeof query.membership_status === 'string' ? query.membership_status : undefined
+  const department =
+    typeof query.department === 'string' && query.department.length > 0
+      ? query.department
+      : undefined
   const status =
     query.status === 'all'
       ? undefined
@@ -63,11 +67,42 @@ export default defineEventHandler(async (event) => {
         ? 'first_name,last_name'
         : 'last_name,first_name'
 
+  // Department filter resolves through the `people_departments` junction, so
+  // a caller who may read people but not departments gets no silent widening:
+  // the department read is required before the junction is consulted.
+  let departmentPersonIds: string[] | undefined
+  if (department) {
+    requireCan(scope, 'departments', 'read')
+    const links = await listItems<{ id: string | number; people: string | null }>(
+      event,
+      scope,
+      'people_departments',
+      {
+        filter: {
+          _and: [{ departments: { _eq: department } }, { status: { _eq: 'active' } }],
+        },
+        fields: ['id', 'people'],
+        limit: -1,
+      },
+    )
+    departmentPersonIds = [
+      ...new Set(
+        links.data
+          .map((link) => link.people)
+          .filter((value): value is string => typeof value === 'string'),
+      ),
+    ]
+    if (departmentPersonIds.length === 0) {
+      return { data: [], meta: { total: 0, page, limit } }
+    }
+  }
+
   const result = await listItems<PersonRow>(event, scope, 'people', {
     filter: mergeFilters(
       status ? { status: { _eq: status } } : undefined,
       membershipStatus ? { membership_status: { _eq: membershipStatus } } : undefined,
       branch ? { branch: { _eq: branch } } : undefined,
+      departmentPersonIds ? { id: { _in: departmentPersonIds } } : undefined,
       scopeFilter(scope),
     ),
     fields: visibleFields(scope, 'people', PERSON_FIELDS),

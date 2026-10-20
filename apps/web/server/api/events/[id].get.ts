@@ -1,4 +1,4 @@
-import type { EventDetail, RegistrationRow } from '../../../types/portal'
+import type { BlessingRow, EventDetail, RegistrationRow } from '../../../types/portal'
 import {
   branchNames,
   can,
@@ -6,9 +6,12 @@ import {
   findScopedItem,
   getPortalScope,
   listItems,
+  mergeFilters,
   requireCan,
+  scopeFilter,
   stripHiddenMany,
   visibleFields,
+  zoneScopeFilter,
 } from '../../utils/portal'
 
 const EVENT_FIELDS = [
@@ -67,6 +70,20 @@ const REGISTRATION_FIELDS = [
   'created_at',
 ]
 
+const BLESSING_FIELDS = [
+  'id',
+  'blessing_type',
+  'other_label',
+  'male_count',
+  'female_count',
+  'total_count',
+  'branch',
+  'service_date',
+  'sunday_service',
+  'event',
+  'created_at',
+]
+
 export default defineEventHandler(async (event): Promise<EventDetail> => {
   const scope = await getPortalScope(event)
   requireCan(scope, 'events', 'read')
@@ -110,6 +127,34 @@ export default defineEventHandler(async (event): Promise<EventDetail> => {
     (registration) => registration.registration_status !== 'cancelled',
   )
 
+  // US-E1 blessings surface: blessings recorded against this event appear
+  // on the event page, with counts linking to the underlying records.
+  // Gated on blessings:read; the event scope bounds the read, and the
+  // branch/zone predicate below keeps a cross-branch blessing recorded
+  // against a shared event out of a narrower session (fail-closed).
+  let blessings: BlessingRow[] = []
+  if (can(scope, 'blessings', 'read')) {
+    const linked = await listItems<BlessingRow>(event, scope, 'blessings', {
+      filter: mergeFilters(
+        { event: { _eq: id } },
+        scope.isArea
+          ? undefined
+          : scope.zoneIds.length > 0
+            ? zoneScopeFilter(scope)
+            : scopeFilter(scope),
+      ),
+      fields: BLESSING_FIELDS,
+      sort: 'blessing_type,service_date',
+      limit: -1,
+    })
+    blessings = linked.data.map((row) => ({
+      ...row,
+      id: String(row.id),
+      branch_name: row.branch ? (names.get(String(row.branch)) ?? null) : null,
+      zone_name: null,
+    }))
+  }
+
   return {
     ...(row as unknown as EventDetail),
     id: String(row.id),
@@ -122,5 +167,10 @@ export default defineEventHandler(async (event): Promise<EventDetail> => {
       (registration) => registration.registration_status === 'attended',
     ).length,
     registrations,
+    blessings,
+    blessings_total: blessings.reduce(
+      (sum, row) => sum + Number(row.total_count ?? 0),
+      0,
+    ),
   }
 })

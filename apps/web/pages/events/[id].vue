@@ -1,16 +1,44 @@
 <script setup lang="ts">
 import { COLLECTIONS } from '@afc/shared'
-import type { BranchSummary, EventDetail } from '~/types/portal'
+import { ApiRequestError } from '~/composables/useApi'
+import type { BranchSummary, EventDetail, RegistrationRow } from '~/types/portal'
 
 definePageMeta({ middleware: 'staff' })
+
+/** Header aggregates from GET /api/events/[id]/rollups (AFC-470 §5). */
+interface RegistrationRollups {
+  registered: number
+  confirmed: number
+  attended: number
+  expected: number
+  collected: number
+  outstanding: number
+  byStatus: Record<string, number>
+}
 
 const route = useRoute()
 const api = useApi()
 const permissions = usePermissions()
 const id = String(route.params.id)
 const showEdit = ref(false)
+const showBlessingForm = ref(false)
+const showWalkinForm = ref(false)
+const showGroupForm = ref(false)
+const managingRegistration = ref<RegistrationRow | null>(null)
+const showManageOpen = computed({
+  get: () => managingRegistration.value !== null,
+  set: (open: boolean) => {
+    if (!open) managingRegistration.value = null
+  },
+})
 const savingStatus = ref(false)
 const actionError = ref('')
+const checkinTicket = ref('')
+const checkinName = ref('')
+const checkingIn = ref(false)
+const checkinMessage = ref('')
+const checkinIsError = ref(false)
+const rollups = ref<RegistrationRollups | null>(null)
 
 const {
   data: event,
@@ -24,8 +52,18 @@ const branches = await useAsyncData('events-branches', () =>
 )
 
 const canEdit = computed(() => permissions.can(COLLECTIONS.events, 'update'))
+const canBlessings = computed(() => permissions.can(COLLECTIONS.blessings, 'read'))
+const canRecordBlessings = computed(() =>
+  permissions.can(COLLECTIONS.blessings, 'create'),
+)
 const canReadRegistrations = computed(() =>
   permissions.can(COLLECTIONS.eventRegistrations, 'read'),
+)
+const canUpdateRegistrations = computed(() =>
+  permissions.can(COLLECTIONS.eventRegistrations, 'update'),
+)
+const canCreateRegistrations = computed(() =>
+  permissions.can(COLLECTIONS.eventRegistrations, 'create'),
 )
 const canExport = computed(
   () =>
@@ -79,6 +117,68 @@ async function setStatus(status: 'published' | 'closed' | 'cancelled'): Promise<
   } finally {
     savingStatus.value = false
   }
+}
+
+/**
+ * Revenue rollups (AFC-470 §5). Loaded client-side on mount so the read
+ * grant is evaluated after the capability list arrives; reloaded with the
+ * page after every check-in. A failure hides the cards rather than the
+ * page — the list underneath is the system of record.
+ */
+async function loadRollups(): Promise<void> {
+  if (!canReadRegistrations.value) {
+    rollups.value = null
+    return
+  }
+  try {
+    const result = await api.get<{ data: RegistrationRollups }>(
+      `/api/events/${id}/rollups`,
+    )
+    rollups.value = result.data
+  } catch {
+    rollups.value = null
+  }
+}
+
+/** Staff check-in by ticket code or name (AFC-470 §2). Exactly one query. */
+async function checkIn(): Promise<void> {
+  const ticket = checkinTicket.value.trim()
+  const name = checkinName.value.trim()
+  checkinMessage.value = ''
+  if ((ticket === '') === (name === '')) {
+    checkinIsError.value = true
+    checkinMessage.value = 'Enter either a ticket code or a name — not both.'
+    return
+  }
+  checkingIn.value = true
+  try {
+    const result = await api.post<{
+      data: Record<string, unknown>
+      meta: { already: boolean }
+    }>(`/api/events/${id}/check-in`, ticket !== '' ? { ticket_code: ticket } : { name })
+    checkinIsError.value = false
+    checkinMessage.value = result.meta.already
+      ? 'Already checked in — no change made.'
+      : 'Checked in and marked attended.'
+    checkinTicket.value = ''
+    checkinName.value = ''
+    await Promise.all([refresh(), loadRollups()])
+  } catch (cause) {
+    checkinIsError.value = true
+    checkinMessage.value =
+      cause instanceof ApiRequestError ? cause.message : 'Check-in failed.'
+  } finally {
+    checkingIn.value = false
+  }
+}
+
+onMounted(() => {
+  void loadRollups()
+})
+
+/** Re-run after any registration write: list counts and revenue move together. */
+async function afterRegistrationSaved(): Promise<void> {
+  await Promise.all([refresh(), loadRollups()])
 }
 </script>
 
@@ -158,6 +258,24 @@ async function setStatus(status: 'published' | 'closed' | 'cancelled'): Promise<
         />
         <StatCard label="Attended" :value="event.attended_count" hint="Marked attended" />
         <StatCard label="Status" :value="event.status" :hint="event.visibility" />
+      </div>
+
+      <div v-if="canReadRegistrations && rollups" class="mt-4 grid gap-4 sm:grid-cols-3">
+        <StatCard
+          label="Expected revenue"
+          :value="`${rollups.expected} ${event.currency ?? ''}`.trim()"
+          hint="Sum of amounts expected, excluding cancelled"
+        />
+        <StatCard
+          label="Collected"
+          :value="`${rollups.collected} ${event.currency ?? ''}`.trim()"
+          hint="Sum of amounts paid, excluding cancelled"
+        />
+        <StatCard
+          label="Outstanding"
+          :value="`${rollups.outstanding} ${event.currency ?? ''}`.trim()"
+          hint="Expected minus collected"
+        />
       </div>
 
       <div class="mt-6 grid gap-6 xl:grid-cols-3">
@@ -280,9 +398,27 @@ async function setStatus(status: 'published' | 'closed' | 'cancelled'): Promise<
         <template #header>
           <div class="flex flex-wrap items-center justify-between gap-2">
             <h2 class="text-base font-semibold">Registrations</h2>
-            <span class="text-xs text-gray-500 dark:text-gray-400">
-              {{ event.registrations.length }} records
-            </span>
+            <div class="flex items-center gap-2">
+              <span class="text-xs text-gray-500 dark:text-gray-400">
+                {{ event.registrations.length }} records
+              </span>
+              <UButton
+                v-if="canCreateRegistrations"
+                size="xs"
+                variant="outline"
+                label="Register walk-in"
+                icon="i-lucide-plus"
+                @click="showWalkinForm = true"
+              />
+              <UButton
+                v-if="canCreateRegistrations"
+                size="xs"
+                variant="outline"
+                label="Register group"
+                icon="i-lucide-users"
+                @click="showGroupForm = true"
+              />
+            </div>
           </div>
         </template>
 
@@ -313,6 +449,9 @@ async function setStatus(status: 'published' | 'closed' | 'cancelled'): Promise<
                 <th v-if="medicalVisible" class="px-3 py-2 font-medium">Medical</th>
                 <th class="px-3 py-2 font-medium">Payment</th>
                 <th class="px-3 py-2 font-medium">Status</th>
+                <th v-if="canUpdateRegistrations" class="px-3 py-2 font-medium">
+                  <span class="sr-only">Actions</span>
+                </th>
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
@@ -357,16 +496,162 @@ async function setStatus(status: 'published' | 'closed' | 'cancelled'): Promise<
                     {{ registration.registration_status.replace(/_/g, ' ') }}
                   </UBadge>
                 </td>
+                <td v-if="canUpdateRegistrations" class="px-3 py-3 text-right">
+                  <UButton
+                    size="xs"
+                    color="neutral"
+                    variant="ghost"
+                    label="Manage"
+                    @click="managingRegistration = registration"
+                  />
+                </td>
               </tr>
             </tbody>
           </table>
         </div>
       </UCard>
 
+      <UCard v-if="canUpdateRegistrations" class="mt-6">
+        <template #header><h2 class="text-base font-semibold">Check-in</h2></template>
+        <p class="mb-3 text-sm text-gray-500 dark:text-gray-400">
+          Find one registration by ticket code or by name and mark it attended. A name
+          must match exactly one registration — otherwise you are asked to refine it.
+        </p>
+        <div class="flex flex-col gap-2 sm:flex-row">
+          <UInput
+            v-model="checkinTicket"
+            placeholder="Ticket code"
+            class="font-mono"
+            :disabled="checkingIn"
+            @keyup.enter="checkIn()"
+          />
+          <UInput
+            v-model="checkinName"
+            placeholder="Registrant name"
+            :disabled="checkingIn"
+            @keyup.enter="checkIn()"
+          />
+          <UButton
+            label="Check in"
+            icon="i-lucide-check"
+            :loading="checkingIn"
+            @click="checkIn()"
+          />
+        </div>
+        <UAlert
+          v-if="checkinMessage"
+          class="mt-3"
+          :color="checkinIsError ? 'error' : 'success'"
+          variant="subtle"
+          :description="checkinMessage"
+        />
+      </UCard>
+
+      <UCard v-if="canBlessings" class="mt-6">
+        <template #header>
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <h2 class="text-base font-semibold">Blessings</h2>
+            <div class="flex items-center gap-2">
+              <span class="text-xs text-gray-500 dark:text-gray-400">
+                {{ event.blessings_total }} total · {{ event.blessings.length }} records
+              </span>
+              <UButton
+                v-if="canRecordBlessings"
+                size="xs"
+                color="neutral"
+                variant="outline"
+                label="Record blessings"
+                icon="i-lucide-plus"
+                @click="showBlessingForm = true"
+              />
+            </div>
+          </div>
+        </template>
+
+        <EmptyState
+          v-if="event.blessings.length === 0"
+          title="No blessings recorded"
+          description="Blessings recorded against this event will appear here."
+        />
+
+        <div v-else class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
+            <thead>
+              <tr
+                class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400"
+              >
+                <th class="px-3 py-2 font-medium">Blessing</th>
+                <th class="px-3 py-2 font-medium">Date</th>
+                <th class="px-3 py-2 font-medium">Male</th>
+                <th class="px-3 py-2 font-medium">Female</th>
+                <th class="px-3 py-2 font-medium">Total</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+              <tr v-for="blessing in event.blessings" :key="blessing.id">
+                <td class="px-3 py-3">
+                  <NuxtLink
+                    :to="`/blessings/${blessing.id}`"
+                    class="font-medium capitalize hover:text-primary-600"
+                  >
+                    {{
+                      blessing.blessing_type === 'other' && blessing.other_label
+                        ? blessing.other_label
+                        : blessing.blessing_type.replace(/_/g, ' ')
+                    }}
+                  </NuxtLink>
+                </td>
+                <td class="px-3 py-3 text-gray-600 dark:text-gray-300">
+                  {{ blessing.service_date }}
+                </td>
+                <td class="px-3 py-3 tabular-nums text-gray-600 dark:text-gray-300">
+                  {{ blessing.male_count }}
+                </td>
+                <td class="px-3 py-3 tabular-nums text-gray-600 dark:text-gray-300">
+                  {{ blessing.female_count }}
+                </td>
+                <td class="px-3 py-3 font-medium tabular-nums">
+                  {{ blessing.total_count }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </UCard>
+
+      <RegistrationManageModal
+        v-model:open="showManageOpen"
+        :registration="managingRegistration"
+        :currency="event.currency"
+        @saved="afterRegistrationSaved()"
+      />
+      <RegistrationCreateModal
+        v-model:open="showWalkinForm"
+        :event-id="event.id"
+        :branches="branches.data.value ?? []"
+        :event-branch="event.branch"
+        :medical-visible="medicalVisible"
+        @saved="afterRegistrationSaved()"
+      />
+      <RegistrationGroupModal
+        v-model:open="showGroupForm"
+        :event-id="event.id"
+        @saved="afterRegistrationSaved()"
+      />
       <EventFormModal
         v-model:open="showEdit"
         :event="event"
         :branches="branches.data.value ?? []"
+        @saved="refresh()"
+      />
+      <BlessingFormModal
+        v-model:open="showBlessingForm"
+        :branches="branches.data.value ?? []"
+        :preset="{
+          event: event.id,
+          branch: event.branch,
+          service_date: event.start_at.slice(0, 10),
+        }"
         @saved="refresh()"
       />
     </template>

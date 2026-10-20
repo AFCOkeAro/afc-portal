@@ -44,6 +44,14 @@ export interface PortalUser {
   departmentIds: string[]
   /** Linked person profile, when the login maps to one. */
   personId: string | null
+  /**
+   * Hierarchy scopes (data-model-expansion §8.5, AFC-461a). Optional so
+   * sessions issued before the hierarchy lands still validate; absent
+   * means "no grant at that level", never "all".
+   */
+  areaId?: string | null
+  zoneId?: string | null
+  zoneIds?: string[]
 }
 
 export const loginCredentialsSchema = z.object({
@@ -72,6 +80,9 @@ export const authSessionSchema: z.ZodType<AuthSession> = z.object({
     branchIds: z.array(z.string().uuid()),
     departmentIds: z.array(z.string().uuid()),
     personId: z.string().uuid().nullable(),
+    areaId: z.string().uuid().nullable().optional(),
+    zoneId: z.string().uuid().nullable().optional(),
+    zoneIds: z.array(z.string().uuid()).optional(),
   }),
   issuedAt: z.string(),
   expiresAt: z.string(),

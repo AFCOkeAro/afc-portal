@@ -24,9 +24,15 @@
 
 -- ---------------------------------------------------------------------------
 -- Fixture. Four January branches holding the board's figures, plus a
--- pre-formula December row for 68.4. Branch ids are uuids with no FK: the
--- branches table does not exist in schema history yet (see the migration
--- header), exactly like incidents.branch_id.
+-- pre-formula December row for 68.4.
+--
+-- AFC-466 MERGE (20261020_0002): branches now exists and both finance tables
+-- hold a RESTRICT FK to branches(id) -- the merge contract the 0001 header
+-- promised ("must ALTER these tables to add the FK; it must not fork them").
+-- Orphan branch uuids no longer insert, so the fixture resolves the SEEDED
+-- Lagos North branches by code instead of minting random ids. Same code =
+-- same branch across features. PRE-FORMULA reuses seeded ABULE-EGBA (its
+-- December row is pre-formula by date, not by branch).
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS fixture_weca_branches (
   label     text PRIMARY KEY,
@@ -39,11 +45,11 @@ DECLARE
   v_rec uuid; v_ret uuid;
 BEGIN
   INSERT INTO fixture_weca_branches (label, branch_id)
-  VALUES ('OKE-ARO', gen_random_uuid()),
-         ('LEGUN', gen_random_uuid()),
-         ('MATOGUN', gen_random_uuid()),
-         ('OLOMOWEWE', gen_random_uuid()),
-         ('PRE-FORMULA', gen_random_uuid());
+  VALUES ('OKE-ARO', (SELECT id FROM branches WHERE code = 'OKE-ARO')),
+         ('LEGUN', (SELECT id FROM branches WHERE code = 'LEGUN')),
+         ('MATOGUN', (SELECT id FROM branches WHERE code = 'MATOGUN')),
+         ('OLOMOWEWE', (SELECT id FROM branches WHERE code = 'OLOMOWEWE')),
+         ('PRE-FORMULA', (SELECT id FROM branches WHERE code = 'ABULE-EGBA'));
 
   -- OKE-ARO: E=1952150, Faith City 38000 (board row).
   SELECT branch_id INTO v_oke FROM fixture_weca_branches WHERE label = 'OKE-ARO';
@@ -397,9 +403,11 @@ BEGIN
     '42501', 'weca', 'the app cannot hand-edit a computed line');
 
   -- §10 floor: the app CAN capture inputs and read the schedule.
+  -- AFC-466 MERGE: branch must be a real branches row (FK). SANGO-OTA holds
+  -- no finance row for 2026-07, so the (branch, month) unique key is free.
   PERFORM test_support.assert_not_raises('directus_app',
     $q$INSERT INTO branch_financial_records (branch, month, income, currency)
-      VALUES ('00000000-0000-0000-0000-000000000000', DATE '2026-07-01', 50000.00, 'NGN')$q$,
+      VALUES ((SELECT id FROM branches WHERE code = 'SANGO-OTA'), DATE '2026-07-01', 50000.00, 'NGN')$q$,
     'weca', 'the app can capture a financial input record');
   PERFORM test_support.assert_not_raises('directus_app',
     $q$SELECT 1 FROM weca_return_formulas WHERE version = 'weca-2026-01'$q$,

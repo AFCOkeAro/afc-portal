@@ -25,10 +25,13 @@ importers:
         version: link:../../packages/shared
       '@nuxt/ui':
         specifier: 3.3.7
-        version: 3.3.7(@babel/parser@7.29.9)(change-case@5.4.4)(db0@0.3.4(@electric-sql/pglite@0.2.17))(embla-carousel@8.6.0)(ioredis@5.11.1)(magicast@0.5.5)(oxc-parser@0.143.0)(typescript@5.9.3)(vite@7.3.6(@types/node@26.6.4)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.51.2)(yaml@2.9.1))(vue-router@4.6.4(vue@3.5.43(typescript@5.9.3)))(vue@3.5.43(typescript@5.9.3))(zod@4.6.5)
+        version: 3.3.7(@babel/parser@7.29.9)(change-case@5.4.4)(db0@0.3.4(@electric-sql/pglite@0.2.17))(embla-carousel@8.6.0)(ioredis@5.11.1)(magicast@0.5.5)(oxc-parser@0.143.0)(typescript@5.9.3)(vite@7.3.6(@types/node@26.6.4)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.51.2)(yaml@2.9.1))(vue-router@4.6.4(vue@3.5.43(typescript@5.9.3)))(vue@3.5.43(typescript@5.9.3))(zod@3.25.76)
       nuxt:
         specifier: 3.21.11
         version: 3.21.11(@electric-sql/pglite@0.2.17)(@oxc-project/types@0.143.0)(@types/node@26.6.4)(@vue/compiler-sfc@3.5.43)(cac@7.0.0)(db0@0.3.4(@electric-sql/pglite@0.2.17))(esbuild@0.28.2)(eslint@10.12.0(jiti@2.7.0))(ioredis@5.11.1)(lightningcss@1.32.0)(magicast@0.5.5)(optionator@0.9.4)(rollup-plugin-visualizer@7.1.1(rollup@4.64.0))(rollup@4.64.0)(srvx@0.11.22)(terser@5.51.2)(typescript@5.9.3)(vite@7.3.6(@types/node@26.6.4)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.51.2)(yaml@2.9.1))(vue-tsc@2.2.12(typescript@5.9.3))(yaml@2.9.1)
+      zod:
+        specifier: ^3.25.76
+        version: 3.25.76
     devDependencies:
       '@nuxt/eslint':
         specifier: 1.17.0
@@ -6272,7 +6275,7 @@ snapshots:
       rc9: 3.1.0
       std-env: 4.3.0
 
-  '@nuxt/ui@3.3.7(@babel/parser@7.29.9)(change-case@5.4.4)(db0@0.3.4(@electric-sql/pglite@0.2.17))(embla-carousel@8.6.0)(ioredis@5.11.1)(magicast@0.5.5)(oxc-parser@0.143.0)(typescript@5.9.3)(vite@7.3.6(@types/node@26.6.4)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.51.2)(yaml@2.9.1))(vue-router@4.6.4(vue@3.5.43(typescript@5.9.3)))(vue@3.5.43(typescript@5.9.3))(zod@4.6.5)':
+  '@nuxt/ui@3.3.7(@babel/parser@7.29.9)(change-case@5.4.4)(db0@0.3.4(@electric-sql/pglite@0.2.17))(embla-carousel@8.6.0)(ioredis@5.11.1)(magicast@0.5.5)(oxc-parser@0.143.0)(typescript@5.9.3)(vite@7.3.6(@types/node@26.6.4)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.51.2)(yaml@2.9.1))(vue-router@4.6.4(vue@3.5.43(typescript@5.9.3)))(vue@3.5.43(typescript@5.9.3))(zod@3.25.76)':
     dependencies:
       '@iconify/vue': 5.0.3(vue@3.5.43(typescript@5.9.3))
       '@internationalized/date': 3.12.4
@@ -6320,7 +6323,7 @@ snapshots:
       vue-component-type-helpers: 3.3.12
     optionalDependencies:
       vue-router: 4.6.4(vue@3.5.43(typescript@5.9.3))
-      zod: 4.6.5
+      zod: 3.25.76
     transitivePeerDependencies:
       - '@azure/app-configuration'
       - '@azure/cosmos'

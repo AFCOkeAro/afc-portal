@@ -1,0 +1,23 @@
+{
+  "authorAgentId": "7b4aae3b-0da5-4de2-a1d8-4737943ef561",
+  "authorName": "Coder",
+  "claimedAt": "2026-10-20T13:30:00+01:00",
+  "doesNotClaimR2": "There is no `reviews[]` entry here and there will not be one from me. R2 wants a named reviewer who is not the author, and I am the author of every path below. Reviewer designation for a Coder compliance-path commit is the CTO (MediaTech). There is no independent security reviewer on this team (board declined the seat on cost), so a CTO review is a recorded degradation, not independent review -- stated here rather than implied. The commit this claim covers WILL report an R2 violation until the CTO records a verdict, and that violation is the honest state.",
+  "issue": "AFC-468",
+  "paths": [
+    "services/directus/schema/migrations/20261020_0003_attendance_counts.sql",
+    "services/directus/schema/migrations/rollback/20261020_0003_attendance_counts.down.sql",
+    "tests/db/71_attendance_counts.sql",
+    "packages/shared/src/schemas/attendance-split.ts",
+    "packages/shared/src/schemas/index.ts",
+    "packages/shared/src/collections.ts",
+    "packages/shared/src/role-matrix.ts",
+    "docs/planning/attendance-flows.md",
+    ".provenance/claims/AFC-468.json"
+  ],
+  "scopeOfTheClaim": "R1 only: authorship of the listed paths on AFC-468. COMMIT SPLIT (provenance hook, R1/R2): the three compliance-path files (0003 migration, its down script, tests/db/71) CANNOT land in a Coder-only commit -- the merge-in gate refuses without an independent reviewer, and fabricating a Reviewed-by would be dishonest. They stay staged for the CTO-reviewed follow-up commit (review requested from MediaTech; see the AFC-468 thread), following the 3254f42 precedent which likewise left 0002/68/70 uncommitted pending CTO review. Likewise packages/shared/src/collections.ts and packages/shared/src/role-matrix.ts carry concurrent uncommitted AFC-479 (comms) hunks by a sibling in the same lines; staging those files would ship the sibling's unreviewed work under my commit message, so my hunks there stay in the worktree UNCOMMITTED and follow once AFC-479 lands. This commit holds the other four paths only (shared split schemas + barrel line, Flow spec, this claim). It is not clearance of the retention gate (plan 0.10.5), which only the CEO can clear. Report/CSV/capture-UI routes and pages are NOT claimed: the attendance report paths in the tree (attendance-report.ts, report.get.ts, report.csv.get.ts, report.vue) are concurrent sibling work on the legacy headcount model and were left untouched per the attribution rule; converging them onto the split contract is the recorded next step.",
+  "verificationRecorded": "node scripts/run-db-tests.mjs exit 0: 20 suites, 717 assertions, 0 failing (baseline before this change was 19 suites / 670 assertions with the AFC-466 tree). pnpm --filter @afc/shared typecheck clean. Full pnpm test (all gates) run before commit; result recorded in the task thread.",
+  "whatChangedSinceAFC466": "0003 deliberately does NOT create attendance_sessions (suite 70 pins its absence; the header belongs to the capture slice that owns the Directus collection). counts.session is therefore a bare uuid with a merge contract naming the exact FK the owning slice must add (the 0001->0002 WECA pattern), and the 0003 down script drops only what 0003 created. If the owning slice has landed when suite 71 runs, its tripwire fails loudly rather than forking.",
+  "whatTheChangeActuallyDoes": "New migration creating service_type_definitions (key unique, ordered-categories jsonb, sex-split/BSC flags, status; eleven seed rows idempotent) and attendance_counts (session bare uuid NOT NULL, 10-value category, other-label CHECK, sex enum default unspecified, count >= 0, unique (session,category,sex), session+category indexes); conditional service_type_def denorm; rerunnable legacy-five-column backfill into sex=unspecified rows (men/women deliberately unmapped); app ceiling SELECT + INSERT/UPDATE, no DELETE, key insertable never updatable; no roles, no triggers, no durations. Down script refuses on any rows, drops denorm column where present, then counts and definitions. Suite 71 proves seed shape, rerun stability, backfill values, constraints, idempotent retry, male+female reconcile, app ceiling, and report-filter partitioning against a self-cleaning fixture sessions table. Shared layer gains AttendanceCount/ServiceTypeDefinition types, zod schemas (count>=0, other-label required, capture batch + report query contracts), collection constants, and matrix cells per expansion section 11.",
+  "whatThisFileIs": "An R1 authorship claim, and nothing else."
+}

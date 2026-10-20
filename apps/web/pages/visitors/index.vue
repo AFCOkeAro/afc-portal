@@ -5,11 +5,17 @@ import type { BranchSummary, Paginated, VisitorRow } from '~/types/portal'
 definePageMeta({ middleware: 'staff' })
 
 const api = useApi()
+const route = useRoute()
 const showForm = ref(false)
 const searchInput = ref('')
 const search = ref('')
-const status = ref('open')
-const branch = ref('all')
+/** Drill-down contract: dashboard/branch pages link here with ?status=&branch=. */
+function queryParam(name: string): string | null {
+  const value = route.query[name]
+  return typeof value === 'string' && value.length > 0 ? value : null
+}
+const status = ref(queryParam('status') ?? 'open')
+const branch = ref(queryParam('branch') ?? 'all')
 const page = ref(1)
 const limit = 25
 
@@ -88,6 +94,13 @@ const statusColor: Record<string, 'success' | 'warning' | 'neutral' | 'error'> =
       description="First-time attenders, follow-ups and newcomers in the journey."
     >
       <template #actions>
+        <UButton
+          to="/visitors/funnel"
+          color="neutral"
+          variant="outline"
+          icon="i-lucide-filter"
+          label="Funnel"
+        />
         <PermissionGate :collection="COLLECTIONS.visitors" action="create">
           <UButton
             label="Record intake"

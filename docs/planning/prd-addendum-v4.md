@@ -257,7 +257,7 @@ An invitee has not consented to anything. We send **one** message, because the i
 - AC4: Limit breaches are visible for approval.
 
 **US-E4 — Remind registrants.** As an event owner, I want registered invitees reminded before the event so that attendance is higher.
-- AC1: A `event_reminder` campaign sends T-24h and T-2h reminders with the live/location details to registrants who consented.
+- AC1: The `event_invitation` campaign sends T-24h and T-2h reminder steps with the live/location details to registrants who consented (AFC-538 finding 1: no separate `event_reminder` key exists; the seeds and data-model-v4 §4.1 carry the single `event_invitation` triggered key whose shape is "invite send + T-24h + T-2h reminders").
 - AC2: Invitees who have not consented get no reminder; their RSVP is handled by staff.
 
 ---
@@ -361,6 +361,31 @@ An invitee has not consented to anything. We send **one** message, because the i
 - **`member`** — a new lightweight **authenticated member** role (not public). Scoped to their own `person` record: read own profile, manage own channel consent, submit event invitations, see their own invitation status. **No** people search, no attendance, no welfare, no financials, no other members' data.
 - Identity for members: **phone-number OTP over WhatsApp/SMS** (no password). This is an authentication change on a new role → **SecurityEngineer review required before implementation**, including OTP rate limiting, lockout, and session scope. *Security lens: least privilege is the design; the review is the gate.*
 - Staff roles are unchanged.
+
+### 6.1 Member OTP parameter block (F1, AFC-478 verdict, AFC-512 pinned)
+
+Authoritative values for enablement review (the verdict wins on conflict; the
+migration `20261020_0007` and `apps/web/server/utils/member-otp.ts` mirror them):
+
+- Code: 6+ digits from the platform CSPRNG (`crypto.randomInt`); expiry <= 10 min
+  (DB CHECK `member_otp_codes_expiry_bound`); single-use (`consumed_at` set on
+  first verify, replay rejected before expiry); stored ONLY as salted hash
+  (`sha256(code || salt)`, no plaintext column exists).
+- Verify: <= 5 attempts per code then invalidate (`member_otp_verify_gate`);
+  resend throttle <= 3/hr per phone + per-IP cap 10/hr (`member_otp_throttle`).
+- Enumeration: identical success-path response AND status whether the phone is
+  registered or not (generic "if this number is registered" message; failures
+  and throttling return the same ack; verify failures all answer one
+  `401 invalid_code`); adversarial test asserts no user-existence oracle.
+- Session: token bound server-side to exactly one `member_person`;
+  `member_access_expires_at` re-checked on every request
+  (`member_session_valid`); lifetime <= 8h (satisfies the <= 24h idle
+  recommendation); deployments SHOULD set `member_access_expires_at <= 7d`
+  so no session outlives a 7-day absolute bound.
+- Device binding: explicitly DROPPED for v1 (sealed httpOnly session cookie is
+  the binding). SIM-swap is a recorded ACCEPTED RISK (owner: CTO/board),
+  bounded by the member least-privilege scope (own record only, S5 denials:
+  no people search, no attendance, no welfare, no financials).
 
 ## 7. Updated phasing
 

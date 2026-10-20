@@ -20,6 +20,15 @@ export interface PortalScope {
   role: StaffRole
   isArea: boolean
   branchIds: string[]
+  /**
+   * Hierarchy scopes (AFC-461a, data-model-expansion §8.5). `areaId` is the
+   * user's area; `zoneIds` is the union of the explicit single/multi zone
+   * grants. Empty `zoneIds` with non-empty `branchIds` means "derive zones
+   * from branches when a zone filter is needed" (see `scopeZoneIds`), never
+   * "see all zones".
+   */
+  areaId: string | null
+  zoneIds: string[]
   hiddenFields: Record<string, string[]>
   token: string
 }
@@ -37,14 +46,27 @@ export async function getPortalScope(event: H3Event): Promise<PortalScope> {
       ),
     ),
   ]
+  const areaId =
+    typeof session.user.areaId === 'string' && session.user.areaId.length > 0
+      ? session.user.areaId
+      : null
+  const zoneIds = [
+    ...new Set(
+      [session.user.zoneId, ...(session.user.zoneIds ?? [])].filter(
+        (value): value is string => typeof value === 'string' && value.length > 0,
+      ),
+    ),
+  ]
 
-  // data-model §9 rule 5: no branch and no area grant means the account sees
-  // nothing. Failing here with an explanation is safer than returning an empty
-  // list that looks like a working page.
-  if (!isArea && branchIds.length === 0) {
+  // data-model §9 rule 5, extended to hierarchy scopes (data-model-expansion
+  // §10: "Fail-closed — a user with no scope values sees nothing"). No branch
+  // and no zone and no area grant means the account sees nothing. Failing here
+  // with an explanation is safer than returning an empty list that looks like
+  // a working page.
+  if (!isArea && branchIds.length === 0 && zoneIds.length === 0) {
     throw createError({
       statusCode: 403,
-      statusMessage: 'Your account has no branch scope',
+      statusMessage: 'Your account has no branch or zone scope',
       data: { code: 'unscoped_session' },
     })
   }
@@ -67,6 +89,8 @@ export async function getPortalScope(event: H3Event): Promise<PortalScope> {
     role,
     isArea,
     branchIds,
+    areaId,
+    zoneIds,
     hiddenFields: hiddenFieldsForRole(role),
     token,
   }
@@ -126,8 +150,101 @@ export function scopeFilter(scope: PortalScope, field = 'branch'): Filter {
   return { [field]: { _in: scope.branchIds } }
 }
 
+/**
+ * Zone-level enforcement for collections that carry a `zone` denorm
+ * (branches, bible_study_centres, attendance_sessions — data-model-expansion
+ * §10 filter building blocks). Area staff see everything; explicit zone
+ * grants filter on `zone`; branch-only staff are narrowed to their own rows
+ * by the caller (their zone set is derived, see `scopeZoneIds`), so this
+ * returns no zone predicate for them rather than inventing one.
+ */
+export function zoneScopeFilter(scope: PortalScope, field = 'zone'): Filter {
+  if (scope.isArea) return {}
+  if (scope.zoneIds.length > 0) return { [field]: { _in: scope.zoneIds } }
+  return {}
+}
+
+/**
+ * Scope predicate for the `branches` collection itself. A branch row has no
+ * `branch` field, so the generic `scopeFilter` does not apply: area staff see
+ * all rows, zone staff see their zones' rows, branch staff see their own rows.
+ */
+export function branchCollectionScope(scope: PortalScope): Filter {
+  if (scope.isArea) return {}
+  if (scope.zoneIds.length > 0) return { zone: { _in: scope.zoneIds } }
+  return { id: { _in: scope.branchIds } }
+}
+
+/**
+ * The zone set a non-area session may see. Explicit grants win; otherwise the
+ * zones are derived from the session's branches (one Directus read of
+ * `branches` for those ids). Returns [] only when neither exists, which
+ * `getPortalScope` already rejects — an empty return here is fail-closed.
+ */
+export async function scopeZoneIds(
+  event: H3Event,
+  scope: PortalScope,
+): Promise<string[]> {
+  if (scope.isArea) return []
+  if (scope.zoneIds.length > 0) return scope.zoneIds
+  if (scope.branchIds.length === 0) return []
+  const rows = await directusFetch<{ data: Array<{ zone: string | null }> }>(
+    event,
+    '/items/branches',
+    {
+      accessToken: scope.token,
+      query: {
+        fields: 'zone',
+        limit: -1,
+        filter: { id: { _in: scope.branchIds } },
+      },
+    },
+  )
+  return [
+    ...new Set(
+      rows.data
+        .map((row) => row.zone)
+        .filter((z): z is string => typeof z === 'string' && z.length > 0),
+    ),
+  ]
+}
+
+/**
+ * Reject a requested zone outside the caller's scope. Area staff may request
+ * any zone. Anything else outside the visible set is a 403 (fail-closed);
+ * callers additionally intersect the requested value with the scope predicate,
+ * so a scope that cannot be enumerated still returns empty, never foreign rows.
+ */
+export function requireZoneInScope(
+  scope: PortalScope,
+  requested: string | null | undefined,
+  visibleZoneIds: string[],
+): void {
+  if (!requested || scope.isArea) return
+  if (!visibleZoneIds.includes(requested)) {
+    throw createError({
+      statusCode: 403,
+      statusMessage: 'That zone is outside your scope',
+      data: { code: 'zone_out_of_scope' },
+    })
+  }
+}
+
 /** Events may be area-wide (branch is null), so a branch user still sees those. */
 export function eventScopeFilter(scope: PortalScope): Filter {
+  if (scope.isArea) return {}
+  return {
+    _or: [{ branch: { _in: scope.branchIds } }, { branch: { _null: true } }],
+  }
+}
+
+/**
+ * Departments may be area-wide (branch is null, data-model §2.2), so a branch
+ * user sees their own branches' departments plus the area-wide ones. Same
+ * shape as `eventScopeFilter`: the null branch is a visibility grant, not a
+ * scope hole — out-of-scope branches still never match.
+ */
+export function departmentScopeFilter(scope: PortalScope): Filter {
   if (scope.isArea) return {}
   return {
     _or: [{ branch: { _in: scope.branchIds } }, { branch: { _null: true } }],
@@ -256,6 +373,23 @@ export async function createItem<T>(
     body,
   })
   return response.data
+}
+
+/**
+ * Delete one row by id (AFC-516, ADR-0011): the invite-quota slot release
+ * path. Best-effort callers tolerate errors; the one place a DELETE helper
+ * lives, next to `createItem`.
+ */
+export async function deleteItem(
+  event: H3Event,
+  scope: PortalScope,
+  collection: string,
+  id: string,
+): Promise<void> {
+  await directusFetch(event, `/items/${collection}/${id}`, {
+    method: 'DELETE',
+    accessToken: scope.token,
+  })
 }
 
 export async function updateItem<T>(

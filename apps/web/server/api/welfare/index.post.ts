@@ -37,6 +37,8 @@ export default defineEventHandler(async (event) => {
       category: form.category,
       priority: form.priority,
       status: form.status,
+      confidentiality: form.confidentiality,
+      title: form.title ?? null,
       amount_requested: form.amount_requested,
       amount_assisted: form.amount_assisted,
       assigned_to: form.assigned_to ?? null,
@@ -48,14 +50,30 @@ export default defineEventHandler(async (event) => {
   )
 
   // Audit trail is written by the portal, not by the role: the matrix gives
-  // area and branch administrators read-only access to case events.
+  // area and branch administrators read-only access to case events. The
+  // dual shape (detail/summary, actor_user/actor) covers the §6.3 names and
+  // the live collection's names until the Directus field update lands.
   await createItem(event, scope, 'welfare_case_events', {
     case: String(created.id),
     event_type: 'created',
+    detail: `Case ${form.case_ref} opened`,
     summary: `Case ${form.case_ref} opened`,
+    actor_user: scope.session.user.id,
     actor: scope.session.user.id,
     created_at: now,
   })
+
+  if (form.assigned_to) {
+    await createItem(event, scope, 'welfare_case_events', {
+      case: String(created.id),
+      event_type: 'assigned',
+      detail: 'Case assigned',
+      summary: 'Case assigned',
+      actor_user: scope.session.user.id,
+      actor: scope.session.user.id,
+      created_at: now,
+    })
+  }
 
   return { data: { ...created, id: String(created.id) } }
 })

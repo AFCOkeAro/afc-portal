@@ -7,6 +7,7 @@ import {
   throwValidation,
   updateItem,
 } from '../../utils/portal'
+import { JOURNEY_FIELDS, validateWelfareOfficer } from '../../utils/visitor-journey'
 
 export default defineEventHandler(async (event) => {
   const scope = await getPortalScope(event)
@@ -34,6 +35,28 @@ export default defineEventHandler(async (event) => {
   if (!parsed.success) throwValidation(parsed.error)
   const form = parsed.data
   const branch = resolveBranch(scope, form.branch)
+
+  // Officer assignment is restricted to branch Welfare position holders
+  // (AFC-471, data-model-v4 §5). The dedicated assign endpoint shares this
+  // check; the edit form cannot bypass it.
+  if (form.follow_up_owner) {
+    const current = await findScopedItem<Record<string, unknown>>(
+      event,
+      scope,
+      'visitors',
+      id,
+      { fields: JOURNEY_FIELDS },
+    )
+    const currentOwner = (current.follow_up_owner as string | null) ?? null
+    if (currentOwner !== form.follow_up_owner) {
+      await validateWelfareOfficer(
+        event,
+        scope,
+        form.follow_up_owner,
+        (current.branch as string | null) ?? branch,
+      )
+    }
+  }
 
   const updated = await updateItem<Record<string, unknown>>(
     event,

@@ -6,13 +6,20 @@ definePageMeta({ middleware: ['staff', 'welfare'] })
 
 const api = useApi()
 const permissions = usePermissions()
+const route = useRoute()
 const showForm = ref(false)
 const searchInput = ref('')
 const search = ref('')
-const status = ref('open')
-const branch = ref('all')
+/** Drill-down contract: dashboard/branch pages link here with ?status=&branch=. */
+function queryParam(name: string): string | null {
+  const value = route.query[name]
+  return typeof value === 'string' && value.length > 0 ? value : null
+}
+const status = ref(queryParam('status') ?? 'open')
+const branch = ref(queryParam('branch') ?? 'all')
 const category = ref('all')
 const priority = ref('all')
+const confidentiality = ref('all')
 const page = ref(1)
 const limit = 25
 
@@ -24,7 +31,7 @@ watch(searchInput, (value: string) => {
   }, 300)
 })
 
-watch([status, branch, category, priority, search], () => {
+watch([status, branch, category, priority, confidentiality, search], () => {
   page.value = 1
 })
 
@@ -36,6 +43,7 @@ const query = computed(() => ({
   ...(branch.value !== 'all' ? { branch: branch.value } : {}),
   ...(category.value !== 'all' ? { category: category.value } : {}),
   ...(priority.value !== 'all' ? { priority: priority.value } : {}),
+  ...(confidentiality.value !== 'all' ? { confidentiality: confidentiality.value } : {}),
 }))
 
 const { data, pending, error, refresh } = await useAsyncData(
@@ -78,9 +86,16 @@ const categoryOptions = [
 const priorityOptions = [
   { label: 'Any priority', value: 'all' },
   { label: 'Low', value: 'low' },
+  { label: 'Medium', value: 'medium' },
   { label: 'Normal', value: 'normal' },
   { label: 'High', value: 'high' },
   { label: 'Urgent', value: 'urgent' },
+]
+
+const confidentialityOptions = [
+  { label: 'Any confidentiality', value: 'all' },
+  { label: 'Branch', value: 'branch' },
+  { label: 'Area', value: 'area' },
 ]
 
 const branchOptions = computed(() => [
@@ -118,9 +133,18 @@ const priorityColor: Record<string, 'success' | 'warning' | 'neutral' | 'error'>
       description="Cases, contributions and outcomes for the branches this account can see."
     >
       <template #actions>
-        <PermissionGate :collection="COLLECTIONS.welfareCases" action="create">
-          <UButton label="Open case" icon="i-lucide-plus" @click="showForm = true" />
-        </PermissionGate>
+        <div class="flex gap-2">
+          <UButton
+            label="Reports"
+            icon="i-lucide-chart-column"
+            color="neutral"
+            variant="outline"
+            to="/welfare/reports"
+          />
+          <PermissionGate :collection="COLLECTIONS.welfareCases" action="create">
+            <UButton label="Open case" icon="i-lucide-plus" @click="showForm = true" />
+          </PermissionGate>
+        </div>
       </template>
     </PageHeader>
 
@@ -135,7 +159,7 @@ const priorityColor: Record<string, 'success' | 'warning' | 'neutral' | 'error'>
     />
 
     <UCard>
-      <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <UInput
           v-model="searchInput"
           icon="i-lucide-search"
@@ -146,6 +170,11 @@ const priorityColor: Record<string, 'success' | 'warning' | 'neutral' | 'error'>
         <USelect v-model="category" :items="categoryOptions" class="w-full" />
         <USelect v-model="priority" :items="priorityOptions" class="w-full" />
         <USelect v-model="branch" :items="branchOptions" class="w-full" />
+        <USelect
+          v-model="confidentiality"
+          :items="confidentialityOptions"
+          class="w-full"
+        />
       </div>
 
       <UAlert
@@ -237,6 +266,14 @@ const priorityColor: Record<string, 'success' | 'warning' | 'neutral' | 'error'>
                   variant="subtle"
                 >
                   {{ (welfareCase.status ?? 'open').replace(/_/g, ' ') }}
+                </UBadge>
+                <UBadge
+                  v-if="welfareCase.confidentiality === 'area'"
+                  class="ml-1"
+                  color="info"
+                  variant="subtle"
+                >
+                  area
                 </UBadge>
               </td>
               <td class="px-3 py-3 text-right">

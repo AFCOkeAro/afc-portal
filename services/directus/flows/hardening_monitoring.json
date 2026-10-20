@@ -1,0 +1,73 @@
+{
+ "costReporting": {
+  "actual": "provider-confirmed spend written to campaign_runs.actual_cost (0006 grant) after the window closes; NULL until confirmed, never zero-guessed",
+  "estimate": "hardening_estimate_cost(audience_size, unit_cost) before activation; stored on campaign_runs.estimated_cost; NULL rate reports unset, never zero",
+  "owner": "area_admin",
+  "rateCard": "campaign_cost_rates (one row per channel, NGN unit cost; NULL = unset until procurement I4)"
+ },
+ "dedupe": {
+  "decision": "branch_admin records merged | kept_separate with reason on person_duplicate_reviews; terminal states require decided_by + decision_reason (CHECK); merging itself is a reviewed migrator step, never an app write",
+  "neverSilentAutoMerge": true,
+  "pattern": "US-N1 AC4",
+  "warning": "phone-identity hash match creates a pending person_duplicate_reviews row; the branch admin sees the warning on the person record before any merge"
+ },
+ "endpointChecks": {
+  "route": "GET /api/hardening/status",
+  "scope": "area_admin, super_admin (full); branch_admin (own branch slice); Telegram alert on anomaly carries ids + counts only, never message content"
+ },
+ "monitoringChecks": [
+  {
+   "action": "GET /api/hardening/status; expect 200 with per-route shape; failure two polls running = endpoint_health red + Telegram alert",
+   "id": "endpoint",
+   "key": "endpoint_health",
+   "name": "Endpoint health"
+  },
+  {
+   "action": "confirm the campaign tick + retention pass ran inside their windows (latest campaign_runs.window_start / retention_runs.started_at); a missed window = schedule_health red",
+   "id": "schedule",
+   "key": "schedule_health",
+   "name": "Schedule health"
+  },
+  {
+   "action": "count campaign_enrollments state = active with next_step_at <= now (due but unprocessed); above the threshold = queue_depth red (tick falling behind)",
+   "id": "queue",
+   "key": "queue_depth",
+   "name": "Queue depth"
+  },
+  {
+   "action": "hardening_tick_slo_met(window_at, began_at) per completed run; the share meeting the SLO must stay >= 99%; below = tick_slo red + Telegram alert",
+   "id": "slo",
+   "key": "tick_slo",
+   "name": "Tick SLO (due step begins within 5 min of window, 99%)"
+  },
+  {
+   "action": "confirm every campaign_runs.excluded_reasons key and every retention_run_items.skip_reason is in the allowlisted set; an unreasoned exclusion = exclusions_audit red",
+   "id": "exclusions",
+   "key": "exclusions_audit",
+   "name": "Exclusions-by-reason audit"
+  },
+  {
+   "id": "pause",
+   "key": "pause_drill",
+   "name": "Pause drill (US-C5)",
+   "action": "set one campaign paused (or one channel disabled); assert campaign_due_enrollments excludes its rows on the very next tick; resume; log pause_drill"
+  }
+ ],
+ "name": "hardening_monitoring",
+ "notes": [
+  "No new service, secret, or dependency: checks read tables this slice owns plus the sibling run tables; alerting reuses the Telegram path from integrations-addendum section 7.",
+  "Pause drill (US-C5): setting campaigns.status = paused (or communication_channels.enabled = false) must remove enrollments from campaign_due_enrollments on the very next tick; the drill asserts this and logs pause_drill.",
+  "Every check writes one hardening_monitor_checks row (ok + detail with ids/counts only); the alert reads the latest row per key, never the delivery log."
+ ],
+ "pauseAll": "see docs/runbooks/pause-all.md",
+ "telegramAlert": {
+  "carries": "campaign/run/check ids + counts only",
+  "never": "message content, contact values, rendered text",
+  "on": "any check red, daily_cap exceeded, failure-rate spike, volume spike"
+ },
+ "trigger": {
+  "cron": "*/5 * * * *",
+  "timezone": "Africa/Lagos",
+  "type": "schedule"
+ }
+}

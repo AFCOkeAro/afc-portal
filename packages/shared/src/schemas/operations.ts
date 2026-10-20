@@ -93,9 +93,17 @@ export const visitorFormSchema = z.object({
 
 export type VisitorForm = z.infer<typeof visitorFormSchema>
 
+/**
+ * Welfare case category (data-model §6.1 + live-portal union, AFC-472).
+ * The spec set admits food/housing; the live portal only offers the subset
+ * it renders. Both validate so existing Directus rows keep parsing; new rows
+ * use the spec values.
+ */
 const WELFARE_CATEGORIES = [
   'medical',
   'financial',
+  'food',
+  'housing',
   'bereavement',
   'education',
   'other',
@@ -106,8 +114,12 @@ export const welfareCaseFormSchema = z.object({
   branch: optionalText(36),
   person: optionalText(36),
   category: z.enum(WELFARE_CATEGORIES).default('other'),
-  priority: z.enum(['low', 'normal', 'high', 'urgent']).default('normal'),
-  status: z.enum(['open', 'in_progress', 'resolved', 'closed']).default('open'),
+  priority: z.enum(['low', 'medium', 'normal', 'high', 'urgent']).default('normal'),
+  status: z
+    .enum(['open', 'in_progress', 'pending_approval', 'resolved', 'closed'])
+    .default('open'),
+  confidentiality: z.enum(['branch', 'area']).default('branch'),
+  title: optionalNote(),
   amount_requested: moneySchema,
   amount_assisted: moneySchema,
   assigned_to: optionalText(36),
@@ -117,8 +129,26 @@ export const welfareCaseFormSchema = z.object({
 
 export type WelfareCaseForm = z.infer<typeof welfareCaseFormSchema>
 
+/**
+ * Freeform case note (AFC-472). Written to welfare_case_events as
+ * event_type `note`: `detail` is the short timeline summary, `body` the
+ * long freeform text. Either may be sent; at least one is required so an
+ * empty timeline row is never stored.
+ */
+export const welfareNoteFormSchema = z
+  .object({
+    detail: optionalNote(),
+    body: optionalNote(),
+  })
+  .refine((value) => (value.detail ?? '') !== '' || (value.body ?? '') !== '', {
+    message: 'Write a summary or a note',
+    path: ['detail'],
+  })
+
+export type WelfareNoteForm = z.infer<typeof welfareNoteFormSchema>
+
 const CONTRIBUTION_TYPES = ['cash', 'goods', 'service'] as const
-const CONTRIBUTION_STATUSES = ['pending', 'approved', 'disbursed'] as const
+const CONTRIBUTION_STATUSES = ['proposed', 'pending', 'approved', 'disbursed'] as const
 
 /**
  * A contribution record against a welfare case. `amount` is optional because

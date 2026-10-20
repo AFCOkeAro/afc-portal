@@ -89,6 +89,64 @@ export default defineEventHandler(async (event): Promise<PersonDetail> => {
     { fields: visibleFields(scope, 'people', PERSON_FIELDS) },
   )
   const names = await branchNames(event, scope)
+
+  // Household + department links for the profile (AFC-469). Both resolve
+  // inside the caller's scope: a household or department outside scope
+  // renders as "not shown", never as a foreign row.
+  const householdId = person.household ? String(person.household) : null
+  const [householdRows, memberships] = await Promise.all([
+    householdId && can(scope, 'households', 'read')
+      ? listItems<{ id: string | number; name: string | null }>(
+          event,
+          scope,
+          'households',
+          {
+            filter: mergeFilters({ id: { _eq: householdId } }, scopeFilter(scope)),
+            fields: ['id', 'name'],
+            limit: 1,
+          },
+        )
+      : Promise.resolve({ data: [], meta: { total: 0, page: 1, limit: 1 } }),
+    can(scope, 'departments', 'read')
+      ? listItems<{
+          id: string | number
+          departments: string | null
+          role: string | null
+          joined_at: string | null
+        }>(event, scope, 'people_departments', {
+          filter: {
+            _and: [{ people: { _eq: id } }, { status: { _eq: 'active' } }],
+          },
+          fields: ['id', 'departments', 'role', 'joined_at'],
+          limit: -1,
+        })
+      : Promise.resolve({ data: [], meta: { total: 0, page: 1, limit: 1 } }),
+  ])
+  const membershipDepartmentIds = [
+    ...new Set(
+      memberships.data
+        .map((link) => link.departments)
+        .filter(
+          (value): value is string => typeof value === 'string' && value.length > 0,
+        ),
+    ),
+  ]
+  const membershipDepartments = new Map<string, string>()
+  if (membershipDepartmentIds.length > 0) {
+    const departments = await listItems<{ id: string | number; name: string }>(
+      event,
+      scope,
+      'departments',
+      {
+        filter: { id: { _in: membershipDepartmentIds } },
+        fields: ['id', 'name'],
+        limit: membershipDepartmentIds.length,
+      },
+    )
+    for (const department of departments.data) {
+      membershipDepartments.set(String(department.id), department.name)
+    }
+  }
   const timeline: PersonTimelineItem[] = []
 
   const [attendance, registrations, visitorRows, welfareRows] = await Promise.all([
@@ -224,5 +282,23 @@ export default defineEventHandler(async (event): Promise<PersonDetail> => {
       : ageFromDob(record.date_of_birth as string | null | undefined),
   })
 
-  return { ...(row as unknown as PersonDetail), timeline }
+  return {
+    ...(row as unknown as PersonDetail),
+    timeline,
+    household: householdId,
+    household_name: householdRows.data[0]?.name ?? null,
+    departments: memberships.data.flatMap((link) => {
+      if (!link.departments) return []
+      const name = membershipDepartments.get(String(link.departments))
+      if (!name) return []
+      return [
+        {
+          id: String(link.departments),
+          name,
+          role: String(link.role ?? 'member'),
+          joined_at: link.joined_at,
+        },
+      ]
+    }),
+  }
 })

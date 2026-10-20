@@ -151,10 +151,75 @@ Do not invent per-user staging accounts in the app for this.
 
 ## 5. Rollback
 
-Rollback = redeploy the previous tag. Set `WEB_IMAGE` in the host `.env` to
-the last good tag and re-run the start command. There is no database in this
-bundle, so there is nothing to migrate back. Keep the previous image tag
-until the new one passes §3.
+Web-only boot: rollback = redeploy the previous tag. Set `WEB_IMAGE` in the
+host `.env` to the last good tag and re-run the start command. There is no
+database in the base bundle, so there is nothing to migrate back. Keep the
+previous image tag until the new one passes §3.
+
+Overlay boot (AFC-532): rollback = previous `WEB_IMAGE` tag + retained
+`directus_pgdata`. Named volumes survive `down` — bring the stack down
+WITHOUT `-v` and the Postgres data stays in place:
+
+```sh
+# Overlay rollback (data-preserving):
+docker compose -f services/staging/compose.yml -f services/staging/compose.directus.yml --env-file services/staging/.env down
+# set WEB_IMAGE to the last good tag in the host .env, then re-run the
+# overlay start command in §7.
+```
+
+Prior web-only state is restorable the same way: `down` the overlay (no
+`-v`) and re-run the §2 web-only start command. NEVER use `down -v` on
+staging — it deletes `directus_pgdata` and `directus_uploads`. There is no
+automated Postgres backup on staging; if the overlay holds anything worth
+keeping, `pg_dump` before any destructive command.
+
+## 7. Directus overlay boot — first boot (AFC-532)
+
+Scope: staging only. Adds Postgres 16 + `directus/directus:11` to the
+web-only bundle for preview login. Staging never holds production or youth
+data. Repo-only change; the VPS steps below run on the host.
+
+### 7.1 Configure
+
+`services/staging/.env` already holds the base values (§1). Fill the overlay
+block per `.env.example` (AFC-535 guidance): server-side
+`NUXT_DIRECTUS_URL=http://directus:8055` (internal overlay DNS — never
+localhost, never production), `NUXT_PUBLIC_DIRECTUS_URL` and
+`DIRECTUS_PUBLIC_URL` empty on first boot (no public Directus route yet),
+tokens after first boot from the admin UI over an SSH tunnel
+(`ssh -L 8055:127.0.0.1:8055 <vps>` — the compose port binds loopback only
+by design; publishing 8055 publicly needs CTO sign-off).
+
+### 7.2 Start
+
+From the repo root on the VPS:
+
+```sh
+docker compose -f services/staging/compose.yml -f services/staging/compose.directus.yml --env-file services/staging/.env up -d --build
+docker compose -f services/staging/compose.yml -f services/staging/compose.directus.yml ps
+```
+
+`web` waits on `directus` `service_healthy` (first boot allows ~60s for
+schema migration); `directus` waits on `postgres` `service_healthy`.
+
+### 7.3 Verify (acceptance)
+
+```sh
+curl -fsS https://afc-staging.bluespace.ng/api/health
+```
+
+must answer **200** with `"directusConfigured":true` (the flag is
+config-only — non-empty `NUXT_DIRECTUS_URL` — so it proves wiring, not
+reachability). Then prove reachability from the operator seat:
+
+```sh
+# On the VPS (loopback publish) or over the SSH tunnel:
+curl -fsS http://127.0.0.1:8055/server/health
+```
+
+That must answer 200 before preview login counts as up. Sign-in and public
+registration answer 503 until the static tokens are set — that is the
+expected pre-token state, not a failure.
 
 ## 6. Constraints (do not negotiate on the host)
 

@@ -25,6 +25,8 @@ export default defineEventHandler(async (event): Promise<CapabilitiesPayload> =>
   const payload = capabilitiesForRole({
     staffRole: session.user.staffRole,
     branchId: session.user.branchId,
+    zoneId: session.user.zoneId ?? null,
+    zoneIds: session.user.zoneIds ?? [],
   })
 
   // A session with no branch and no area grant sees nothing (data-model §9

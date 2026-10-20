@@ -18,6 +18,7 @@ export * from './collections'
 export * from './permissions'
 export * from './schemas'
 export * from './types'
+export * from './office-feed'
 
 /**
  * `role-matrix` is deliberately NOT re-exported from here.

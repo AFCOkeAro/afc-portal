@@ -1,0 +1,56 @@
+{
+    "consentWithdrawal": {
+        "action": "route:POST /api/communications/opt-out (contact_hash + channel + reason) -> communication_suppressions row; Flow step 'stop' also writes the consent_records withdrawal (granted = false, new row via the 0004 INSERT grant \u2014 a withdrawal is never an edit)",
+        "guarantee": "a STOP suppresses ALL further sends to that number on the withdrawn channel (channel = 'all' for STOP ALL suppresses every channel, US-N3 AC3, prd-addendum-v4 s.3.3), including other campaigns; recorded with reason (opt_out_stop, consent_withdrawn, dnc, invalid_contact, over_cap_abuse) and source (member_reply, staff_action, flow, tick)",
+        "hashOnly": "the route takes contact_hash, never a raw phone number; hashing is identityHash() over canonical digits (hardening.ts), same posture as the 0014 ledger",
+        "tickEnforcement": "the tick calls hardening_suppressed(contact_hash, channel) before any send; a suppression write failing fails the send closed (incident-path.md: stop all sends on that channel until both INSERTs succeed)"
+    },
+    "enforcement": {
+        "dryRun": "retention.run() dry-run first: report-only pass over due clocks, exclusions-by-reason counted by isKnownExclusionReason(); unreasoned exclusions = exclusions_audit red and the run does not proceed to delete",
+        "enforce": "retention.run() enforce pass deletes only the clocks the dry-run approved; every deletion lands in retention_run_items with reason; finished runs immutable (0004)",
+        "guarantee": "the scheduled Flow drives the existing engine \u2014 it never reimplements windows, clocks, or deletion; retention periods live in retention_policies (counsel-ratified config), never in this file"
+    },
+    "name": "retention_consent_automation",
+    "notes": [
+        "No new service, secret, or dependency: triggers are Directus Flows and state is the existing worker tick (ADR-0009 runtime, ADR-0010 decision 4). The Flow schedules and records; the engine deletes; the tick suppresses.",
+        "Retention windows live in retention_policies (config, counsel-ratified). This file names no period, so the retention-literal gate stays clean.",
+        "Suppression, dedupe, and monitor writes are hashes/ids/counts only \u2014 never message content, contact values, or rendered text (integrations-addendum s.7)."
+    ],
+    "retentionWindow": {
+        "dryRunFirst": true,
+        "engine": "retention.run() \u2014 the existing retention engine owned by migration 0004; this Flow passes due clocks and records the run, it does not fork the engine",
+        "windowSource": "retention_policies (config-owned windows) read by retention_clocks; the Flow never hard-codes a duration"
+    },
+    "steps": [
+        {
+            "action": "inbound reply -> parseStopRequest(); STOP ALL maps to channel 'all' via suppressionChannelFor(); POST /api/communications/opt-out writes the communication_suppressions row (contact_hash, channel, reason, source)",
+            "failure": "a failing suppression INSERT fails the send closed on that channel (no silent drop of the withdrawal); the miss is logged to hardening_monitor_checks and paged per incident-path.md",
+            "id": "stop",
+            "name": "Record STOP / consent withdrawal"
+        },
+        {
+            "action": "Flow invokes retention.run() in dry-run mode over retention_clocks due under retention_policies; report due/deleted/skipped-by-reason; write the exclusions_audit monitor row",
+            "failure": "any exclusion reason outside the allowlist (hardening.ts EXCLUSION_REASONS + retention skip reasons) marks exclusions_audit red and blocks the enforce pass",
+            "id": "dry-run",
+            "name": "Dry-run the retention pass"
+        },
+        {
+            "action": "Flow invokes retention.run() enforce for the dry-run-approved clocks only; deletions recorded in retention_run_items; run row finished (immutable); tick SLO sample (window_at, began_at) logged via hardening_tick_slo_met()",
+            "failure": "enforce runs only on dry-run-approved clocks; a partial failure leaves the run open and re-queues, never half-applied-and-marked-finished",
+            "id": "enforce",
+            "name": "Enforce the approved retention pass"
+        },
+        {
+            "action": "write one hardening_monitor_checks row per execution (queue_depth, tick_slo, exclusions_audit); on anomaly emit the Telegram staff alert (ids + counts only)",
+            "failure": "a red check pages staff per incident-path.md; the alert never carries message content",
+            "id": "report",
+            "name": "Log checks and alert on anomaly"
+        }
+    ],
+    "trigger": {
+        "cron": "0 * * * *",
+        "notes": "hourly retention pass plus event-driven STOP ingest (opt-out route); the campaign tick stays on its own schedule \u2014 this Flow never nests a state machine inside a Flow",
+        "timezone": "Africa/Lagos",
+        "type": "schedule"
+    }
+}

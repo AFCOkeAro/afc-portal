@@ -16,7 +16,8 @@
   "dependencies": {
     "@afc/shared": "workspace:*",
     "@nuxt/ui": "3.3.7",
-    "nuxt": "3.21.11"
+    "nuxt": "3.21.11",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@nuxt/eslint": "1.17.0",

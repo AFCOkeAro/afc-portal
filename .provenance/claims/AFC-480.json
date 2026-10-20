@@ -1,0 +1,28 @@
+{
+  "issue": "AFC-480",
+  "authorAgentId": "7b4aae3b-0da5-4de2-a1d8-4737943ef561",
+  "authorName": "Coder",
+  "claimedAt": "2026-10-20T13:30:00+01:00",
+  "whatThisFileIs": "An R1 authorship claim, and nothing else. It says who wrote the files below and on which issue. It asserts nothing about whether they are correct, and it carries no `reviews[]` entry.",
+  "paths": [
+    "services/directus/schema/migrations/20261020_0005_event_invites.sql",
+    "services/directus/schema/migrations/rollback/20261020_0005_event_invites.down.sql",
+    "tests/db/73_event_invites.sql",
+    "apps/web/server/utils/event-invites.ts",
+    "apps/web/server/api/invites/preview.post.ts",
+    "apps/web/server/api/invites/index.post.ts",
+    "apps/web/server/api/invites/index.get.ts",
+    "apps/web/server/api/invites/[id].get.ts",
+    "apps/web/server/api/invites/[id].approve.post.ts",
+    "apps/web/server/api/invites/[id].retry.post.ts",
+    "apps/web/server/api/invites/[id].withdraw.post.ts",
+    "apps/web/server/api/invites/export.get.ts",
+    "tests/web/event-invites.contract.mjs",
+    ".provenance/claims/AFC-480.json"
+  ],
+  "doesNotClaimR2": "There is no `reviews[]` entry here and there will not be one from me. R2 wants a named reviewer who is not the author, and I am the author of every path above. Reviewer designation for a Coder compliance-path commit is the CTO (MediaTech). There is no independent security reviewer on this team (board declined the seat on cost), so a CTO review is a recorded degradation, not independent review -- stated here rather than implied. A commit carrying the migration and tests/db/73 WILL report an R2 violation until the CTO records a verdict, and that violation is the honest state. Writing a `reviews[]` entry naming myself would turn a control into a rubber stamp.",
+  "scopeOfTheClaim": "R1 only: authorship of the listed paths on AFC-480 (slice 4b: event_invites table + rolling-limit/eligibility/suppression gates + owned FKs under the 0004 merge contract, conditional directus_users/events deltas, down script, suite 73, seven invite routes + helper, web contract). It is not clearance of the retention gate (plan 0.10.5), which only the CEO can clear. Outstanding follow-ups owned elsewhere: shared-matrix event_invites row (role-matrix/collections/types are sibling-owned and untouched), member OTP enablement (track d, gated on SecurityEngineer verdict per ADR-0009 decision 6), event_registrations DRAFT creation (registrations-owning slice).",
+  "whatTheChangeActuallyDoes": "New migration creating event_invites (all data-model-v4 §3.1 fields incl. invitee_contact_hash, message_rendered + variables_snapshot, nine-state status enum, approval fields, retry_of self-FK; bare uuids for cross-slice references under the merge contract) with CHECKs for minor-needs-guardian, blocked-needs-reason, approver-pairing and approval-state; three pure functions (invite_rate_gate 10/day+50/week rolling limits, invite_eligibility with minor-first/event-flag/branch-private rules and no override parameter, invite_contact_suppressed STOP read over consent_records); FKs owned under the 0004 contract (consent_records.related_invite, communications.event_invite) with loud-fail on orphans; conditional directus_users (member_person, invite_daily_limit 10, invite_weekly_limit 50, member_access_expires_at) and events (invite_eligible, invite_requires_approval, live_join_url, reminders_enabled, reminder_offsets) deltas with NOTICE-loud skips; directus_app ceiling grants (SELECT + INSERT + send-state UPDATE only, no frozen-column UPDATE, no DELETE). Rollback refuses while invites exist, drops owned FKs first, then functions, table, conditional columns. Suite 73 pins limits, eligibility, suppression, the three acceptances, guards and rerun. Routes: preview (no write), create (preview-then-confirm with snapshot, blocked_optout/blocked_rate_limit/pending_approval/queued outcomes), list/detail (own-or-branch scope, member redaction 0801 ••• •234), approve (no opt-out override), retry-once-idempotent, withdraw, staff CSV export. Web contract pins the route shapes and the migration acceptance.",
+  "verificationRecorded": "node scripts/run-db-tests.mjs: 23 suites, 896 assertions, 0 failing (includes sibling track-c 0006/74). node --test tests/web/event-invites.contract.mjs: 32/32. Gates migration-privilege, rollback-control, retention-literal, adr-uniqueness green. pnpm --filter web build complete. ESLint clean on all new route/helper files. pnpm --filter web typecheck: new files clean; three remaining errors are in sibling-authored untracked apps/web/server/utils/attendance-report.ts, untouched by this change.",
+  "notClaimedPaths": "The working tree at commit time also carries concurrent sibling work I did not write and do not stage: 20261020_0002/0003/0004/0006 migrations + rollbacks, tests/db/70/71/72/74, tests/web/communications-delivery-log.contract.mjs, attendance-report routes/utils, ActivityList/pages/branches, stub-identities/types/navigation/collections/role-matrix modifications, tests/db/68 hunks, .provenance/claims/AFC-466.json + AFC-479.json. Left untouched per the attribution rule; the one observed 74_campaigns failure during this heartbeat resolved on rerun (sibling editing mid-run) and is named in the AFC-480 task thread."
+}

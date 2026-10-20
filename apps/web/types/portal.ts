@@ -1,11 +1,23 @@
 import type {
   AttendanceRecord,
   AttendanceSession,
+  Blessing,
+  BlessingEvent,
+  Branch,
+  Celebration,
+  CelebrationEvent,
+  Department,
   EventRecord,
   EventRegistration,
+  Household,
   Person,
+  ServiceAssignment,
+  SundayService,
+  SundayServiceEvent,
   Visitor,
   WelfareCase,
+  YouthProfile,
+  YouthProfileEvent,
 } from '@afc/shared'
 
 export interface BranchSummary {
@@ -14,6 +26,30 @@ export interface BranchSummary {
   code: string
   branch_type: string
   status: string
+  city?: string | null
+  state?: string | null
+  parent_branch?: string | null
+  type_label?: string | null
+  zone?: string | null
+  area?: string | null
+}
+
+export interface BranchDetail extends Branch {
+  people_count: number
+  youth_count: number
+  minor_count: number
+  open_follow_ups: number
+  open_welfare: number
+  upcoming_events: number
+  attendance_last_sunday: number
+  attendance_last_30_days: number
+  attendance_trend: DashboardAttendancePoint[]
+  recent_people: PersonRow[]
+  events: EventRow[]
+  follow_ups: VisitorRow[]
+  welfare_cases: WelfareCaseRow[]
+  blessings_total: number
+  blessings_breakdown: BlessingBreakdownRow[]
 }
 
 export interface PersonRow extends Person {
@@ -33,6 +69,58 @@ export interface PersonTimelineItem {
 
 export interface PersonDetail extends PersonRow {
   timeline: PersonTimelineItem[]
+  household_name: string | null
+  departments: PersonDepartmentMembership[]
+}
+
+export interface PersonDepartmentMembership {
+  id: string
+  name: string
+  role: string
+  joined_at: string | null
+}
+
+export interface HouseholdRow extends Household {
+  branch_name: string | null
+  member_count: number
+}
+
+export interface HouseholdMemberRow {
+  id: string
+  display_name: string
+  gender: string
+  is_minor: boolean | null
+  phone: string | null
+  membership_status: string
+  status: string
+  age: number | null
+  is_head: boolean
+}
+
+export interface HouseholdDetail extends HouseholdRow {
+  head_name: string | null
+  members: HouseholdMemberRow[]
+}
+
+export interface DepartmentRow extends Department {
+  branch_name: string | null
+  leader_name: string | null
+  member_count: number
+}
+
+export interface DepartmentMemberRow {
+  id: string
+  display_name: string
+  role: string
+  phone: string | null
+  branch_name: string | null
+  membership_status: string
+  status: string
+  joined_at: string | null
+}
+
+export interface DepartmentDetail extends DepartmentRow {
+  members: DepartmentMemberRow[]
 }
 
 export interface RegistrationRow extends EventRegistration {
@@ -48,11 +136,72 @@ export interface EventRow extends EventRecord {
 
 export interface EventDetail extends EventRow {
   registrations: RegistrationRow[]
+  blessings: BlessingRow[]
+  blessings_total: number
 }
 
 export interface AttendanceSessionRow extends AttendanceSession {
   branch_name: string | null
   records_count: number
+}
+
+export interface ServiceRow extends SundayService {
+  branch_name: string | null
+}
+
+export interface ServiceAssignmentRow extends ServiceAssignment {
+  person_name: string | null
+}
+
+export interface ServiceDetail extends ServiceRow {
+  preacher_name: string | null
+  assignments: ServiceAssignmentRow[]
+  assignment_count: number
+  events: SundayServiceEvent[]
+  blessings: BlessingRow[]
+  blessings_total: number
+}
+
+/** Blessing list/detail row (AFC-474): the shared Blessing plus resolved scope names. */
+export interface BlessingRow extends Blessing {
+  branch_name: string | null
+  zone_name: string | null
+}
+
+export interface BlessingBreakdownRow {
+  blessing_type: string
+  male: number
+  female: number
+  total: number
+}
+
+export interface BlessingDetail extends BlessingRow {
+  events: BlessingEvent[]
+}
+
+/** Youth directory row (AFC-476): the shared YouthProfile plus resolved names. */
+export interface YouthRow extends YouthProfile {
+  person_name: string | null
+  branch_name: string | null
+}
+
+export interface YouthDetail extends YouthRow {
+  person_is_minor: boolean | null
+  events: YouthProfileEvent[]
+  previous_branches: Array<Record<string, unknown>>
+  milestones: Array<Record<string, unknown>>
+}
+
+/** Celebrations feed row (AFC-476): the shared Celebration plus resolved names. */
+export interface CelebrationRow extends Celebration {
+  person_name: string | null
+  person_is_minor: boolean | null
+  branch_name: string | null
+  zone_name: string | null
+}
+
+export interface CelebrationDetail extends CelebrationRow {
+  events: CelebrationEvent[]
 }
 
 export interface AttendanceDetail extends AttendanceSessionRow {
@@ -82,8 +231,34 @@ export interface WelfareEvent {
   case: string
   event_type: string
   summary: string
+  /** Freeform note text (AFC-472); null for non-note audit rows. */
+  body: string | null
+  /** Short summary under the spec field name; mirrors summary. */
+  detail: string | null
   actor: string | null
   created_at: string | null
+}
+
+export interface WelfareReportGroup {
+  status: string
+  category: string
+  priority: string
+  count: number
+}
+
+export interface WelfareReport {
+  groups: WelfareReportGroup[]
+  totals: {
+    cases: number
+    open: number
+  }
+  filters: {
+    branch: string | null
+    confidentiality: string | null
+    status: string | null
+    category: string | null
+    priority: string | null
+  }
 }
 
 export interface WelfareCaseRow extends WelfareCase {
@@ -132,5 +307,59 @@ export interface Paginated<T> {
     total: number
     page: number
     limit: number
+  }
+}
+
+export type AttendanceReportGroup = 'branch' | 'zone'
+
+export type AttendanceReportPeriod =
+  'weekly' | 'monthly' | 'quarterly' | 'yearly' | 'custom'
+
+/** One grouped row of the split contract: group x service x bucket x category. */
+export interface AttendanceSplitRow {
+  branch: string | null
+  branch_name: string | null
+  zone: string | null
+  zone_name: string | null
+  service: string
+  /** Date bucket for the period (week-start YYYY-MM-DD, YYYY-MM, YYYY-Qn, YYYY, or day). */
+  date: string
+  category: string
+  male: number
+  female: number
+  total: number
+}
+
+export interface AttendanceReportTotals {
+  sessions: number
+  male: number
+  female: number
+  total: number
+}
+
+export interface AttendanceReportCompare extends AttendanceReportTotals {
+  from: string
+  to: string
+  has_data: boolean
+}
+
+export interface AttendanceReport {
+  rows: AttendanceSplitRow[]
+  totals: AttendanceReportTotals
+  /** Prior-year side of the compare toggle; null when the toggle is off. */
+  compare: AttendanceReportCompare | null
+  meta: {
+    total: number
+    page: number
+    limit: number
+  }
+  filters: {
+    from: string
+    to: string
+    branch: string | null
+    zone: string | null
+    session_type: string | null
+    group_by: AttendanceReportGroup
+    period: AttendanceReportPeriod
   }
 }

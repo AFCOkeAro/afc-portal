@@ -24,6 +24,23 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    # Least privilege (AFC-535): Directus stays internal-only. The web
+    # container reaches it over the overlay network at http://directus:8055,
+    # so no host publish is needed for the app path. The loopback publish
+    # below exists only so the operator can open the admin UI over SSH
+    # (`ssh -L 8055:127.0.0.1:8055 <vps>`). Publishing 8055 to the host
+    # network (bare "8055:8055") or routing it through Caddy requires an
+    # explicit CTO sign-off — do not do it for first boot.
+    ports:
+      - "127.0.0.1:8055:8055"
+    healthcheck:
+      # Mirrors the web healthcheck style (node fetch, no curl dependency).
+      # start_period covers cold-start schema migration on first boot.
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:8055/server/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
     environment:
       KEY: ${DIRECTUS_KEY}
       SECRET: ${DIRECTUS_SECRET}
@@ -41,15 +58,18 @@ services:
       STORAGE_LOCAL_ROOT: /directus/uploads
       RATE_LIMITER_ENABLED: "true"
       TELEMETRY: "false"
-    ports:
-      - "8055:8055"
     volumes:
       - directus_uploads:/directus/uploads
 
   web:
+    # service_healthy (not service_started): the acceptance flag
+    # directusConfigured is config-only (non-empty NUXT_DIRECTUS_URL, no
+    # fetch), so service_started would be enough for that one flag — but
+    # sign-in and registration actually fetch Directus, and without this
+    # gate web serves 503/502s against a still-migrating Directus.
     depends_on:
       directus:
-        condition: service_started
+        condition: service_healthy
 
 volumes:
   directus_pgdata:

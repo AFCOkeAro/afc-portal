@@ -1,0 +1,19 @@
+{
+  "issue": "AFC-461",
+  "authorAgentId": "7b4aae3b-0da5-4de2-a1d8-4737943ef561",
+  "authorName": "Coder",
+  "claimedAt": "2026-10-20T13:00:00+01:00",
+  "whatThisFileIs": "An R1 authorship claim, and nothing else. It says who wrote the compliance-path files below and on which issue. It asserts nothing about whether they are correct, and it carries no `reviews[]` entry.",
+  "paths": [
+    "services/directus/schema/migrations/20261020_0002_hierarchy.sql",
+    "services/directus/schema/migrations/rollback/20261020_0002_hierarchy.down.sql",
+    "tests/db/68_weca_returns.sql",
+    "tests/db/70_hierarchy_scope.sql",
+    ".provenance/claims/AFC-461.json"
+  ],
+  "doesNotClaimR2": "There is no `reviews[]` entry here and there will not be one from me. R2 review for this commit is recorded as a `Reviewed-by` trailer on the commit message (CTO verdict APPROVE on the AFC-466 review interaction 113a3272-d7dd-49ab-8bee-cb2a7840b229, resolved by a human, server-verified). I am the author of every path above. There is no independent security reviewer on this team (board declined the seat on cost), so a CTO review is a recorded degradation, not independent review.",
+  "scopeOfTheClaim": "R1 only: authorship of the listed paths for AFC-461a hierarchy work tracked under AFC-466. It is not clearance of the retention gate (plan 0.10.5), which only the CEO can clear. Non-compliance-path files on the same work (packages/shared hierarchy types, portal scope helpers, zones/bscs/branches routes, hierarchy-flows.md) landed earlier in 3254f42 and are not claimed here.",
+  "whatTheChangeActuallyDoes": "New migration creating areas, zones, branches, bible_study_centres, conference_centres, sunday_school_classes, avs_centres and campus_institutions (reference only); branches.zone is NOT NULL per spec; WECA branch FKs added per the 0001 merge contract; Lagos North seed idempotent via ON CONFLICT (code) DO NOTHING; app SELECT + INSERT/UPDATE, no DELETE anywhere, campus read-only; conditional Directus-only columns (no fork); no role creation, no durations, no triggers. Rollback refuses while any hierarchy or finance row exists. tests/db/70 proves seed shape, rerun idempotence, zone partition, uniqueness/RESTRICT/app-ceiling, the WECA FK merge, and the conditional skips. tests/db/68 fixture now resolves seeded branches by code (same board figures).",
+  "verificationRecorded": "pnpm test exit 0: 32 suites, 1351 assertions, 0 failing (includes sibling slices 0003-0014; hierarchy contribution: 19 suites / 670 at time of writing, now 32 / 1351 with no failures). All gates green incl. self-tests. Shared typecheck clean.",
+  "notClaimedPaths": "Concurrent sibling work in the tree is not mine and is not staged: later migrations 0003-0014, suites 72-81, shared role-matrix/schemas/collections additions, routes, flows, tests/web, stub-identities/types/navigation edits."
+}

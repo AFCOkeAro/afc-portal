@@ -5,13 +5,19 @@ import type { BranchSummary, EventRow, Paginated } from '~/types/portal'
 definePageMeta({ middleware: 'staff' })
 
 const api = useApi()
+const route = useRoute()
 const showForm = ref(false)
 const searchInput = ref('')
 const search = ref('')
 const when = ref('upcoming')
 const type = ref('all')
-const branch = ref('all')
-const status = ref('all')
+/** Drill-down contract: dashboard/branch pages link here with ?branch=. */
+function queryParam(name: string): string | null {
+  const value = route.query[name]
+  return typeof value === 'string' && value.length > 0 ? value : null
+}
+const branch = ref(queryParam('branch') ?? 'all')
+const status = ref(queryParam('status') ?? 'all')
 const page = ref(1)
 const limit = 25
 

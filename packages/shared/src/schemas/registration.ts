@@ -83,6 +83,12 @@ export const registrationFormSchema = z
       form.age_group,
     )
     const isMinorByDate = isMinorByAge(form.date_of_birth)
+    // F5 (AFC-512): unknown age band defaults to the guardian path. An
+    // unknown group with no DOB proving adulthood is treated as a minor
+    // for consent purposes -- the draft confirmation must carry an
+    // age-band reality check rather than assuming adult.
+    const isUnknownWithoutAdultProof =
+      form.age_group === 'unknown' && (form.date_of_birth === undefined || isMinorByDate)
 
     // A declared child age group plus an adult DOB is a contradiction, and a
     // contradiction here decides whether consent was collected. Refuse it
@@ -95,7 +101,7 @@ export const registrationFormSchema = z
       })
     }
 
-    if (isMinorByGroup || isMinorByDate) {
+    if (isMinorByGroup || isMinorByDate || isUnknownWithoutAdultProof) {
       if (!form.guardian_consent) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,

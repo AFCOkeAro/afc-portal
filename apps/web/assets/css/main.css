@@ -60,3 +60,15 @@
     vertical-align: top;
   }
 }
+
+/* Single-page shell print (prd-addendum-v4 §1 US-S3): one section per page,
+ * tab strip omitted so a profile can be filed or pasted into a report. */
+@media print {
+  .section-nav {
+    display: none !important;
+  }
+
+  section[id] {
+    break-inside: avoid;
+  }
+}

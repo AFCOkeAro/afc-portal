@@ -32,6 +32,10 @@ export const PERMISSION_SCOPES = [
   'own_branch',
   /** Records on any branch in `branchIds`. */
   'assigned_branches',
+  /** Records in the user's own zone (`zone` = user zone). */
+  'own_zone',
+  /** Records in any zone in `zoneIds`. */
+  'assigned_zones',
   /** Records scoped to the user's own department. */
   'own_department',
   /** Only events/visitors/cases tagged for the user's departments. */
