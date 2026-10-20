@@ -152,6 +152,37 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     volunteer: [C, 'own_branch', 'own branch intake'],
     none: [NONE, 'none'],
   },
+  // Newcomer journey (AFC-471, data-model-v4 §5). Stages are reference data:
+  // branch admins manage their own branch rows, everyone else reads. The
+  // follow-up log and the transition audit are append-only in spirit (no D
+  // for any role -- corrections are new rows); volunteers log intake
+  // follow-ups on their own branch. Follow-up notes restriction (§10.1) is
+  // record-level and lives in the Directus policy; FIELD_RESTRICTIONS below
+  // hides the field from roles that never see it.
+  [COLLECTIONS.visitorJourneyStages]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [ALL, 'all'],
+    branch_admin: [CRU, 'own_branch'],
+    department_leader: [R, 'assigned_branches'],
+    volunteer: [R, 'own_branch'],
+    none: [NONE, 'none'],
+  },
+  [COLLECTIONS.visitorFollowUps]: {
+    super_admin: [CRU, 'all'],
+    area_admin: [CRU, 'all'],
+    branch_admin: [CRU, 'own_branch'],
+    department_leader: [CRU, 'assigned_departments', 'assigned, youth'],
+    volunteer: [CR, 'own_branch', 'own branch intake follow-ups'],
+    none: [NONE, 'none'],
+  },
+  [COLLECTIONS.visitorJourneyTransitions]: {
+    super_admin: [CRU, 'all'],
+    area_admin: [CRU, 'all'],
+    branch_admin: [CRU, 'own_branch'],
+    department_leader: [R, 'assigned_departments', 'assigned, youth'],
+    volunteer: [R, 'own_branch'],
+    none: [NONE, 'none'],
+  },
   [COLLECTIONS.welfareCases]: {
     super_admin: [ALL, 'all'],
     area_admin: [ALL, 'all'],
@@ -426,6 +457,17 @@ const FIELD_RESTRICTIONS: Readonly<
     ],
     roles: ['super_admin', 'area_admin'],
     note: 'computed returns: area+, finance lead (not a staff_role; excluded)',
+  },
+  // Newcomer follow-up notes (AFC-471, data-model-v4 §5: restricted to
+  // branch admin + assigned officer + area). Whole-field hiding here covers
+  // the roles that never qualify; the assigned-officer read is record-level
+  // and lives in the Directus policy, which withholds the row (or the field)
+  // for non-assignees. Volunteers log intake follow-ups but do not read
+  // notes back except through assignment, which the policy grants.
+  [COLLECTIONS.visitorFollowUps]: {
+    fields: ['notes'],
+    roles: ['super_admin', 'area_admin', 'branch_admin'],
+    note: 'follow-up notes: branch admin (own branch, enforced by policy), area+; assigned officer read is record-level in policy',
   },
 }
 

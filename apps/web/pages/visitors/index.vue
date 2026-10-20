@@ -94,6 +94,13 @@ const statusColor: Record<string, 'success' | 'warning' | 'neutral' | 'error'> =
       description="First-time attenders, follow-ups and newcomers in the journey."
     >
       <template #actions>
+        <UButton
+          to="/visitors/funnel"
+          color="neutral"
+          variant="outline"
+          icon="i-lucide-filter"
+          label="Funnel"
+        />
         <PermissionGate :collection="COLLECTIONS.visitors" action="create">
           <UButton
             label="Record intake"

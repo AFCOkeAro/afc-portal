@@ -31,6 +31,14 @@ export const COLLECTIONS = {
   sundayServices: 'sunday_services',
   serviceAssignments: 'service_assignments',
   visitors: 'visitors',
+  /**
+   * Newcomer journey (AFC-471, data-model-v4 §2). `visitorJourneyStages` is
+   * the seedable reference; `visitorFollowUps` the outcome log;
+   * `visitorJourneyTransitions` the stage-move audit.
+   */
+  visitorJourneyStages: 'visitor_journey_stages',
+  visitorFollowUps: 'visitor_follow_ups',
+  visitorJourneyTransitions: 'visitor_journey_transitions',
   welfareCases: 'welfare_cases',
   welfareContributions: 'welfare_contributions',
   welfareCaseEvents: 'welfare_case_events',

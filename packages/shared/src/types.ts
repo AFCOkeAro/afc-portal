@@ -326,7 +326,69 @@ export interface AttendanceRecord {
 
 export type VisitorStatus = 'new' | 'follow_up' | 'converted' | 'closed' | 'declined'
 
-export interface Visitor {
+/**
+ * Newcomer journey fields (AFC-471, data-model-v4 §2.1 deltas). All optional
+ * so rows written before the journey slice still parse; `follow_up_owner`
+ * is the single owner field (the PRD `welfare_officer` maps to it -- no
+ * second column by design). Status enum deliberately unchanged (see the
+ * 0008 migration header): conversion sets `converted` + `person`.
+ */
+export interface VisitorJourney {
+  journey_stage: string | null
+  journey_stage_entered_at: string | null
+  journey_started_at: string | null
+  pack_checklist: string[]
+  dropoff_outcome:
+    | 'pending'
+    | 'address_confirmed'
+    | 'moved'
+    | 'not_home'
+    | 'declined'
+    | 'wrong_number'
+    | null
+  dropoff_visited_at: string | null
+  next_check_in_at: string | null
+  last_contact_at: string | null
+  last_contact_channel:
+    'whatsapp' | 'sms' | 'phone' | 'visit' | 'in_person' | 'none' | null
+  welfare_officer_assigned_at: string | null
+}
+
+export interface VisitorFollowUp {
+  id: string
+  visitor: string
+  branch: string | null
+  contact_at: string
+  contact_channel: 'whatsapp' | 'sms' | 'phone' | 'visit' | 'in_person'
+  outcome:
+    | 'reached'
+    | 'no_answer'
+    | 'requested_visit'
+    | 'needs_support'
+    | 'declined'
+    | 'moved'
+    | 'wrong_number'
+    | 'integrated'
+  /** Restricted read -- data-model-v4 §5. */
+  notes: string | null
+  welfare_case: string | null
+  next_step: string | null
+  next_follow_up_at: string | null
+  logged_by: string | null
+  communication: string | null
+}
+
+export interface VisitorJourneyTransition {
+  id: string
+  visitor: string
+  from_stage: string | null
+  to_stage: string
+  entered_at: string
+  logged_by: string | null
+  note: string | null
+}
+
+export interface Visitor extends Partial<VisitorJourney> {
   id: string
   branch: string | null
   visitor_first_name: string
