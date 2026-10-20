@@ -513,6 +513,113 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     volunteer: [R, 'own_branch'],
     none: [NONE, 'none'],
   },
+  // Office bundle (AFC-477, data-model-expansion §11). `zone_admin` is not a
+  // StaffRole, so the zone column's CRU/R grant lives in the Directus policy
+  // only; the cells below give the closest portal-role reading and never
+  // invent a wider grant. `welfare` (marriage R) is not a StaffRole either:
+  // the dept cell carries the welfare-dept reading and the policy narrows it.
+  [COLLECTIONS.transfers]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [ALL, 'all'],
+    branch_admin: [CRU, 'own_branch', 'CRU (own)'],
+    department_leader: [NONE, 'none'],
+    volunteer: [NONE, 'none'],
+    none: [NONE, 'none'],
+  },
+  [COLLECTIONS.transferEvents]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [R, 'all'],
+    branch_admin: [R, 'own_branch'],
+    department_leader: [NONE, 'none'],
+    volunteer: [NONE, 'none'],
+    none: [NONE, 'none'],
+  },
+  [COLLECTIONS.marriageMatters]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [ALL, 'all'],
+    branch_admin: [CRU, 'own_branch', 'CRU (own)'],
+    department_leader: [R, 'assigned_departments', 'R (welfare dept via policy)'],
+    volunteer: [NONE, 'none'],
+    // "R (own)": household reads its own matters; enforced record-level.
+    none: [R, 'public_only', 'R (own household via policy)'],
+  },
+  [COLLECTIONS.marriageMatterEvents]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [R, 'all'],
+    branch_admin: [R, 'own_branch'],
+    department_leader: [R, 'assigned_departments', 'assigned welfare'],
+    volunteer: [NONE, 'none'],
+    none: [NONE, 'none'],
+  },
+  [COLLECTIONS.officeMinutes]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [ALL, 'all'],
+    branch_admin: [R, 'own_branch', 'R (own)'],
+    department_leader: [R, 'assigned_branches', 'R (dept)'],
+    volunteer: [NONE, 'none'],
+    none: [NONE, 'none'],
+  },
+  [COLLECTIONS.minutesAttendees]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [ALL, 'all'],
+    branch_admin: [R, 'own_branch'],
+    department_leader: [R, 'assigned_branches'],
+    volunteer: [NONE, 'none'],
+    none: [NONE, 'none'],
+  },
+  [COLLECTIONS.officeMinuteEvents]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [R, 'all'],
+    branch_admin: [R, 'own_branch'],
+    department_leader: [R, 'assigned_branches'],
+    volunteer: [NONE, 'none'],
+    none: [NONE, 'none'],
+  },
+  // "R/C own": volunteers create tasks assigned to themselves and read their
+  // own; household reads its own. Assignee-scoped views are route-enforced
+  // (assignee_user = session user OR branch scope by role).
+  [COLLECTIONS.tasks]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [ALL, 'all'],
+    branch_admin: [ALL, 'own_branch', 'CRUD (own)'],
+    department_leader: [CRU, 'own_department', 'CRU (dept)'],
+    volunteer: [CR, 'own_branch', 'R/C own'],
+    none: [R, 'public_only', 'R own via policy'],
+  },
+  [COLLECTIONS.taskEvents]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [R, 'all'],
+    branch_admin: [R, 'own_branch'],
+    department_leader: [R, 'assigned_departments', 'assigned'],
+    volunteer: [R, 'own_branch', 'own tasks'],
+    none: [NONE, 'none'],
+  },
+  // "R (public ones)": household/volunteer/public read published rows in
+  // scope; the publish window (publish_from/to) is route-enforced.
+  [COLLECTIONS.announcements]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [ALL, 'all'],
+    branch_admin: [CRU, 'own_branch', 'CRU (own)'],
+    department_leader: [R, 'assigned_branches', 'R (dept)'],
+    volunteer: [R, 'own_branch'],
+    none: [R, 'public_only', 'R (public ones)'],
+  },
+  [COLLECTIONS.announcementEvents]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [R, 'all'],
+    branch_admin: [R, 'own_branch'],
+    department_leader: [R, 'assigned_branches'],
+    volunteer: [NONE, 'none'],
+    none: [NONE, 'none'],
+  },
+  [COLLECTIONS.eventReferrals]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [ALL, 'all'],
+    branch_admin: [CRU, 'own_branch', 'CRU (own)'],
+    department_leader: [CRU, 'own_department', 'CRU (dept)'],
+    volunteer: [C, 'own_branch', 'C (own)'],
+    none: [C, 'allowlisted_fields', 'C (public reg)'],
+  },
   // Youth profiles + celebrations (AFC-476, data-model-expansion §11):
   // youth_profiles CRUD / CRUD / CRUD (zone) / CRUD (own) / CRU (youth dept)
   // / R / R (own); celebrations CRUD / CRUD / CRUD (zone) / CRUD (own) /
@@ -699,6 +806,14 @@ const FIELD_RESTRICTIONS: Readonly<
     fields: ['notes'],
     roles: ['super_admin', 'area_admin', 'branch_admin'],
     note: 'follow-up notes: branch admin (own branch, enforced by policy), area+; assigned officer read is record-level in policy',
+  },
+  // Office tasks (AFC-477, data-model-expansion §11.1). description is an
+  // assignee + scoped-admin read: the policy withholds it from anyone else,
+  // and the portal strips it (visibleFields/stripHidden) for the same roles.
+  [COLLECTIONS.tasks]: {
+    fields: ['description'],
+    roles: ['super_admin', 'area_admin', 'branch_admin'],
+    note: 'task description: assignee + scoped admin (record-level in policy); hidden here for roles that never qualify',
   },
 }
 
