@@ -1,4 +1,6 @@
 import type { H3Event } from 'h3'
+import { readSession, writeSession } from './session'
+import type { PortalSessionData } from './session'
 
 /**
  * The only module that reads the Directus base URL.
@@ -64,19 +66,122 @@ export async function directusFetch<T>(
   const token = options.accessToken ?? String(config.directusServerToken ?? '')
   const url = `${directusBaseUrl(event)}${path}`
 
+  return requestWithRefresh<T>(event, url, path, options, token, false)
+}
+
+async function performDirectusRequest<T>(
+  url: string,
+  options: DirectusFetchOptions,
+  token: string,
+): Promise<T> {
+  // `$fetch` is typed against the typed routes, which know nothing about
+  // Directus. The cast is confined to this one call; every caller above sees
+  // the `T` the function was asked for.
+  return (await $fetch(url, {
+    method: options.method ?? 'GET',
+    query: options.query,
+    body: options.body as Record<string, unknown> | undefined,
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    ignoreResponseError: options.tolerateError === true,
+  })) as T
+}
+
+/**
+ * Request wrapper with one-shot refresh-and-retry (permanent fix for the
+ * recurring `GET /api/finance/records → 500 DirectusAuthError: Token expired`).
+ *
+ * Directus access tokens expire (default 15m) while the portal session cookie
+ * lives 8h. Before this wrapper, the first request after expiry threw an
+ * unhandled `DirectusAuthError` → Nitro 500 on every data route until the user
+ * manually re-logged in. Now:
+ *
+ * - a 401/403 on a call carrying the session's current user token triggers one
+ *   `POST /auth/refresh` with the stored refresh token, reseals the session
+ *   with the new pair, and retries the original request once;
+ * - a user-token failure that cannot be refreshed (rotated/revoked refresh
+ *   token) becomes a clean 401 `reauthenticate` so the UI routes to sign-in;
+ * - the server-token path (no session, or callers using the shared fallback
+ *   token) is untouched: a rejection there is a deployment fault and still
+ *   surfaces as `DirectusAuthError` (500), exactly as before — including the
+ *   `/auth/login` flow, which runs with no session.
+ */
+async function requestWithRefresh<T>(
+  event: H3Event,
+  url: string,
+  path: string,
+  options: DirectusFetchOptions,
+  token: string,
+  retried: boolean,
+): Promise<T> {
   try {
-    // `$fetch` is typed against the typed routes, which know nothing about
-    // Directus. The cast is confined to this one call; every caller above sees
-    // the `T` the function was asked for.
-    return (await $fetch(url, {
-      method: options.method ?? 'GET',
-      query: options.query,
-      body: options.body as Record<string, unknown> | undefined,
-      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-      ignoreResponseError: options.tolerateError === true,
-    })) as T
+    return await performDirectusRequest<T>(url, options, token)
   } catch (cause) {
-    throw mapDirectusError(cause, path)
+    const mapped = mapDirectusError(cause, path)
+    if (!(mapped instanceof DirectusAuthError)) {
+      throw mapped
+    }
+    const session = await readSession(event).catch(() => null)
+    const isUserToken =
+      !!session?.accessToken && session.accessToken === token
+    if (!isUserToken) {
+      throw mapped
+    }
+    if (!retried) {
+      const retryToken = await tryRefreshSessionToken(event, session)
+      if (retryToken) {
+        return requestWithRefresh<T>(event, url, path, options, retryToken, true)
+      }
+    }
+    throw createError({
+      statusCode: 401,
+      statusMessage: 'Sign in to continue',
+      data: { code: 'reauthenticate' },
+    })
+  }
+}
+
+interface DirectusRefreshResponse {
+  data: {
+    access_token: string
+    refresh_token: string | null
+    expires: number
+  }
+}
+
+/**
+ * Exchange the session's refresh token for a new pair and reseal the session.
+ * Returns the new access token, or null when there is nothing usable to
+ * refresh with (no refresh token, already rotated, or refresh rejected).
+ * Never throws: a failed refresh is a normal "re-authenticate" outcome, and it
+ * must not mask the original request error with a second 500.
+ */
+async function tryRefreshSessionToken(
+  event: H3Event,
+  session: PortalSessionData,
+): Promise<string | null> {
+  if (!session.refreshToken) {
+    return null
+  }
+  try {
+    const refreshed = await $fetch<DirectusRefreshResponse>(
+      `${directusBaseUrl(event)}/auth/refresh`,
+      {
+        method: 'POST',
+        body: { refresh_token: session.refreshToken, mode: 'json' },
+      },
+    )
+    const accessToken = refreshed?.data?.access_token
+    if (!accessToken) {
+      return null
+    }
+    await writeSession(event, {
+      accessToken,
+      refreshToken: refreshed.data.refresh_token ?? session.refreshToken,
+      session: session.session,
+    })
+    return accessToken
+  } catch {
+    return null
   }
 }
 

@@ -23,3 +23,23 @@ http://afc-staging.bluespace.ng {
 		Referrer-Policy "strict-origin-when-cross-origin"
 	}
 }
+
+# Directus admin/API (afc-staging-api.bluespace.ng). Added 2026-10-21: NPM
+# already routes this hostname at CT105:80, but Caddy had no site block for it.
+# Same http:// pattern as above (TLS at Cloudflare Flexible; see AFC-561).
+# NOTE: exposing Directus publicly was gated on CTO sign-off in
+# compose.directus.yml (least-privilege comment) — this block enacts that
+# approval for staging. Directus itself stays loopback-only (127.0.0.1:8055);
+# external traffic enters only through this reverse proxy.
+
+http://afc-staging-api.bluespace.ng {
+	encode gzip
+
+	reverse_proxy directus:8055
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+}
