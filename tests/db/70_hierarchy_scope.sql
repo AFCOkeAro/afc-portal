@@ -8,7 +8,7 @@
 -- the columns it reads, so this suite asserts the database half of that
 -- promise -- the half a crafted HTTP request cannot change:
 --
---   70.1  seed shape    -- Lagos North loads: 1 area, 6 zones, 7 branches,
+--   70.1  seed shape    -- Lagos North loads: 1 area, 6 zones, 6 branches,
 --                         9 BSCs; every branch carries a zone; every branch
 --                         area equals its zone's area; every BSC zone equals
 --                         its parent branch's zone; the satellite hangs under
@@ -61,7 +61,7 @@ BEGIN
     'hierarchy', 'all six zones carry the LAG-NORTH-Z prefix');
 
   SELECT count(*) INTO v_branches FROM branches;
-  PERFORM test_support.assert_true(v_branches = 7, 'hierarchy', 'seven seeded branches');
+  PERFORM test_support.assert_true(v_branches = 6, 'hierarchy', 'six seeded branches (ABULE-EGBA removed by 0024)');
 
   SELECT count(*) INTO v_bsc FROM bible_study_centres;
   PERFORM test_support.assert_true(v_bsc = 9, 'hierarchy', 'nine seeded BSCs');
@@ -109,15 +109,18 @@ BEGIN
 END $$;
 
 -- ---------------------------------------------------------------------------
--- 70.2  RERUN. Re-applying the migration changes nothing.
+-- 70.2  RERUN. Re-applying the migration changes nothing. NOTE: 0002 alone
+--        resurrects ABULE-EGBA (ON CONFLICT DO NOTHING skips present codes
+--        only), so 0024 is re-applied after it.
 -- ---------------------------------------------------------------------------
 \i services/directus/schema/migrations/20261020_0002_hierarchy.sql
+\i services/directus/schema/migrations/20261020_0024_remove_abule_egba.sql
 
 DO $$
 BEGIN
   PERFORM test_support.assert_true((SELECT count(*) FROM areas) = 1, 'hierarchy', 'rerun: still one area');
   PERFORM test_support.assert_true((SELECT count(*) FROM zones) = 6, 'hierarchy', 'rerun: still six zones');
-  PERFORM test_support.assert_true((SELECT count(*) FROM branches) = 7, 'hierarchy', 'rerun: still seven branches');
+  PERFORM test_support.assert_true((SELECT count(*) FROM branches) = 6, 'hierarchy', 'rerun: still six branches');
   PERFORM test_support.assert_true((SELECT count(*) FROM bible_study_centres) = 9, 'hierarchy', 'rerun: still nine BSCs');
 END $$;
 
@@ -143,7 +146,7 @@ BEGIN
   SELECT count(*) INTO v_overlap FROM branches WHERE zone = v_z1 AND zone = v_z2;
   PERFORM test_support.assert_true(v_overlap = 0, 'hierarchy', 'Z1 and Z2 branch predicates are disjoint');
   PERFORM test_support.assert_true(
-    (SELECT count(*) FROM branches WHERE zone NOT IN (v_z1, v_z2)) = 4,
+    (SELECT count(*) FROM branches WHERE zone NOT IN (v_z1, v_z2)) = 3,
     'hierarchy', 'every other branch is outside both zones');
 
   -- Same for BSCs: three under Z1, two under Z2, disjoint.

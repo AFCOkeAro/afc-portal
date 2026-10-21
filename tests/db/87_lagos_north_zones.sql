@@ -10,7 +10,7 @@
 --
 --   87.1  names       -- the six zones read exactly the authoritative names,
 --                         codes/sorts unchanged, still one area + six zones.
---   87.2  dependents  -- every FK dependent is green: 7 branches + 9 BSCs
+--   87.2  dependents  -- every FK dependent is green: 6 branches + 9 BSCs
 --                         intact, no branch zoneless or re-homed, denorm
 --                         consistency (branch.area = zone.area, bsc.zone =
 --                         parent zone), WECA workbook branch codes resolve,
@@ -80,8 +80,8 @@ DECLARE
   v_mismatch integer;
 BEGIN
   PERFORM test_support.assert_true(
-    (SELECT count(*) FROM branches) = 7,
-    'zones578', 'seven seeded branches intact');
+    (SELECT count(*) FROM branches) = 6,
+    'zones578', 'six seeded branches intact (ABULE-EGBA removed by 0024)');
   PERFORM test_support.assert_true(
     (SELECT count(*) FROM bible_study_centres) = 9,
     'zones578', 'nine seeded BSCs intact');
@@ -89,7 +89,8 @@ BEGIN
     (SELECT count(*) FROM branches WHERE zone IS NULL) = 0,
     'zones578', 'no branch is zoneless after the rename');
 
-  -- Branch>zone mapping pinned: the correction renames, never re-homes.
+  -- Branch>zone mapping pinned: the correction renames, never re-homes;
+  -- 0024 removes ABULE-EGBA, so six rows remain on their 0002 zone.
   PERFORM test_support.assert_true(
     (SELECT count(*) FROM branches b JOIN zones z ON z.id = b.zone
       WHERE (b.code = 'OKE-ARO' AND z.code = 'LAG-NORTH-Z1')
@@ -97,9 +98,8 @@ BEGIN
          OR (b.code = 'LEGUN' AND z.code = 'LAG-NORTH-Z2')
          OR (b.code = 'MATOGUN' AND z.code = 'LAG-NORTH-Z3')
          OR (b.code = 'OLOMOWEWE' AND z.code = 'LAG-NORTH-Z4')
-         OR (b.code = 'ABULE-EGBA' AND z.code = 'LAG-NORTH-Z5')
-         OR (b.code = 'SANGO-OTA' AND z.code = 'LAG-NORTH-Z6')) = 7,
-    'zones578', 'no branch re-homed: all seven branches keep their 0002 zone');
+         OR (b.code = 'SANGO-OTA' AND z.code = 'LAG-NORTH-Z6')) = 6,
+    'zones578', 'no branch re-homed: all six remaining branches keep their 0002 zone');
 
   -- Denorm consistency survives the rename (names changed, ids did not).
   SELECT count(*) INTO v_mismatch
@@ -144,17 +144,20 @@ BEGIN
 END $$;
 
 -- ---------------------------------------------------------------------------
--- 87.3  RERUN. 0002 + 0022 re-applied change nothing.
+-- 87.3  RERUN. 0002 + 0022 + 0024 re-applied change nothing. NOTE: 0002
+--        alone resurrects ABULE-EGBA (ON CONFLICT DO NOTHING skips present
+--        codes only), so 0024 is re-applied after it.
 -- ---------------------------------------------------------------------------
 \i services/directus/schema/migrations/20261020_0002_hierarchy.sql
 \i services/directus/schema/migrations/20261020_0022_lagos_north_zones.sql
+\i services/directus/schema/migrations/20261020_0024_remove_abule_egba.sql
 
 DO $$
 BEGIN
   PERFORM test_support.assert_true((SELECT count(*) FROM zones) = 6,
     'zones578', 'rerun: still six zones');
-  PERFORM test_support.assert_true((SELECT count(*) FROM branches) = 7,
-    'zones578', 'rerun: still seven branches');
+  PERFORM test_support.assert_true((SELECT count(*) FROM branches) = 6,
+    'zones578', 'rerun: still six branches');
   PERFORM test_support.assert_equals(
     (SELECT string_agg(name, '|' ORDER BY code) FROM zones),
     'Oke Aro Zone|Sango Zone|Ifo Zone|Itoki Zone|Ijoko Zone|Agege Zone',
@@ -173,7 +176,7 @@ BEGIN
     'Oke-Aro Zone|Legun Zone|Matogun Zone|Olomowewe Zone|Abule-Egba Zone|Sango-Ota Zone',
     'zones578', 'down script restores the six 0002 names by code');
   PERFORM test_support.assert_true(
-    (SELECT count(*) FROM branches) = 7,
+    (SELECT count(*) FROM branches) = 6,
     'zones578', 'down script deletes no branch row');
 END $$;
 
