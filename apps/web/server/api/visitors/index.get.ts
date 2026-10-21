@@ -6,6 +6,7 @@ import {
   mergeFilters,
   requireCan,
   scopeFilter,
+  throwStoreUnavailable,
 } from '../../utils/portal'
 
 const FIELDS = [
@@ -45,18 +46,30 @@ export default defineEventHandler(async (event) => {
         ? { status: { _in: ['new', 'follow_up'] } }
         : { status: { _eq: status } }
 
-  const result = await listItems<VisitorRow>(event, scope, 'visitors', {
-    filter: mergeFilters(
-      filter,
-      branch ? { branch: { _eq: branch } } : undefined,
-      scopeFilter(scope),
-    ),
-    fields: FIELDS,
-    sort: 'next_follow_up_date,visit_date',
-    page,
-    limit,
-    search: search || undefined,
-  })
+  // AFC-583: the list read hits the 0025 register. A missing table and a
+  // missing read grant both arrive without a deliberate status — map to the
+  // named store error, never a bare 500. Deliberate 4xx pass through untouched.
+  let result: {
+    data: VisitorRow[]
+    meta: { total: number; page: number; limit: number }
+  }
+  try {
+    result = await listItems<VisitorRow>(event, scope, 'visitors', {
+      filter: mergeFilters(
+        filter,
+        branch ? { branch: { _eq: branch } } : undefined,
+        scopeFilter(scope),
+      ),
+      fields: FIELDS,
+      sort: 'next_follow_up_date,visit_date',
+      page,
+      limit,
+      search: search || undefined,
+    })
+  } catch (error) {
+    if ((error as { statusCode?: number })?.statusCode) throw error
+    throwStoreUnavailable(error, 'visitor_store', '0025')
+  }
 
   const names = await branchNames(event, scope)
   const rows = result.data.map((row) => ({

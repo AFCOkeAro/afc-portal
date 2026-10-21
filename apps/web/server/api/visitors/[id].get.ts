@@ -4,6 +4,7 @@ import {
   findScopedItem,
   getPortalScope,
   requireCan,
+  throwStoreUnavailable,
 } from '../../utils/portal'
 import { JOURNEY_FIELDS, loadJourneyStages } from '../../utils/visitor-journey'
 
@@ -29,9 +30,19 @@ export default defineEventHandler(
     if (!id)
       throw createError({ statusCode: 400, statusMessage: 'A visitor id is required' })
 
-    const row = await findScopedItem<VisitorRow>(event, scope, 'visitors', id, {
-      fields: JOURNEY_FIELDS,
-    })
+    // AFC-583: the detail read hits the 0025 register — map an unreadable
+    // store to the named error, never a bare 500. Deliberate 4xx (scope
+    // 404s) pass through; the journey-vocabulary enrichment below keeps its
+    // own fail-soft try.
+    let row: VisitorRow
+    try {
+      row = await findScopedItem<VisitorRow>(event, scope, 'visitors', id, {
+        fields: JOURNEY_FIELDS,
+      })
+    } catch (error) {
+      if ((error as { statusCode?: number })?.statusCode) throw error
+      throwStoreUnavailable(error, 'visitor_store', '0025')
+    }
     const names = await branchNames(event, scope)
     // Resolve the journey vocabulary server-side so the UI renders stage keys,
     // never bare uuids. A missing stages collection fails the journey cards,
