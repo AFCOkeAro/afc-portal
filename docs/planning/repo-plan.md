@@ -69,6 +69,8 @@ afc-church-portal/
 - Merge method: **squash** (linear history).
 - `release-*` tags for production cuts (e.g. `v0.3.0`).
 - Optional `staging` branch is unnecessary; staging deploys from `main` on merge.
+- **Staging-first standard** (board ruling 2026-10-21): branch PR, merge to `main`, rebuild staging, QA verify on staging. Until `deploy-staging.yml` automation lands, the operator rebuilds staging after every PR merge; QA verification on staging gates the next production cut, never the other way round.
+- **Push immediately:** land small complete PRs as soon as CI is green — never hold finished commits for a batch. One issue, one PR, promptly.
 
 ---
 
