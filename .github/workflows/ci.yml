@@ -163,6 +163,12 @@ jobs:
           bash scripts/migration-privilege-gate.sh --self-test
           node scripts/migration-rollback-gate.mjs --self-test
           bash scripts/adr-uniqueness-gate.sh --self-test
+          # AFC-429. The credential-surface scanner's offline self-test rides
+          # with the gate self-tests (it is offline: no network, no secrets).
+          # The corpus scan itself is NOT a CI tree gate: it reads the live
+          # Paperclip API and runs inside a Paperclip agent run and on the
+          # AFC-312 routine (cron 0 3 * * * UTC), never in this pipeline.
+          node scripts/credential-surface-scan.mjs --self-test
 
       - name: Awareness write-context gate
         run: bash scripts/awareness-write-context-gate.sh
