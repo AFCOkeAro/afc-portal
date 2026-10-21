@@ -1,5 +1,10 @@
 <script setup lang="ts">
-import { isCalendarView, isISODate, rangeForView, todayISO } from '~/utils/calendar-ranges'
+import {
+  isCalendarView,
+  isISODate,
+  rangeForView,
+  todayISO,
+} from '~/utils/calendar-ranges'
 import type { CalendarView, CalendarViewItem } from '~/utils/calendar-ranges'
 
 /**
@@ -84,7 +89,13 @@ const rows = computed<CalendarViewItem[]>(() =>
           class="w-full sm:w-48"
           aria-label="Filter by entry type"
         />
-        <UButton to="/register" color="neutral" variant="ghost" size="sm" label="Register for an event" />
+        <UButton
+          to="/register"
+          color="neutral"
+          variant="ghost"
+          size="sm"
+          label="Register for an event"
+        />
       </div>
 
       <CalendarViews

@@ -86,7 +86,10 @@ export default defineEventHandler(async (event) => {
       : level === 'zone'
         ? { zone: { _eq: id } }
         : {
-            _or: [{ area: { _eq: id } }, { branch: { _null: true }, zone: { _null: true }, area: { _null: true } }],
+            _or: [
+              { area: { _eq: id } },
+              { branch: { _null: true }, zone: { _null: true }, area: { _null: true } },
+            ],
           }
 
   let departments: { data: Record<string, unknown>[] }
@@ -100,8 +103,22 @@ export default defineEventHandler(async (event) => {
   }
   try {
     departments = await listItems<Record<string, unknown>>(event, scope, 'departments', {
-      filter: mergeFilters({ status: { _eq: 'active' } }, scopeMatch, departmentScopeFilter(scope)),
-      fields: ['id', 'name', 'code', 'department_type', 'branch', 'zone', 'area', 'leader_person', 'status'],
+      filter: mergeFilters(
+        { status: { _eq: 'active' } },
+        scopeMatch,
+        departmentScopeFilter(scope),
+      ),
+      fields: [
+        'id',
+        'name',
+        'code',
+        'department_type',
+        'branch',
+        'zone',
+        'area',
+        'leader_person',
+        'status',
+      ],
       sort: 'name',
       limit: -1,
     })

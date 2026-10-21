@@ -38,13 +38,10 @@ export default defineEventHandler(async (event) => {
   // forbidden fields, validation) pass through.
   let eventRow: Record<string, unknown>
   try {
-    eventRow = await findScopedItem<Record<string, unknown>>(
-      event,
-      scope,
-      'events',
-      id,
-      { fields: ['id', 'branch'], scope: eventScopeFilter(scope) },
-    )
+    eventRow = await findScopedItem<Record<string, unknown>>(event, scope, 'events', id, {
+      fields: ['id', 'branch'],
+      scope: eventScopeFilter(scope),
+    })
   } catch (error) {
     if ((error as { statusCode?: number })?.statusCode) throw error
     throwStoreUnavailable(error, 'event_store', '0021')

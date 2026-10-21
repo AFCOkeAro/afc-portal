@@ -52,13 +52,10 @@ export default defineEventHandler(async (event) => {
   // its own group_partial_failure 502, which also passes through.
   let eventRow: Record<string, unknown>
   try {
-    eventRow = await findScopedItem<Record<string, unknown>>(
-      event,
-      scope,
-      'events',
-      id,
-      { fields: ['id', 'branch'], scope: eventScopeFilter(scope) },
-    )
+    eventRow = await findScopedItem<Record<string, unknown>>(event, scope, 'events', id, {
+      fields: ['id', 'branch'],
+      scope: eventScopeFilter(scope),
+    })
   } catch (error) {
     if ((error as { statusCode?: number })?.statusCode) throw error
     throwStoreUnavailable(error, 'event_store', '0021')

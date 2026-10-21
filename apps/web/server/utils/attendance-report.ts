@@ -179,7 +179,9 @@ export async function collectSplitAggregate(
       sessions = await listItems<SessionRow>(event, scope, 'attendance_sessions', {
         filter: mergeFilters(
           { session_date: { _gte: options.from, _lte: options.to } },
-          options.sessionType ? { session_type: { _eq: options.sessionType } } : undefined,
+          options.sessionType
+            ? { session_type: { _eq: options.sessionType } }
+            : undefined,
           options.branch ? { branch: { _eq: options.branch } } : undefined,
           options.zone ? { zone: { _eq: options.zone } } : undefined,
           scopeFilter(scope),

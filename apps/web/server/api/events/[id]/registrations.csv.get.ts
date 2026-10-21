@@ -56,13 +56,10 @@ export default defineEventHandler(async (event): Promise<string> => {
   let result: { data: RegistrationRow[] }
   let fields: string[]
   try {
-    eventRow = await findScopedItem<Record<string, unknown>>(
-      event,
-      scope,
-      'events',
-      id,
-      { fields: ['id', 'title'], scope: eventScopeFilter(scope) },
-    )
+    eventRow = await findScopedItem<Record<string, unknown>>(event, scope, 'events', id, {
+      fields: ['id', 'title'],
+      scope: eventScopeFilter(scope),
+    })
 
     fields = visibleFields(scope, 'event_registrations', FIELDS)
     result = await listItems<RegistrationRow>(event, scope, 'event_registrations', {

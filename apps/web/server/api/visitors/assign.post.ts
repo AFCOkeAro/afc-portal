@@ -48,7 +48,9 @@ export default defineEventHandler(async (event) => {
       parsed.data.id,
       {
         follow_up_owner: parsed.data.officer,
-        welfare_officer_assigned_at: parsed.data.officer ? new Date().toISOString() : null,
+        welfare_officer_assigned_at: parsed.data.officer
+          ? new Date().toISOString()
+          : null,
       },
     )
     return { data: { ...updated, id: String((updated as { id: unknown }).id) } }

@@ -223,7 +223,9 @@ function isToday(iso: string): boolean {
       <!-- Month: Monday-first grid, padded weeks share the feed window. -->
       <div v-else-if="view === 'month'" class="mt-4 overflow-x-auto">
         <div class="min-w-[560px]">
-          <div class="grid grid-cols-7 text-center text-xs font-medium text-gray-500 dark:text-gray-400">
+          <div
+            class="grid grid-cols-7 text-center text-xs font-medium text-gray-500 dark:text-gray-400"
+          >
             <span v-for="day in weekdayNames" :key="day" class="py-1">{{ day }}</span>
           </div>
           <div
@@ -240,7 +242,11 @@ function isToday(iso: string): boolean {
               <button
                 type="button"
                 class="text-xs font-medium focus-visible:outline-2 focus-visible:outline-primary-500"
-                :class="isToday(iso) ? 'text-primary-600 dark:text-primary-400' : 'text-gray-700 dark:text-gray-200'"
+                :class="
+                  isToday(iso)
+                    ? 'text-primary-600 dark:text-primary-400'
+                    : 'text-gray-700 dark:text-gray-200'
+                "
                 :aria-label="`Open ${iso}`"
                 @click="openDay(iso)"
               >
@@ -289,7 +295,11 @@ function isToday(iso: string): boolean {
             <button
               type="button"
               class="text-xs font-semibold focus-visible:outline-2 focus-visible:outline-primary-500"
-              :class="isToday(iso) ? 'text-primary-600 dark:text-primary-400' : 'text-gray-700 dark:text-gray-200'"
+              :class="
+                isToday(iso)
+                  ? 'text-primary-600 dark:text-primary-400'
+                  : 'text-gray-700 dark:text-gray-200'
+              "
               @click="openDay(iso)"
             >
               {{ weekdayNames[dayIndex] }} {{ dayNumber(iso) }}
@@ -300,7 +310,10 @@ function isToday(iso: string): boolean {
                 :key="`${item.item_type}-${item.id}`"
                 class="text-xs"
               >
-                <span v-if="formatTime(item.starts_at)" class="font-mono text-gray-500 dark:text-gray-400">
+                <span
+                  v-if="formatTime(item.starts_at)"
+                  class="font-mono text-gray-500 dark:text-gray-400"
+                >
                   {{ formatTime(item.starts_at) }}
                 </span>
                 <slot name="row" :item="item">
@@ -332,7 +345,10 @@ function isToday(iso: string): boolean {
             class="flex flex-wrap items-center gap-x-3 gap-y-1 py-2.5 text-sm"
           >
             <UBadge color="neutral" variant="subtle">{{ item.item_type }}</UBadge>
-            <span v-if="formatTime(item.starts_at)" class="font-mono text-gray-500 dark:text-gray-400">
+            <span
+              v-if="formatTime(item.starts_at)"
+              class="font-mono text-gray-500 dark:text-gray-400"
+            >
               {{ formatTime(item.starts_at) }}
             </span>
             <slot name="row" :item="item">
@@ -343,11 +359,16 @@ function isToday(iso: string): boolean {
               >
                 {{ item.title }}
               </NuxtLink>
-              <span v-else class="font-medium text-gray-900 dark:text-white">{{ item.title }}</span>
+              <span v-else class="font-medium text-gray-900 dark:text-white">{{
+                item.title
+              }}</span>
             </slot>
           </li>
         </ul>
-        <p v-if="itemsOn(focused).length === 0" class="mt-2 text-sm text-gray-500 dark:text-gray-400">
+        <p
+          v-if="itemsOn(focused).length === 0"
+          class="mt-2 text-sm text-gray-500 dark:text-gray-400"
+        >
           Nothing scheduled this day.
         </p>
       </div>
@@ -355,7 +376,9 @@ function isToday(iso: string): boolean {
       <!-- List: grouped by date, the previous default rendering. -->
       <div v-else class="mt-4 space-y-5">
         <section v-for="[date, group] in listGroups" :key="date">
-          <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+          <h3
+            class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400"
+          >
             {{ formatLong(date) }}
           </h3>
           <ul class="mt-1 divide-y divide-gray-100 dark:divide-gray-800">
@@ -365,7 +388,10 @@ function isToday(iso: string): boolean {
               class="flex flex-wrap items-center gap-x-3 gap-y-1 py-2.5 text-sm"
             >
               <UBadge color="neutral" variant="subtle">{{ item.item_type }}</UBadge>
-              <span v-if="formatTime(item.starts_at)" class="font-mono text-gray-500 dark:text-gray-400">
+              <span
+                v-if="formatTime(item.starts_at)"
+                class="font-mono text-gray-500 dark:text-gray-400"
+              >
                 {{ formatTime(item.starts_at) }}
               </span>
               <slot name="row" :item="item">
@@ -376,7 +402,9 @@ function isToday(iso: string): boolean {
                 >
                   {{ item.title }}
                 </NuxtLink>
-                <span v-else class="font-medium text-gray-900 dark:text-white">{{ item.title }}</span>
+                <span v-else class="font-medium text-gray-900 dark:text-white">{{
+                  item.title
+                }}</span>
               </slot>
               <span v-if="item.branch_name" class="text-gray-500 dark:text-gray-400">
                 {{ item.branch_name }}

@@ -18,12 +18,7 @@ const props = defineProps<{
 
 const api = useApi()
 
-const {
-  data,
-  pending,
-  error,
-  refresh,
-} = await useAsyncData(
+const { data, pending, error, refresh } = await useAsyncData(
   () => `management-team-${props.level}-${props.scopeId}`,
   () =>
     api.get<{ data: ManagementTeamEntry[] }>(
@@ -49,7 +44,13 @@ const entries = computed(() => data.value?.data ?? [])
       :description="error.message"
     >
       <template #actions>
-        <UButton color="neutral" variant="soft" size="xs" label="Retry" @click="refresh()" />
+        <UButton
+          color="neutral"
+          variant="soft"
+          size="xs"
+          label="Retry"
+          @click="refresh()"
+        />
       </template>
     </UAlert>
 
@@ -93,9 +94,7 @@ const entries = computed(() => data.value?.data ?? [])
             >
               {{ leader.display_name }}
             </NuxtLink>
-            <span
-              class="shrink-0 text-xs capitalize text-gray-500 dark:text-gray-400"
-            >
+            <span class="shrink-0 text-xs capitalize text-gray-500 dark:text-gray-400">
               {{ leader.role.replace(/_/g, ' ') }}
             </span>
           </li>

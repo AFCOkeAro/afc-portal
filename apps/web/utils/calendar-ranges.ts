@@ -30,9 +30,7 @@ export interface CalendarViewItem {
 }
 
 export function isCalendarView(value: unknown): value is CalendarView {
-  return (
-    typeof value === 'string' && (CALENDAR_VIEWS as string[]).includes(value)
-  )
+  return typeof value === 'string' && (CALENDAR_VIEWS as string[]).includes(value)
 }
 
 export function isISODate(value: unknown): value is string {

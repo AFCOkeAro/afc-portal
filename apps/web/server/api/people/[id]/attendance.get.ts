@@ -158,7 +158,9 @@ export default defineEventHandler(async (event) => {
       const start = new Date(oldestMonday.getTime() + index * 7 * DAY_MS)
       return { week_start: isoDay(start), sessions_held: 0, present: 0 }
     })
-    const bucketIndex = new Map(buckets.map((bucket, index) => [bucket.week_start, index]))
+    const bucketIndex = new Map(
+      buckets.map((bucket, index) => [bucket.week_start, index]),
+    )
     for (const session of scopedSessions.values()) {
       const index = bucketIndex.get(weekStartFor(session.session_date))
       const bucket = index === undefined ? undefined : buckets[index]

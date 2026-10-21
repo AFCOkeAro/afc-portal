@@ -47,23 +47,18 @@ export default defineEventHandler(async (event) => {
   }
   const counts = new Map<string, number>()
   try {
-    result = await listItems<AttendanceSessionRow>(
-      event,
-      scope,
-      'attendance_sessions',
-      {
-        filter: mergeFilters(
-          branch ? { branch: { _eq: branch } } : undefined,
-          sessionType ? { session_type: { _eq: sessionType } } : undefined,
-          scopeFilter(scope),
-        ),
-        fields: FIELDS,
-        sort: '-session_date,-id',
-        page,
-        limit,
-        search: search || undefined,
-      },
-    )
+    result = await listItems<AttendanceSessionRow>(event, scope, 'attendance_sessions', {
+      filter: mergeFilters(
+        branch ? { branch: { _eq: branch } } : undefined,
+        sessionType ? { session_type: { _eq: sessionType } } : undefined,
+        scopeFilter(scope),
+      ),
+      fields: FIELDS,
+      sort: '-session_date,-id',
+      page,
+      limit,
+      search: search || undefined,
+    })
 
     const ids = result.data.map((row) => String(row.id))
     if (ids.length > 0) {

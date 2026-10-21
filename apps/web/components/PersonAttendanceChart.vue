@@ -50,9 +50,12 @@ const { data, pending, error } = await useAsyncData(
   `person-attendance-${props.personId}`,
   () =>
     api
-      .get<{ data: PersonAttendanceHistory }>(`/api/people/${props.personId}/attendance`, {
-        query: query.value,
-      })
+      .get<{ data: PersonAttendanceHistory }>(
+        `/api/people/${props.personId}/attendance`,
+        {
+          query: query.value,
+        },
+      )
       .then((res) => res.data),
   { watch: [query] },
 )
@@ -62,7 +65,10 @@ const maxHeld = computed(() =>
 )
 
 function barHeight(bucket: { sessions_held: number }): number {
-  return Math.max(bucket.sessions_held > 0 ? 12 : 4, (bucket.sessions_held / maxHeld.value) * 96)
+  return Math.max(
+    bucket.sessions_held > 0 ? 12 : 4,
+    (bucket.sessions_held / maxHeld.value) * 96,
+  )
 }
 
 /** Session href for a week with exactly one attended session, else null. */
@@ -153,9 +159,15 @@ const summary = computed(() => {
                 :width="Math.max(4, 344 / data.buckets.length - 4)"
                 :height="barHeight(bucket)"
                 rx="2"
-                :class="bucket.present ? 'fill-primary-500' : 'fill-gray-200 dark:fill-gray-700'"
+                :class="
+                  bucket.present ? 'fill-primary-500' : 'fill-gray-200 dark:fill-gray-700'
+                "
               >
-                <title>{{ shortLabel(bucket.week_start) }}: {{ bucket.present ? 'present' : 'absent' }} ({{ bucket.sessions_held }} held)</title>
+                <title>
+                  {{ shortLabel(bucket.week_start) }}:
+                  {{ bucket.present ? 'present' : 'absent' }} ({{ bucket.sessions_held }}
+                  held)
+                </title>
               </rect>
             </a>
             <rect
@@ -165,15 +177,25 @@ const summary = computed(() => {
               :width="Math.max(4, 344 / data.buckets.length - 4)"
               :height="barHeight(bucket)"
               rx="2"
-              :class="bucket.present ? 'fill-primary-500' : 'fill-gray-200 dark:fill-gray-700'"
+              :class="
+                bucket.present ? 'fill-primary-500' : 'fill-gray-200 dark:fill-gray-700'
+              "
             >
-              <title>{{ shortLabel(bucket.week_start) }}: {{ bucket.present ? 'present' : 'absent' }} ({{ bucket.sessions_held }} held)</title>
+              <title>
+                {{ shortLabel(bucket.week_start) }}:
+                {{ bucket.present ? 'present' : 'absent' }} ({{ bucket.sessions_held }}
+                held)
+              </title>
             </rect>
           </g>
         </svg>
-        <figcaption class="mt-1 flex justify-between text-[11px] text-gray-500 dark:text-gray-400">
+        <figcaption
+          class="mt-1 flex justify-between text-[11px] text-gray-500 dark:text-gray-400"
+        >
           <span>{{ shortLabel(data.buckets[0]?.week_start ?? '') }}</span>
-          <span>{{ shortLabel(data.buckets[data.buckets.length - 1]?.week_start ?? '') }}</span>
+          <span>{{
+            shortLabel(data.buckets[data.buckets.length - 1]?.week_start ?? '')
+          }}</span>
         </figcaption>
       </figure>
 

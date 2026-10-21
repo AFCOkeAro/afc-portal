@@ -26,7 +26,8 @@ const branchScope = computed<string>(() => {
   if (extra.length > 0) parts.push(`Scope (${extra.length}): ${extra.join(', ')}`)
   if (u.areaId) parts.push(`Area: ${u.areaId}`)
   if (u.zoneId) parts.push(`Zone: ${u.zoneId}`)
-  if (u.zoneIds?.length) parts.push(`Zones (${u.zoneIds.length}): ${u.zoneIds.join(', ')}`)
+  if (u.zoneIds?.length)
+    parts.push(`Zones (${u.zoneIds.length}): ${u.zoneIds.join(', ')}`)
   if (u.departmentIds.length > 0)
     parts.push(`Departments (${u.departmentIds.length}): ${u.departmentIds.join(', ')}`)
   return parts.length > 0 ? parts.join(' · ') : '—'
@@ -45,9 +46,7 @@ const branchScope = computed<string>(() => {
         <h2 class="text-base font-semibold">Account</h2>
       </template>
 
-      <dl
-        class="grid gap-x-8 gap-y-4 sm:grid-cols-[160px_1fr]"
-      >
+      <dl class="grid gap-x-8 gap-y-4 sm:grid-cols-[160px_1fr]">
         <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Name</dt>
         <dd class="text-sm text-gray-900 dark:text-white">
           {{ user?.firstName ?? '—' }}
@@ -59,12 +58,8 @@ const branchScope = computed<string>(() => {
         <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Role</dt>
         <dd class="text-sm text-gray-900 dark:text-white">{{ roleLabel }}</dd>
 
-        <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">
-          Branch scope
-        </dt>
-        <dd
-          class="break-all font-mono text-xs text-gray-600 dark:text-gray-300"
-        >
+        <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Branch scope</dt>
+        <dd class="break-all font-mono text-xs text-gray-600 dark:text-gray-300">
           {{ branchScope }}
         </dd>
       </dl>

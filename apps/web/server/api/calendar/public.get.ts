@@ -79,13 +79,21 @@ export default defineEventHandler(
     }
     if (filters.date_from) eventFilter.start_at = { _gte: filters.date_from }
     if (filters.date_to) {
-      eventFilter.start_at = { ...(eventFilter.start_at as object), _lte: `${filters.date_to}T23:59:59.999Z` }
+      eventFilter.start_at = {
+        ...(eventFilter.start_at as object),
+        _lte: `${filters.date_to}T23:59:59.999Z`,
+      }
     }
     const [eventRows, branchNames] = await Promise.all([
       directusFetch<{ data: Record<string, unknown>[] }>(event, '/items/events', {
         method: 'GET',
         accessToken: publicToken,
-        query: { filter: eventFilter, fields: PUBLIC_EVENT_FIELDS, limit: 200, sort: 'start_at' },
+        query: {
+          filter: eventFilter,
+          fields: PUBLIC_EVENT_FIELDS,
+          limit: 200,
+          sort: 'start_at',
+        },
       }).then((response) => response.data),
       loadBranchNames(event, publicToken),
     ])
@@ -103,7 +111,11 @@ export default defineEventHandler(
           href: null,
         })),
       },
-      { dateFrom: filters.date_from, dateTo: filters.date_to, itemType: filters.item_type },
+      {
+        dateFrom: filters.date_from,
+        dateTo: filters.date_to,
+        itemType: filters.item_type,
+      },
     )
 
     const items: PublicCalendarItem[] = feed
@@ -131,15 +143,13 @@ async function loadBranchNames(
   publicToken: string,
 ): Promise<Map<string, string>> {
   try {
-    const response = await directusFetch<{ data: Array<{ id: string | number; name: string }> }>(
-      event,
-      '/items/branches',
-      {
-        method: 'GET',
-        accessToken: publicToken,
-        query: { fields: 'id,name', limit: -1 },
-      },
-    )
+    const response = await directusFetch<{
+      data: Array<{ id: string | number; name: string }>
+    }>(event, '/items/branches', {
+      method: 'GET',
+      accessToken: publicToken,
+      query: { fields: 'id,name', limit: -1 },
+    })
     return new Map(response.data.map((row) => [String(row.id), row.name]))
   } catch {
     return new Map()

@@ -43,7 +43,10 @@ export default defineEventHandler(async (event) => {
   // snapshot-owned people table, so it stays inside the same try only for
   // the deliberate-4xx passthrough: a scope 404 from findScopedItem must
   // never be renamed into pending_migration_0020.
-  let result: { data: Record<string, unknown>[]; meta: { total: number; page: number; limit: number } }
+  let result: {
+    data: Record<string, unknown>[]
+    meta: { total: number; page: number; limit: number }
+  }
   const counts = new Map<string, number>()
   try {
     result = await listItems<Record<string, unknown>>(event, scope, 'households', {

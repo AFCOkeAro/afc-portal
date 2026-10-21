@@ -1,5 +1,9 @@
 import { followUpFormSchema } from '@afc/shared'
-import { getPortalScope, throwStoreUnavailable, throwValidation } from '../../utils/portal'
+import {
+  getPortalScope,
+  throwStoreUnavailable,
+  throwValidation,
+} from '../../utils/portal'
 import { logFollowUp } from '../../utils/visitor-journey'
 
 export default defineEventHandler(async (event) => {
