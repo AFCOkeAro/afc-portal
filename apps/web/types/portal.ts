@@ -87,6 +87,39 @@ export interface PersonDepartmentMembership {
   joined_at: string | null
 }
 
+/** One week of per-person attendance history (AFC-597). */
+export interface PersonAttendanceBucket {
+  week_start: string
+  sessions_held: number
+  /** 1 when the person attended at least one scoped session that week. */
+  present: number
+}
+
+export interface PersonAttendanceSession {
+  id: string
+  session_name: string
+  session_date: string
+  session_type: string
+  href: string
+}
+
+/** GET /api/people/:id/attendance payload (AFC-597). */
+export interface PersonAttendanceHistory {
+  person: string
+  weeks: number
+  session_type: string | null
+  from: string
+  to: string
+  buckets: PersonAttendanceBucket[]
+  sessions: PersonAttendanceSession[]
+  totals: {
+    sessions_held: number
+    sessions_attended: number
+    weeks_present: number
+    rate: number | null
+  }
+}
+
 export interface HouseholdRow extends Household {
   branch_name: string | null
   member_count: number

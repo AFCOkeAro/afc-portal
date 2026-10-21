@@ -275,6 +275,7 @@ async function toggleStatus(): Promise<void> {
               </span>
             </div>
           </template>
+          <PersonAttendanceChart :person-id="id" class="mb-4" />
           <ActivityList
             :items="attendanceItems"
             empty-title="No attendance recorded"
