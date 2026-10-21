@@ -95,6 +95,7 @@ export interface HouseholdRow extends Household {
 export interface HouseholdMemberRow {
   id: string
   display_name: string
+  household_role: string | null
   gender: string
   is_minor: boolean | null
   phone: string | null

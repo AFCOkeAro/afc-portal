@@ -71,6 +71,7 @@ function formatDate(value: string | null | undefined): string {
     >
       <template #actions>
         <PermissionGate :collection="COLLECTIONS.households" action="create">
+          <UButton to="/households/new" label="New family" icon="i-lucide-users" />
           <UButton
             label="Add household"
             icon="i-lucide-house-plus"

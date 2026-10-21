@@ -37,6 +37,7 @@ const MEMBER_FIELDS = [
   'is_minor',
   'phone',
   'branch',
+  'household_role',
   'membership_status',
   'status',
 ]
@@ -44,6 +45,7 @@ const MEMBER_FIELDS = [
 export interface HouseholdMemberRow {
   id: string
   display_name: string
+  household_role: string | null
   gender: string
   is_minor: boolean | null
   phone: string | null
@@ -135,6 +137,7 @@ export default defineEventHandler(async (event): Promise<HouseholdDetail> => {
       row.preferred_name as string | null | undefined,
     ),
     gender: String(row.gender ?? 'unspecified'),
+    household_role: (row.household_role as string | null) ?? null,
     is_minor: (row.is_minor as boolean | null) ?? null,
     phone: (row.phone as string | null) ?? null,
     membership_status: String(row.membership_status ?? ''),

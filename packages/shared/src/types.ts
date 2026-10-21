@@ -192,6 +192,9 @@ export interface Person {
   email: string | null
   address: string | null
   household: string | null
+  /** Member's place in the family (AFC-590, migration 0026). Null for rows
+   *  written before the wizard. */
+  household_role: 'head_of_household' | 'spouse' | 'child' | 'relative' | null
   branch: string | null
   membership_status: MembershipStatus
   member_since: string | null
