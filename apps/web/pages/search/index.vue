@@ -2,7 +2,14 @@
 definePageMeta({ middleware: 'staff' })
 
 const api = useApi()
-const q = ref('')
+const route = useRoute()
+
+/**
+ * Header search (AFC-585) navigates here with `?q=`. Initialise from the
+ * route so shared links and header submissions run immediately, and follow
+ * later `?q=` changes while staying on this page.
+ */
+const q = ref(typeof route.query.q === 'string' ? route.query.q : '')
 const domain = ref('all')
 const error = ref('')
 
@@ -23,6 +30,14 @@ async function run() {
   }
   await refresh()
 }
+
+watch(
+  () => route.query.q,
+  (next: unknown) => {
+    q.value = typeof next === 'string' ? next : ''
+    void run()
+  },
+)
 
 const domainOptions = [
   { label: 'All', value: 'all' },

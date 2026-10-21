@@ -164,9 +164,9 @@ const menuItems = computed(() => [
 
     <div class="flex min-w-0 flex-1 flex-col lg:pl-64">
       <header
-        class="sticky top-0 z-10 flex h-16 items-center justify-between border-b border-gray-200 bg-white/80 px-5 backdrop-blur dark:border-gray-800 dark:bg-gray-950/80"
+        class="sticky top-0 z-10 flex h-16 items-center justify-between gap-2 border-b border-gray-200 bg-white/80 px-3 backdrop-blur sm:px-5 dark:border-gray-800 dark:bg-gray-950/80"
       >
-        <div class="min-w-0">
+        <div class="min-w-0 shrink-0">
           <p class="truncate text-sm font-medium text-gray-900 dark:text-white">
             {{ user?.email ?? 'Not signed in' }}
           </p>
@@ -175,29 +175,39 @@ const menuItems = computed(() => [
           </p>
         </div>
 
-        <UDropdownMenu :items="menuItems" :content="{ align: 'end' }">
-          <UButton
-            color="neutral"
-            variant="ghost"
-            square
-            :aria-label="`Account menu for ${displayName}`"
-            class="rounded-full"
-          >
-            <UAvatar :alt="initials" size="sm" />
-          </UButton>
+        <!-- Header search (AFC-585): desktop field, mobile icon-expands. -->
+        <HeaderSearch />
 
-          <template #content-top>
-            <div class="min-w-0 px-3 py-2">
-              <p class="truncate text-sm font-medium text-gray-900 dark:text-white">
-                {{ displayName }}
-              </p>
-              <p class="truncate text-xs text-gray-500 dark:text-gray-400">
-                {{ user?.staffRole?.replace(/_/g, ' ') ?? '' }}
-              </p>
-            </div>
-            <USeparator />
-          </template>
-        </UDropdownMenu>
+        <div class="flex shrink-0 items-center gap-1">
+          <!-- Notification bell (AFC-585): client-aggregated from endpoints
+            the session may already load; no new backend. Sits next to the
+            AFC-574 avatar menu. -->
+          <NotificationBell />
+
+          <UDropdownMenu :items="menuItems" :content="{ align: 'end' }">
+            <UButton
+              color="neutral"
+              variant="ghost"
+              square
+              :aria-label="`Account menu for ${displayName}`"
+              class="rounded-full"
+            >
+              <UAvatar :alt="initials" size="sm" />
+            </UButton>
+
+            <template #content-top>
+              <div class="min-w-0 px-3 py-2">
+                <p class="truncate text-sm font-medium text-gray-900 dark:text-white">
+                  {{ displayName }}
+                </p>
+                <p class="truncate text-xs text-gray-500 dark:text-gray-400">
+                  {{ user?.staffRole?.replace(/_/g, ' ') ?? '' }}
+                </p>
+              </div>
+              <USeparator />
+            </template>
+          </UDropdownMenu>
+        </div>
       </header>
 
       <main class="min-w-0 flex-1 p-5 lg:p-8">
