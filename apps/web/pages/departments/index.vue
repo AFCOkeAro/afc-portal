@@ -20,7 +20,7 @@ watch(
   () => route.query,
   (next: typeof route.query) => {
     const branchNext = typeof next.branch === 'string' ? next.branch : null
-    if (branchNext && branchNext !== branch.value) branch.value = branchNext
+    branch.value = branchNext ?? 'all'
   },
 )
 
@@ -49,38 +49,26 @@ const branches = await useAsyncData('departments-branches', () =>
   api.get<BranchSummary[]>('/api/branches'),
 )
 
-/** Dashboard strip (AFC-588): figures from list queries, no new backend. */
-async function countDepartments(params: Record<string, string>): Promise<number> {
-  const res = await api.get<{ data: DepartmentRow[] }>('/api/departments', {
-    query: params,
-  })
-  return res.data.length
-}
-
-const { data: stripCounts } = await useAsyncData('departments-strip', () =>
-  Promise.all([countDepartments({}), countDepartments({ search: 'choir' })]),
+/** Dashboard strip (AFC-588): figures from one unfiltered fetch, no new backend. */
+const { data: stripAll } = await useAsyncData('departments-strip', () =>
+  api.get<{ data: DepartmentRow[] }>('/api/departments'),
 )
 
 const stripItems = computed(() => {
-  const areaWide = rows.value.filter((row: DepartmentRow) => !row.branch_name).length
+  const all = stripAll.value?.data ?? []
+  const areaWide = all.filter((row: DepartmentRow) => !row.branch_name).length
   return [
     {
       label: 'Departments',
-      value: stripCounts.value?.[0] ?? null,
-      to: '/departments',
+      value: all.length,
+      to: '/departments?branch=all',
       hint: 'Open filtered list',
     },
     {
       label: 'Area-wide',
-      value: rows.value.length ? areaWide : null,
+      value: areaWide,
       to: null,
-      hint: 'No branch filter honoured for area-wide',
-    },
-    {
-      label: 'Choir (sample)',
-      value: stripCounts.value?.[1] ?? null,
-      to: '/departments',
-      hint: 'Search-scoped sample',
+      hint: 'No branch set, all departments',
     },
   ]
 })

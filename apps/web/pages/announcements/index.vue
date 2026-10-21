@@ -37,13 +37,13 @@ async function create() {
 
 const rows = computed(() => data.value?.data ?? [])
 
-/** Dashboard strip (AFC-588): no server filters — total only, no new backend. */
+/** Dashboard strip (AFC-588): no server filters — display-only total, no new backend. */
 const stripItems = computed(() => [
   {
     label: 'Announcements',
     value: rows.value.length,
-    to: '/announcements',
-    hint: 'Open list',
+    to: null,
+    hint: 'Total in view',
   },
 ])
 </script>

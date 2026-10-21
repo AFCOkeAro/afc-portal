@@ -30,8 +30,7 @@ watch(
   () => route.query,
   (next: typeof route.query) => {
     const statusNext = typeof next.status === 'string' ? next.status : null
-    if (statusNext && statusNext !== computationStatus.value)
-      computationStatus.value = statusNext
+    computationStatus.value = statusNext ?? 'all'
   },
 )
 
@@ -74,7 +73,7 @@ const stripItems = computed(() => [
   {
     label: 'Returns',
     value: stripCounts.value?.[0] ?? null,
-    to: '/finance/returns',
+    to: '/finance/returns?status=all',
     hint: 'Open filtered list',
   },
   {

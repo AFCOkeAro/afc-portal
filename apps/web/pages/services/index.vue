@@ -36,9 +36,9 @@ watch(
   () => route.query,
   (next: typeof route.query) => {
     const typeNext = typeof next.service_type === 'string' ? next.service_type : null
-    if (typeNext && typeNext !== type.value) type.value = typeNext
+    type.value = typeNext ?? 'all'
     const statusNext = typeof next.status === 'string' ? next.status : null
-    if (statusNext && statusNext !== status.value) status.value = statusNext
+    status.value = statusNext ?? 'all'
   },
 )
 
@@ -87,7 +87,7 @@ const stripItems = computed(() => [
   {
     label: 'Services',
     value: stripCounts.value?.[0] ?? null,
-    to: '/services',
+    to: '/services?service_type=all&status=all',
     hint: 'Open filtered list',
   },
   {

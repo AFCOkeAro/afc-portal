@@ -49,7 +49,7 @@ watch(
   () => route.query,
   (next: typeof route.query) => {
     const statusNext = typeof next.status === 'string' ? next.status : null
-    if (statusNext && statusNext !== statusFilter.value) statusFilter.value = statusNext
+    statusFilter.value = statusNext ?? 'all'
   },
 )
 
@@ -98,7 +98,7 @@ const stripItems = computed(() => [
   {
     label: 'Invitations',
     value: stripCounts.value?.[0] ?? null,
-    to: '/invites',
+    to: '/invites?status=all',
     hint: 'Open filtered list',
   },
   {

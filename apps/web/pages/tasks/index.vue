@@ -34,7 +34,8 @@ watch(
   () => route.query,
   (next: typeof route.query) => {
     const statusNext = typeof next.status === 'string' ? next.status : null
-    if (statusNext && statusNext !== status.value) status.value = statusNext
+    status.value = statusNext ?? 'all'
+    mine.value = next.mine === '1'
   },
 )
 const { data, pending, refresh } = await useAsyncData(
@@ -69,7 +70,7 @@ const stripItems = computed(() => [
   {
     label: 'Tasks',
     value: stripCounts.value?.[0] ?? null,
-    to: '/tasks',
+    to: '/tasks?status=all',
     hint: 'Open filtered list',
   },
   {

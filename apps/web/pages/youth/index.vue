@@ -35,11 +35,13 @@ watch(
   () => route.query,
   (next: typeof route.query) => {
     const statusNext = typeof next.status === 'string' ? next.status : null
-    if (statusNext && statusNext !== status.value) status.value = statusNext
+    status.value = statusNext ?? 'all'
     const entrepreneurNext =
       typeof next.is_entrepreneur === 'string' ? next.is_entrepreneur : null
-    if (entrepreneurNext && entrepreneurNext !== entrepreneur.value)
-      entrepreneur.value = entrepreneurNext
+    entrepreneur.value = entrepreneurNext ?? 'all'
+    const employmentNext =
+      typeof next.employment_status === 'string' ? next.employment_status : null
+    employment.value = employmentNext ?? 'all'
   },
 )
 
@@ -106,7 +108,7 @@ const stripItems = computed(() => [
   {
     label: 'Youth',
     value: stripCounts.value?.[0] ?? null,
-    to: '/youth',
+    to: '/youth?status=all&is_entrepreneur=all&employment_status=all',
     hint: 'Open filtered list',
   },
   {

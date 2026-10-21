@@ -36,7 +36,7 @@ watch(
   () => route.query,
   (next: typeof route.query) => {
     const typeNext = typeof next.session_type === 'string' ? next.session_type : null
-    if (typeNext && typeNext !== type.value) type.value = typeNext
+    type.value = typeNext ?? 'all'
   },
 )
 
@@ -80,7 +80,7 @@ const stripItems = computed(() => [
   {
     label: 'Sessions',
     value: stripCounts.value?.[0] ?? null,
-    to: '/attendance',
+    to: '/attendance?session_type=all',
     hint: 'Open filtered list',
   },
   {

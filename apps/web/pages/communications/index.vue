@@ -55,9 +55,9 @@ watch(
   () => route.query,
   (next: typeof route.query) => {
     const sourceNext = typeof next.source_kind === 'string' ? next.source_kind : null
-    if (sourceNext && sourceNext !== sourceKind.value) sourceKind.value = sourceNext
+    sourceKind.value = sourceNext ?? 'all'
     const statusNext = typeof next.status === 'string' ? next.status : null
-    if (statusNext && statusNext !== status.value) status.value = statusNext
+    status.value = statusNext ?? 'all'
   },
 )
 
@@ -105,7 +105,7 @@ const stripItems = computed(() => [
   {
     label: 'Messages',
     value: stripCounts.value?.[0] ?? null,
-    to: '/communications',
+    to: '/communications?status=all',
     hint: 'Open filtered list',
   },
   {

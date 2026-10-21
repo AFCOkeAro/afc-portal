@@ -27,12 +27,16 @@ defineProps<{
 </script>
 
 <template>
-  <div class="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+  <div
+    class="mb-4 grid gap-3 sm:grid-cols-2"
+    :class="items.length >= 5 ? 'xl:grid-cols-5' : 'xl:grid-cols-4'"
+  >
     <template v-for="item in items" :key="item.label">
       <NuxtLink
         v-if="item.to"
         :to="item.to"
-        class="block transition hover:-translate-y-0.5"
+        :aria-label="`Show ${item.label} in the list below`"
+        class="block transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
       >
         <StatCard :label="item.label" :value="item.value" :hint="item.hint" />
       </NuxtLink>

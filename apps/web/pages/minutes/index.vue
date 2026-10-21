@@ -8,9 +8,9 @@ const { data, pending, error } = await useAsyncData('minutes-list', () =>
 
 const rows = computed(() => data.value?.data ?? [])
 
-/** Dashboard strip (AFC-588): no server filters — total only, no new backend. */
+/** Dashboard strip (AFC-588): no server filters — display-only total, no new backend. */
 const stripItems = computed(() => [
-  { label: 'Minutes', value: rows.value.length, to: '/minutes', hint: 'Open list' },
+  { label: 'Minutes', value: rows.value.length, to: null, hint: 'Total in view' },
 ])
 </script>
 

@@ -71,8 +71,8 @@ const stripItems = computed(() => {
     {
       label: 'My invitations',
       value: all.length,
-      to: '/me/invitations',
-      hint: 'Open list',
+      to: null,
+      hint: 'Total in view',
     },
     {
       label: 'Actionable',

@@ -26,7 +26,7 @@ const stripItems = computed(() => {
   const all = data.value ?? []
   const active = all.filter((branch) => branch.status === 'active').length
   return [
-    { label: 'Branches', value: all.length, to: '/branches', hint: 'Open list' },
+    { label: 'Branches', value: all.length, to: null, hint: 'Total in view' },
     { label: 'Active', value: active, to: null, hint: 'Client-side count' },
     {
       label: 'Shown',

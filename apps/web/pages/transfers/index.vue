@@ -78,12 +78,13 @@ const statusOptions = [
 
 const rows = computed(() => data.value?.data ?? [])
 
-/** Dashboard strip (AFC-588): figures from filtered list fetches, no new backend. */
+/** Dashboard strip (AFC-588): figures from list-meta counts, no new backend. */
 async function countTransfers(params: Record<string, string>): Promise<number> {
-  const res = await api.get<{ data: Record<string, unknown>[] }>('/api/transfers', {
-    query: params,
-  })
-  return res.data.length
+  const res = await api.get<{
+    data: Record<string, unknown>[]
+    meta: { total: number }
+  }>('/api/transfers', { query: { page: 1, limit: 1, ...params } })
+  return res.meta.total
 }
 
 const { data: stripCounts } = await useAsyncData('transfers-strip', () =>
