@@ -15,6 +15,15 @@ function queryParam(name: string): string | null {
 }
 const branch = ref(queryParam('branch') ?? 'all')
 
+/** Same-page strip navigation (AFC-588): query-only link, sync the filter. */
+watch(
+  () => route.query,
+  (next: typeof route.query) => {
+    const branchNext = typeof next.branch === 'string' ? next.branch : null
+    if (branchNext && branchNext !== branch.value) branch.value = branchNext
+  },
+)
+
 let searchTimer: ReturnType<typeof setTimeout> | undefined
 watch(searchInput, (value: string) => {
   clearTimeout(searchTimer)
@@ -40,6 +49,42 @@ const branches = await useAsyncData('departments-branches', () =>
   api.get<BranchSummary[]>('/api/branches'),
 )
 
+/** Dashboard strip (AFC-588): figures from list queries, no new backend. */
+async function countDepartments(params: Record<string, string>): Promise<number> {
+  const res = await api.get<{ data: DepartmentRow[] }>('/api/departments', {
+    query: params,
+  })
+  return res.data.length
+}
+
+const { data: stripCounts } = await useAsyncData('departments-strip', () =>
+  Promise.all([countDepartments({}), countDepartments({ search: 'choir' })]),
+)
+
+const stripItems = computed(() => {
+  const areaWide = rows.value.filter((row: DepartmentRow) => !row.branch_name).length
+  return [
+    {
+      label: 'Departments',
+      value: stripCounts.value?.[0] ?? null,
+      to: '/departments',
+      hint: 'Open filtered list',
+    },
+    {
+      label: 'Area-wide',
+      value: rows.value.length ? areaWide : null,
+      to: null,
+      hint: 'No branch filter honoured for area-wide',
+    },
+    {
+      label: 'Choir (sample)',
+      value: stripCounts.value?.[1] ?? null,
+      to: '/departments',
+      hint: 'Search-scoped sample',
+    },
+  ]
+})
+
 const branchOptions = computed(() => [
   { label: 'All branches', value: 'all' },
   ...(branches.data.value ?? []).map((row) => ({ label: row.name, value: row.id })),
@@ -52,6 +97,8 @@ const branchOptions = computed(() => [
       title="Departments"
       description="Ministry departments and their members, within the branches this account can see. Area-wide departments carry no branch."
     />
+
+    <DashboardStrip :items="stripItems" />
 
     <UCard>
       <div class="grid gap-3 sm:grid-cols-2">

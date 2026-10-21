@@ -44,6 +44,15 @@ const statusFilter = ref(queryParam('status') || 'all')
 const page = ref(1)
 const limit = 25
 
+/** Same-page strip navigation (AFC-588): query-only link, sync the filters. */
+watch(
+  () => route.query,
+  (next: typeof route.query) => {
+    const statusNext = typeof next.status === 'string' ? next.status : null
+    if (statusNext && statusNext !== statusFilter.value) statusFilter.value = statusNext
+  },
+)
+
 const canManage = computed(() => permissions.can(COLLECTIONS.events, 'read'))
 
 const query = computed(() => ({
@@ -66,6 +75,51 @@ const { data, pending, error, refresh } = await useAsyncData(
 const rows = computed(() => data.value?.data ?? [])
 const total = computed(() => data.value?.meta.total ?? 0)
 const pageCount = computed(() => Math.max(1, Math.ceil(total.value / limit)))
+
+/** Dashboard strip (AFC-588): figures from list-meta counts, no new backend. */
+async function countInvites(params: Record<string, string>): Promise<number> {
+  const res = await api.get<{ data: InviteRow[]; meta: { total: number } }>(
+    '/api/invites',
+    { query: { page: 1, limit: 1, ...params } },
+  )
+  return res.meta.total
+}
+
+const { data: stripCounts } = await useAsyncData('staff-invites-strip', () =>
+  Promise.all([
+    countInvites({}),
+    countInvites({ status: 'pending_approval' }),
+    countInvites({ status: 'sent' }),
+    countInvites({ status: 'failed' }),
+  ]),
+)
+
+const stripItems = computed(() => [
+  {
+    label: 'Invitations',
+    value: stripCounts.value?.[0] ?? null,
+    to: '/invites',
+    hint: 'Open filtered list',
+  },
+  {
+    label: 'Pending approval',
+    value: stripCounts.value?.[1] ?? null,
+    to: '/invites?status=pending_approval',
+    hint: 'Open filtered list',
+  },
+  {
+    label: 'Sent',
+    value: stripCounts.value?.[2] ?? null,
+    to: '/invites?status=sent',
+    hint: 'Open filtered list',
+  },
+  {
+    label: 'Failed',
+    value: stripCounts.value?.[3] ?? null,
+    to: '/invites?status=failed',
+    hint: 'Open filtered list',
+  },
+])
 
 const acting = ref<string | null>(null)
 const actionError = ref('')
@@ -136,6 +190,8 @@ async function act(id: string, action: 'approve' | 'retry' | 'withdraw'): Promis
         />
       </template>
     </PageHeader>
+
+    <DashboardStrip :items="stripItems" />
 
     <PermissionGate :collection="COLLECTIONS.events" action="read">
       <div v-if="canManage" class="mb-4 grid max-w-3xl gap-3 sm:grid-cols-4">

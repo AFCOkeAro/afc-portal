@@ -50,6 +50,11 @@ const matterTypeOptions = [
 ]
 
 const rows = computed(() => data.value?.data ?? [])
+
+/** Dashboard strip (AFC-588): no server filters — total only, no new backend. */
+const stripItems = computed(() => [
+  { label: 'Matters', value: rows.value.length, to: '/marriage', hint: 'Open list' },
+])
 </script>
 
 <template>
@@ -68,6 +73,8 @@ const rows = computed(() => data.value?.data ?? [])
         </PermissionGate>
       </template>
     </PageHeader>
+
+    <DashboardStrip :items="stripItems" />
 
     <UCard v-if="showForm" class="mb-4">
       <template #header>

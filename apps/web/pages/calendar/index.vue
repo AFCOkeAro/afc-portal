@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import type { CalendarItemType } from '@afc/shared'
-import { isCalendarView, isISODate, rangeForView, todayISO } from '~/utils/calendar-ranges'
+import {
+  isCalendarView,
+  isISODate,
+  rangeForView,
+  todayISO,
+} from '~/utils/calendar-ranges'
 import type { CalendarView, CalendarViewItem } from '~/utils/calendar-ranges'
 
 definePageMeta({ middleware: 'staff' })
@@ -20,7 +25,9 @@ const view = ref<CalendarView>(isCalendarView(initialView) ? initialView : 'mont
 const initialDate = queryParam('date')
 const focused = ref<string>(isISODate(initialDate) ? initialDate : todayISO())
 /** Staff = scoped feed; Public = the session-free published-public feed preview. */
-const scope = ref<'staff' | 'public'>(queryParam('scope') === 'public' ? 'public' : 'staff')
+const scope = ref<'staff' | 'public'>(
+  queryParam('scope') === 'public' ? 'public' : 'staff',
+)
 const itemType = ref(queryParam('item_type') || 'all')
 
 /** The feed is paged per visible range (server cap of 200 unchanged). */
@@ -52,6 +59,15 @@ watch([view, focused, scope, itemType], () => {
   })
 })
 
+/** Same-page strip navigation (AFC-588): query-only link, sync the filter. */
+watch(
+  () => route.query.item_type,
+  (next: unknown) => {
+    const value = typeof next === 'string' ? next : 'all'
+    if (value !== itemType.value) itemType.value = value
+  },
+)
+
 const typeOptions = [
   { label: 'All types', value: 'all' },
   { label: 'Services', value: 'service' },
@@ -60,6 +76,7 @@ const typeOptions = [
   { label: 'Celebrations', value: 'celebration' },
 ]
 
+/** Dashboard strip (AFC-588): client-side range totals, no new backend. */
 const rows = computed<CalendarViewItem[]>(() =>
   (data.value?.data ?? []).map((row) => ({
     id: String(row.id ?? ''),
@@ -72,6 +89,39 @@ const rows = computed<CalendarViewItem[]>(() =>
     href: typeof row.href === 'string' ? row.href : null,
   })),
 )
+
+const stripItems = computed(() => {
+  const all = rows.value
+  const count = (type: string) =>
+    all.filter((row: CalendarViewItem) => row.item_type === type).length
+  const base = `?view=${view.value}&date=${focused.value}`
+  return [
+    {
+      label: 'Entries',
+      value: all.length,
+      to: `/calendar${base}`,
+      hint: 'Open filtered view',
+    },
+    {
+      label: 'Services',
+      value: count('service'),
+      to: `/calendar${base}&item_type=service`,
+      hint: 'Open filtered view',
+    },
+    {
+      label: 'Events',
+      value: count('event'),
+      to: `/calendar${base}&item_type=event`,
+      hint: 'Open filtered view',
+    },
+    {
+      label: 'Celebrations',
+      value: count('celebration'),
+      to: `/calendar${base}&item_type=celebration`,
+      hint: 'Open filtered view',
+    },
+  ]
+})
 </script>
 
 <template>
@@ -80,6 +130,8 @@ const rows = computed<CalendarViewItem[]>(() =>
       title="Calendar"
       description="Services, events, programmes and celebrations in your scope. Select an entry for its detail."
     />
+
+    <DashboardStrip :items="stripItems" />
 
     <UCard>
       <div class="flex flex-wrap items-center gap-3">
@@ -110,7 +162,10 @@ const rows = computed<CalendarViewItem[]>(() =>
       <p v-if="scope === 'public'" class="mt-3 text-sm text-gray-500 dark:text-gray-400">
         Preview of the public feed: published public items only, as a visitor without
         login sees them.
-        <NuxtLink to="/calendar/public" class="text-primary-600 hover:underline dark:text-primary-400">
+        <NuxtLink
+          to="/calendar/public"
+          class="text-primary-600 hover:underline dark:text-primary-400"
+        >
           Open the public calendar
         </NuxtLink>
       </p>

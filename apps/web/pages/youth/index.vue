@@ -30,6 +30,19 @@ watch([branch, zone, education, employment, entrepreneur, status], () => {
   page.value = 1
 })
 
+/** Same-page strip navigation (AFC-588): query-only link, sync the filters. */
+watch(
+  () => route.query,
+  (next: typeof route.query) => {
+    const statusNext = typeof next.status === 'string' ? next.status : null
+    if (statusNext && statusNext !== status.value) status.value = statusNext
+    const entrepreneurNext =
+      typeof next.is_entrepreneur === 'string' ? next.is_entrepreneur : null
+    if (entrepreneurNext && entrepreneurNext !== entrepreneur.value)
+      entrepreneur.value = entrepreneurNext
+  },
+)
+
 interface YouthResponse extends Paginated<YouthRow> {
   filters: Record<string, unknown>
 }
@@ -71,6 +84,50 @@ const csvHref = computed(() => {
 const rows = computed(() => data.value?.data ?? [])
 const total = computed(() => data.value?.meta.total ?? 0)
 const pageCount = computed(() => Math.max(1, Math.ceil(total.value / limit)))
+
+/** Dashboard strip (AFC-588): figures from list-meta counts, no new backend. */
+async function countYouth(params: Record<string, string>): Promise<number> {
+  const res = await api.get<YouthResponse>('/api/youth', {
+    query: { page: 1, limit: 1, ...params },
+  })
+  return res.meta.total
+}
+
+const { data: stripCounts } = await useAsyncData('youth-strip', () =>
+  Promise.all([
+    countYouth({}),
+    countYouth({ status: 'active' }),
+    countYouth({ is_entrepreneur: 'true' }),
+    countYouth({ employment_status: 'unemployed' }),
+  ]),
+)
+
+const stripItems = computed(() => [
+  {
+    label: 'Youth',
+    value: stripCounts.value?.[0] ?? null,
+    to: '/youth',
+    hint: 'Open filtered list',
+  },
+  {
+    label: 'Active',
+    value: stripCounts.value?.[1] ?? null,
+    to: '/youth?status=active',
+    hint: 'Open filtered list',
+  },
+  {
+    label: 'Entrepreneurs',
+    value: stripCounts.value?.[2] ?? null,
+    to: '/youth?is_entrepreneur=true',
+    hint: 'Open filtered list',
+  },
+  {
+    label: 'Unemployed',
+    value: stripCounts.value?.[3] ?? null,
+    to: '/youth?employment_status=unemployed',
+    hint: 'Open filtered list',
+  },
+])
 
 const branchOptions = computed(() => [
   { label: 'All branches', value: 'all' },
@@ -132,6 +189,8 @@ const statusOptions = [
         </PermissionGate>
       </template>
     </PageHeader>
+
+    <DashboardStrip :items="stripItems" />
 
     <UCard>
       <div class="grid gap-3 sm:grid-cols-3 xl:grid-cols-6">

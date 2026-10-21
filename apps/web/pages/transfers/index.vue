@@ -4,7 +4,23 @@ import { COLLECTIONS } from '@afc/shared'
 definePageMeta({ middleware: 'staff' })
 
 const api = useApi()
-const status = ref('all')
+const route = useRoute()
+
+function queryParam(name: string): string | null {
+  const value = route.query[name]
+  return typeof value === 'string' && value.length > 0 ? value : null
+}
+
+const status = ref(queryParam('status') ?? 'all')
+
+/** Same-page strip navigation (AFC-588): query-only link, sync the filter. */
+watch(
+  () => route.query,
+  (next: typeof route.query) => {
+    const statusNext = typeof next.status === 'string' ? next.status : null
+    if (statusNext && statusNext !== status.value) status.value = statusNext
+  },
+)
 const showForm = ref(false)
 const form = ref({
   person: '',
@@ -61,6 +77,50 @@ const statusOptions = [
 ]
 
 const rows = computed(() => data.value?.data ?? [])
+
+/** Dashboard strip (AFC-588): figures from filtered list fetches, no new backend. */
+async function countTransfers(params: Record<string, string>): Promise<number> {
+  const res = await api.get<{ data: Record<string, unknown>[] }>('/api/transfers', {
+    query: params,
+  })
+  return res.data.length
+}
+
+const { data: stripCounts } = await useAsyncData('transfers-strip', () =>
+  Promise.all([
+    countTransfers({}),
+    countTransfers({ status: 'requested' }),
+    countTransfers({ status: 'approved' }),
+    countTransfers({ status: 'completed' }),
+  ]),
+)
+
+const stripItems = computed(() => [
+  {
+    label: 'Transfers',
+    value: stripCounts.value?.[0] ?? null,
+    to: '/transfers?status=all',
+    hint: 'Open filtered list',
+  },
+  {
+    label: 'Requested',
+    value: stripCounts.value?.[1] ?? null,
+    to: '/transfers?status=requested',
+    hint: 'Open filtered list',
+  },
+  {
+    label: 'Approved',
+    value: stripCounts.value?.[2] ?? null,
+    to: '/transfers?status=approved',
+    hint: 'Open filtered list',
+  },
+  {
+    label: 'Completed',
+    value: stripCounts.value?.[3] ?? null,
+    to: '/transfers?status=completed',
+    hint: 'Open filtered list',
+  },
+])
 </script>
 
 <template>
@@ -87,6 +147,8 @@ const rows = computed(() => data.value?.data ?? [])
         </PermissionGate>
       </template>
     </PageHeader>
+
+    <DashboardStrip :items="stripItems" />
 
     <UCard v-if="showForm" class="mb-4">
       <template #header>
