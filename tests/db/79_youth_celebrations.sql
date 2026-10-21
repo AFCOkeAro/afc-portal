@@ -54,7 +54,8 @@
 
 -- ---------------------------------------------------------------------------
 -- 79.0  FIXTURE. Fixed ids so this file reruns cleanly in one database.
---        OKE-ARO (Z1) and LEGUN (Z2) come from the 0002 hierarchy seed.
+--        OKE-ARO (Z1) and SANGO (Z2) come from the hierarchy seed (LEGUN
+--        moved to Z1 under the user-confirmed map, AFC-578).
 -- ---------------------------------------------------------------------------
 INSERT INTO people (id, date_of_birth, status)
 VALUES
@@ -78,8 +79,8 @@ VALUES
   ('d2222222-2222-4222-8222-222222222222',
    'a2222222-2222-4222-8222-222222222222',
    'secondary', 'Lagos Grammar School', NULL, 'final_year',
-   'student', false, 'Youth Secretariat',
-   (SELECT id FROM branches WHERE code = 'LEGUN'), 'active')
+    'student', false, 'Youth Secretariat',
+    (SELECT id FROM branches WHERE code = 'SANGO'), 'active')
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO youth_profile_events
@@ -102,7 +103,7 @@ VALUES
    'a2222222-2222-4222-8222-222222222222',
    'graduation', DATE '2026-07-20', false, 'Convocation shout-out',
    'First class honours', 'public', '["whatsapp","telegram"]'::jsonb,
-   (SELECT id FROM branches WHERE code = 'LEGUN'), 'approved', false)
+    (SELECT id FROM branches WHERE code = 'SANGO'), 'approved', false)
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO celebration_events

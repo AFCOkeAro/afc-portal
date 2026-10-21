@@ -54,7 +54,8 @@
 
 -- ---------------------------------------------------------------------------
 -- 80.0  FIXTURE. Fixed ids so this file reruns cleanly in one database.
---        OKE-ARO (Z1) and LEGUN (Z2) come from the 0002 hierarchy seed;
+--        OKE-ARO (Z1) and SANGO (Z2) come from the hierarchy seed (LEGUN
+--        moved to Z1 under the user-confirmed map, AFC-578);
 --        UNILAG/LASU come from the 0003 seed (fixed ids in the migration).
 -- ---------------------------------------------------------------------------
 INSERT INTO people (id, date_of_birth, status)
@@ -65,7 +66,7 @@ VALUES
   ('a7777777-7777-4444-8444-777777777777', DATE '1979-12-19', 'active')
 ON CONFLICT (id) DO NOTHING;
 
--- S1: OKE-ARO (Z1), UNILAG. S2: LEGUN (Z2), LASU.
+-- S1: OKE-ARO (Z1), UNILAG. S2: SANGO (Z2), LASU.
 INSERT INTO campus_students
   (id, person, institution, course, level, admission_year,
    coordinator, afcf_handshake_status, afcmf_linked, nysc_status,
@@ -84,7 +85,7 @@ VALUES
    'Accounting', 'sophomore', 2024,
    NULL,
    'contacted', false, 'deployed',
-   (SELECT id FROM branches WHERE code = 'LEGUN'), 'active')
+   (SELECT id FROM branches WHERE code = 'SANGO'), 'active')
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO coaching_programmes
@@ -352,7 +353,7 @@ BEGIN
   SELECT id INTO v_z1 FROM zones WHERE code = 'LAG-NORTH-Z1';
   SELECT id INTO v_z2 FROM zones WHERE code = 'LAG-NORTH-Z2';
   SELECT id INTO v_s1_branch FROM branches WHERE code = 'OKE-ARO';
-  SELECT id INTO v_s2_branch FROM branches WHERE code = 'LEGUN';
+  SELECT id INTO v_s2_branch FROM branches WHERE code = 'SANGO';
 
   -- Branch filter returns exactly its own student, and the two are disjoint.
   PERFORM test_support.assert_true(
@@ -360,7 +361,7 @@ BEGIN
     'campus', 'OKE-ARO filter returns exactly one student');
   PERFORM test_support.assert_true(
     (SELECT count(*) FROM campus_students WHERE branch = v_s2_branch) = 1,
-    'campus', 'LEGUN filter returns exactly one student');
+    'campus', 'SANGO filter returns exactly one student');
   PERFORM test_support.assert_true(
     (SELECT count(*) FROM campus_students
       WHERE branch = v_s1_branch AND branch = v_s2_branch) = 0,
@@ -382,7 +383,7 @@ BEGIN
     (SELECT count(*) FROM exam_results r JOIN campus_students s
        ON s.id = r.campus_student
       WHERE s.branch = v_s2_branch) = 1,
-    'campus', 'one exam result resolves to the LEGUN student');
+    'campus', 'one exam result resolves to the SANGO student');
 
   -- Support joined through its student partitions the same way.
   PERFORM test_support.assert_true(

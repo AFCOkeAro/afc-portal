@@ -56,7 +56,7 @@ VALUES
     (SELECT id FROM branches WHERE code = 'OKE-ARO'),
     DATE '2026-10-04', TIME '09:00', 'sunday', 'Grace for the journey', 'completed'),
   ('22222222-2222-4222-8222-222222222222',
-    (SELECT id FROM branches WHERE code = 'LEGUN'),
+    (SELECT id FROM branches WHERE code = 'SANGO'),
     DATE '2026-10-04', TIME '09:00', 'sunday', 'Faithful in little', 'planned')
 ON CONFLICT (id) DO NOTHING;
 

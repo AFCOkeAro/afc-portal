@@ -47,7 +47,8 @@
 
 -- ---------------------------------------------------------------------------
 -- 78.0  FIXTURE. Fixed ids so this file reruns cleanly in one database.
---        OKE-ARO (Z1) and LEGUN (Z2) come from the 0002 hierarchy seed.
+--        OKE-ARO (Z1) and SANGO (Z2) come from the hierarchy seed (LEGUN
+--        moved to Z1 under the user-confirmed map, AFC-578).
 -- ---------------------------------------------------------------------------
 INSERT INTO blessings
   (id, blessing_type, male_count, female_count, branch, service_date, notes)
@@ -55,7 +56,7 @@ VALUES
   ('b1111111-1111-4111-8111-111111111111', 'salvation', 3, 2,
     (SELECT id FROM branches WHERE code = 'OKE-ARO'), DATE '2026-10-04', 'Sunday service'),
   ('b2222222-2222-4222-8222-222222222222', 'healing', 1, 4,
-    (SELECT id FROM branches WHERE code = 'LEGUN'), DATE '2026-10-04', 'Midweek service')
+    (SELECT id FROM branches WHERE code = 'SANGO'), DATE '2026-10-04', 'Midweek service')
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO blessing_events
