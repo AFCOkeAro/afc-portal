@@ -71,7 +71,7 @@ async function submit() {
       <UCard class="max-w-2xl">
         <form class="grid gap-4" @submit.prevent="submit">
           <UFormField label="Branch" name="branch" :error="fieldErrors.branch" required>
-            <USelect v-model="form.branch" :items="branchOptions" class="w-full" />
+            <EntitySelect v-model="form.branch" :items="branchOptions" placeholder="Select branch…" class="w-full" />
           </UFormField>
 
           <UFormField

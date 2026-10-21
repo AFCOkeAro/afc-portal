@@ -7,6 +7,7 @@ const api = useApi()
 const route = useRoute()
 const id = String(route.params.id)
 const person = ref('')
+const { personOptions, personPending, onPersonSearch } = usePersonSearch()
 const error = ref('')
 
 const {
@@ -113,11 +114,15 @@ const attendees = computed(() => data.value?.attendees ?? [])
         <p v-else class="text-sm text-gray-500">No attendees recorded.</p>
         <PermissionGate :collection="COLLECTIONS.officeMinutes" action="update">
           <div class="mt-3 grid gap-3 sm:grid-cols-[1fr_auto]">
-            <UInput
+            <EntitySelect
               v-model="person"
+              :items="personOptions"
+              placeholder="Type a name to search…"
+              :loading="personPending"
+              server-search
               class="w-full"
-              placeholder="Person id"
-              aria-label="Person id"
+              aria-label="Person to add as attendee"
+              @update:search-term="onPersonSearch"
             />
             <UButton
               label="Add attendee"

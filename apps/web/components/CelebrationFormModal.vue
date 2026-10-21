@@ -13,6 +13,7 @@ const emit = defineEmits<{
 }>()
 
 const api = useApi()
+const { personOptions, personPending, onPersonSearch } = usePersonSearch()
 const saving = ref(false)
 const formError = ref('')
 const fieldErrors = ref<Record<string, string>>({})
@@ -114,9 +115,17 @@ async function submit(): Promise<void> {
           label="Person"
           required
           :error="fieldErrors.person"
-          hint="Paste the person's id from the People directory."
+          hint="Type a name to search the People directory."
         >
-          <UInput v-model="form.person" class="w-full" placeholder="Person id (uuid)" />
+          <EntitySelect
+            v-model="form.person"
+            :items="personOptions"
+            placeholder="Type a name to search…"
+            :loading="personPending"
+            server-search
+            class="w-full"
+            @update:search-term="onPersonSearch"
+          />
         </UFormField>
 
         <div class="grid gap-4 sm:grid-cols-2">
@@ -153,7 +162,7 @@ async function submit(): Promise<void> {
             />
           </UFormField>
           <UFormField label="Branch" :error="fieldErrors.branch">
-            <USelect v-model="form.branch" :items="branchOptions" class="w-full" />
+            <EntitySelect v-model="form.branch" :items="branchOptions" placeholder="Select branch…" class="w-full" />
           </UFormField>
         </div>
 

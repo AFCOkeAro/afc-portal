@@ -8,7 +8,7 @@ import {
   JOURNEY_STAGE_KEYS,
   type VisitorFollowUp,
 } from '@afc/shared'
-import type { BranchSummary, VisitorRow } from '~/types/portal'
+import type { BranchSummary, Paginated, PersonRow, VisitorRow } from '~/types/portal'
 
 definePageMeta({ middleware: 'staff' })
 
@@ -253,6 +253,37 @@ const convertResult = ref<{
   duplicates: DuplicateWarning[]
 } | null>(null)
 const linkPersonId = ref('')
+const linkPersonSearch = ref('')
+const linkPeople = await useAsyncData(
+  'visitor-link-people',
+  () =>
+    linkPersonSearch.value.trim()
+      ? api.get<Paginated<PersonRow>>('/api/people', {
+          query: { search: linkPersonSearch.value.trim(), limit: 25 },
+        })
+      : Promise.resolve({
+          data: [],
+          meta: { total: 0, page: 1, limit: 25 },
+        }),
+  { watch: [linkPersonSearch] },
+)
+
+const linkPersonOptions = computed(() =>
+  (linkPeople.data.value?.data ?? []).map((row) => ({
+    label: [row.preferred_name || row.first_name, row.last_name]
+      .filter(Boolean)
+      .join(' '),
+    value: row.id,
+  })),
+)
+
+let linkSearchTimer: ReturnType<typeof setTimeout> | null = null
+function onLinkPersonSearch(term: string): void {
+  if (linkSearchTimer) clearTimeout(linkSearchTimer)
+  linkSearchTimer = setTimeout(() => {
+    linkPersonSearch.value = term
+  }, 250)
+}
 
 async function convert(mode: 'create' | 'link'): Promise<void> {
   converting.value = true
@@ -729,10 +760,17 @@ async function convert(mode: 'create' | 'link'): Promise<void> {
               />
             </div>
             <div class="mt-3 flex flex-wrap items-center gap-2">
-              <UInput
+              <EntitySelect
                 v-model="linkPersonId"
-                placeholder="Existing person id"
-                class="w-48"
+                :items="linkPersonOptions"
+                placeholder="Type a name to search…"
+                search-placeholder="Type a name to link…"
+                empty-text="No people match. Keep typing to search."
+                :loading="linkPeople.pending"
+                server-search
+                class="w-64"
+                aria-label="Link to existing person"
+                @update:search-term="onLinkPersonSearch"
               />
               <UButton
                 size="sm"

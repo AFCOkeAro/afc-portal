@@ -4,6 +4,7 @@ import { COLLECTIONS } from '@afc/shared'
 definePageMeta({ middleware: 'staff' })
 
 const api = useApi()
+const { branchOptions, branchesPending } = useBranchOptions()
 const showForm = ref(false)
 const form = ref({ title: '', body: '', publish_from: '', publish_to: '', branch: '' })
 const error = ref('')
@@ -87,7 +88,13 @@ const stripItems = computed(() => [
           </UFormField>
         </div>
         <UFormField label="Branch" hint="Blank means area-wide; area staff only.">
-          <UInput v-model="form.branch" class="w-full" placeholder="Branch id" />
+          <EntitySelect
+            v-model="form.branch"
+            :items="branchOptions"
+            placeholder="Select branch…"
+            :loading="branchesPending"
+            class="w-full"
+          />
         </UFormField>
       </div>
       <UAlert

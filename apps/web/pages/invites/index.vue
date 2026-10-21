@@ -76,6 +76,21 @@ const rows = computed(() => data.value?.data ?? [])
 const total = computed(() => data.value?.meta.total ?? 0)
 const pageCount = computed(() => Math.max(1, Math.ceil(total.value / limit)))
 
+// Preloaded caller-scoped event list for the searchable filter below.
+// Same GET /api/events list route the Events page uses; no new endpoints.
+const eventsQuery = await useAsyncData('staff-invites-events', () =>
+  api.get<{ data: Array<{ id: string; title: string }> }>('/api/events', {
+    query: { limit: 100 },
+  }),
+)
+const eventOptions = computed(() => [
+  { label: 'All events', value: '' },
+  ...(eventsQuery.data.value?.data ?? []).map((row) => ({
+    label: row.title,
+    value: row.id,
+  })),
+])
+
 /** Dashboard strip (AFC-588): figures from list-meta counts, no new backend. */
 async function countInvites(params: Record<string, string>): Promise<number> {
   const res = await api.get<{ data: InviteRow[]; meta: { total: number } }>(
@@ -195,10 +210,12 @@ async function act(id: string, action: 'approve' | 'retry' | 'withdraw'): Promis
 
     <PermissionGate :collection="COLLECTIONS.events" action="read">
       <div v-if="canManage" class="mb-4 grid max-w-3xl gap-3 sm:grid-cols-4">
-        <UFormField label="Event id">
-          <UInput
+        <UFormField label="Event">
+          <EntitySelect
             v-model="eventFilter"
-            placeholder="event uuid"
+            :items="eventOptions"
+            placeholder="Select event…"
+            :loading="eventsQuery.pending"
             class="w-full"
             @update:model-value="page = 1"
           />

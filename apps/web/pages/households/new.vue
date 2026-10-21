@@ -171,7 +171,7 @@ async function submit(): Promise<void> {
             />
           </UFormField>
           <UFormField label="Branch" :error="fieldErrors.branch">
-            <USelect v-model="branch" :items="branchOptions" class="w-full" />
+            <EntitySelect v-model="branch" :items="branchOptions" placeholder="Select branch…" class="w-full" />
           </UFormField>
         </div>
         <UFormField label="Address" class="mt-4" :error="fieldErrors.address">

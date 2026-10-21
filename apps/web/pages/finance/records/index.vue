@@ -188,9 +188,10 @@ const statusColor: Record<string, 'success' | 'warning' | 'neutral' | 'info'> = 
           class="w-full"
           aria-label="Filter by status"
         />
-        <USelect
+        <EntitySelect
           v-model="branch"
           :items="branchOptions"
+          placeholder="Select branch…"
           class="w-full"
           aria-label="Filter by branch"
         />

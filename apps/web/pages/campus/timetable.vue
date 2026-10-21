@@ -183,9 +183,10 @@ async function saveSlot() {
 
     <UCard class="mt-4">
       <div class="grid gap-3 sm:grid-cols-2">
-        <USelect
+        <EntitySelect
           v-model="programmeId"
           :items="programmeOptions"
+          placeholder="Select programme…"
           class="w-full"
           aria-label="Filter by programme"
         />

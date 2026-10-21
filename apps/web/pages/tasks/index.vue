@@ -4,6 +4,8 @@ import { COLLECTIONS, isTaskOverdue } from '@afc/shared'
 definePageMeta({ middleware: 'staff' })
 
 const api = useApi()
+const { personOptions, personPending, onPersonSearch } = usePersonSearch()
+const { branchOptions, branchesPending } = useBranchOptions()
 const route = useRoute()
 
 /** Drill-down contract (AFC-588): dashboard strip links here with ?status=&mine=. */
@@ -190,15 +192,25 @@ function isOverdue(row: Record<string, unknown>): boolean {
             placeholder="Assignee user id"
           />
         </UFormField>
-        <UFormField label="Assignee person id">
-          <UInput
+        <UFormField label="Assignee person">
+          <EntitySelect
             v-model="form.assignee_person"
+            :items="personOptions"
+            placeholder="Type a name to search…"
+            :loading="personPending"
+            server-search
             class="w-full"
-            placeholder="Assignee person id"
+            @update:search-term="onPersonSearch"
           />
         </UFormField>
-        <UFormField label="Branch id">
-          <UInput v-model="form.branch" class="w-full" placeholder="Branch id" />
+        <UFormField label="Branch">
+          <EntitySelect
+            v-model="form.branch"
+            :items="branchOptions"
+            placeholder="Select branch…"
+            :loading="branchesPending"
+            class="w-full"
+          />
         </UFormField>
         <UFormField label="Due date">
           <UInput v-model="form.due_date" type="date" class="w-full" />

@@ -96,7 +96,7 @@ const branchOptions = computed(() => [
           placeholder="Search department name"
           aria-label="Search departments"
         />
-        <USelect v-model="branch" :items="branchOptions" class="w-full" />
+        <EntitySelect v-model="branch" :items="branchOptions" placeholder="Select branch…" class="w-full" />
       </div>
 
       <UAlert

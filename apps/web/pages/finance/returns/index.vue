@@ -7,6 +7,7 @@ import type { FinancialRecordRow, WecaReturnRow } from '~/types/finance'
 definePageMeta({ middleware: ['staff', 'finance'] })
 
 const api = useApi()
+const { branchOptions: scopedBranches, branchesPending } = useBranchOptions()
 const permissions = usePermissions()
 const route = useRoute()
 
@@ -51,6 +52,11 @@ const { data, pending, error, refresh } = await useAsyncData(
 const rows = computed(() => data.value?.data ?? [])
 const total = computed(() => data.value?.meta.total ?? 0)
 const pageCount = computed(() => Math.max(1, Math.ceil(total.value / limit)))
+
+const branchFilterOptions = computed(() => [
+  { label: 'All branches', value: 'all' },
+  ...scopedBranches.value,
+])
 
 /** Dashboard strip (AFC-588): figures from list-meta counts, no new backend. */
 async function countReturns(params: Record<string, string>): Promise<number> {
@@ -209,9 +215,10 @@ const statusColor: Record<string, 'success' | 'warning' | 'neutral' | 'info'> = 
           stays pending until the effective formula version computes it.
         </p>
         <div class="mt-3 flex flex-col gap-2 sm:flex-row">
-          <USelect
+          <EntitySelect
             v-model="openRecordId"
             :items="recordOptions"
+            placeholder="Choose a captured record…"
             class="w-full sm:max-w-md"
             aria-label="Captured record"
           />
@@ -242,9 +249,12 @@ const statusColor: Record<string, 'success' | 'warning' | 'neutral' | 'info'> = 
           class="w-full"
           aria-label="Filter by state"
         />
-        <UInput
+        <EntitySelect
           v-model="branch"
-          placeholder="Branch id (optional)"
+          :items="branchFilterOptions"
+          placeholder="Select branch…"
+          :loading="branchesPending"
+          class="w-full"
           aria-label="Filter by branch"
         />
         <UButton

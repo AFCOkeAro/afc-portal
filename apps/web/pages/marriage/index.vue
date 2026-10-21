@@ -4,6 +4,8 @@ import { COLLECTIONS } from '@afc/shared'
 definePageMeta({ middleware: 'staff' })
 
 const api = useApi()
+const { personOptions, personPending, onPersonSearch } = usePersonSearch()
+const { branchOptions, branchesPending } = useBranchOptions()
 const showForm = ref(false)
 const form = ref({
   person: '',
@@ -81,11 +83,25 @@ const stripItems = computed(() => [
         <h2 class="font-semibold">New matter</h2>
       </template>
       <div class="grid gap-3 sm:grid-cols-2">
-        <UFormField label="Person id">
-          <UInput v-model="form.person" class="w-full" placeholder="Person id" />
+        <UFormField label="Person">
+          <EntitySelect
+            v-model="form.person"
+            :items="personOptions"
+            placeholder="Type a name to search…"
+            :loading="personPending"
+            server-search
+            class="w-full"
+            @update:search-term="onPersonSearch"
+          />
         </UFormField>
-        <UFormField label="Branch id">
-          <UInput v-model="form.branch" class="w-full" placeholder="Branch id" />
+        <UFormField label="Branch">
+          <EntitySelect
+            v-model="form.branch"
+            :items="branchOptions"
+            placeholder="Select branch…"
+            :loading="branchesPending"
+            class="w-full"
+          />
         </UFormField>
         <UFormField label="Matter type">
           <USelect v-model="form.matter_type" :items="matterTypeOptions" class="w-full" />
