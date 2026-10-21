@@ -53,8 +53,7 @@ export function directusBaseUrl(event: H3Event): string {
  * is down".
  */
 export function directusIsConfigured(event: H3Event): boolean {
-  const config = useRuntimeConfig(event)
-  return Boolean(String(config.directusUrl ?? '').trim())
+  return Boolean(String(useRuntimeConfig(event).directusUrl ?? '').trim())
 }
 
 export async function directusFetch<T>(
@@ -149,12 +148,18 @@ interface DirectusRefreshResponse {
 }
 
 /**
- * Exchange the session's refresh token for a new pair and reseal the session.
- * Returns the new access token, or null when there is nothing usable to
- * refresh with (no refresh token, already rotated, or refresh rejected).
- * Never throws: a failed refresh is a normal "re-authenticate" outcome, and it
- * must not mask the original request error with a second 500.
+ * In-flight refreshes, keyed by the refresh token being exchanged.
+ *
+ * A dashboard load fires many API calls in parallel; when the access token has
+ * just expired they all 401 at once. Without dedup they would each POST
+ * /auth/refresh with the same token — Directus rotates refresh tokens on use,
+ * so the first wins and the rest get 401, surfacing a bogus "session has
+ * ended" even though the session is fine. Sharing one promise per refresh
+ * token means a single exchange and every waiter retries with the new access
+ * token. Entries are removed when settled, so this never grows.
  */
+const inflightRefreshes = new Map<string, Promise<string | null>>()
+
 async function tryRefreshSessionToken(
   event: H3Event,
   session: PortalSessionData,
@@ -162,6 +167,31 @@ async function tryRefreshSessionToken(
   if (!session.refreshToken) {
     return null
   }
+  const key = session.refreshToken
+  const existing = inflightRefreshes.get(key)
+  if (existing) {
+    return existing
+  }
+  const pending = doRefreshSessionToken(event, session).finally(() => {
+    if (inflightRefreshes.get(key) === pending) {
+      inflightRefreshes.delete(key)
+    }
+  })
+  inflightRefreshes.set(key, pending)
+  return pending
+}
+
+/**
+ * Exchange the session's refresh token for a new pair and reseal the session.
+ * Returns the new access token, or null when there is nothing usable to
+ * refresh with (no refresh token, already rotated, or refresh rejected).
+ * Never throws: a failed refresh is a normal "re-authenticate" outcome, and it
+ * must not mask the original request error with a second 500.
+ */
+async function doRefreshSessionToken(
+  event: H3Event,
+  session: PortalSessionData,
+): Promise<string | null> {
   try {
     const refreshed = await $fetch<DirectusRefreshResponse>(
       `${directusBaseUrl(event)}/auth/refresh`,
