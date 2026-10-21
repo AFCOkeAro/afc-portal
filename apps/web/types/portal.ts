@@ -164,6 +164,23 @@ export interface DepartmentDetail extends DepartmentRow {
   members: DepartmentMemberRow[]
 }
 
+export interface ManagementTeamLeader {
+  person: string
+  display_name: string
+  role: string
+  phone: string | null
+  branch_name: string | null
+}
+
+export interface ManagementTeamEntry {
+  department: string
+  department_name: string
+  department_type: string | null
+  code: string | null
+  level: 'branch' | 'zone' | 'area'
+  leaders: ManagementTeamLeader[]
+}
+
 export interface RegistrationRow extends EventRegistration {
   person_name: string | null
 }

@@ -17,6 +17,8 @@ const DEPARTMENT_FIELDS = [
   'code',
   'department_type',
   'branch',
+  'zone',
+  'area',
   'leader_person',
   'description',
   'status',
@@ -36,6 +38,8 @@ export default defineEventHandler(async (event) => {
   const search =
     typeof query.search === 'string' ? query.search.trim().slice(0, 120) : undefined
   const branch = typeof query.branch === 'string' ? query.branch : undefined
+  const zone = typeof query.zone === 'string' ? query.zone : undefined
+  const area = typeof query.area === 'string' ? query.area : undefined
   const departmentType =
     typeof query.department_type === 'string' ? query.department_type : undefined
   const status =
@@ -50,6 +54,23 @@ export default defineEventHandler(async (event) => {
       statusCode: 403,
       statusMessage: 'That branch is outside your scope',
       data: { code: 'branch_out_of_scope' },
+    })
+  }
+  // AFC-593: zone/area narrowing fails closed like the branch narrowing
+  // above -- an explicit level outside the caller's grants is a 403, never
+  // an empty-but-200 that hides a scope hole.
+  if (zone && !scope.isArea && !scope.zoneIds.includes(zone)) {
+    throw createError({
+      statusCode: 403,
+      statusMessage: 'That zone is outside your scope',
+      data: { code: 'zone_out_of_scope' },
+    })
+  }
+  if (area && !scope.isArea && scope.areaId !== area) {
+    throw createError({
+      statusCode: 403,
+      statusMessage: 'That area is outside your scope',
+      data: { code: 'area_out_of_scope' },
     })
   }
 
@@ -67,9 +88,16 @@ export default defineEventHandler(async (event) => {
       filter: mergeFilters(
         status ? { status: { _eq: status } } : undefined,
         departmentType ? { department_type: { _eq: departmentType } } : undefined,
-        // An explicit branch narrows to that branch only (area-wide rows have
-        // no branch, so they drop out of a narrowed view by construction).
-        branch ? { branch: { _eq: branch } } : departmentScopeFilter(scope),
+        // An explicit level narrows to that level only (area-wide rows drop
+        // out of a narrowed view by construction). Otherwise the scope
+        // predicate (branch + granted zone/area + fully unscoped) applies.
+        branch
+          ? { branch: { _eq: branch } }
+          : zone
+            ? { zone: { _eq: zone } }
+            : area
+              ? { area: { _eq: area } }
+              : departmentScopeFilter(scope),
       ),
       fields: DEPARTMENT_FIELDS,
       sort: 'name',

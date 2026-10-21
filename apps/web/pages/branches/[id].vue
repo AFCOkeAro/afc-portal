@@ -516,10 +516,7 @@ function formatDateTime(value: string | null | undefined): string {
           <template #header>
             <h2 class="text-base font-semibold" tabindex="-1">Leadership</h2>
           </template>
-          <EmptyState
-            title="Leadership assignments appear here"
-            description="Positions for this branch render here once the hierarchy endpoints from AFC-461a land. Gated on departments:read."
-          />
+          <ManagementTeamSection level="branch" :scope-id="id" />
         </UCard>
       </section>
     </template>

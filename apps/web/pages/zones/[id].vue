@@ -164,10 +164,7 @@ const rows = computed(() => branches.value ?? [])
           <template #header>
             <h2 class="text-base font-semibold" tabindex="-1">Leadership</h2>
           </template>
-          <EmptyState
-            title="Zone leadership appears here"
-            description="Zone leadership assignments render here once the hierarchy endpoints land."
-          />
+          <ManagementTeamSection level="zone" :scope-id="zoneId" />
         </UCard>
       </section>
     </template>

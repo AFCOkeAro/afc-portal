@@ -18,6 +18,8 @@ const DEPARTMENT_FIELDS = [
   'code',
   'department_type',
   'branch',
+  'zone',
+  'area',
   'leader_person',
   'description',
   'status',
