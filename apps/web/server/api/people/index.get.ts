@@ -1,5 +1,10 @@
 import type { PersonRow } from '../../../types/portal'
 import {
+  AGE_BUCKETS,
+  dobRangeForBucket,
+  type AgeBucket,
+} from '../../utils/people-summary'
+import {
   ageFromDob,
   branchNames,
   getPortalScope,
@@ -60,6 +65,36 @@ export default defineEventHandler(async (event) => {
         ? 'archived'
         : 'active'
 
+  // Dashboard deep-link filters (AFC-576): the summary cards link here with
+  // ?gender= / ?age_bucket= / ?household=unlinked, so the filtered list must
+  // count exactly what the summary counts. Gender is an exact match; the age
+  // range is the calendar-exact translation of the bucket (dobRangeForBucket).
+  const gender =
+    typeof query.gender === 'string' && query.gender.length > 0 ? query.gender : undefined
+  if (gender && gender !== 'male' && gender !== 'female' && gender !== 'unspecified') {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'gender must be male, female or unspecified',
+      data: { code: 'invalid_gender' },
+    })
+  }
+  const ageBucket =
+    typeof query.age_bucket === 'string' && query.age_bucket.length > 0
+      ? query.age_bucket
+      : undefined
+  if (ageBucket && !(AGE_BUCKETS as readonly string[]).includes(ageBucket)) {
+    throw createError({
+      statusCode: 400,
+      statusMessage:
+        'age_bucket must be one of 0-12, 13-17, 18-25, 26-40, 41-60, 60+, unknown',
+      data: { code: 'invalid_age_bucket' },
+    })
+  }
+  const household =
+    typeof query.household === 'string' && query.household.length > 0
+      ? query.household
+      : undefined
+
   const sort =
     query.sort === 'recent'
       ? 'member_since:desc,last_name'
@@ -102,6 +137,15 @@ export default defineEventHandler(async (event) => {
       status ? { status: { _eq: status } } : undefined,
       membershipStatus ? { membership_status: { _eq: membershipStatus } } : undefined,
       branch ? { branch: { _eq: branch } } : undefined,
+      gender ? { gender: { _eq: gender } } : undefined,
+      ageBucket
+        ? { date_of_birth: dobRangeForBucket(ageBucket as AgeBucket) }
+        : undefined,
+      household
+        ? household === 'unlinked'
+          ? { household: { _null: true } }
+          : { household: { _eq: household } }
+        : undefined,
       departmentPersonIds ? { id: { _in: departmentPersonIds } } : undefined,
       scopeFilter(scope),
     ),

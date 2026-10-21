@@ -11,6 +11,7 @@ import {
   requireCan,
   scopeFilter,
   stripHiddenMany,
+  throwStoreUnavailable,
   visibleFields,
 } from '../../utils/portal'
 
@@ -36,6 +37,7 @@ const MEMBER_FIELDS = [
   'is_minor',
   'phone',
   'branch',
+  'household_role',
   'membership_status',
   'status',
 ]
@@ -43,6 +45,7 @@ const MEMBER_FIELDS = [
 export interface HouseholdMemberRow {
   id: string
   display_name: string
+  household_role: string | null
   gender: string
   is_minor: boolean | null
   phone: string | null
@@ -72,20 +75,30 @@ export default defineEventHandler(async (event): Promise<HouseholdDetail> => {
   // (data-model-expansion §11) has no session field in the portal yet
   // (`PortalUser` carries no `household`), so it lives in the Directus
   // policy — the same recorded-not-invented precedent as `zone_admin`.
-  const household = await findScopedItem<Record<string, unknown>>(
-    event,
-    scope,
-    'households',
-    id,
-    { fields: HOUSEHOLD_FIELDS },
-  )
+  // AFC-566: core reads hit the 0020 household register (members resolve
+  // via the snapshot-owned people table). Map an unreadable store to the
+  // named error, never a bare 500; deliberate 4xx pass through untouched.
+  let household: Record<string, unknown>
+  let members: { data: Record<string, unknown>[] }
+  try {
+    household = await findScopedItem<Record<string, unknown>>(
+      event,
+      scope,
+      'households',
+      id,
+      { fields: HOUSEHOLD_FIELDS },
+    )
 
-  const members = await listItems<Record<string, unknown>>(event, scope, 'people', {
-    filter: mergeFilters({ household: { _eq: id } }, scopeFilter(scope)),
-    fields: visibleFields(scope, 'people', MEMBER_FIELDS),
-    sort: 'last_name,first_name',
-    limit: -1,
-  })
+    members = await listItems<Record<string, unknown>>(event, scope, 'people', {
+      filter: mergeFilters({ household: { _eq: id } }, scopeFilter(scope)),
+      fields: visibleFields(scope, 'people', MEMBER_FIELDS),
+      sort: 'last_name,first_name',
+      limit: -1,
+    })
+  } catch (error) {
+    if ((error as { statusCode?: number })?.statusCode) throw error
+    throwStoreUnavailable(error, 'household_store', '0020')
+  }
 
   const names = await branchNames(event, scope)
   const headId = household.household_head ? String(household.household_head) : null
@@ -124,6 +137,7 @@ export default defineEventHandler(async (event): Promise<HouseholdDetail> => {
       row.preferred_name as string | null | undefined,
     ),
     gender: String(row.gender ?? 'unspecified'),
+    household_role: (row.household_role as string | null) ?? null,
     is_minor: (row.is_minor as boolean | null) ?? null,
     phone: (row.phone as string | null) ?? null,
     membership_status: String(row.membership_status ?? ''),

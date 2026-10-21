@@ -8,6 +8,7 @@ import {
   findScopedItem,
   getPortalScope,
   requireCan,
+  throwStoreUnavailable,
   throwValidation,
   updateItem,
 } from '../../../utils/portal'
@@ -59,19 +60,28 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const current = await findScopedItem<Record<string, unknown>>(
-    event,
-    scope,
-    'event_registrations',
-    id,
-    { fields: ['id', 'event', 'registration_status', 'payment_status'] },
-  )
-  // The registration must belong to an event inside the caller's scope —
-  // a branch id on the row alone is not enough for area-wide events.
-  await findScopedItem(event, scope, 'events', String(current.event), {
-    fields: ['id'],
-    scope: eventScopeFilter(scope),
-  })
+  // AFC-566: scope-gates below hit 0021 registers. Unreadable store →
+  // named error, never a bare 500; the deliberate 404/409/validation 4xx
+  // further down pass through untouched.
+  let current: Record<string, unknown>
+  try {
+    current = await findScopedItem<Record<string, unknown>>(
+      event,
+      scope,
+      'event_registrations',
+      id,
+      { fields: ['id', 'event', 'registration_status', 'payment_status'] },
+    )
+    // The registration must belong to an event inside the caller's scope —
+    // a branch id on the row alone is not enough for area-wide events.
+    await findScopedItem(event, scope, 'events', String(current.event), {
+      fields: ['id'],
+      scope: eventScopeFilter(scope),
+    })
+  } catch (error) {
+    if ((error as { statusCode?: number })?.statusCode) throw error
+    throwStoreUnavailable(error, 'event_store', '0021')
+  }
 
   const patch: Record<string, unknown> = {}
 
@@ -119,19 +129,24 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const updated = await updateItem<Record<string, unknown>>(
-    event,
-    scope,
-    'event_registrations',
-    id,
-    patch,
-  )
-  return {
-    data: { ...updated, id: String(updated.id) },
-    meta: {
-      actor: scope.session.user.id,
-      audit_note: auditNote,
-      audit_trail: 'directus_activity',
-    },
+  try {
+    const updated = await updateItem<Record<string, unknown>>(
+      event,
+      scope,
+      'event_registrations',
+      id,
+      patch,
+    )
+    return {
+      data: { ...updated, id: String(updated.id) },
+      meta: {
+        actor: scope.session.user.id,
+        audit_note: auditNote,
+        audit_trail: 'directus_activity',
+      },
+    }
+  } catch (error) {
+    if ((error as { statusCode?: number })?.statusCode) throw error
+    throwStoreUnavailable(error, 'event_store', '0021')
   }
 })

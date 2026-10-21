@@ -560,3 +560,70 @@ describe('detail page: group action with the create gate', () => {
     assert.match(src, /RegistrationGroupModal/)
   })
 })
+
+describe('event routes: unreadable store fails named, never bare 500 (AFC-566)', () => {
+  const list = codeOf('apps/web/server/api/events/index.get.ts')
+  const detail = codeOf('apps/web/server/api/events/[id].get.ts')
+  const post = codeOf('apps/web/server/api/events/index.post.ts')
+  const patch = codeOf('apps/web/server/api/events/[id].patch.ts')
+  const create = codeOf('apps/web/server/api/events/[id]/registrations.post.ts')
+  const group = codeOf('apps/web/server/api/events/[id]/group-registrations.post.ts')
+  const checkin = codeOf('apps/web/server/api/events/[id]/check-in.post.ts')
+  const csv = codeOf('apps/web/server/api/events/[id]/registrations.csv.get.ts')
+  const rollups = codeOf('apps/web/server/api/events/[id]/rollups.get.ts')
+  const regPatch = codeOf('apps/web/server/api/events/registrations/[id].patch.ts')
+
+  it('catalogue and detail wrap the 0021 registers in the named store error', () => {
+    assert.match(list, /throwStoreUnavailable\(error, 'event_store', '0021'\)/)
+    assert.match(detail, /throwStoreUnavailable\(error, 'event_store', '0021'\)/)
+  })
+
+  it('create/patch wrap the 0021 event register in the named store error', () => {
+    assert.match(post, /throwStoreUnavailable\(error, 'event_store', '0021'\)/)
+    assert.match(patch, /throwStoreUnavailable\(error, 'event_store', '0021'\)/)
+  })
+
+  it('registration create/group/check-in keep their 4xx semantics under the named error', () => {
+    assert.match(create, /throwStoreUnavailable\(error, 'event_store', '0021'\)/)
+    assert.match(create, /client_forbidden_field/)
+    assert.match(group, /throwStoreUnavailable\(error, 'event_store', '0021'\)/)
+    assert.match(group, /group_partial_failure/)
+    assert.match(checkin, /throwStoreUnavailable\(error, 'event_store', '0021'\)/)
+    assert.match(checkin, /checkin_not_found/)
+    assert.match(checkin, /checkin_ambiguous/)
+  })
+
+  it('csv/rollups/reg-patch wrap the 0021 registers in the named store error', () => {
+    assert.match(csv, /throwStoreUnavailable\(error, 'event_store', '0021'\)/)
+    assert.match(rollups, /throwStoreUnavailable\(error, 'event_store', '0021'\)/)
+    assert.match(regPatch, /throwStoreUnavailable\(error, 'event_store', '0021'\)/)
+    assert.match(regPatch, /assertStatusTransitionAllowed\(from, to\)/)
+  })
+
+  it('deliberate 4xx pass through instead of being renamed into the store', () => {
+    for (const src of [
+      list,
+      detail,
+      post,
+      patch,
+      create,
+      group,
+      checkin,
+      csv,
+      rollups,
+      regPatch,
+    ]) {
+      assert.match(src, /statusCode\?\: number \}\)\?\.statusCode\) throw error/)
+    }
+  })
+
+  it('the 0021 migration owns exactly the tables these routes assume', () => {
+    const migration = read(
+      'services/directus/schema/migrations/20261020_0021_events_registrations.sql',
+    )
+    assert.match(migration, /CREATE TABLE IF NOT EXISTS events/)
+    assert.match(migration, /CREATE TABLE IF NOT EXISTS event_registrations/)
+    assert.match(migration, /invite_eligible\s+boolean NOT NULL DEFAULT true/)
+    assert.match(migration, /event_registrations_group_code_len/)
+  })
+})

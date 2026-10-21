@@ -15,6 +15,12 @@ definePageMeta({ middleware: 'staff' })
 
 const api = useApi()
 const permissions = usePermissions()
+const route = useRoute()
+
+function queryParam(name: string): string | null {
+  const value = route.query[name]
+  return typeof value === 'string' && value.length > 0 ? value : null
+}
 
 interface RecipientCounts {
   total: number
@@ -39,10 +45,21 @@ interface LogRow {
   recipient_counts: RecipientCounts | null
 }
 
-const sourceKind = ref('all')
-const status = ref('all')
+const sourceKind = ref(queryParam('source_kind') ?? 'all')
+const status = ref(queryParam('status') ?? 'all')
 const page = ref(1)
 const limit = 25
+
+/** Same-page strip navigation (AFC-588): query-only link, sync the filters. */
+watch(
+  () => route.query,
+  (next: typeof route.query) => {
+    const sourceNext = typeof next.source_kind === 'string' ? next.source_kind : null
+    sourceKind.value = sourceNext ?? 'all'
+    const statusNext = typeof next.status === 'string' ? next.status : null
+    status.value = statusNext ?? 'all'
+  },
+)
 
 const canRead = computed(() => permissions.can(COLLECTIONS.communications, 'read'))
 
@@ -65,6 +82,51 @@ const { data, pending, error, refresh } = await useAsyncData(
 const rows = computed(() => data.value?.data ?? [])
 const total = computed(() => data.value?.meta.total ?? 0)
 const pageCount = computed(() => Math.max(1, Math.ceil(total.value / limit)))
+
+/** Dashboard strip (AFC-588): figures from list-meta counts, no new backend. */
+async function countMessages(params: Record<string, string>): Promise<number> {
+  const res = await api.get<{ data: LogRow[]; meta: { total: number } }>(
+    '/api/communications',
+    { query: { page: 1, limit: 1, ...params } },
+  )
+  return res.meta.total
+}
+
+const { data: stripCounts } = await useAsyncData('delivery-log-strip', () =>
+  Promise.all([
+    countMessages({}),
+    countMessages({ status: 'sent' }),
+    countMessages({ status: 'failed' }),
+    countMessages({ status: 'queued' }),
+  ]),
+)
+
+const stripItems = computed(() => [
+  {
+    label: 'Messages',
+    value: stripCounts.value?.[0] ?? null,
+    to: '/communications?status=all',
+    hint: 'Open filtered list',
+  },
+  {
+    label: 'Sent',
+    value: stripCounts.value?.[1] ?? null,
+    to: '/communications?status=sent',
+    hint: 'Open filtered list',
+  },
+  {
+    label: 'Failed',
+    value: stripCounts.value?.[2] ?? null,
+    to: '/communications?status=failed',
+    hint: 'Open filtered list',
+  },
+  {
+    label: 'Queued',
+    value: stripCounts.value?.[3] ?? null,
+    to: '/communications?status=queued',
+    hint: 'Open filtered list',
+  },
+])
 
 const sourceOptions = [
   { label: 'Any source', value: 'all' },
@@ -102,6 +164,8 @@ const statusOptions = [
         />
       </template>
     </PageHeader>
+
+    <DashboardStrip :items="stripItems" />
 
     <PermissionGate :collection="COLLECTIONS.communications" action="read">
       <div class="mb-4 grid max-w-2xl gap-3 sm:grid-cols-3">

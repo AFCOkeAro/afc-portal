@@ -4,6 +4,7 @@ import {
   getPortalScope,
   requireCan,
   resolveBranch,
+  throwStoreUnavailable,
   throwValidation,
   updateItem,
 } from '../../utils/portal'
@@ -16,33 +17,41 @@ export default defineEventHandler(async (event) => {
   if (!id) {
     throw createError({ statusCode: 400, statusMessage: 'A household id is required' })
   }
-  await findScopedItem(event, scope, 'households', id, { fields: ['id'] })
+  // AFC-566: every store call below hits the 0020 register or the
+  // snapshot-owned people table. Map an unreadable store to the named
+  // error, never a bare 500; deliberate 4xx (scope 404s) pass through.
+  try {
+    await findScopedItem(event, scope, 'households', id, { fields: ['id'] })
 
-  const parsed = householdPatchSchema.safeParse(await readBody(event))
-  if (!parsed.success) throwValidation(parsed.error)
-  const form = parsed.data
+    const parsed = householdPatchSchema.safeParse(await readBody(event))
+    if (!parsed.success) throwValidation(parsed.error)
+    const form = parsed.data
 
-  const payload: Record<string, unknown> = {}
-  if (form.name !== undefined) payload.name = form.name
-  if (form.branch !== undefined) payload.branch = resolveBranch(scope, form.branch)
-  if (form.address !== undefined) payload.address = form.address ?? null
-  if (form.phone !== undefined) payload.phone = form.phone ?? null
-  if (form.wedding_date !== undefined) payload.wedding_date = form.wedding_date ?? null
-  if (form.household_head !== undefined) {
-    if (form.household_head) {
-      await findScopedItem(event, scope, 'people', form.household_head, {
-        fields: ['id'],
-      })
+    const payload: Record<string, unknown> = {}
+    if (form.name !== undefined) payload.name = form.name
+    if (form.branch !== undefined) payload.branch = resolveBranch(scope, form.branch)
+    if (form.address !== undefined) payload.address = form.address ?? null
+    if (form.phone !== undefined) payload.phone = form.phone ?? null
+    if (form.wedding_date !== undefined) payload.wedding_date = form.wedding_date ?? null
+    if (form.household_head !== undefined) {
+      if (form.household_head) {
+        await findScopedItem(event, scope, 'people', form.household_head, {
+          fields: ['id'],
+        })
+      }
+      payload.household_head = form.household_head ?? null
     }
-    payload.household_head = form.household_head ?? null
-  }
 
-  const updated = await updateItem<Record<string, unknown>>(
-    event,
-    scope,
-    'households',
-    id,
-    payload,
-  )
-  return { data: { ...updated, id: String(updated.id) } }
+    const updated = await updateItem<Record<string, unknown>>(
+      event,
+      scope,
+      'households',
+      id,
+      payload,
+    )
+    return { data: { ...updated, id: String(updated.id) } }
+  } catch (error) {
+    if ((error as { statusCode?: number })?.statusCode) throw error
+    throwStoreUnavailable(error, 'household_store', '0020')
+  }
 })

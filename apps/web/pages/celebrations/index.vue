@@ -37,6 +37,15 @@ watch([branch, zone, type, visibility, status, month, sort], () => {
   page.value = 1
 })
 
+/** Same-page strip navigation (AFC-588): query-only link, sync the filter. */
+watch(
+  () => route.query,
+  (next: typeof route.query) => {
+    const statusNext = typeof next.status === 'string' ? next.status : null
+    status.value = statusNext ?? 'all'
+  },
+)
+
 interface CelebrationsResponse extends Paginated<CelebrationRow> {
   filters: Record<string, unknown>
 }
@@ -88,6 +97,50 @@ const lookaheadHref = computed(
 const rows = computed(() => data.value?.data ?? [])
 const total = computed(() => data.value?.meta.total ?? 0)
 const pageCount = computed(() => Math.max(1, Math.ceil(total.value / limit)))
+
+/** Dashboard strip (AFC-588): figures from list-meta counts, no new backend. */
+async function countCelebrations(params: Record<string, string>): Promise<number> {
+  const res = await api.get<CelebrationsResponse>('/api/celebrations', {
+    query: { page: 1, limit: 1, ...params },
+  })
+  return res.meta.total
+}
+
+const { data: stripCounts } = await useAsyncData('celebrations-strip', () =>
+  Promise.all([
+    countCelebrations({}),
+    countCelebrations({ status: 'approved' }),
+    countCelebrations({ status: 'published' }),
+    countCelebrations({ status: 'draft' }),
+  ]),
+)
+
+const stripItems = computed(() => [
+  {
+    label: 'Celebrations',
+    value: stripCounts.value?.[0] ?? null,
+    to: '/celebrations?status=all',
+    hint: 'Open filtered list',
+  },
+  {
+    label: 'Approved',
+    value: stripCounts.value?.[1] ?? null,
+    to: '/celebrations?status=approved',
+    hint: 'Open filtered list',
+  },
+  {
+    label: 'Published',
+    value: stripCounts.value?.[2] ?? null,
+    to: '/celebrations?status=published',
+    hint: 'Open filtered list',
+  },
+  {
+    label: 'Draft',
+    value: stripCounts.value?.[3] ?? null,
+    to: '/celebrations?status=draft',
+    hint: 'Open filtered list',
+  },
+])
 
 const branchOptions = computed(() => [
   { label: 'All branches', value: 'all' },
@@ -178,6 +231,8 @@ function formatDate(value: string, recurring: boolean): string {
         </PermissionGate>
       </template>
     </PageHeader>
+
+    <DashboardStrip :items="stripItems" />
 
     <UCard>
       <div class="grid gap-3 sm:grid-cols-3 xl:grid-cols-4">

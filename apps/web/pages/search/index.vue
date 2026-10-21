@@ -2,7 +2,14 @@
 definePageMeta({ middleware: 'staff' })
 
 const api = useApi()
-const q = ref('')
+const route = useRoute()
+
+/**
+ * Header search (AFC-585) navigates here with `?q=`. Initialise from the
+ * route so shared links and header submissions run immediately, and follow
+ * later `?q=` changes while staying on this page.
+ */
+const q = ref(typeof route.query.q === 'string' ? route.query.q : '')
 const domain = ref('all')
 const error = ref('')
 
@@ -24,6 +31,14 @@ async function run() {
   await refresh()
 }
 
+watch(
+  () => route.query.q,
+  (next: unknown) => {
+    q.value = typeof next === 'string' ? next : ''
+    void run()
+  },
+)
+
 const domainOptions = [
   { label: 'All', value: 'all' },
   { label: 'People', value: 'people' },
@@ -44,6 +59,29 @@ const total = computed(() =>
     0,
   ),
 )
+
+/** Dashboard strip (AFC-588): client-side domain totals, no new backend. */
+const stripItems = computed(() => {
+  const byDomain = new Map<string, number>(
+    sections.value.map(([name, rows]: [string, unknown[]]): [string, number] => [
+      name,
+      rows.length,
+    ]),
+  )
+  const pick = (name: string): number | null =>
+    sections.value.length ? (byDomain.get(name) ?? 0) : null
+  return [
+    {
+      label: 'Matches',
+      value: sections.value.length ? total.value : null,
+      to: null,
+      hint: 'Across honoured domains',
+    },
+    { label: 'People', value: pick('people'), to: null, hint: 'Current query' },
+    { label: 'Events', value: pick('events'), to: null, hint: 'Current query' },
+    { label: 'Tasks', value: pick('tasks'), to: null, hint: 'Current query' },
+  ]
+})
 </script>
 
 <template>
@@ -52,6 +90,8 @@ const total = computed(() =>
       title="Search"
       description="People, households, branches, BSCs, events, tasks and minutes — within your scope only."
     />
+
+    <DashboardStrip :items="stripItems" />
 
     <UCard>
       <div class="grid gap-3 sm:grid-cols-[1fr_220px_auto]">

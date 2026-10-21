@@ -16,6 +16,12 @@ definePageMeta({ middleware: 'staff' })
 
 const api = useApi()
 const permissions = usePermissions()
+const route = useRoute()
+
+function queryParam(name: string): string | null {
+  const value = route.query[name]
+  return typeof value === 'string' && value.length > 0 ? value : null
+}
 
 interface LastRun {
   id: string
@@ -39,7 +45,16 @@ interface CampaignRow {
   last_run: LastRun | null
 }
 
-const statusFilter = ref('all')
+const statusFilter = ref(queryParam('status') ?? 'all')
+
+/** Same-page strip navigation (AFC-588): query-only link, sync the filter. */
+watch(
+  () => route.query,
+  (next: typeof route.query) => {
+    const statusNext = typeof next.status === 'string' ? next.status : null
+    if (statusNext && statusNext !== statusFilter.value) statusFilter.value = statusNext
+  },
+)
 
 const { data, pending, error, refresh } = await useAsyncData(
   'campaigns-catalogue',
@@ -51,6 +66,50 @@ const { data, pending, error, refresh } = await useAsyncData(
 )
 
 const rows = computed(() => data.value?.data ?? [])
+
+/** Dashboard strip (AFC-588): figures from list queries, no new backend. */
+async function countCampaigns(params: Record<string, string>): Promise<number> {
+  const res = await api.get<{ data: CampaignRow[] }>('/api/campaigns', {
+    query: params,
+  })
+  return res.data.length
+}
+
+const { data: stripCounts } = await useAsyncData('campaigns-strip', () =>
+  Promise.all([
+    countCampaigns({}),
+    countCampaigns({ status: 'active' }),
+    countCampaigns({ status: 'paused' }),
+    countCampaigns({ status: 'draft' }),
+  ]),
+)
+
+const stripItems = computed(() => [
+  {
+    label: 'Campaigns',
+    value: stripCounts.value?.[0] ?? null,
+    to: '/campaigns?status=all',
+    hint: 'Open filtered list',
+  },
+  {
+    label: 'Active',
+    value: stripCounts.value?.[1] ?? null,
+    to: '/campaigns?status=active',
+    hint: 'Open filtered list',
+  },
+  {
+    label: 'Paused',
+    value: stripCounts.value?.[2] ?? null,
+    to: '/campaigns?status=paused',
+    hint: 'Open filtered list',
+  },
+  {
+    label: 'Draft',
+    value: stripCounts.value?.[3] ?? null,
+    to: '/campaigns?status=draft',
+    hint: 'Open filtered list',
+  },
+])
 
 const canPauseAll = computed(() => permissions.can(COLLECTIONS.communications, 'create'))
 const pausing = ref(false)
@@ -166,6 +225,8 @@ async function pauseAll(): Promise<void> {
         <USelect v-model="statusFilter" :items="statusOptions" class="w-full" />
       </UFormField>
     </div>
+
+    <DashboardStrip :items="stripItems" />
 
     <div v-if="pending" class="mt-8 flex justify-center py-10">
       <UIcon name="i-lucide-loader-circle" class="size-6 animate-spin text-gray-400" />

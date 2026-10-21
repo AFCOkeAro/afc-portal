@@ -5,6 +5,7 @@ import {
   getPortalScope,
   listItems,
   requireCan,
+  throwStoreUnavailable,
   updateItem,
 } from '../../../utils/portal'
 
@@ -35,10 +36,18 @@ export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
   if (!id)
     throw createError({ statusCode: 400, statusMessage: 'An event id is required' })
-  await findScopedItem(event, scope, 'events', id, {
-    fields: ['id'],
-    scope: eventScopeFilter(scope),
-  })
+  // AFC-566: scope-gate + roster read below hit 0021 registers.
+  // Unreadable store → named error, never a bare 500; the deliberate
+  // check-in 400/404/409s below pass through untouched.
+  try {
+    await findScopedItem(event, scope, 'events', id, {
+      fields: ['id'],
+      scope: eventScopeFilter(scope),
+    })
+  } catch (error) {
+    if ((error as { statusCode?: number })?.statusCode) throw error
+    throwStoreUnavailable(error, 'event_store', '0021')
+  }
 
   const body = ((await readBody(event)) ?? {}) as Record<string, unknown>
   const hasTicket = String(body.ticket_code ?? '').trim() !== ''
@@ -51,16 +60,22 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const result = await listItems<Record<string, unknown>>(
-    event,
-    scope,
-    'event_registrations',
-    {
-      filter: { event: { _eq: id } },
-      fields: CHECKIN_FIELDS,
-      limit: -1,
-    },
-  )
+  let result: { data: Record<string, unknown>[] }
+  try {
+    result = await listItems<Record<string, unknown>>(
+      event,
+      scope,
+      'event_registrations',
+      {
+        filter: { event: { _eq: id } },
+        fields: CHECKIN_FIELDS,
+        limit: -1,
+      },
+    )
+  } catch (error) {
+    if ((error as { statusCode?: number })?.statusCode) throw error
+    throwStoreUnavailable(error, 'event_store', '0021')
+  }
   const resolution = resolveCheckIn(result.data, {
     ticket_code: body.ticket_code,
     name: body.name,
@@ -92,12 +107,17 @@ export default defineEventHandler(async (event) => {
       data: { code: 'checkin_cancelled' },
     })
   }
-  const updated = await updateItem<Record<string, unknown>>(
-    event,
-    scope,
-    'event_registrations',
-    String(row.id),
-    { registration_status: 'attended' },
-  )
-  return { data: { ...updated, id: String(updated.id) }, meta: { already: false } }
+  try {
+    const updated = await updateItem<Record<string, unknown>>(
+      event,
+      scope,
+      'event_registrations',
+      String(row.id),
+      { registration_status: 'attended' },
+    )
+    return { data: { ...updated, id: String(updated.id) }, meta: { already: false } }
+  } catch (error) {
+    if ((error as { statusCode?: number })?.statusCode) throw error
+    throwStoreUnavailable(error, 'event_store', '0021')
+  }
 })

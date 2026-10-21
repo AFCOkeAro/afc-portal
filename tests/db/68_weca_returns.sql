@@ -31,8 +31,9 @@
 -- promised ("must ALTER these tables to add the FK; it must not fork them").
 -- Orphan branch uuids no longer insert, so the fixture resolves the SEEDED
 -- Lagos North branches by code instead of minting random ids. Same code =
--- same branch across features. PRE-FORMULA reuses seeded ABULE-EGBA (its
--- December row is pre-formula by date, not by branch).
+-- same branch across features. PRE-FORMULA reuses seeded SANGO-OTA (its
+-- December row is pre-formula by date, not by branch; SANGO-OTA holds no
+-- finance row for 2026-07, keeping 68.7's free-key assertion intact).
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS fixture_weca_branches (
   label     text PRIMARY KEY,
@@ -49,7 +50,7 @@ BEGIN
          ('LEGUN', (SELECT id FROM branches WHERE code = 'LEGUN')),
          ('MATOGUN', (SELECT id FROM branches WHERE code = 'MATOGUN')),
          ('OLOMOWEWE', (SELECT id FROM branches WHERE code = 'OLOMOWEWE')),
-         ('PRE-FORMULA', (SELECT id FROM branches WHERE code = 'ABULE-EGBA'));
+         ('PRE-FORMULA', (SELECT id FROM branches WHERE code = 'SANGO-OTA'));
 
   -- OKE-ARO: E=1952150, Faith City 38000 (board row).
   SELECT branch_id INTO v_oke FROM fixture_weca_branches WHERE label = 'OKE-ARO';

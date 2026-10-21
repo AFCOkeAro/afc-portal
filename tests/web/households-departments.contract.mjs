@@ -264,3 +264,97 @@ describe('UI: two-way links behind capabilities, no role names', () => {
     assert.match(src, /map pin is deferred/)
   })
 })
+
+describe('household/department routes: unreadable store fails named, never bare 500 (AFC-566)', () => {
+  const householdList = codeOf('apps/web/server/api/households/index.get.ts')
+  const householdDetail = codeOf('apps/web/server/api/households/[id].get.ts')
+  const householdPost = codeOf('apps/web/server/api/households/index.post.ts')
+  const householdPatch = codeOf('apps/web/server/api/households/[id].patch.ts')
+  const householdLink = codeOf('apps/web/server/api/households/[id]/members.post.ts')
+  const householdUnlink = codeOf(
+    'apps/web/server/api/households/[id]/members.delete.ts',
+  )
+  const deptList = codeOf('apps/web/server/api/departments/index.get.ts')
+  const deptDetail = codeOf('apps/web/server/api/departments/[id].get.ts')
+  const deptLink = codeOf('apps/web/server/api/departments/[id]/members.post.ts')
+  const deptUnlink = codeOf('apps/web/server/api/departments/[id]/members.delete.ts')
+
+  it('household list/detail wrap the 0020 register in the named store error', () => {
+    assert.match(
+      householdList,
+      /throwStoreUnavailable\(error, 'household_store', '0020'\)/,
+    )
+    assert.match(
+      householdDetail,
+      /throwStoreUnavailable\(error, 'household_store', '0020'\)/,
+    )
+  })
+
+  it('household create/patch wrap the 0020 register in the named store error', () => {
+    assert.match(
+      householdPost,
+      /throwStoreUnavailable\(error, 'household_store', '0020'\)/,
+    )
+    assert.match(
+      householdPatch,
+      /throwStoreUnavailable\(error, 'household_store', '0020'\)/,
+    )
+  })
+
+  it('household link/unlink keep the 409/404 semantics under the named error', () => {
+    assert.match(
+      householdLink,
+      /throwStoreUnavailable\(error, 'household_store', '0020'\)/,
+    )
+    assert.match(householdLink, /household_conflict/)
+    assert.match(
+      householdUnlink,
+      /throwStoreUnavailable\(error, 'household_store', '0020'\)/,
+    )
+    assert.match(householdUnlink, /not a member of this household/)
+  })
+
+  it('department list/detail wrap the 0020 register in the named store error', () => {
+    assert.match(deptList, /throwStoreUnavailable\(error, 'department_store', '0020'\)/)
+    assert.match(
+      deptDetail,
+      /throwStoreUnavailable\(error, 'department_store', '0020'\)/,
+    )
+  })
+
+  it('department link/unlink wrap the junction in the named store error', () => {
+    assert.match(deptLink, /throwStoreUnavailable\(error, 'department_store', '0020'\)/)
+    assert.match(
+      deptUnlink,
+      /throwStoreUnavailable\(error, 'department_store', '0020'\)/,
+    )
+    assert.match(deptUnlink, /not an active member of this department/)
+  })
+
+  it('deliberate 4xx pass through instead of being renamed into the store', () => {
+    for (const src of [
+      householdList,
+      householdDetail,
+      householdPost,
+      householdPatch,
+      householdLink,
+      householdUnlink,
+      deptList,
+      deptDetail,
+      deptLink,
+      deptUnlink,
+    ]) {
+      assert.match(src, /statusCode\?\: number \}\)\?\.statusCode\) throw error/)
+    }
+  })
+
+  it('the 0020 migration owns exactly the tables these routes assume', () => {
+    const migration = read(
+      'services/directus/schema/migrations/20261020_0020_households_departments.sql',
+    )
+    assert.match(migration, /CREATE TABLE IF NOT EXISTS households/)
+    assert.match(migration, /CREATE TABLE IF NOT EXISTS departments/)
+    assert.match(migration, /CREATE TABLE IF NOT EXISTS people_departments/)
+    assert.match(migration, /ADD COLUMN IF NOT EXISTS household/)
+  })
+})

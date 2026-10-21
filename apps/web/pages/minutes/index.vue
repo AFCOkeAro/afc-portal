@@ -7,6 +7,11 @@ const { data, pending, error } = await useAsyncData('minutes-list', () =>
 )
 
 const rows = computed(() => data.value?.data ?? [])
+
+/** Dashboard strip (AFC-588): no server filters — display-only total, no new backend. */
+const stripItems = computed(() => [
+  { label: 'Minutes', value: rows.value.length, to: null, hint: 'Total in view' },
+])
 </script>
 
 <template>
@@ -15,6 +20,8 @@ const rows = computed(() => data.value?.data ?? [])
       title="Minutes"
       description="Minutes attach a file and attendees; writes are area-scoped per the matrix."
     />
+
+    <DashboardStrip :items="stripItems" />
 
     <UCard>
       <UAlert

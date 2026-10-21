@@ -1,28 +1,71 @@
 <script setup lang="ts">
 import type { CalendarItemType } from '@afc/shared'
+import {
+  isCalendarView,
+  isISODate,
+  rangeForView,
+  todayISO,
+} from '~/utils/calendar-ranges'
+import type { CalendarView, CalendarViewItem } from '~/utils/calendar-ranges'
 
 definePageMeta({ middleware: 'staff' })
 
 const api = useApi()
 const route = useRoute()
+const router = useRouter()
+
 function queryParam(name: string): string {
   const value = route.query[name]
   return typeof value === 'string' ? value : ''
 }
-const itemType = ref(queryParam('item_type') || 'all')
-const dateFrom = ref(queryParam('date_from'))
-const dateTo = ref(queryParam('date_to'))
 
+/** Month is the default view; view + focused date live in the query (deep-linkable). */
+const initialView = queryParam('view')
+const view = ref<CalendarView>(isCalendarView(initialView) ? initialView : 'month')
+const initialDate = queryParam('date')
+const focused = ref<string>(isISODate(initialDate) ? initialDate : todayISO())
+/** Staff = scoped feed; Public = the session-free published-public feed preview. */
+const scope = ref<'staff' | 'public'>(
+  queryParam('scope') === 'public' ? 'public' : 'staff',
+)
+const itemType = ref(queryParam('item_type') || 'all')
+
+/** The feed is paged per visible range (server cap of 200 unchanged). */
+const range = computed(() => rangeForView(view.value, focused.value))
+const endpoint = computed(() =>
+  scope.value === 'public' ? '/api/calendar/public' : '/api/calendar',
+)
 const query = computed(() => ({
+  date_from: range.value.from,
+  date_to: range.value.to,
   ...(itemType.value !== 'all' ? { item_type: itemType.value as CalendarItemType } : {}),
-  ...(dateFrom.value ? { date_from: dateFrom.value } : {}),
-  ...(dateTo.value ? { date_to: dateTo.value } : {}),
 }))
 const { data, pending } = await useAsyncData(
   'calendar-feed',
   () =>
-    api.get<{ data: Record<string, unknown>[] }>(`/api/calendar`, { query: query.value }),
-  { watch: [query] },
+    api.get<{ data: Record<string, unknown>[] }>(endpoint.value, { query: query.value }),
+  { watch: [query, endpoint] },
+)
+
+/** Keep the URL behind the state so every view is a shareable link. */
+watch([view, focused, scope, itemType], () => {
+  router.replace({
+    query: {
+      view: view.value,
+      date: focused.value,
+      ...(scope.value === 'public' ? { scope: 'public' } : {}),
+      ...(itemType.value !== 'all' ? { item_type: itemType.value } : {}),
+    },
+  })
+})
+
+/** Same-page strip navigation (AFC-588): query-only link, sync the filter. */
+watch(
+  () => route.query.item_type,
+  (next: unknown) => {
+    const value = typeof next === 'string' ? next : 'all'
+    if (value !== itemType.value) itemType.value = value
+  },
 )
 
 const typeOptions = [
@@ -33,7 +76,52 @@ const typeOptions = [
   { label: 'Celebrations', value: 'celebration' },
 ]
 
-const rows = computed(() => data.value?.data ?? [])
+/** Dashboard strip (AFC-588): client-side range totals, no new backend. */
+const rows = computed<CalendarViewItem[]>(() =>
+  (data.value?.data ?? []).map((row) => ({
+    id: String(row.id ?? ''),
+    item_type: String(row.item_type ?? ''),
+    title: String(row.title ?? 'Untitled'),
+    date: String(row.date ?? ''),
+    starts_at: typeof row.starts_at === 'string' ? row.starts_at : null,
+    branch: typeof row.branch === 'string' ? row.branch : null,
+    branch_name: typeof row.branch_name === 'string' ? row.branch_name : null,
+    href: typeof row.href === 'string' ? row.href : null,
+  })),
+)
+
+const stripItems = computed(() => {
+  const all = rows.value
+  const count = (type: string) =>
+    all.filter((row: CalendarViewItem) => row.item_type === type).length
+  const base = `?view=${view.value}&date=${focused.value}`
+  return [
+    {
+      label: 'Entries',
+      value: all.length,
+      to: `/calendar${base}`,
+      hint: 'Open filtered view',
+    },
+    {
+      label: 'Services',
+      value: count('service'),
+      to: `/calendar${base}&item_type=service`,
+      hint: 'Open filtered view',
+    },
+    {
+      label: 'Events',
+      value: count('event'),
+      to: `/calendar${base}&item_type=event`,
+      hint: 'Open filtered view',
+    },
+    {
+      label: 'Celebrations',
+      value: count('celebration'),
+      to: `/calendar${base}&item_type=celebration`,
+      hint: 'Open filtered view',
+    },
+  ]
+})
 </script>
 
 <template>
@@ -43,44 +131,65 @@ const rows = computed(() => data.value?.data ?? [])
       description="Services, events, programmes and celebrations in your scope. Select an entry for its detail."
     />
 
+    <DashboardStrip :items="stripItems" />
+
     <UCard>
-      <div class="grid gap-3 sm:grid-cols-3">
+      <div class="flex flex-wrap items-center gap-3">
         <USelect
           v-model="itemType"
           :items="typeOptions"
-          class="w-full"
+          class="w-full sm:w-48"
           aria-label="Filter by entry type"
         />
-        <UInput v-model="dateFrom" type="date" class="w-full" aria-label="From date" />
-        <UInput v-model="dateTo" type="date" class="w-full" aria-label="To date" />
+        <div class="flex items-center gap-1" role="group" aria-label="Calendar scope">
+          <UButton
+            label="Staff"
+            size="sm"
+            :color="scope === 'staff' ? 'primary' : 'neutral'"
+            :variant="scope === 'staff' ? 'solid' : 'ghost'"
+            @click="scope = 'staff'"
+          />
+          <UButton
+            label="Public"
+            size="sm"
+            :color="scope === 'public' ? 'primary' : 'neutral'"
+            :variant="scope === 'public' ? 'solid' : 'ghost'"
+            @click="scope = 'public'"
+          />
+        </div>
       </div>
 
-      <div v-if="pending" class="mt-8 flex justify-center py-10">
-        <UIcon name="i-lucide-loader-circle" class="size-6 animate-spin text-gray-400" />
-      </div>
-
-      <EmptyState
-        v-else-if="rows.length === 0"
-        title="No calendar entries in this window"
-        description="Widen the dates or pick another entry type."
-      />
-
-      <ul v-else class="mt-4 divide-y divide-gray-100 dark:divide-gray-800">
-        <li
-          v-for="row in rows"
-          :key="`${row.item_type}-${String(row.id)}`"
-          class="flex flex-wrap items-center gap-x-3 gap-y-1 py-2.5 text-sm"
+      <p v-if="scope === 'public'" class="mt-3 text-sm text-gray-500 dark:text-gray-400">
+        Preview of the public feed: published public items only, as a visitor without
+        login sees them.
+        <NuxtLink
+          to="/calendar/public"
+          class="text-primary-600 hover:underline dark:text-primary-400"
         >
-          <UBadge color="neutral" variant="subtle">{{ row.item_type }}</UBadge>
+          Open the public calendar
+        </NuxtLink>
+      </p>
+
+      <CalendarViews
+        v-model:view="view"
+        v-model:focused="focused"
+        :items="rows"
+        :pending="pending"
+        class="mt-4"
+      >
+        <template #row="{ item }">
           <NuxtLink
-            :to="String(row.href ?? '#')"
+            v-if="item.href"
+            :to="String(item.href)"
             class="font-medium text-gray-900 hover:text-primary-600 dark:text-white"
           >
-            {{ row.title }}
+            {{ item.title }}
           </NuxtLink>
-          <span class="text-gray-500 dark:text-gray-400">{{ row.date }}</span>
-        </li>
-      </ul>
+          <span v-else class="font-medium text-gray-900 dark:text-white">
+            {{ item.title }}
+          </span>
+        </template>
+      </CalendarViews>
     </UCard>
   </div>
 </template>

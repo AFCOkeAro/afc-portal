@@ -167,8 +167,18 @@ export interface Department {
     | 'media'
     | 'ushering'
     | 'admin'
+    | 'group'
+    | 'music'
+    | 'security'
+    | 'kitchen'
+    | 'sanitation'
+    | 'elementary'
   /** Null means an area-wide department (data-model §2.2). */
   branch: string | null
+  /** Zone scope (AFC-593, migration 0027). Null unless zone-level. */
+  zone: string | null
+  /** Area scope (AFC-593, migration 0027). Set for area-level rows incl. Groups 1-4. */
+  area: string | null
   leader_person: string | null
   description: string | null
   status: 'active' | 'inactive'
@@ -192,6 +202,9 @@ export interface Person {
   email: string | null
   address: string | null
   household: string | null
+  /** Member's place in the family (AFC-590, migration 0026). Null for rows
+   *  written before the wizard. */
+  household_role: 'head_of_household' | 'spouse' | 'child' | 'relative' | null
   branch: string | null
   membership_status: MembershipStatus
   member_since: string | null

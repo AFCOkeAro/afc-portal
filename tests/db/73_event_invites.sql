@@ -86,9 +86,24 @@ BEGIN
   PERFORM test_support.assert_true(
     to_regclass('public.directus_users') IS NULL, 'invites',
     'scratch has no directus_users: member/limit columns skipped, not forked');
+  -- AFC-566: events is no longer absent -- 20261020_0021 created the
+  -- register WITH the invite deltas, so the no-fork invariant is now pinned
+  -- positively: the table present carries the owning migration's full shape
+  -- (route columns 0005 would never create, e.g. title/status, plus the
+  -- invite_eligible flag set), proving 0005's conditional ALTERs met a real
+  -- register, never a fork of their own making.
   PERFORM test_support.assert_true(
-    to_regclass('public.events') IS NULL, 'invites',
-    'scratch has no events: invite-eligibility columns skipped, not forked');
+    to_regclass('public.events') IS NOT NULL
+    AND EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_schema = 'public' AND table_name = 'events'
+                   AND column_name = 'title')
+    AND EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_schema = 'public' AND table_name = 'events'
+                   AND column_name = 'status')
+    AND EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_schema = 'public' AND table_name = 'events'
+                   AND column_name = 'invite_eligible'), 'invites',
+    'events is 0021-owned with the full register shape incl. invite deltas (0005 met it, never forked it)');
 END $$;
 
 -- Every §3.1 status inserts; anything outside the enum does not.

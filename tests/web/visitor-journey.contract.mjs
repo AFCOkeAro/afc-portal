@@ -347,3 +347,67 @@ describe('officer assignment is restricted and fail-closed', () => {
     )
   })
 })
+
+/* ---- 6. Unreadable store fails named, never bare 500 (AFC-583) ---- */
+
+describe('visitors routes: unreadable store fails named, never bare 500 (AFC-583)', () => {
+  const list = read('apps/web/server/api/visitors/index.get.ts')
+  const post = read('apps/web/server/api/visitors/index.post.ts')
+  const detail = read('apps/web/server/api/visitors/[id].get.ts')
+  const patch = read('apps/web/server/api/visitors/[id].patch.ts')
+  const assign = read('apps/web/server/api/visitors/assign.post.ts')
+  const convert = read('apps/web/server/api/visitors/convert.post.ts')
+  const followGet = read('apps/web/server/api/visitors/follow-ups.get.ts')
+  const followPost = read('apps/web/server/api/visitors/follow-ups.post.ts')
+  const funnel = read('apps/web/server/api/visitors/funnel.get.ts')
+  const funnelCsv = read('apps/web/server/api/visitors/funnel.csv.get.ts')
+  const journey = read('apps/web/server/api/visitors/journey.post.ts')
+
+  it('list/create/detail wrap the 0025 register in the named store error', () => {
+    assert.match(list, /throwStoreUnavailable\(error, 'visitor_store', '0025'\)/)
+    assert.match(post, /throwStoreUnavailable\(error, 'visitor_store', '0025'\)/)
+    assert.match(detail, /throwStoreUnavailable\(error, 'visitor_store', '0025'\)/)
+  })
+
+  it('patch/assign/convert wrap the 0025 register in the named store error', () => {
+    assert.match(patch, /throwStoreUnavailable\(error, 'visitor_store', '0025'\)/)
+    assert.match(assign, /throwStoreUnavailable\(error, 'visitor_store', '0025'\)/)
+    assert.match(convert, /throwStoreUnavailable\(error, 'visitor_store', '0025'\)/)
+  })
+
+  it('follow-ups/funnel/journey wrap the 0025 register in the named store error', () => {
+    assert.match(followGet, /throwStoreUnavailable\(error, 'visitor_store', '0025'\)/)
+    assert.match(followPost, /throwStoreUnavailable\(error, 'visitor_store', '0025'\)/)
+    assert.match(funnel, /throwStoreUnavailable\(error, 'visitor_store', '0025'\)/)
+    assert.match(funnelCsv, /throwStoreUnavailable\(error, 'visitor_store', '0025'\)/)
+    assert.match(journey, /throwStoreUnavailable\(error, 'visitor_store', '0025'\)/)
+  })
+
+  it('deliberate 4xx pass through instead of being renamed into the store', () => {
+    for (const src of [
+      list,
+      post,
+      detail,
+      patch,
+      assign,
+      convert,
+      followGet,
+      followPost,
+      funnel,
+      funnelCsv,
+      journey,
+    ]) {
+      assert.match(src, /statusCode\?\: number \}\)\?\.statusCode\) throw error/)
+    }
+  })
+
+  it('the 0025 migration owns exactly the tables these routes assume', () => {
+    const migration = read(
+      'services/directus/schema/migrations/20261020_0025_visitors_register.sql',
+    )
+    assert.match(migration, /CREATE TABLE IF NOT EXISTS visitors/)
+    assert.match(migration, /visitor_follow_ups_visitor_fkey/)
+    assert.match(migration, /visitor_journey_transitions_visitor_fkey/)
+    assert.match(migration, /visitors_journey_stage_fkey/)
+  })
+})

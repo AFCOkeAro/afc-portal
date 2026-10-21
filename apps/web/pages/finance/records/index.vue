@@ -24,6 +24,15 @@ watch([status, branch, month], () => {
   page.value = 1
 })
 
+/** Same-page strip navigation (AFC-588): query-only link, sync the filters. */
+watch(
+  () => route.query,
+  (next: typeof route.query) => {
+    const statusNext = typeof next.status === 'string' ? next.status : null
+    status.value = statusNext ?? 'all'
+  },
+)
+
 const query = computed(() => ({
   page: page.value,
   limit,
@@ -48,6 +57,50 @@ const branches = await useAsyncData('finance-records-branches', () =>
 const rows = computed(() => data.value?.data ?? [])
 const total = computed(() => data.value?.meta.total ?? 0)
 const pageCount = computed(() => Math.max(1, Math.ceil(total.value / limit)))
+
+/** Dashboard strip (AFC-588): figures from list-meta counts, no new backend. */
+async function countRecords(params: Record<string, string>): Promise<number> {
+  const res = await api.get<Paginated<FinancialRecordRow>>('/api/finance/records', {
+    query: { page: 1, limit: 1, ...params },
+  })
+  return res.meta.total
+}
+
+const { data: stripCounts } = await useAsyncData('finance-records-strip', () =>
+  Promise.all([
+    countRecords({}),
+    countRecords({ status: 'draft' }),
+    countRecords({ status: 'submitted' }),
+    countRecords({ status: 'confirmed' }),
+  ]),
+)
+
+const stripItems = computed(() => [
+  {
+    label: 'Records',
+    value: stripCounts.value?.[0] ?? null,
+    to: '/finance/records?status=all',
+    hint: 'Open filtered list',
+  },
+  {
+    label: 'Draft',
+    value: stripCounts.value?.[1] ?? null,
+    to: '/finance/records?status=draft',
+    hint: 'Open filtered list',
+  },
+  {
+    label: 'Submitted',
+    value: stripCounts.value?.[2] ?? null,
+    to: '/finance/records?status=submitted',
+    hint: 'Open filtered list',
+  },
+  {
+    label: 'Confirmed',
+    value: stripCounts.value?.[3] ?? null,
+    to: '/finance/records?status=confirmed',
+    hint: 'Open filtered list',
+  },
+])
 
 const statusOptions = [
   { label: 'All statuses', value: 'all' },
@@ -124,6 +177,8 @@ const statusColor: Record<string, 'success' | 'warning' | 'neutral' | 'info'> = 
       title="Amounts hidden on this account"
       description="Capture amounts are limited to branch, area and super administrators (data-model §11.1). This account sees statuses and its own rows."
     />
+
+    <DashboardStrip :items="stripItems" />
 
     <UCard>
       <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">

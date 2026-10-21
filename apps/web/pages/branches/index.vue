@@ -21,6 +21,22 @@ const rows = computed(() => {
   )
 })
 
+/** Dashboard strip (AFC-588): no server filters — display-only totals, no new backend. */
+const stripItems = computed(() => {
+  const all = data.value ?? []
+  const active = all.filter((branch) => branch.status === 'active').length
+  return [
+    { label: 'Branches', value: all.length, to: null, hint: 'Total in view' },
+    { label: 'Active', value: active, to: null, hint: 'Client-side count' },
+    {
+      label: 'Shown',
+      value: rows.value.length,
+      to: null,
+      hint: 'Matches current search',
+    },
+  ]
+})
+
 function typeLabel(value: string): string {
   return value.replace(/_/g, ' ')
 }
@@ -32,6 +48,8 @@ function typeLabel(value: string): string {
       title="Branches"
       description="Every branch this account can see, with its people, attendance and care at a glance."
     />
+
+    <DashboardStrip :items="stripItems" />
 
     <UCard>
       <UInput

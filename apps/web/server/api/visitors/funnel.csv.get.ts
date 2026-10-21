@@ -1,4 +1,9 @@
-import { getPortalScope, csvResponse, requireCan } from '../../utils/portal'
+import {
+  csvResponse,
+  getPortalScope,
+  requireCan,
+  throwStoreUnavailable,
+} from '../../utils/portal'
 import { buildFunnelForScope } from '../../utils/visitor-journey'
 
 export default defineEventHandler(async (event) => {
@@ -7,7 +12,15 @@ export default defineEventHandler(async (event) => {
   // branch scope folded into the rows. Hidden fields never reach a CSV --
   // the funnel carries no contact detail by construction.
   requireCan(scope, 'visitors', 'read')
-  const funnel = await buildFunnelForScope(event, scope)
+  // AFC-583: the funnel folds 0025 register rows — map an unreadable store
+  // to the named error, never a bare 500. Deliberate 4xx pass through untouched.
+  let funnel: Awaited<ReturnType<typeof buildFunnelForScope>>
+  try {
+    funnel = await buildFunnelForScope(event, scope)
+  } catch (error) {
+    if ((error as { statusCode?: number })?.statusCode) throw error
+    throwStoreUnavailable(error, 'visitor_store', '0025')
+  }
 
   const stageRows: string[][] = [
     ['stage', 'sequence', 'visitors', 'new_this_week', 'avg_days_in_stage', 'overdue'],

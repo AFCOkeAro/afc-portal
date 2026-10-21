@@ -25,6 +25,15 @@ watch([period, computationStatus, branch], () => {
   page.value = 1
 })
 
+/** Same-page strip navigation (AFC-588): query-only link, sync the filters. */
+watch(
+  () => route.query,
+  (next: typeof route.query) => {
+    const statusNext = typeof next.status === 'string' ? next.status : null
+    computationStatus.value = statusNext ?? 'all'
+  },
+)
+
 const query = computed(() => ({
   page: page.value,
   limit,
@@ -42,6 +51,50 @@ const { data, pending, error, refresh } = await useAsyncData(
 const rows = computed(() => data.value?.data ?? [])
 const total = computed(() => data.value?.meta.total ?? 0)
 const pageCount = computed(() => Math.max(1, Math.ceil(total.value / limit)))
+
+/** Dashboard strip (AFC-588): figures from list-meta counts, no new backend. */
+async function countReturns(params: Record<string, string>): Promise<number> {
+  const res = await api.get<Paginated<WecaReturnRow>>('/api/finance/returns', {
+    query: { page: 1, limit: 1, ...params },
+  })
+  return res.meta.total
+}
+
+const { data: stripCounts } = await useAsyncData('weca-returns-strip', () =>
+  Promise.all([
+    countReturns({}),
+    countReturns({ status: 'calculated' }),
+    countReturns({ status: 'submitted' }),
+    countReturns({ status: 'confirmed' }),
+  ]),
+)
+
+const stripItems = computed(() => [
+  {
+    label: 'Returns',
+    value: stripCounts.value?.[0] ?? null,
+    to: '/finance/returns?status=all',
+    hint: 'Open filtered list',
+  },
+  {
+    label: 'Calculated',
+    value: stripCounts.value?.[1] ?? null,
+    to: '/finance/returns?status=calculated',
+    hint: 'Open filtered list',
+  },
+  {
+    label: 'Submitted',
+    value: stripCounts.value?.[2] ?? null,
+    to: '/finance/returns?status=submitted',
+    hint: 'Open filtered list',
+  },
+  {
+    label: 'Confirmed',
+    value: stripCounts.value?.[3] ?? null,
+    to: '/finance/returns?status=confirmed',
+    hint: 'Open filtered list',
+  },
+])
 
 const statusOptions = [
   { label: 'All states', value: 'all' },
@@ -145,6 +198,8 @@ const statusColor: Record<string, 'success' | 'warning' | 'neutral' | 'info'> = 
         </div>
       </template>
     </PageHeader>
+
+    <DashboardStrip :items="stripItems" />
 
     <PermissionGate :collection="COLLECTIONS.wecaReturns" action="create">
       <UCard class="mb-4">

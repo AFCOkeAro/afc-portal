@@ -31,6 +31,15 @@ watch([type, branch, search], () => {
   page.value = 1
 })
 
+/** Same-page strip navigation (AFC-588): query-only link, sync the filter. */
+watch(
+  () => route.query,
+  (next: typeof route.query) => {
+    const typeNext = typeof next.session_type === 'string' ? next.session_type : null
+    type.value = typeNext ?? 'all'
+  },
+)
+
 const query = computed(() => ({
   page: page.value,
   limit,
@@ -49,6 +58,50 @@ const { data, pending, error, refresh } = await useAsyncData(
 const branches = await useAsyncData('attendance-branches', () =>
   api.get<BranchSummary[]>('/api/branches'),
 )
+
+/** Dashboard strip (AFC-588): figures from list-meta counts, no new backend. */
+async function countSessions(params: Record<string, string>): Promise<number> {
+  const res = await api.get<Paginated<AttendanceSessionRow>>('/api/attendance', {
+    query: { page: 1, limit: 1, ...params },
+  })
+  return res.meta.total
+}
+
+const { data: stripCounts } = await useAsyncData('attendance-strip', () =>
+  Promise.all([
+    countSessions({}),
+    countSessions({ session_type: 'sunday_service' }),
+    countSessions({ session_type: 'midweek' }),
+    countSessions({ session_type: 'event' }),
+  ]),
+)
+
+const stripItems = computed(() => [
+  {
+    label: 'Sessions',
+    value: stripCounts.value?.[0] ?? null,
+    to: '/attendance?session_type=all',
+    hint: 'Open filtered list',
+  },
+  {
+    label: 'Sunday service',
+    value: stripCounts.value?.[1] ?? null,
+    to: '/attendance?session_type=sunday_service',
+    hint: 'Open filtered list',
+  },
+  {
+    label: 'Midweek',
+    value: stripCounts.value?.[2] ?? null,
+    to: '/attendance?session_type=midweek',
+    hint: 'Open filtered list',
+  },
+  {
+    label: 'Event sessions',
+    value: stripCounts.value?.[3] ?? null,
+    to: '/attendance?session_type=event',
+    hint: 'Open filtered list',
+  },
+])
 
 const rows = computed(() => data.value?.data ?? [])
 const total = computed(() => data.value?.meta.total ?? 0)
@@ -101,6 +154,8 @@ function typeLabel(value: string): string {
         </PermissionGate>
       </template>
     </PageHeader>
+
+    <DashboardStrip :items="stripItems" />
 
     <UCard>
       <div class="grid gap-3 sm:grid-cols-3">

@@ -111,6 +111,16 @@ VALUES
     '51111111-1111-4111-8111-111111111111', 'created', 'Draft created')
 ON CONFLICT (id) DO NOTHING;
 
+-- AFC-566: 0021 created the events register, so the 0013 merge FK
+-- (event_referrals_event_fkey, added by this suite's own 0013 re-apply
+-- below) is now enforced. The referral fixture therefore names a REAL
+-- event row, seeded here -- the merge contract working, not a fork.
+INSERT INTO events (id, title, start_at, end_at)
+VALUES
+  ('00000000-0000-4000-8000-0000000000e1',
+    'Office Fixture Event', TIMESTAMPTZ '2026-10-05 09:00:00+00', TIMESTAMPTZ '2026-10-05 12:00:00+00')
+ON CONFLICT (id) DO NOTHING;
+
 INSERT INTO event_referrals (id, event, invitee_name, status)
 VALUES
   ('61111111-1111-4111-8111-111111111111',

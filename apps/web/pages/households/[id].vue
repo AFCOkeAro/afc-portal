@@ -221,6 +221,7 @@ const sections = computed(() => [
                   {{ member.display_name }}
                 </NuxtLink>
                 <p class="text-xs text-gray-500 dark:text-gray-400">
+                  {{ member.household_role?.replace(/_/g, ' ') || 'member' }} ·
                   {{ member.membership_status.replace(/_/g, ' ') }}
                   <span v-if="member.is_head"> · household head</span>
                   <span v-if="member.is_minor"> · minor</span>

@@ -61,6 +61,28 @@ const actionDone = ref('')
 
 const rows = computed(() => invites.value?.data ?? [])
 
+/** Dashboard strip (AFC-588): member scope has no server filters — client-side totals, no new backend. */
+const stripItems = computed(() => {
+  const all = rows.value
+  const actionable = all.filter((row: MemberInvite) =>
+    ['pending_approval', 'queued', 'blocked_rate_limit'].includes(row.status ?? ''),
+  ).length
+  return [
+    {
+      label: 'My invitations',
+      value: all.length,
+      to: null,
+      hint: 'Total in view',
+    },
+    {
+      label: 'Actionable',
+      value: actionable,
+      to: null,
+      hint: 'Awaiting approval or queued',
+    },
+  ]
+})
+
 const sections = [
   { id: 'invitations', label: 'My invitations' },
   { id: 'consent', label: 'My consent' },
@@ -120,6 +142,8 @@ async function withdraw(id: string): Promise<void> {
         />
       </template>
     </PageHeader>
+
+    <DashboardStrip :items="stripItems" />
 
     <SectionNav :sections="sections" />
 

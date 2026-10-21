@@ -10,10 +10,10 @@
 --   76.1  schema         -- the three tables with every §2 field that this
 --                         slice owns and the §6 indexes; the five seeded
 --                         stages with sequences 1-5; the four pure gates;
---                         the guard trigger; scratch has no visitors table so
---                         the journey columns + views were skipped loudly and
---                         the Directus collection spec stays the authority
---                         (0002 §10 pattern, same as suite 73.1).
+--                         the guard trigger; the visitors register is
+--                         0025-owned WITH the journey deltas (the absent-pin
+--                         retired in AFC-583 -- 0002 §10 pattern met a real
+--                         register, same as suite 73.1).
 --   76.2  order guard    -- the trigger: initial capture must land on
 --                         sequence 1; then exactly one step forward; skips,
 --                         repeats and backward moves raise check_violation;
@@ -52,7 +52,8 @@
 --     (HTTP layer, covered by the web contract test -- a SQL suite
 --     asserting HTTP status codes would be testing the wrong layer), and
 --     the funnel numbers themselves (the route folds loaded rows; the
---     views need the visitors table, absent here).
+--     views land on the 0008 re-apply now that 0025 owns the host table,
+--     pinned by suite 90.4).
 
 -- ---------------------------------------------------------------------------
 -- 76.1  SCHEMA. The tables, the seed, the gates, the guard.
@@ -108,25 +109,54 @@ BEGIN
     EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'journey_transition_guard_trg'), 'journey',
     'the sequence-guard trigger is installed on the transitions table');
 
-  -- Scratch DB has no visitors table: the journey columns + views were
-  -- skipped loudly and the Directus collection spec stays the authority.
+  -- AFC-583: visitors is no longer absent -- 20261020_0025 created the
+  -- register WITH the 0008 journey deltas. The no-fork invariant is now
+  -- pinned positively: the table present carries the owning migration's
+  -- full shape (route columns 0008 would never create, e.g.
+  -- visitor_first_name/status/visit_date, alongside the delta columns),
+  -- so 0008's conditional ALTERs met a real register, never a fork of
+  -- their own making.
   PERFORM test_support.assert_true(
-    to_regclass('public.visitors') IS NULL, 'journey',
-    'scratch has no visitors: journey columns + funnel views skipped, not forked');
+    to_regclass('public.visitors') IS NOT NULL
+    AND EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_schema = 'public' AND table_name = 'visitors'
+                   AND column_name = 'visitor_first_name')
+    AND EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_schema = 'public' AND table_name = 'visitors'
+                   AND column_name = 'status')
+    AND EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_schema = 'public' AND table_name = 'visitors'
+                   AND column_name = 'pack_checklist')
+    AND EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_schema = 'public' AND table_name = 'visitors'
+                   AND column_name = 'dropoff_outcome'),
+    'journey', 'visitors is 0025-owned with base + journey-delta shape (0008 met it, never forked it)');
+  PERFORM test_support.assert_true(
+    (SELECT count(*) FROM pg_constraint
+      WHERE conname = 'visitors_journey_stage_fkey') = 1,
+    'journey', 'visitors.journey_stage FK exists exactly once under the fixed name (0008 conditional met the 0025 register)');
 END $$;
 
 -- Every §2.7 outcome inserts; anything outside the enum does not.
 DO $$
 DECLARE
   o text;
+  v_anchor uuid;
 BEGIN
+  -- AFC-583: the 0025 register is real, so the 0008 §2 merge FK holds --
+  -- outcome rows need a real visitor (the AFC-566/79-fixture posture: a
+  -- no-PII anchor row, cleaned below).
+  INSERT INTO visitors (visitor_first_name, visitor_last_name, visit_date)
+    VALUES ('Journey', 'Anchor-One', DATE '2026-10-05')
+  RETURNING id INTO v_anchor;
+
   FOREACH o IN ARRAY ARRAY['reached', 'no_answer', 'requested_visit',
       'needs_support', 'declined', 'moved', 'wrong_number', 'integrated']
   LOOP
     INSERT INTO visitor_follow_ups
       (visitor, contact_channel, outcome, logged_by)
     VALUES
-      (gen_random_uuid(), 'visit', o, gen_random_uuid());
+      (v_anchor, 'visit', o, gen_random_uuid());
   END LOOP;
 
   PERFORM test_support.assert_true(
@@ -134,16 +164,17 @@ BEGIN
     'all eight §2.7 outcomes insert');
 
   PERFORM test_support.assert_raises(NULL,
-    $q$INSERT INTO visitor_follow_ups (visitor, contact_channel, outcome) VALUES (gen_random_uuid(), 'visit', 'teleported')$q$,
+    'INSERT INTO visitor_follow_ups (visitor, contact_channel, outcome) VALUES (''' || v_anchor::text || ''', ''visit'', ''teleported'')',
     '23514', 'journey', 'an outcome outside the §2.7 enum is rejected');
   PERFORM test_support.assert_raises(NULL,
-    $q$INSERT INTO visitor_follow_ups (visitor, contact_channel, outcome) VALUES (gen_random_uuid(), 'pigeon', 'reached')$q$,
+    'INSERT INTO visitor_follow_ups (visitor, contact_channel, outcome) VALUES (''' || v_anchor::text || ''', ''pigeon'', ''reached'')',
     '23514', 'journey', 'a channel outside the §2.7 enum is rejected');
   PERFORM test_support.assert_raises(NULL,
-    $q$INSERT INTO visitor_follow_ups (visitor, contact_channel, outcome, notes) VALUES (gen_random_uuid(), 'visit', 'reached', '   ')$q$,
+    'INSERT INTO visitor_follow_ups (visitor, contact_channel, outcome, notes) VALUES (''' || v_anchor::text || ''', ''visit'', ''reached'', ''   '')',
     '23514', 'journey', 'blank follow-up notes are rejected (NULL or real text, never whitespace)');
 
   DELETE FROM visitor_follow_ups;
+  DELETE FROM visitors WHERE id = v_anchor;
 END $$;
 
 -- ---------------------------------------------------------------------------
@@ -152,8 +183,12 @@ END $$;
 DO $$
 DECLARE
   v_identify uuid; v_welcome uuid; v_pack uuid; v_dropoff uuid; v_follow uuid;
-  v_visitor uuid := gen_random_uuid();
+  v_visitor uuid;
 BEGIN
+  -- AFC-583: anchor newcomer (0025 register real; the §3 merge FK holds).
+  INSERT INTO visitors (visitor_first_name, visitor_last_name, visit_date)
+    VALUES ('Journey', 'Anchor-Two', DATE '2026-10-05')
+  RETURNING id INTO v_visitor;
   SELECT id INTO v_identify FROM visitor_journey_stages WHERE key = 'identify' AND branch IS NULL;
   SELECT id INTO v_welcome FROM visitor_journey_stages WHERE key = 'welcome' AND branch IS NULL;
   SELECT id INTO v_pack FROM visitor_journey_stages WHERE key = 'pack' AND branch IS NULL;
@@ -167,7 +202,7 @@ BEGIN
     'initial capture onto identify (sequence 1) is accepted');
 
   PERFORM test_support.assert_raises(NULL,
-    'INSERT INTO visitor_journey_transitions (visitor, from_stage, to_stage) VALUES (''' || gen_random_uuid() || ''', NULL, ''' || v_welcome || ''')',
+    'INSERT INTO visitor_journey_transitions (visitor, from_stage, to_stage) VALUES (''' || v_visitor || ''', NULL, ''' || v_welcome || ''')',
     '23514', 'journey', 'initial capture onto welcome (sequence 2) is rejected -- no skipping the start');
 
   -- One step forward is accepted; skips, repeats and backward moves are not.
@@ -192,6 +227,7 @@ BEGIN
     '23514', 'journey', 'a move onto a stage that does not exist is rejected');
 
   DELETE FROM visitor_journey_transitions WHERE visitor = v_visitor;
+  DELETE FROM visitors WHERE id = v_visitor;
 END $$;
 
 -- ---------------------------------------------------------------------------
@@ -263,10 +299,22 @@ END $$;
 DO $$
 DECLARE
   v_ids uuid[];
-  v_visitor uuid := gen_random_uuid();
+  v_visitor uuid;
   v_rows integer;
   v_stamped integer;
 BEGIN
+  -- AFC-583: anchor newcomer (0025 register real; the §3 merge FK holds).
+  -- Pre-seeded with a complete pack checklist and a recorded drop-off
+  -- outcome: now that the register exists, the guard enforces the
+  -- pack/drop-off gates on the walk (0008 design -- the gates were
+  -- skipped, not absent, while there was no row to read). The walk below
+  -- pins ordering/audit; the gates themselves are pinned in 76.2/76.3.
+  INSERT INTO visitors (visitor_first_name, visitor_last_name, visit_date,
+      pack_checklist, dropoff_outcome)
+    VALUES ('Journey', 'Anchor-Three', DATE '2026-10-05',
+      '["literature","sermon_notes","gift_bag","malt","biscuits","contact_card"]'::jsonb,
+      'address_confirmed')
+  RETURNING id INTO v_visitor;
   SELECT array_agg(id ORDER BY sequence) INTO v_ids
     FROM visitor_journey_stages WHERE branch IS NULL;
 
@@ -304,6 +352,7 @@ BEGIN
 
   DELETE FROM visitor_follow_ups WHERE visitor = v_visitor;
   DELETE FROM visitor_journey_transitions WHERE visitor = v_visitor;
+  DELETE FROM visitors WHERE id = v_visitor;
 END $$;
 
 -- ---------------------------------------------------------------------------
@@ -311,19 +360,27 @@ END $$;
 -- and nothing else.
 -- ---------------------------------------------------------------------------
 DO $$
+DECLARE
+  v_anchor uuid;
 BEGIN
+  -- AFC-583: anchor newcomer for the app-identity inserts below (0025
+  -- register real; the §§2-3 merge FKs hold for directus_app too).
+  INSERT INTO visitors (visitor_first_name, visitor_last_name, visit_date)
+    VALUES ('Journey', 'Anchor-Four', DATE '2026-10-05')
+  RETURNING id INTO v_anchor;
+
   PERFORM test_support.assert_not_raises('directus_app',
     $q$SELECT count(*) FROM visitor_journey_stages$q$,
     'journey', 'directus_app reads the stage reference');
 
   PERFORM test_support.assert_not_raises('directus_app',
-    $q$INSERT INTO visitor_follow_ups (visitor, contact_channel, outcome, next_step) VALUES (gen_random_uuid(), 'sms', 'no_answer', 'Call again')$q$,
+    'INSERT INTO visitor_follow_ups (visitor, contact_channel, outcome, next_step) VALUES (''' || v_anchor::text || ''', ''sms'', ''no_answer'', ''Call again'')',
     'journey', 'directus_app inserts a follow-up row');
   PERFORM test_support.assert_not_raises('directus_app',
     $q$UPDATE visitor_follow_ups SET next_step = 'Call Sunday' WHERE next_step = 'Call again'$q$,
     'journey', 'directus_app advances next_step on a follow-up');
   PERFORM test_support.assert_not_raises('directus_app',
-    $q$INSERT INTO visitor_journey_transitions (visitor, from_stage, to_stage) SELECT gen_random_uuid(), NULL, id FROM visitor_journey_stages WHERE key = 'identify' AND branch IS NULL LIMIT 1$q$,
+    'INSERT INTO visitor_journey_transitions (visitor, from_stage, to_stage) VALUES (''' || v_anchor::text || ''', NULL, (SELECT id FROM visitor_journey_stages WHERE key = ''identify'' AND branch IS NULL LIMIT 1))',
     'journey', 'directus_app inserts the initial-capture audit row');
 
   -- Frozen columns: a correction is a new row, not an edit.
@@ -353,6 +410,7 @@ BEGIN
 
   DELETE FROM visitor_follow_ups WHERE next_step = 'Call Sunday';
   DELETE FROM visitor_journey_transitions;
+  DELETE FROM visitors WHERE id = v_anchor;
 END $$;
 
 -- ---------------------------------------------------------------------------
@@ -375,4 +433,11 @@ BEGIN
     (SELECT count(*) FROM visitor_follow_ups) = 0
     AND (SELECT count(*) FROM visitor_journey_transitions) = 0, 'journey',
     'rerun: reseeding inserts nothing -- the suite cleaned its rows and the migration seeds no log rows');
+  -- AFC-583: with 0025 owning the host table, this re-apply lands the
+  -- §2.8 read model for the first time (the documented scratch skip,
+  -- closed -- suite 90.4 pins the same landing from the register side).
+  PERFORM test_support.assert_true(
+    to_regclass('public.visitor_funnel') IS NOT NULL
+    AND to_regclass('public.visitor_follow_up_status') IS NOT NULL, 'journey',
+    'rerun: the funnel views land on re-apply now visitors exists');
 END $$;

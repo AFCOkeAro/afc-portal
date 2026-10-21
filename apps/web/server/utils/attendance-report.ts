@@ -10,6 +10,7 @@ import {
   requireZoneInScope,
   scopeFilter,
   scopeZoneIds,
+  throwStoreUnavailable,
   throwValidation,
   zoneScopeFilter,
   type PortalScope,
@@ -168,31 +169,49 @@ export async function collectSplitAggregate(
   let page = 1
 
   for (;;) {
-    const sessions = await listItems<SessionRow>(event, scope, 'attendance_sessions', {
-      filter: mergeFilters(
-        { session_date: { _gte: options.from, _lte: options.to } },
-        options.sessionType ? { session_type: { _eq: options.sessionType } } : undefined,
-        options.branch ? { branch: { _eq: options.branch } } : undefined,
-        options.zone ? { zone: { _eq: options.zone } } : undefined,
-        scopeFilter(scope),
-        zoneScopeFilter(scope),
-      ),
-      fields: ['id', 'branch', 'zone', 'session_date', 'session_type'],
-      sort: 'session_date,id',
-      page,
-      limit: SESSION_CHUNK,
-    })
+    // AFC-566: the chunked reads below hit the 0023 sessions register
+    // (counts ride the 0003 table). A missing/unreadable store maps to
+    // the named error, never a bare 500 -- this hardens report.get,
+    // report.csv.get and every future caller of the shared collector.
+    let sessions: { data: SessionRow[] }
+    let counts: { data: CountRow[] }
+    try {
+      sessions = await listItems<SessionRow>(event, scope, 'attendance_sessions', {
+        filter: mergeFilters(
+          { session_date: { _gte: options.from, _lte: options.to } },
+          options.sessionType
+            ? { session_type: { _eq: options.sessionType } }
+            : undefined,
+          options.branch ? { branch: { _eq: options.branch } } : undefined,
+          options.zone ? { zone: { _eq: options.zone } } : undefined,
+          scopeFilter(scope),
+          zoneScopeFilter(scope),
+        ),
+        fields: ['id', 'branch', 'zone', 'session_date', 'session_type'],
+        sort: 'session_date,id',
+        page,
+        limit: SESSION_CHUNK,
+      })
+    } catch (error) {
+      if ((error as { statusCode?: number })?.statusCode) throw error
+      throwStoreUnavailable(error, 'attendance_store', '0023')
+    }
     if (sessions.data.length === 0) break
 
     const ids = sessions.data.map((row) => String(row.id))
     const byId = new Map(sessions.data.map((row) => [String(row.id), row]))
     for (const id of ids) seenSessions.add(id)
 
-    const counts = await listItems<CountRow>(event, scope, 'attendance_counts', {
-      filter: { session: { _in: ids } },
-      fields: ['session', 'category', 'sex', 'count'],
-      limit: -1,
-    })
+    try {
+      counts = await listItems<CountRow>(event, scope, 'attendance_counts', {
+        filter: { session: { _in: ids } },
+        fields: ['session', 'category', 'sex', 'count'],
+        limit: -1,
+      })
+    } catch (error) {
+      if ((error as { statusCode?: number })?.statusCode) throw error
+      throwStoreUnavailable(error, 'attendance_store', '0023')
+    }
     for (const count of counts.data) {
       const session = byId.get(String(count.session))
       if (!session) continue

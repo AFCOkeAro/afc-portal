@@ -6,6 +6,7 @@ import {
   listItems,
   mergeFilters,
   requireCan,
+  throwStoreUnavailable,
 } from '../../utils/portal'
 
 const EVENT_FIELDS = [
@@ -54,46 +55,55 @@ export default defineEventHandler(async (event) => {
   const when = query.when === 'past' ? 'past' : query.when === 'all' ? 'all' : 'upcoming'
   const now = new Date().toISOString()
 
-  const result = await listItems<EventRow>(event, scope, 'events', {
-    filter: mergeFilters(
-      when === 'upcoming' ? { start_at: { _gte: now } } : undefined,
-      when === 'past' ? { start_at: { _lt: now } } : undefined,
-      branch ? { branch: { _eq: branch } } : undefined,
-      eventType ? { event_type: { _eq: eventType } } : undefined,
-      status ? { status: { _eq: status } } : undefined,
-      eventScopeFilter(scope),
-    ),
-    fields: EVENT_FIELDS,
-    sort: when === 'past' ? '-start_at' : 'start_at',
-    page,
-    limit,
-    search: search || undefined,
-  })
-
-  const ids = result.data.map((row) => String(row.id))
+  // AFC-566: both reads hit 0021 collections. A missing table and a
+  // missing read grant both arrive as DirectusAuthError — map to the named
+  // store error, never a bare 500. Deliberate 4xx pass through untouched.
+  let result: { data: EventRow[]; meta: { total: number; page: number; limit: number } }
   const counts = new Map<
     string,
     { registered: number; confirmed: number; attended: number }
   >()
-  if (ids.length > 0) {
-    const registrations = await listItems<RegistrationCountRow>(
-      event,
-      scope,
-      'event_registrations',
-      {
-        filter: { event: { _in: ids } },
-        fields: ['event', 'registration_status'],
-        limit: -1,
-      },
-    )
-    for (const registration of registrations.data) {
-      const key = String(registration.event)
-      const row = counts.get(key) ?? { registered: 0, confirmed: 0, attended: 0 }
-      if (registration.registration_status !== 'cancelled') row.registered += 1
-      if (registration.registration_status === 'confirmed') row.confirmed += 1
-      if (registration.registration_status === 'attended') row.attended += 1
-      counts.set(key, row)
+  try {
+    result = await listItems<EventRow>(event, scope, 'events', {
+      filter: mergeFilters(
+        when === 'upcoming' ? { start_at: { _gte: now } } : undefined,
+        when === 'past' ? { start_at: { _lt: now } } : undefined,
+        branch ? { branch: { _eq: branch } } : undefined,
+        eventType ? { event_type: { _eq: eventType } } : undefined,
+        status ? { status: { _eq: status } } : undefined,
+        eventScopeFilter(scope),
+      ),
+      fields: EVENT_FIELDS,
+      sort: when === 'past' ? '-start_at' : 'start_at',
+      page,
+      limit,
+      search: search || undefined,
+    })
+
+    const ids = result.data.map((row) => String(row.id))
+    if (ids.length > 0) {
+      const registrations = await listItems<RegistrationCountRow>(
+        event,
+        scope,
+        'event_registrations',
+        {
+          filter: { event: { _in: ids } },
+          fields: ['event', 'registration_status'],
+          limit: -1,
+        },
+      )
+      for (const registration of registrations.data) {
+        const key = String(registration.event)
+        const row = counts.get(key) ?? { registered: 0, confirmed: 0, attended: 0 }
+        if (registration.registration_status !== 'cancelled') row.registered += 1
+        if (registration.registration_status === 'confirmed') row.confirmed += 1
+        if (registration.registration_status === 'attended') row.attended += 1
+        counts.set(key, row)
+      }
     }
+  } catch (error) {
+    if ((error as { statusCode?: number })?.statusCode) throw error
+    throwStoreUnavailable(error, 'event_store', '0021')
   }
 
   const names = await branchNames(event, scope)

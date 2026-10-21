@@ -38,15 +38,15 @@
 --                         way the report and CSV queries filter them (the DB
 --                         half of "CSV row-equality with the query").
 --
--- FIXTURE, STATED PLAINLY. The scratch DB has no attendance_sessions table
--- (suite 70 pins its absence: the header belongs to the capture slice that
--- owns the Directus collection). So §71.0 creates a fixture table OF THAT
--- NAME, shaped per the header contract in 0003's file header, inserts legacy
--- fixtures, re-applies 0003 (the REAL backfill block fires, not a copy), and
--- drops the fixture at the end. If the owning slice has landed by the time
--- this suite runs, the tripwire below fails loudly: backfill must then run
--- against the real table, and this fixture must be retired, not silently
--- forked. Fixture session ids are fixed uuids and every probe write is
+-- FIXTURE, STATED PLAINLY. Retired as a stand-in, kept as rows (AFC-566):
+-- 20261020_0023 created the real attendance_sessions register, so the
+-- tripwire below now pins the opposite -- the table MUST exist with the
+-- owning slice's shape (route columns 0003 would never create) -- and the
+-- legacy fixtures insert into the real table instead of a fork. 71.2
+-- re-applies 0003 so the REAL backfill block fires against the real table
+-- (not a copy), and 71.9 deletes only the three fixture rows (fixed ids,
+-- ON CONFLICT-safe), leaving the register standing for suites 77/78/88.
+-- Fixture session ids are fixed uuids and every probe write is
 -- ON CONFLICT-safe, so this file reruns cleanly in one database.
 --
 -- What this suite does NOT assert (stated, not missing): the HTTP 403/empty
@@ -56,46 +56,30 @@
 -- suite asserting HTTP status codes would be testing the wrong layer.
 
 -- ---------------------------------------------------------------------------
--- 71.0  FIXTURE. Tripwire first, then the stand-in sessions table.
+-- 71.0  FIXTURE. Tripwire retired: the real table must exist with the
+--        owning slice's shape (route columns + legacy headcounts +
+--        idempotency UNIQUE). Fixtures insert into the real register.
 -- ---------------------------------------------------------------------------
 DO $$
 BEGIN
   PERFORM test_support.assert_true(
-    to_regclass('public.attendance_sessions') IS NULL,
-    'attendance', 'no real attendance_sessions yet: the fixture below is a stand-in, not a fork');
+    to_regclass('public.attendance_sessions') IS NOT NULL
+    AND EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_schema = 'public' AND table_name = 'attendance_sessions'
+                   AND column_name = 'session_type')
+    AND EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_schema = 'public' AND table_name = 'attendance_sessions'
+                   AND column_name = 'headcount_adults')
+    AND EXISTS (SELECT 1 FROM pg_constraint
+                 WHERE conname = 'attendance_sessions_idempotency_key_key'),
+    'attendance', 'real attendance_sessions present with the 0023 shape: the backfill below runs against the register, not a stand-in');
 END $$;
 
-DROP TABLE IF EXISTS attendance_sessions;
-
-CREATE TABLE attendance_sessions (
-  id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  branch            uuid,
-  zone              uuid,
-  bsc               uuid,
-  service_type      text NOT NULL DEFAULT 'sunday_service',
-  service_type_def  uuid,
-  session_date      date NOT NULL,
-  session_name      text,
-  service           uuid,
-  event             uuid,
-  headcount_men      integer,
-  headcount_women    integer,
-  headcount_children integer,
-  headcount_youth    integer,
-  headcount_adults   integer,
-  headcount_teens    integer,
-  headcount_visitors integer,
-  headcount_total    integer,
-  recorded_by        uuid,
-  recorded_at        timestamptz,
-  idempotency_key    text UNIQUE,
-  status             text NOT NULL DEFAULT 'recorded',
-  notes              text
-);
-
 -- Probe rows use fixed session ids so a rerun collides into the same rows.
+-- (AFC-566: fixture-era `service_type` renamed to the route-canonical
+-- `session_type` with the 0023 register; values unchanged, all 11-key.)
 INSERT INTO attendance_sessions
-  (id, branch, zone, service_type, session_date, session_name,
+  (id, branch, zone, session_type, session_date, session_name,
    headcount_men, headcount_women, headcount_children, headcount_youth,
    headcount_adults, headcount_teens, headcount_visitors, headcount_total,
    idempotency_key)
@@ -298,12 +282,12 @@ BEGIN
     'attendance', 'a replayed batch keeps the latest figure');
 
   -- The session-level key turns a double submit into a refusal, not a twin.
-  -- Probed as the runner session (NULL role): the fixture table is owned by
-  -- this session, and only the session owner can write it -- directus_migrator
-  -- holds no grant on a test fixture, so probing as the migrator would report
-  -- the grant (42501) instead of the uniqueness violation under test.
-  PERFORM test_support.assert_raises(NULL,
-    $q$INSERT INTO attendance_sessions (branch, service_type, session_date, idempotency_key) VALUES ((SELECT id FROM branches WHERE code = 'OKE-ARO'), 'sunday_service', DATE '2026-10-11', 'capture-a1')$q$,
+  -- Probed as the table owner (AFC-566: the retired fixture was session-
+  -- owned, so the probe used the NULL role; the real register is
+  -- migrator-owned with no app DELETE, and the owner hits the UNIQUE
+  -- directly instead of a grant refusal).
+  PERFORM test_support.assert_raises('directus_migrator',
+    $q$INSERT INTO attendance_sessions (branch, session_type, session_date, idempotency_key) VALUES ((SELECT id FROM branches WHERE code = 'OKE-ARO'), 'sunday_service', DATE '2026-10-11', 'capture-a1')$q$,
     '23505', 'attendance', 'replaying a session idempotency_key is refused');
 END $$;
 
@@ -419,7 +403,7 @@ BEGIN
   PERFORM test_support.assert_equals(
     (SELECT count(*)::text FROM attendance_sessions
       WHERE session_date >= DATE '2026-10-01' AND session_date <= DATE '2026-10-31'
-        AND service_type = 'sunday_service'),
+        AND session_type = 'sunday_service'),
     '1',
     'attendance', 'a date-range + session-type predicate isolates one session');
 
@@ -433,13 +417,23 @@ BEGIN
 END $$;
 
 -- ---------------------------------------------------------------------------
--- 71.9  TEARDOWN. The fixture table goes; the migration tables stay.
+-- 71.9  TEARDOWN. The three fixture rows go (their counts cascade with
+--        them); the real register stays for suites 77/78/88.
 -- ---------------------------------------------------------------------------
-DROP TABLE IF EXISTS attendance_sessions;
+DELETE FROM attendance_sessions WHERE id IN
+  ('11111111-1111-1111-1111-111111111111',
+   '22222222-2222-2222-2222-222222222222',
+   '33333333-3333-3333-3333-333333333333');
 
 DO $$
 BEGIN
   PERFORM test_support.assert_true(
-    to_regclass('public.attendance_sessions') IS NULL,
-    'attendance', 'the fixture table is gone; the scratch DB is as 70 expects it');
+    (SELECT count(*) FROM attendance_sessions WHERE id IN
+      ('11111111-1111-1111-1111-111111111111',
+       '22222222-2222-2222-2222-222222222222',
+       '33333333-3333-3333-3333-333333333333')) = 0,
+    'attendance', 'the fixture rows are gone (their backfilled counts cascaded with them)');
+  PERFORM test_support.assert_true(
+    to_regclass('public.attendance_sessions') IS NOT NULL,
+    'attendance', 'the real register stands: 0023 owns it, not this suite');
 END $$;

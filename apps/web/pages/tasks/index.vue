@@ -4,8 +4,15 @@ import { COLLECTIONS, isTaskOverdue } from '@afc/shared'
 definePageMeta({ middleware: 'staff' })
 
 const api = useApi()
-const status = ref('all')
-const mine = ref(false)
+const route = useRoute()
+
+/** Drill-down contract (AFC-588): dashboard strip links here with ?status=&mine=. */
+function queryParam(name: string): string | null {
+  const value = route.query[name]
+  return typeof value === 'string' && value.length > 0 ? value : null
+}
+const status = ref(queryParam('status') ?? 'all')
+const mine = ref(queryParam('mine') === '1')
 const showForm = ref(false)
 const form = ref({
   title: '',
@@ -21,12 +28,76 @@ const query = computed(() => ({
   ...(status.value !== 'all' ? { status: status.value } : {}),
   ...(mine.value ? { mine: '1' } : {}),
 }))
+
+/** Same-page strip navigation (AFC-588): query-only link, sync the filter. */
+watch(
+  () => route.query,
+  (next: typeof route.query) => {
+    const statusNext = typeof next.status === 'string' ? next.status : null
+    status.value = statusNext ?? 'all'
+    mine.value = next.mine === '1'
+  },
+)
 const { data, pending, refresh } = await useAsyncData(
   'tasks-list',
   () =>
-    api.get<{ data: Record<string, unknown>[] }>('/api/tasks', { query: query.value }),
+    api.get<{ data: Record<string, unknown>[]; meta: { total: number } }>('/api/tasks', {
+      query: query.value,
+    }),
   { watch: [query] },
 )
+
+/** Dashboard strip (AFC-588): figures from list-meta counts, no new backend. */
+async function countTasks(params: Record<string, string>): Promise<number> {
+  const res = await api.get<{ data: Record<string, unknown>[]; meta: { total: number } }>(
+    '/api/tasks',
+    { query: { page: 1, limit: 1, ...params } },
+  )
+  return res.meta.total
+}
+
+const { data: stripCounts } = await useAsyncData('tasks-strip', () =>
+  Promise.all([
+    countTasks({}),
+    countTasks({ status: 'todo' }),
+    countTasks({ status: 'in_progress' }),
+    countTasks({ status: 'blocked' }),
+    countTasks({ status: 'done' }),
+  ]),
+)
+
+const stripItems = computed(() => [
+  {
+    label: 'Tasks',
+    value: stripCounts.value?.[0] ?? null,
+    to: '/tasks?status=all',
+    hint: 'Open filtered list',
+  },
+  {
+    label: 'To do',
+    value: stripCounts.value?.[1] ?? null,
+    to: '/tasks?status=todo',
+    hint: 'Open filtered list',
+  },
+  {
+    label: 'In progress',
+    value: stripCounts.value?.[2] ?? null,
+    to: '/tasks?status=in_progress',
+    hint: 'Open filtered list',
+  },
+  {
+    label: 'Blocked',
+    value: stripCounts.value?.[3] ?? null,
+    to: '/tasks?status=blocked',
+    hint: 'Open filtered list',
+  },
+  {
+    label: 'Done',
+    value: stripCounts.value?.[4] ?? null,
+    to: '/tasks?status=done',
+    hint: 'Open filtered list',
+  },
+])
 
 async function create() {
   error.value = ''
@@ -101,6 +172,8 @@ function isOverdue(row: Record<string, unknown>): boolean {
         </PermissionGate>
       </template>
     </PageHeader>
+
+    <DashboardStrip :items="stripItems" />
 
     <UCard v-if="showForm" class="mb-4">
       <template #header>

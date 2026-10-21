@@ -15,6 +15,15 @@ function queryParam(name: string): string | null {
 }
 const branch = ref(queryParam('branch') ?? 'all')
 
+/** Same-page strip navigation (AFC-588): query-only link, sync the filter. */
+watch(
+  () => route.query,
+  (next: typeof route.query) => {
+    const branchNext = typeof next.branch === 'string' ? next.branch : null
+    branch.value = branchNext ?? 'all'
+  },
+)
+
 let searchTimer: ReturnType<typeof setTimeout> | undefined
 watch(searchInput, (value: string) => {
   clearTimeout(searchTimer)
@@ -40,6 +49,30 @@ const branches = await useAsyncData('departments-branches', () =>
   api.get<BranchSummary[]>('/api/branches'),
 )
 
+/** Dashboard strip (AFC-588): figures from one unfiltered fetch, no new backend. */
+const { data: stripAll } = await useAsyncData('departments-strip', () =>
+  api.get<{ data: DepartmentRow[] }>('/api/departments'),
+)
+
+const stripItems = computed(() => {
+  const all = stripAll.value?.data ?? []
+  const areaWide = all.filter((row: DepartmentRow) => !row.branch_name).length
+  return [
+    {
+      label: 'Departments',
+      value: all.length,
+      to: '/departments?branch=all',
+      hint: 'Open filtered list',
+    },
+    {
+      label: 'Area-wide',
+      value: areaWide,
+      to: null,
+      hint: 'No branch set, all departments',
+    },
+  ]
+})
+
 const branchOptions = computed(() => [
   { label: 'All branches', value: 'all' },
   ...(branches.data.value ?? []).map((row) => ({ label: row.name, value: row.id })),
@@ -52,6 +85,8 @@ const branchOptions = computed(() => [
       title="Departments"
       description="Ministry departments and their members, within the branches this account can see. Area-wide departments carry no branch."
     />
+
+    <DashboardStrip :items="stripItems" />
 
     <UCard>
       <div class="grid gap-3 sm:grid-cols-2">

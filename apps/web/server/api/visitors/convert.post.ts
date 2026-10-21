@@ -4,6 +4,7 @@ import {
   findScopedItem,
   getPortalScope,
   requireCan,
+  throwStoreUnavailable,
   throwValidation,
   updateItem,
 } from '../../utils/portal'
@@ -41,102 +42,112 @@ export default defineEventHandler(async (event) => {
   })
   if (!parsed.success) throwValidation(parsed.error)
 
-  const visitor = await findScopedItem<Record<string, unknown>>(
-    event,
-    scope,
-    'visitors',
-    id,
-    { fields: JOURNEY_FIELDS },
-  )
+  // AFC-583: the visitor read, the duplicate probe and the conversion
+  // writes hit the 0025 register (the people create rides along -- the
+  // people register exists since 0004, so a store failure here still names
+  // the visitors gap-table row). Deliberate 4xx (scope 404s, link/create
+  // validation 400s) pass through untouched, never renamed into the store.
+  try {
+    const visitor = await findScopedItem<Record<string, unknown>>(
+      event,
+      scope,
+      'visitors',
+      id,
+      { fields: JOURNEY_FIELDS },
+    )
 
-  // Idempotency: the link is the state. A replay returns the same link.
-  if (visitor.person) {
+    // Idempotency: the link is the state. A replay returns the same link.
+    if (visitor.person) {
+      return {
+        data: {
+          visitor_id: id,
+          person_id: String(visitor.person),
+          already_converted: true,
+          duplicates: [],
+        },
+      }
+    }
+
+    const phone = (visitor.phone as string | null) ?? null
+    const email = (visitor.email as string | null) ?? null
+    const duplicates = await findDuplicateCandidates(event, scope, {
+      phone,
+      email,
+      excludeVisitorId: id,
+    })
+
+    let personId: string
+    if (parsed.data.mode === 'link') {
+      if (!parsed.data.person_id) {
+        throw createError({
+          statusCode: 400,
+          statusMessage: 'Choose the existing person to link to',
+          data: { code: 'validation_error' },
+        })
+      }
+      // The linked person must be readable in scope -- no blind link.
+      await findScopedItem(event, scope, 'people', parsed.data.person_id, {
+        fields: ['id'],
+      })
+      personId = parsed.data.person_id
+    } else {
+      const firstName =
+        parsed.data.first_name ?? (visitor.visitor_first_name as string | null) ?? ''
+      const lastName =
+        parsed.data.last_name ?? (visitor.visitor_last_name as string | null) ?? ''
+      if (!firstName.trim() || !lastName.trim()) {
+        throw createError({
+          statusCode: 400,
+          statusMessage: 'A first and last name are required to create the person',
+          data: { code: 'validation_error' },
+        })
+      }
+      const created = await createItem<{ id: string | number }>(event, scope, 'people', {
+        ...toPersonPayload({
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
+          preferred_name: undefined,
+          other_names: undefined,
+          gender: 'unspecified',
+          date_of_birth: undefined,
+          phone: phone ?? undefined,
+          email: email ?? undefined,
+          address: undefined,
+          branch: (visitor.branch as string | null) ?? undefined,
+          membership_status: 'member',
+          member_since: new Date().toISOString().slice(0, 10),
+          guardian: undefined,
+          consent_data: false,
+          consent_media: false,
+          // AFC-476 added §4.2 fields to PersonForm; a converted visitor is
+          // not known to be an entrepreneur (toPersonPayload defaults false).
+          is_entrepreneur: false,
+        }),
+        is_minor: false,
+        status: 'active',
+      })
+      personId = String(created.id)
+    }
+
+    // The trail is preserved both ways: visitors.person points at the person,
+    // and the visitor row (journey stages, follow-ups, transitions) is never
+    // rewritten by conversion -- the reverse lookup is visitors?person=<id>.
+    await updateItem(event, scope, 'visitors', id, {
+      person: personId,
+      status: 'converted',
+      last_contact_at: new Date().toISOString(),
+    })
+
     return {
       data: {
         visitor_id: id,
-        person_id: String(visitor.person),
-        already_converted: true,
-        duplicates: [],
+        person_id: personId,
+        already_converted: false,
+        duplicates,
       },
     }
-  }
-
-  const phone = (visitor.phone as string | null) ?? null
-  const email = (visitor.email as string | null) ?? null
-  const duplicates = await findDuplicateCandidates(event, scope, {
-    phone,
-    email,
-    excludeVisitorId: id,
-  })
-
-  let personId: string
-  if (parsed.data.mode === 'link') {
-    if (!parsed.data.person_id) {
-      throw createError({
-        statusCode: 400,
-        statusMessage: 'Choose the existing person to link to',
-        data: { code: 'validation_error' },
-      })
-    }
-    // The linked person must be readable in scope -- no blind link.
-    await findScopedItem(event, scope, 'people', parsed.data.person_id, {
-      fields: ['id'],
-    })
-    personId = parsed.data.person_id
-  } else {
-    const firstName =
-      parsed.data.first_name ?? (visitor.visitor_first_name as string | null) ?? ''
-    const lastName =
-      parsed.data.last_name ?? (visitor.visitor_last_name as string | null) ?? ''
-    if (!firstName.trim() || !lastName.trim()) {
-      throw createError({
-        statusCode: 400,
-        statusMessage: 'A first and last name are required to create the person',
-        data: { code: 'validation_error' },
-      })
-    }
-    const created = await createItem<{ id: string | number }>(event, scope, 'people', {
-      ...toPersonPayload({
-        first_name: firstName.trim(),
-        last_name: lastName.trim(),
-        preferred_name: undefined,
-        other_names: undefined,
-        gender: 'unspecified',
-        date_of_birth: undefined,
-        phone: phone ?? undefined,
-        email: email ?? undefined,
-        address: undefined,
-        branch: (visitor.branch as string | null) ?? undefined,
-        membership_status: 'member',
-        member_since: new Date().toISOString().slice(0, 10),
-        guardian: undefined,
-        consent_data: false,
-        consent_media: false,
-        // AFC-476 added §4.2 fields to PersonForm; a converted visitor is
-        // not known to be an entrepreneur (toPersonPayload defaults false).
-        is_entrepreneur: false,
-      }),
-      is_minor: false,
-      status: 'active',
-    })
-    personId = String(created.id)
-  }
-
-  // The trail is preserved both ways: visitors.person points at the person,
-  // and the visitor row (journey stages, follow-ups, transitions) is never
-  // rewritten by conversion -- the reverse lookup is visitors?person=<id>.
-  await updateItem(event, scope, 'visitors', id, {
-    person: personId,
-    status: 'converted',
-    last_contact_at: new Date().toISOString(),
-  })
-
-  return {
-    data: {
-      visitor_id: id,
-      person_id: personId,
-      already_converted: false,
-      duplicates,
-    },
+  } catch (error) {
+    if ((error as { statusCode?: number })?.statusCode) throw error
+    throwStoreUnavailable(error, 'visitor_store', '0025')
   }
 })

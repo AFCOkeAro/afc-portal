@@ -8,7 +8,7 @@
 -- the columns it reads, so this suite asserts the database half of that
 -- promise -- the half a crafted HTTP request cannot change:
 --
---   70.1  seed shape    -- Lagos North loads: 1 area, 6 zones, 7 branches,
+--   70.1  seed shape    -- Lagos North loads: 1 area, 6 zones, 6 branches,
 --                         9 BSCs; every branch carries a zone; every branch
 --                         area equals its zone's area; every BSC zone equals
 --                         its parent branch's zone; the satellite hangs under
@@ -61,7 +61,7 @@ BEGIN
     'hierarchy', 'all six zones carry the LAG-NORTH-Z prefix');
 
   SELECT count(*) INTO v_branches FROM branches;
-  PERFORM test_support.assert_true(v_branches = 7, 'hierarchy', 'seven seeded branches');
+  PERFORM test_support.assert_true(v_branches = 32, 'hierarchy', 'thirty-two branches (30 mapped + satellite + kept Sango-Ota)');
 
   SELECT count(*) INTO v_bsc FROM bible_study_centres;
   PERFORM test_support.assert_true(v_bsc = 9, 'hierarchy', 'nine seeded BSCs');
@@ -106,18 +106,31 @@ BEGIN
   PERFORM test_support.assert_true(
     (SELECT count(*) FROM branches WHERE code = 'MATOGUN' AND branch_type = 'afwc' AND type_label = 'AFWC') = 1,
     'hierarchy', 'Matogun is the AFWC branch');
+  -- AFC-578 user table + CTO sequencing: LEGUN and OLOMOWEWE were sampled
+  -- as full_fledged but are Semi Formed Church; SANGO-OTA is kept per
+  -- explicit CTO ruling (absence from the 30-list is not a removal order).
+  PERFORM test_support.assert_true(
+    (SELECT count(*) FROM branches WHERE code IN ('LEGUN', 'OLOMOWEWE') AND branch_type = 'semi_formed' AND type_label IS NULL) = 2,
+    'hierarchy', 'Legun and Olomowewe are semi_formed without a label');
+  PERFORM test_support.assert_true(
+    (SELECT count(*) FROM branches WHERE code = 'SANGO-OTA') = 1,
+    'hierarchy', 'Sango-Ota is kept');
 END $$;
 
 -- ---------------------------------------------------------------------------
--- 70.2  RERUN. Re-applying the migration changes nothing.
+-- 70.2  RERUN. Re-applying the migrations changes nothing. NOTE: 0002
+--        alone resurrects ABULE-EGBA (ON CONFLICT DO NOTHING skips present
+--        codes only), so the narrow 0024 + 0028 are re-applied after it.
 -- ---------------------------------------------------------------------------
 \i services/directus/schema/migrations/20261020_0002_hierarchy.sql
+\i services/directus/schema/migrations/20261020_0024_remove_abule_egba.sql
+\i services/directus/schema/migrations/20261020_0028_lagos_north_branches.sql
 
 DO $$
 BEGIN
   PERFORM test_support.assert_true((SELECT count(*) FROM areas) = 1, 'hierarchy', 'rerun: still one area');
   PERFORM test_support.assert_true((SELECT count(*) FROM zones) = 6, 'hierarchy', 'rerun: still six zones');
-  PERFORM test_support.assert_true((SELECT count(*) FROM branches) = 7, 'hierarchy', 'rerun: still seven branches');
+  PERFORM test_support.assert_true((SELECT count(*) FROM branches) = 32, 'hierarchy', 'rerun: still thirty-two branches');
   PERFORM test_support.assert_true((SELECT count(*) FROM bible_study_centres) = 9, 'hierarchy', 'rerun: still nine BSCs');
 END $$;
 
@@ -133,22 +146,25 @@ BEGIN
   SELECT id INTO v_z1 FROM zones WHERE code = 'LAG-NORTH-Z1';
   SELECT id INTO v_z2 FROM zones WHERE code = 'LAG-NORTH-Z2';
 
-  -- A Z1 filter returns exactly Z1's rows: Oke-Aro + its satellite.
+  -- A Z1 filter returns exactly Z1's rows: Oke-Aro, its satellite, Akute,
+  -- Koyemidun, Olambe, Legun, Olomowewe, Matogun (eight after the 0028 seed).
   SELECT count(*) INTO v_z1_branches FROM branches WHERE zone = v_z1;
-  PERFORM test_support.assert_true(v_z1_branches = 2, 'hierarchy', 'Z1 filter returns exactly two branches');
+  PERFORM test_support.assert_true(v_z1_branches = 8, 'hierarchy', 'Z1 filter returns exactly eight branches');
   SELECT count(*) INTO v_z2_branches FROM branches WHERE zone = v_z2;
-  PERFORM test_support.assert_true(v_z2_branches = 1, 'hierarchy', 'Z2 filter returns exactly one branch');
+  PERFORM test_support.assert_true(v_z2_branches = 4, 'hierarchy', 'Z2 filter returns exactly four branches');
 
   -- And none of Z2's: the two predicates are disjoint.
   SELECT count(*) INTO v_overlap FROM branches WHERE zone = v_z1 AND zone = v_z2;
   PERFORM test_support.assert_true(v_overlap = 0, 'hierarchy', 'Z1 and Z2 branch predicates are disjoint');
   PERFORM test_support.assert_true(
-    (SELECT count(*) FROM branches WHERE zone NOT IN (v_z1, v_z2)) = 4,
+    (SELECT count(*) FROM branches WHERE zone NOT IN (v_z1, v_z2)) = 20,
     'hierarchy', 'every other branch is outside both zones');
 
-  -- Same for BSCs: three under Z1, two under Z2, disjoint.
+  -- Same for BSCs: nine under Z1 (the three Oke-Aro rows plus the six
+  -- carried with Legun/Matogun/Olomowewe by 0028), none left under Z2,
+  -- and the two predicates disjoint.
   SELECT count(*) INTO v_z1_bsc FROM bible_study_centres WHERE zone = v_z1;
-  PERFORM test_support.assert_true(v_z1_bsc = 3, 'hierarchy', 'Z1 filter returns exactly three BSCs');
+  PERFORM test_support.assert_true(v_z1_bsc = 9, 'hierarchy', 'Z1 filter returns exactly nine BSCs');
   SELECT count(*) INTO v_overlap_bsc FROM bible_study_centres WHERE zone = v_z1 AND zone = v_z2;
   PERFORM test_support.assert_true(v_overlap_bsc = 0, 'hierarchy', 'Z1 and Z2 BSC predicates are disjoint');
 END $$;
@@ -247,12 +263,48 @@ END $$;
 -- ---------------------------------------------------------------------------
 DO $$
 BEGIN
+  -- AFC-566: attendance_sessions is no longer absent -- 20261020_0023
+  -- created the register WITH the 0002/0010 denorm columns (zone, bsc,
+  -- service_type_def). The no-fork invariant is now pinned positively: the
+  -- table present carries the owning migration's full shape (route columns
+  -- 0002 would never create, e.g. session_name/idempotency_key), so 0002's
+  -- conditional ALTERs met a real register, never a fork of their own
+  -- making.
   PERFORM test_support.assert_true(
-    to_regclass('public.attendance_sessions') IS NULL,
-    'hierarchy', 'attendance_sessions is absent here: denorm lands with its own table, not a fork');
+    to_regclass('public.attendance_sessions') IS NOT NULL
+    AND EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_schema = 'public' AND table_name = 'attendance_sessions'
+                   AND column_name = 'session_name')
+    AND EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_schema = 'public' AND table_name = 'attendance_sessions'
+                   AND column_name = 'idempotency_key')
+    AND EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_schema = 'public' AND table_name = 'attendance_sessions'
+                   AND column_name = 'zone')
+    AND EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_schema = 'public' AND table_name = 'attendance_sessions'
+                   AND column_name = 'service_type_def'),
+    'hierarchy', 'attendance_sessions is 0023-owned with the full register shape (0002 met it, never forked it)');
+  -- AFC-566: households is no longer absent -- 20261020_0020 created the
+  -- register. The no-fork invariant is now pinned positively: the table
+  -- present carries the owning migration's full shape (route columns 0002
+  -- would never create, e.g. name/status), so 0002's conditional ALTERs
+  -- met a real register, not a fork of their own making.
   PERFORM test_support.assert_true(
-    to_regclass('public.households') IS NULL,
-    'hierarchy', 'households is absent here: denorm lands with its own table, not a fork');
+    to_regclass('public.households') IS NOT NULL
+    AND EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_schema = 'public' AND table_name = 'households'
+                   AND column_name = 'name')
+    AND EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_schema = 'public' AND table_name = 'households'
+                   AND column_name = 'status')
+    AND EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_schema = 'public' AND table_name = 'households'
+                   AND column_name = 'zone')
+    AND EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_schema = 'public' AND table_name = 'households'
+                   AND column_name = 'household_head'),
+    'hierarchy', 'households is 0020-owned with the full register shape (0002 met it, never forked it)');
   PERFORM test_support.assert_true(
     to_regclass('public.directus_users') IS NULL,
     'hierarchy', 'directus_users is absent here: scopes land in the Directus project, not a shadow table');

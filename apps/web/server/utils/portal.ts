@@ -239,16 +239,28 @@ export function eventScopeFilter(scope: PortalScope): Filter {
 }
 
 /**
- * Departments may be area-wide (branch is null, data-model §2.2), so a branch
- * user sees their own branches' departments plus the area-wide ones. Same
- * shape as `eventScopeFilter`: the null branch is a visibility grant, not a
- * scope hole — out-of-scope branches still never match.
+ * Departments may live at branch, zone, or area level (AFC-593, migration
+ * 0027: branch XOR zone, area-wide when both null). A non-area session sees
+ * its own branches' rows plus the levels its grants reach: explicit zone
+ * grants open those zones' rows, an explicit area grant opens that area's
+ * rows, and fully unscoped rows (branch + zone + area all null) stay visible
+ * as the back-compat area-wide grant. No grant for a level means no rows
+ * from that level (fail-closed): a branch-only session without a zone grant
+ * does not see zone-scoped departments. Out-of-scope ids still never match.
  */
 export function departmentScopeFilter(scope: PortalScope): Filter {
   if (scope.isArea) return {}
-  return {
-    _or: [{ branch: { _in: scope.branchIds } }, { branch: { _null: true } }],
-  }
+  const or: Filter[] = [{ branch: { _in: scope.branchIds } }]
+  if (scope.zoneIds.length > 0) or.push({ zone: { _in: scope.zoneIds } })
+  if (scope.areaId) or.push({ area: { _eq: scope.areaId } })
+  or.push({
+    _and: [
+      { branch: { _null: true } },
+      { zone: { _null: true } },
+      { area: { _null: true } },
+    ],
+  })
+  return { _or: or }
 }
 
 export function mergeFilters(...filters: Array<Filter | undefined>): Filter | undefined {

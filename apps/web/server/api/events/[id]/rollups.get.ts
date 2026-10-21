@@ -6,6 +6,7 @@ import {
   getPortalScope,
   listItems,
   requireCan,
+  throwStoreUnavailable,
   visibleFields,
 } from '../../../utils/portal'
 
@@ -27,19 +28,26 @@ export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
   if (!id)
     throw createError({ statusCode: 400, statusMessage: 'An event id is required' })
-  await findScopedItem(event, scope, 'events', id, {
-    fields: ['id'],
-    scope: eventScopeFilter(scope),
-  })
+  // AFC-566: both reads hit 0021 registers. Unreadable store → named
+  // error, never a bare 500; deliberate 4xx pass through untouched.
+  try {
+    await findScopedItem(event, scope, 'events', id, {
+      fields: ['id'],
+      scope: eventScopeFilter(scope),
+    })
 
-  const result = await listItems<RollupRow>(event, scope, 'event_registrations', {
-    filter: { event: { _eq: id } },
-    fields: visibleFields(scope, 'event_registrations', [
-      'registration_status',
-      'amount_expected',
-      'amount_paid',
-    ]),
-    limit: -1,
-  })
-  return { data: summarizeRegistrations(result.data) }
+    const result = await listItems<RollupRow>(event, scope, 'event_registrations', {
+      filter: { event: { _eq: id } },
+      fields: visibleFields(scope, 'event_registrations', [
+        'registration_status',
+        'amount_expected',
+        'amount_paid',
+      ]),
+      limit: -1,
+    })
+    return { data: summarizeRegistrations(result.data) }
+  } catch (error) {
+    if ((error as { statusCode?: number })?.statusCode) throw error
+    throwStoreUnavailable(error, 'event_store', '0021')
+  }
 })

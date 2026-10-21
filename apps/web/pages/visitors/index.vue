@@ -31,6 +31,15 @@ watch([status, branch, search], () => {
   page.value = 1
 })
 
+/** Same-page strip navigation (AFC-588): query-only link, sync the filter. */
+watch(
+  () => route.query,
+  (next: typeof route.query) => {
+    const statusNext = typeof next.status === 'string' ? next.status : null
+    if (statusNext && statusNext !== status.value) status.value = statusNext
+  },
+)
+
 const query = computed(() => ({
   page: page.value,
   limit,
@@ -48,6 +57,50 @@ const { data, pending, error, refresh } = await useAsyncData(
 const branches = await useAsyncData('visitors-branches', () =>
   api.get<BranchSummary[]>('/api/branches'),
 )
+
+/** Dashboard strip (AFC-588): figures from list-meta counts, no new backend. */
+async function countVisitors(params: Record<string, string>): Promise<number> {
+  const res = await api.get<Paginated<VisitorRow>>('/api/visitors', {
+    query: { page: 1, limit: 1, ...params },
+  })
+  return res.meta.total
+}
+
+const { data: stripCounts } = await useAsyncData('visitors-strip', () =>
+  Promise.all([
+    countVisitors({ status: 'open' }),
+    countVisitors({ status: 'new' }),
+    countVisitors({ status: 'follow_up' }),
+    countVisitors({ status: 'converted' }),
+  ]),
+)
+
+const stripItems = computed(() => [
+  {
+    label: 'Open follow-ups',
+    value: stripCounts.value?.[0] ?? null,
+    to: '/visitors?status=open',
+    hint: 'New + follow-up',
+  },
+  {
+    label: 'New',
+    value: stripCounts.value?.[1] ?? null,
+    to: '/visitors?status=new',
+    hint: 'Open filtered list',
+  },
+  {
+    label: 'Follow-up',
+    value: stripCounts.value?.[2] ?? null,
+    to: '/visitors?status=follow_up',
+    hint: 'Open filtered list',
+  },
+  {
+    label: 'Converted',
+    value: stripCounts.value?.[3] ?? null,
+    to: '/visitors?status=converted',
+    hint: 'Open filtered list',
+  },
+])
 
 const rows = computed(() => data.value?.data ?? [])
 const total = computed(() => data.value?.meta.total ?? 0)
@@ -110,6 +163,8 @@ const statusColor: Record<string, 'success' | 'warning' | 'neutral' | 'error'> =
         </PermissionGate>
       </template>
     </PageHeader>
+
+    <DashboardStrip :items="stripItems" />
 
     <UCard>
       <div class="grid gap-3 sm:grid-cols-3">
