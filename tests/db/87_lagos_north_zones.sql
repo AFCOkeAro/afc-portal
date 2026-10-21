@@ -80,8 +80,8 @@ DECLARE
   v_mismatch integer;
 BEGIN
   PERFORM test_support.assert_true(
-    (SELECT count(*) FROM branches) = 6,
-    'zones578', 'six seeded branches intact (ABULE-EGBA removed by 0024)');
+    (SELECT count(*) FROM branches) = 32,
+    'zones578', 'thirty-two branches intact (30 mapped + satellite + kept Sango-Ota)');
   PERFORM test_support.assert_true(
     (SELECT count(*) FROM bible_study_centres) = 9,
     'zones578', 'nine seeded BSCs intact');
@@ -89,17 +89,17 @@ BEGIN
     (SELECT count(*) FROM branches WHERE zone IS NULL) = 0,
     'zones578', 'no branch is zoneless after the rename');
 
-  -- Branch>zone mapping pinned: the correction renames, never re-homes;
-  -- 0024 removes ABULE-EGBA, so six rows remain on their 0002 zone.
+  -- Branch>zone mapping: the rename corrects names; the user-confirmed map
+  -- (0028) re-homes LEGUN/MATOGUN/OLOMOWEWE to Z1. Oke-Aro, its satellite
+  -- and the three re-homed samples sit in Z1; kept SANGO-OTA stays in Z6.
+  -- The full 30-row map is pinned in suite 93.
   PERFORM test_support.assert_true(
     (SELECT count(*) FROM branches b JOIN zones z ON z.id = b.zone
       WHERE (b.code = 'OKE-ARO' AND z.code = 'LAG-NORTH-Z1')
          OR (b.code = 'OKE-ARO-SAT-1' AND z.code = 'LAG-NORTH-Z1')
-         OR (b.code = 'LEGUN' AND z.code = 'LAG-NORTH-Z2')
-         OR (b.code = 'MATOGUN' AND z.code = 'LAG-NORTH-Z3')
-         OR (b.code = 'OLOMOWEWE' AND z.code = 'LAG-NORTH-Z4')
+         OR (b.code IN ('LEGUN', 'MATOGUN', 'OLOMOWEWE') AND z.code = 'LAG-NORTH-Z1')
          OR (b.code = 'SANGO-OTA' AND z.code = 'LAG-NORTH-Z6')) = 6,
-    'zones578', 'no branch re-homed: all six remaining branches keep their 0002 zone');
+    'zones578', 'Oke-Aro, satellite, re-homed three in Z1; kept Sango-Ota in Z6');
 
   -- Denorm consistency survives the rename (names changed, ids did not).
   SELECT count(*) INTO v_mismatch
@@ -113,16 +113,20 @@ BEGIN
   PERFORM test_support.assert_true(v_mismatch = 0,
     'zones578', 'bsc.zone still agrees with parent branch zone on every row');
 
-  -- Partition counts unchanged: Z1 two branches / three BSCs, Z2 one / two.
+  -- Partition counts after the 0028 seed + BSC carry: Z1 eight branches /
+  -- nine BSCs, Z2 four branches / no BSCs.
   PERFORM test_support.assert_true(
-    (SELECT count(*) FROM branches WHERE zone = (SELECT id FROM zones WHERE code = 'LAG-NORTH-Z1')) = 2,
-    'zones578', 'Z1 still scopes two branches');
+    (SELECT count(*) FROM branches WHERE zone = (SELECT id FROM zones WHERE code = 'LAG-NORTH-Z1')) = 8,
+    'zones578', 'Z1 scopes eight branches');
   PERFORM test_support.assert_true(
-    (SELECT count(*) FROM branches WHERE zone = (SELECT id FROM zones WHERE code = 'LAG-NORTH-Z2')) = 1,
-    'zones578', 'Z2 still scopes one branch');
+    (SELECT count(*) FROM branches WHERE zone = (SELECT id FROM zones WHERE code = 'LAG-NORTH-Z2')) = 4,
+    'zones578', 'Z2 scopes four branches');
   PERFORM test_support.assert_true(
-    (SELECT count(*) FROM bible_study_centres WHERE zone = (SELECT id FROM zones WHERE code = 'LAG-NORTH-Z1')) = 3,
-    'zones578', 'Z1 still scopes three BSCs');
+    (SELECT count(*) FROM bible_study_centres WHERE zone = (SELECT id FROM zones WHERE code = 'LAG-NORTH-Z1')) = 9,
+    'zones578', 'Z1 scopes nine BSCs after the carry');
+  PERFORM test_support.assert_true(
+    (SELECT count(*) FROM bible_study_centres WHERE zone = (SELECT id FROM zones WHERE code = 'LAG-NORTH-Z2')) = 0,
+    'zones578', 'Z2 scopes no BSCs after the carry');
 
   -- WECA workbook branch codes still resolve (one branch identity).
   PERFORM test_support.assert_true(
@@ -144,20 +148,21 @@ BEGIN
 END $$;
 
 -- ---------------------------------------------------------------------------
--- 87.3  RERUN. 0002 + 0022 + 0024 re-applied change nothing. NOTE: 0002
---        alone resurrects ABULE-EGBA (ON CONFLICT DO NOTHING skips present
---        codes only), so 0024 is re-applied after it.
+-- 87.3  RERUN. 0002 + narrow 0024 + 0022 + 0028 re-applied change nothing.
+--        NOTE: 0002 alone resurrects ABULE-EGBA (ON CONFLICT DO NOTHING
+--        skips present codes only), so the narrow 0024 + 0028 follow it.
 -- ---------------------------------------------------------------------------
 \i services/directus/schema/migrations/20261020_0002_hierarchy.sql
-\i services/directus/schema/migrations/20261020_0022_lagos_north_zones.sql
 \i services/directus/schema/migrations/20261020_0024_remove_abule_egba.sql
+\i services/directus/schema/migrations/20261020_0022_lagos_north_zones.sql
+\i services/directus/schema/migrations/20261020_0028_lagos_north_branches.sql
 
 DO $$
 BEGIN
   PERFORM test_support.assert_true((SELECT count(*) FROM zones) = 6,
     'zones578', 'rerun: still six zones');
-  PERFORM test_support.assert_true((SELECT count(*) FROM branches) = 6,
-    'zones578', 'rerun: still six branches');
+  PERFORM test_support.assert_true((SELECT count(*) FROM branches) = 32,
+    'zones578', 'rerun: still thirty-two branches');
   PERFORM test_support.assert_equals(
     (SELECT string_agg(name, '|' ORDER BY code) FROM zones),
     'Oke Aro Zone|Sango Zone|Ifo Zone|Itoki Zone|Ijoko Zone|Agege Zone',
@@ -176,7 +181,7 @@ BEGIN
     'Oke-Aro Zone|Legun Zone|Matogun Zone|Olomowewe Zone|Abule-Egba Zone|Sango-Ota Zone',
     'zones578', 'down script restores the six 0002 names by code');
   PERFORM test_support.assert_true(
-    (SELECT count(*) FROM branches) = 6,
+    (SELECT count(*) FROM branches) = 32,
     'zones578', 'down script deletes no branch row');
 END $$;
 

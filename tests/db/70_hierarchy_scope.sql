@@ -61,7 +61,7 @@ BEGIN
     'hierarchy', 'all six zones carry the LAG-NORTH-Z prefix');
 
   SELECT count(*) INTO v_branches FROM branches;
-  PERFORM test_support.assert_true(v_branches = 6, 'hierarchy', 'six seeded branches (ABULE-EGBA removed by 0024)');
+  PERFORM test_support.assert_true(v_branches = 32, 'hierarchy', 'thirty-two branches (30 mapped + satellite + kept Sango-Ota)');
 
   SELECT count(*) INTO v_bsc FROM bible_study_centres;
   PERFORM test_support.assert_true(v_bsc = 9, 'hierarchy', 'nine seeded BSCs');
@@ -106,21 +106,31 @@ BEGIN
   PERFORM test_support.assert_true(
     (SELECT count(*) FROM branches WHERE code = 'MATOGUN' AND branch_type = 'afwc' AND type_label = 'AFWC') = 1,
     'hierarchy', 'Matogun is the AFWC branch');
+  -- AFC-578 user table + CTO sequencing: LEGUN and OLOMOWEWE were sampled
+  -- as full_fledged but are Semi Formed Church; SANGO-OTA is kept per
+  -- explicit CTO ruling (absence from the 30-list is not a removal order).
+  PERFORM test_support.assert_true(
+    (SELECT count(*) FROM branches WHERE code IN ('LEGUN', 'OLOMOWEWE') AND branch_type = 'semi_formed' AND type_label IS NULL) = 2,
+    'hierarchy', 'Legun and Olomowewe are semi_formed without a label');
+  PERFORM test_support.assert_true(
+    (SELECT count(*) FROM branches WHERE code = 'SANGO-OTA') = 1,
+    'hierarchy', 'Sango-Ota is kept');
 END $$;
 
 -- ---------------------------------------------------------------------------
--- 70.2  RERUN. Re-applying the migration changes nothing. NOTE: 0002 alone
---        resurrects ABULE-EGBA (ON CONFLICT DO NOTHING skips present codes
---        only), so 0024 is re-applied after it.
+-- 70.2  RERUN. Re-applying the migrations changes nothing. NOTE: 0002
+--        alone resurrects ABULE-EGBA (ON CONFLICT DO NOTHING skips present
+--        codes only), so the narrow 0024 + 0028 are re-applied after it.
 -- ---------------------------------------------------------------------------
 \i services/directus/schema/migrations/20261020_0002_hierarchy.sql
 \i services/directus/schema/migrations/20261020_0024_remove_abule_egba.sql
+\i services/directus/schema/migrations/20261020_0028_lagos_north_branches.sql
 
 DO $$
 BEGIN
   PERFORM test_support.assert_true((SELECT count(*) FROM areas) = 1, 'hierarchy', 'rerun: still one area');
   PERFORM test_support.assert_true((SELECT count(*) FROM zones) = 6, 'hierarchy', 'rerun: still six zones');
-  PERFORM test_support.assert_true((SELECT count(*) FROM branches) = 6, 'hierarchy', 'rerun: still six branches');
+  PERFORM test_support.assert_true((SELECT count(*) FROM branches) = 32, 'hierarchy', 'rerun: still thirty-two branches');
   PERFORM test_support.assert_true((SELECT count(*) FROM bible_study_centres) = 9, 'hierarchy', 'rerun: still nine BSCs');
 END $$;
 
@@ -136,22 +146,25 @@ BEGIN
   SELECT id INTO v_z1 FROM zones WHERE code = 'LAG-NORTH-Z1';
   SELECT id INTO v_z2 FROM zones WHERE code = 'LAG-NORTH-Z2';
 
-  -- A Z1 filter returns exactly Z1's rows: Oke-Aro + its satellite.
+  -- A Z1 filter returns exactly Z1's rows: Oke-Aro, its satellite, Akute,
+  -- Koyemidun, Olambe, Legun, Olomowewe, Matogun (eight after the 0028 seed).
   SELECT count(*) INTO v_z1_branches FROM branches WHERE zone = v_z1;
-  PERFORM test_support.assert_true(v_z1_branches = 2, 'hierarchy', 'Z1 filter returns exactly two branches');
+  PERFORM test_support.assert_true(v_z1_branches = 8, 'hierarchy', 'Z1 filter returns exactly eight branches');
   SELECT count(*) INTO v_z2_branches FROM branches WHERE zone = v_z2;
-  PERFORM test_support.assert_true(v_z2_branches = 1, 'hierarchy', 'Z2 filter returns exactly one branch');
+  PERFORM test_support.assert_true(v_z2_branches = 4, 'hierarchy', 'Z2 filter returns exactly four branches');
 
   -- And none of Z2's: the two predicates are disjoint.
   SELECT count(*) INTO v_overlap FROM branches WHERE zone = v_z1 AND zone = v_z2;
   PERFORM test_support.assert_true(v_overlap = 0, 'hierarchy', 'Z1 and Z2 branch predicates are disjoint');
   PERFORM test_support.assert_true(
-    (SELECT count(*) FROM branches WHERE zone NOT IN (v_z1, v_z2)) = 3,
+    (SELECT count(*) FROM branches WHERE zone NOT IN (v_z1, v_z2)) = 20,
     'hierarchy', 'every other branch is outside both zones');
 
-  -- Same for BSCs: three under Z1, two under Z2, disjoint.
+  -- Same for BSCs: nine under Z1 (the three Oke-Aro rows plus the six
+  -- carried with Legun/Matogun/Olomowewe by 0028), none left under Z2,
+  -- and the two predicates disjoint.
   SELECT count(*) INTO v_z1_bsc FROM bible_study_centres WHERE zone = v_z1;
-  PERFORM test_support.assert_true(v_z1_bsc = 3, 'hierarchy', 'Z1 filter returns exactly three BSCs');
+  PERFORM test_support.assert_true(v_z1_bsc = 9, 'hierarchy', 'Z1 filter returns exactly nine BSCs');
   SELECT count(*) INTO v_overlap_bsc FROM bible_study_centres WHERE zone = v_z1 AND zone = v_z2;
   PERFORM test_support.assert_true(v_overlap_bsc = 0, 'hierarchy', 'Z1 and Z2 BSC predicates are disjoint');
 END $$;

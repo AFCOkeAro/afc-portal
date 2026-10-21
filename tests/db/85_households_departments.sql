@@ -232,8 +232,12 @@ END $$;
 
 -- ---------------------------------------------------------------------------
 -- 85.4  OVERLAP. 0002's conditional households blocks are no-ops over 0020.
+--        CTO verdict on AFC-578 review: 0002 alone resurrects ABULE-EGBA
+--        (ON CONFLICT DO NOTHING skips present codes only), so the landed
+--        narrow 0024 is re-applied after it.
 -- ---------------------------------------------------------------------------
 \i services/directus/schema/migrations/20261020_0002_hierarchy.sql
+\i services/directus/schema/migrations/20261020_0024_remove_abule_egba.sql
 
 DO $$
 BEGIN

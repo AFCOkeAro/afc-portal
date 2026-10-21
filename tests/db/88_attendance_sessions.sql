@@ -215,9 +215,13 @@ END $$;
 -- ---------------------------------------------------------------------------
 -- 88.4  OVERLAP. Re-applying 0002 + 0003 + 0010 + 0011 changes nothing:
 --        denorms and merge FKs are IF NOT EXISTS no-ops over 0023's tables
---        (0013's re-apply is proven by suite 79).
+--        (0013's re-apply is proven by suite 79). CTO verdict on AFC-578
+--        review: 0002 alone resurrects ABULE-EGBA, so the landed narrow
+--        0024 is re-applied after it.
 -- ---------------------------------------------------------------------------
 \i services/directus/schema/migrations/20261020_0002_hierarchy.sql
+
+\i services/directus/schema/migrations/20261020_0024_remove_abule_egba.sql
 
 \i services/directus/schema/migrations/20261020_0003_attendance_counts.sql
 
