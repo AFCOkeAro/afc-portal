@@ -35,6 +35,15 @@ watch([status, branch, category, priority, confidentiality, search], () => {
   page.value = 1
 })
 
+/** Same-page strip navigation (AFC-588): query-only link, sync the filter. */
+watch(
+  () => route.query,
+  (next: typeof route.query) => {
+    const statusNext = typeof next.status === 'string' ? next.status : null
+    if (statusNext && statusNext !== status.value) status.value = statusNext
+  },
+)
+
 const query = computed(() => ({
   page: page.value,
   limit,
@@ -61,6 +70,50 @@ const people = await useAsyncData('welfare-people', () =>
     query: { limit: 200, status: 'active', sort: 'last_name' },
   }),
 )
+
+/** Dashboard strip (AFC-588): figures from list-meta counts, no new backend. */
+async function countWelfare(params: Record<string, string>): Promise<number> {
+  const res = await api.get<Paginated<WelfareCaseRow>>('/api/welfare', {
+    query: { page: 1, limit: 1, ...params },
+  })
+  return res.meta.total
+}
+
+const { data: stripCounts } = await useAsyncData('welfare-strip', () =>
+  Promise.all([
+    countWelfare({ status: 'open' }),
+    countWelfare({ status: 'in_progress' }),
+    countWelfare({ status: 'resolved' }),
+    countWelfare({ status: 'all' }),
+  ]),
+)
+
+const stripItems = computed(() => [
+  {
+    label: 'Open cases',
+    value: stripCounts.value?.[0] ?? null,
+    to: '/welfare?status=open',
+    hint: 'Open + in progress',
+  },
+  {
+    label: 'In progress',
+    value: stripCounts.value?.[1] ?? null,
+    to: '/welfare?status=in_progress',
+    hint: 'Open filtered list',
+  },
+  {
+    label: 'Resolved',
+    value: stripCounts.value?.[2] ?? null,
+    to: '/welfare?status=resolved',
+    hint: 'Open filtered list',
+  },
+  {
+    label: 'All cases',
+    value: stripCounts.value?.[3] ?? null,
+    to: '/welfare?status=all',
+    hint: 'Open filtered list',
+  },
+])
 
 const rows = computed(() => data.value?.data ?? [])
 const total = computed(() => data.value?.meta.total ?? 0)
@@ -157,6 +210,8 @@ const priorityColor: Record<string, 'success' | 'warning' | 'neutral' | 'error'>
       title="Restricted on this account"
       :description="`Not shown here: ${restricted.join(', ')}. Case details and outcome notes are limited to branch, area and super administrators (data-model §10.1).`"
     />
+
+    <DashboardStrip :items="stripItems" />
 
     <UCard>
       <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">

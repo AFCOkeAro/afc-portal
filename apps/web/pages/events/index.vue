@@ -33,6 +33,17 @@ watch([when, type, branch, status, search], () => {
   page.value = 1
 })
 
+/** Same-page strip navigation (AFC-588): query-only link, sync the filters. */
+watch(
+  () => route.query,
+  (next: typeof route.query) => {
+    const whenNext = typeof next.when === 'string' ? next.when : null
+    if (whenNext && whenNext !== when.value) when.value = whenNext
+    const statusNext = typeof next.status === 'string' ? next.status : null
+    if (statusNext && statusNext !== status.value) status.value = statusNext
+  },
+)
+
 const query = computed(() => ({
   page: page.value,
   limit,
@@ -52,6 +63,50 @@ const { data, pending, error, refresh } = await useAsyncData(
 const branches = await useAsyncData('events-branches', () =>
   api.get<BranchSummary[]>('/api/branches'),
 )
+
+/** Dashboard strip (AFC-588): figures from list-meta counts, no new backend. */
+async function countEvents(params: Record<string, string>): Promise<number> {
+  const res = await api.get<Paginated<EventRow>>('/api/events', {
+    query: { page: 1, limit: 1, ...params },
+  })
+  return res.meta.total
+}
+
+const { data: stripCounts } = await useAsyncData('events-strip', () =>
+  Promise.all([
+    countEvents({ when: 'upcoming' }),
+    countEvents({ when: 'past' }),
+    countEvents({ when: 'all', status: 'published' }),
+    countEvents({ when: 'all', status: 'draft' }),
+  ]),
+)
+
+const stripItems = computed(() => [
+  {
+    label: 'Upcoming',
+    value: stripCounts.value?.[0] ?? null,
+    to: '/events?when=upcoming',
+    hint: 'Open filtered list',
+  },
+  {
+    label: 'Past',
+    value: stripCounts.value?.[1] ?? null,
+    to: '/events?when=past',
+    hint: 'Open filtered list',
+  },
+  {
+    label: 'Published',
+    value: stripCounts.value?.[2] ?? null,
+    to: '/events?when=all&status=published',
+    hint: 'Open filtered list',
+  },
+  {
+    label: 'Draft',
+    value: stripCounts.value?.[3] ?? null,
+    to: '/events?when=all&status=draft',
+    hint: 'Open filtered list',
+  },
+])
 
 const rows = computed(() => data.value?.data ?? [])
 const total = computed(() => data.value?.meta.total ?? 0)
@@ -131,6 +186,8 @@ const statusColor: Record<string, 'success' | 'warning' | 'neutral' | 'error'> =
         </PermissionGate>
       </template>
     </PageHeader>
+
+    <DashboardStrip :items="stripItems" />
 
     <UCard>
       <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">

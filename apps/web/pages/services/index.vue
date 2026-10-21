@@ -8,8 +8,8 @@ const route = useRoute()
 const showForm = ref(false)
 const searchInput = ref('')
 const search = ref('')
-const type = ref('all')
-const status = ref('all')
+const type = ref(queryParam('service_type') ?? 'all')
+const status = ref(queryParam('status') ?? 'all')
 
 function queryParam(name: string): string | null {
   const value = route.query[name]
@@ -30,6 +30,17 @@ watch(searchInput, (value: string) => {
 watch([type, status, branch, search], () => {
   page.value = 1
 })
+
+/** Same-page strip navigation (AFC-588): query-only link, sync the filters. */
+watch(
+  () => route.query,
+  (next: typeof route.query) => {
+    const typeNext = typeof next.service_type === 'string' ? next.service_type : null
+    if (typeNext && typeNext !== type.value) type.value = typeNext
+    const statusNext = typeof next.status === 'string' ? next.status : null
+    if (statusNext && statusNext !== status.value) status.value = statusNext
+  },
+)
 
 const query = computed(() => ({
   page: page.value,
@@ -53,6 +64,57 @@ const branches = await useAsyncData('services-branches', () =>
 const rows = computed(() => data.value?.data ?? [])
 const total = computed(() => data.value?.meta.total ?? 0)
 const pageCount = computed(() => Math.max(1, Math.ceil(total.value / limit)))
+
+/** Dashboard strip (AFC-588): figures from list-meta counts, no new backend. */
+async function countServices(params: Record<string, string>): Promise<number> {
+  const res = await api.get<Paginated<ServiceRow>>('/api/services', {
+    query: { page: 1, limit: 1, ...params },
+  })
+  return res.meta.total
+}
+
+const { data: stripCounts } = await useAsyncData('services-strip', () =>
+  Promise.all([
+    countServices({}),
+    countServices({ service_type: 'sunday' }),
+    countServices({ service_type: 'midweek' }),
+    countServices({ status: 'planned' }),
+    countServices({ status: 'completed' }),
+  ]),
+)
+
+const stripItems = computed(() => [
+  {
+    label: 'Services',
+    value: stripCounts.value?.[0] ?? null,
+    to: '/services',
+    hint: 'Open filtered list',
+  },
+  {
+    label: 'Sunday',
+    value: stripCounts.value?.[1] ?? null,
+    to: '/services?service_type=sunday',
+    hint: 'Open filtered list',
+  },
+  {
+    label: 'Midweek',
+    value: stripCounts.value?.[2] ?? null,
+    to: '/services?service_type=midweek',
+    hint: 'Open filtered list',
+  },
+  {
+    label: 'Planned',
+    value: stripCounts.value?.[3] ?? null,
+    to: '/services?status=planned',
+    hint: 'Open filtered list',
+  },
+  {
+    label: 'Completed',
+    value: stripCounts.value?.[4] ?? null,
+    to: '/services?status=completed',
+    hint: 'Open filtered list',
+  },
+])
 
 const typeOptions = [
   { label: 'Any service type', value: 'all' },
@@ -91,6 +153,8 @@ function formatDate(value: string): string {
         </PermissionGate>
       </template>
     </PageHeader>
+
+    <DashboardStrip :items="stripItems" />
 
     <UCard>
       <div class="grid gap-3 sm:grid-cols-4">
