@@ -65,7 +65,17 @@ export async function directusFetch<T>(
   const token = options.accessToken ?? String(config.directusServerToken ?? '')
   const url = `${directusBaseUrl(event)}${path}`
 
-  return requestWithRefresh<T>(event, url, path, options, token, false)
+  // Whether this call carries the session's current user token, resolved once
+  // up front and passed through the retry unchanged. Re-reading the sealed
+  // cookie after a refresh would compare the OLD request cookie against the NEW
+  // retried token and misclassify the retry as a server-token call.
+  const session = await readSession(event).catch(() => null)
+  const userToken =
+    session?.accessToken && session.accessToken === token
+      ? session.accessToken
+      : null
+
+  return attemptRequest<T>(event, url, path, options, token, session, userToken, false)
 }
 
 async function performDirectusRequest<T>(
@@ -94,22 +104,27 @@ async function performDirectusRequest<T>(
  * unhandled `DirectusAuthError` → Nitro 500 on every data route until the user
  * manually re-logged in. Now:
  *
- * - a 401/403 on a call carrying the session's current user token triggers one
+ * - a 401 on a call carrying the session's current user token triggers one
  *   `POST /auth/refresh` with the stored refresh token, reseals the session
  *   with the new pair, and retries the original request once;
  * - a user-token failure that cannot be refreshed (rotated/revoked refresh
  *   token) becomes a clean 401 `reauthenticate` so the UI routes to sign-in;
+ * - a 403 (missing permission OR missing collection/schema) is NEVER a token
+ *   problem: no refresh is attempted and it surfaces as a clean, named 403
+ *   instead of an unactionable 500;
  * - the server-token path (no session, or callers using the shared fallback
  *   token) is untouched: a rejection there is a deployment fault and still
  *   surfaces as `DirectusAuthError` (500), exactly as before — including the
  *   `/auth/login` flow, which runs with no session.
  */
-async function requestWithRefresh<T>(
+async function attemptRequest<T>(
   event: H3Event,
   url: string,
   path: string,
   options: DirectusFetchOptions,
   token: string,
+  session: PortalSessionData | null,
+  userToken: string | null,
   retried: boolean,
 ): Promise<T> {
   try {
@@ -119,16 +134,29 @@ async function requestWithRefresh<T>(
     if (!(mapped instanceof DirectusAuthError)) {
       throw mapped
     }
-    const session = await readSession(event).catch(() => null)
-    const isUserToken =
-      !!session?.accessToken && session.accessToken === token
-    if (!isUserToken) {
+    if (!userToken || !session) {
       throw mapped
+    }
+    if (readDirectusStatus(cause) !== 401) {
+      throw createError({
+        statusCode: 403,
+        statusMessage: `Directus denied access to ${path} — check Directus permissions or schema`,
+        data: { code: 'directus_forbidden', path },
+      })
     }
     if (!retried) {
       const retryToken = await tryRefreshSessionToken(event, session)
       if (retryToken) {
-        return requestWithRefresh<T>(event, url, path, options, retryToken, true)
+        return attemptRequest<T>(
+          event,
+          url,
+          path,
+          options,
+          retryToken,
+          session,
+          userToken,
+          true,
+        )
       }
     }
     throw createError({
@@ -213,6 +241,14 @@ async function doRefreshSessionToken(
   } catch {
     return null
   }
+}
+
+function readDirectusStatus(cause: unknown): number {
+  const error = cause as {
+    statusCode?: number
+    status?: number
+  }
+  return error?.statusCode ?? error?.status ?? 500
 }
 
 function mapDirectusError(cause: unknown, path: string): Error {
