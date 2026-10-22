@@ -55,6 +55,8 @@ export default defineNuxtConfig({
         { name: 'apple-mobile-web-app-capable', content: 'yes' },
         { name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' },
         { name: 'apple-mobile-web-app-title', content: 'AFC Portal' },
+        { name: 'msapplication-TileColor', content: '#052e16' },
+        { name: 'msapplication-config', content: '/browserconfig.xml' },
       ],
     },
   },
@@ -107,6 +109,10 @@ export default defineNuxtConfig({
     // is not cacheable.
     '/register': { ssr: true },
     '/api/**': { cors: false },
+    // The worker script and manifest must revalidate, never stick behind an
+    // edge cache: a stale worker or manifest poisons installability checks.
+    '/pwa-sw.js': { headers: { 'cache-control': 'public, max-age=0, must-revalidate' } },
+    '/manifest.webmanifest': { headers: { 'cache-control': 'public, max-age=0, must-revalidate' } },
   },
 
   // The app manifest is Nuxt's build-polling feature for a statically served
