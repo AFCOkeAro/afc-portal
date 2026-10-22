@@ -199,26 +199,6 @@ const menuItems = computed(() => [
 
 <template>
   <div class="min-h-screen lg:flex">
-    <!-- Mobile app bar: persistent brand + menu button. The drawer slides
-      away when closed, so the control that opens it must live outside it. -->
-    <div class="sticky top-0 z-30 flex h-16 items-center justify-between gap-1 border-b border-gray-200 bg-white/95 px-3 backdrop-blur lg:hidden dark:border-gray-800 dark:bg-gray-900/95">
-      <NuxtLink
-        to="/dashboard"
-        class="flex min-w-0 items-center gap-2 rounded-lg px-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500"
-      >
-        <UIcon name="i-lucide-church" class="size-6 shrink-0 text-primary-500" />
-        <span class="truncate font-semibold">AFC Portal</span>
-      </NuxtLink>
-      <button
-        type="button"
-        class="rounded-lg p-2 text-gray-500 hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:text-gray-400 dark:hover:bg-gray-800"
-        aria-label="Open menu"
-        aria-controls="portal-sections-nav"
-        @click="mobileOpen = true"
-      >
-        <UIcon name="i-lucide-menu" class="size-5" />
-      </button>
-    </div>
     <!-- Mobile drawer backdrop. -->
     <div
       v-if="mobileOpen"
@@ -359,13 +339,30 @@ const menuItems = computed(() => [
       <header
         class="sticky top-0 z-10 flex h-16 items-center justify-between gap-2 border-b border-gray-200 bg-white/80 px-3 backdrop-blur sm:px-5 dark:border-gray-800 dark:bg-gray-950/80"
       >
-        <div class="min-w-0 shrink-0">
-          <p class="truncate text-sm font-medium text-gray-900 dark:text-white">
-            {{ user?.email ?? 'Not signed in' }}
-          </p>
-          <p class="truncate text-xs text-gray-500 dark:text-gray-400">
-            {{ user?.staffRole?.replace(/_/g, ' ') ?? '' }}
-          </p>
+        <div class="flex min-w-0 flex-1 items-center gap-1">
+          <button
+            type="button"
+            class="shrink-0 rounded-lg p-2 text-gray-500 hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 lg:hidden dark:text-gray-400 dark:hover:bg-gray-800"
+            aria-label="Open menu"
+            aria-controls="portal-sections-nav"
+            @click="mobileOpen = true"
+          >
+            <UIcon name="i-lucide-menu" class="size-5" />
+          </button>
+          <NuxtLink
+            to="/dashboard"
+            class="flex min-w-0 shrink-0 items-center gap-2 rounded-lg px-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 lg:hidden"
+          >
+            <UIcon name="i-lucide-church" class="size-6 shrink-0 text-primary-500" />
+          </NuxtLink>
+          <div class="hidden min-w-0 shrink-0 lg:block">
+            <p class="truncate text-sm font-medium text-gray-900 dark:text-white">
+              {{ user?.email ?? 'Not signed in' }}
+            </p>
+            <p class="truncate text-xs text-gray-500 dark:text-gray-400">
+              {{ user?.staffRole?.replace(/_/g, ' ') ?? '' }}
+            </p>
+          </div>
         </div>
 
         <!-- Header search (AFC-585): desktop field, mobile icon-expands. -->
