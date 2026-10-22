@@ -37,6 +37,12 @@ services:
       NUXT_PUBLIC_DIRECTUS_URL: ${NUXT_PUBLIC_DIRECTUS_URL:-}
       NUXT_DIRECTUS_SERVER_TOKEN: ${NUXT_DIRECTUS_SERVER_TOKEN:-}
       NUXT_DIRECTUS_PUBLIC_TOKEN: ${NUXT_DIRECTUS_PUBLIC_TOKEN:-}
+      # Admin-surface only (AFC-669 roles/permissions management): the portal
+      # server logs in as the Directus administrator for role/policy reads
+      # and writes. Names only here; values resolve from services/staging/.env
+      # on the host, same as every other entry in this block.
+      DIRECTUS_ADMIN_EMAIL: ${DIRECTUS_ADMIN_EMAIL:-}
+      DIRECTUS_ADMIN_PASSWORD: ${DIRECTUS_ADMIN_PASSWORD:-}
       NITRO_HOST: 0.0.0.0
       NITRO_PORT: 3000
     expose:

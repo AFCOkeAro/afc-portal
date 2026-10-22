@@ -1,6 +1,8 @@
-import type { CapabilitiesPayload } from '@afc/shared'
+import type { CapabilitiesPayload, Grant } from '@afc/shared'
+import { readableCollections, sortGrants, writableCollections } from '@afc/shared'
 import { capabilitiesForRole } from '@afc/shared/role-matrix'
 import { requireSession } from '../../utils/session'
+import { customGrantsForRole, isBuiltInRole } from '../../utils/custom-grants'
 
 /**
  * GET /api/me/permissions
@@ -28,6 +30,29 @@ export default defineEventHandler(async (event): Promise<CapabilitiesPayload> =>
     zoneId: session.user.zoneId ?? null,
     zoneIds: session.user.zoneIds ?? [],
   })
+
+  // Custom roles (AFC-669) resolve through Directus permissions rather than
+  // the code matrix, so the sidebar sees the same grants the route gate
+  // enforces. Fail-closed: a resolution failure keeps the empty payload.
+  if (!isBuiltInRole(String(session.user.staffRole))) {
+    const custom: Grant[] = await customGrantsForRole(
+      event,
+      String(session.user.staffRole),
+    ).catch(() => [] as Grant[])
+    if (custom.length > 0) {
+      const grants = sortGrants(custom)
+      return {
+        grants,
+        readable: readableCollections(grants),
+        writable: writableCollections(grants),
+        hiddenFields: {},
+        scoped:
+          session.user.branchId !== null ||
+          (session.user.zoneId ?? null) !== null ||
+          (session.user.zoneIds ?? []).length > 0,
+      }
+    }
+  }
 
   // A session with no branch and no area grant sees nothing (data-model §9
   // rule 5, fail closed). `capabilitiesForRole` already returns an empty grant

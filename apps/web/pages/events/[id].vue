@@ -4,9 +4,9 @@ import { ApiRequestError } from '~/composables/useApi'
 import type { BranchSummary, EventDetail, RegistrationRow } from '~/types/portal'
 
 /**
- * Programme detail (AFC-649 §A–D, F): hero with public link + 6 tabs
- * (Overview, Registrations, Check-in, Reports, Schedule, Materials)
- * matching the reference screenshots.
+ * Programme detail (AFC-649 §A–D, F; AFC-666 Tasks tab): hero with public
+ * link + 7 tabs (Overview, Registrations, Check-in, Reports, Schedule,
+ * Materials, Tasks) matching the reference screenshots.
  *
  * Data paths unchanged (GET /api/events/[id], rollups, check-in,
  * registrations, invites, visitors — all scope-filtered server-side).
@@ -33,6 +33,7 @@ const TABS = [
   { id: 'reports', label: 'Reports', icon: 'i-lucide-chart-column' },
   { id: 'schedule', label: 'Schedule', icon: 'i-lucide-calendar-days' },
   { id: 'materials', label: 'Materials', icon: 'i-lucide-folder-open' },
+  { id: 'tasks', label: 'Tasks', icon: 'i-lucide-square-kanban' },
 ] as const
 
 type TabId = (typeof TABS)[number]['id']
@@ -551,7 +552,7 @@ async function afterRegistrationSaved(): Promise<void> {
         :description="restrictedMessage"
       />
 
-      <!-- 6 tabs -->
+      <!-- 7 tabs -->
       <nav aria-label="Programme sections" class="mt-4">
         <div
           class="flex gap-1 overflow-x-auto rounded-xl border border-gray-200 bg-white p-1 dark:border-gray-800 dark:bg-gray-900"
@@ -1368,6 +1369,17 @@ async function afterRegistrationSaved(): Promise<void> {
             />
           </EmptyState>
         </UCard>
+      </section>
+
+      <!-- TASKS (AFC-666 board; AFC-668 recurring checklist) -->
+      <section v-if="tab === 'tasks'" aria-label="Programme tasks" class="mt-4">
+        <TaskViews
+          :branch-id="event.branch"
+          description="Tasks filed under this programme's branch — one list, six views."
+          template-id="event_programme"
+          :related-id="String(event.id)"
+          :base-date="event.start_at.slice(0, 10)"
+        />
       </section>
 
       <!-- Modals (unchanged) -->

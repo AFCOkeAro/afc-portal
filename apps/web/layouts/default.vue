@@ -10,6 +10,7 @@ import type { NavigationItem } from '~/utils/navigation'
 
 const { user, logout } = useAuth()
 const permissions = usePermissions()
+const route = useRoute()
 
 const items = computed(() =>
   NAVIGATION.filter(
@@ -30,13 +31,21 @@ const sections = computed(() =>
 )
 
 /**
- * Collapsible sidebar state (AFC-565). All groups render collapsed on fresh
- * load; the expanded set persists per browser in localStorage so users are
- * not forced to re-expand on every navigation. SSR renders collapsed (empty
- * set) and hydration restores the stored set on mount.
+ * Accordion sidebar state. Exactly one section is open at a time: opening a
+ * section closes the others, and the choice persists per browser in
+ * localStorage. SSR renders collapsed and hydration restores on mount. The
+ * section holding the current route opens automatically on navigation, so
+ * the menu always reflects where the account is.
  */
 const SIDEBAR_EXPANDED_KEY = 'afc:sidebar-expanded-v1'
 const expandedKeys = ref<string[]>([])
+
+/**
+ * Mobile drawer state. Below the lg breakpoint the menu lives behind a
+ * hamburger button in the brand row instead of pushing content down the
+ * page; it closes on every navigation. Desktop is unaffected.
+ */
+const mobileOpen = ref(false)
 
 /**
  * Icon-rail state. On large screens the sidebar collapses to a narrow rail
@@ -70,22 +79,79 @@ function persistExpanded(): void {
 }
 
 function toggleSection(key: string): void {
-  expandedKeys.value = isExpanded(key)
-    ? expandedKeys.value.filter((k: string) => k !== key)
-    : [...expandedKeys.value, key]
+  expandedKeys.value = isExpanded(key) ? [] : [key]
   persistExpanded()
 }
+
+/** The section holding a path: exact item match, else longest prefix (so
+ *  detail pages like /tasks/:id keep their section open). */
+function sectionForPath(path: string): string | null {
+  let best: { key: string; length: number } | null = null
+  for (const section of sections.value) {
+    for (const item of section.items) {
+      if (path === item.to || path.startsWith(`${item.to}/`)) {
+        if (!best || item.to.length > best.length) best = { key: section.key, length: item.to.length }
+      }
+    }
+  }
+  return best?.key ?? null
+}
+
+watch(
+  () => route.path,
+  (path) => {
+    mobileOpen.value = false
+    const current = sectionForPath(path)
+    if (current !== null && !isExpanded(current)) {
+      expandedKeys.value = [current]
+      persistExpanded()
+    }
+  },
+)
+
+/** Escape closes the mobile drawer; the open drawer locks body scroll so
+ *  the page underneath stays put. */
+function onEscape(event: KeyboardEvent): void {
+  if (event.key === 'Escape') mobileOpen.value = false
+}
+
+watch(mobileOpen, (open) => {
+  try {
+    document.body.style.overflow = open ? 'hidden' : ''
+  } catch {
+    // Non-DOM environment: nothing to lock.
+  }
+})
+
+onMounted(() => {
+  window.addEventListener('keydown', onEscape)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', onEscape)
+  try {
+    document.body.style.overflow = ''
+  } catch {
+    // Non-DOM environment: nothing to unlock.
+  }
+})
 
 onMounted(() => {
   try {
     const raw = window.localStorage.getItem(SIDEBAR_EXPANDED_KEY)
     if (raw) {
       const parsed: unknown = JSON.parse(raw)
-      if (Array.isArray(parsed))
-        expandedKeys.value = parsed.filter((k): k is string => typeof k === 'string')
+      if (Array.isArray(parsed)) {
+        const keys = parsed.filter((k): k is string => typeof k === 'string')
+        if (keys.length > 0) expandedKeys.value = [keys[0]]
+      }
     }
   } catch {
     expandedKeys.value = []
+  }
+  if (expandedKeys.value.length === 0) {
+    const current = sectionForPath(route.path)
+    if (current !== null) expandedKeys.value = [current]
   }
 
   try {
@@ -133,11 +199,41 @@ const menuItems = computed(() => [
 
 <template>
   <div class="min-h-screen lg:flex">
+    <!-- Mobile app bar: persistent brand + menu button. The drawer slides
+      away when closed, so the control that opens it must live outside it. -->
+    <div class="sticky top-0 z-30 flex h-16 items-center justify-between gap-1 border-b border-gray-200 bg-white/95 px-3 backdrop-blur lg:hidden dark:border-gray-800 dark:bg-gray-900/95">
+      <NuxtLink
+        to="/dashboard"
+        class="flex min-w-0 items-center gap-2 rounded-lg px-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500"
+      >
+        <UIcon name="i-lucide-church" class="size-6 shrink-0 text-primary-500" />
+        <span class="truncate font-semibold">AFC Portal</span>
+      </NuxtLink>
+      <button
+        type="button"
+        class="rounded-lg p-2 text-gray-500 hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:text-gray-400 dark:hover:bg-gray-800"
+        aria-label="Open menu"
+        aria-controls="portal-sections-nav"
+        @click="mobileOpen = true"
+      >
+        <UIcon name="i-lucide-menu" class="size-5" />
+      </button>
+    </div>
+    <!-- Mobile drawer backdrop. -->
+    <div
+      v-if="mobileOpen"
+      class="fixed inset-0 z-40 bg-gray-950/50 lg:hidden"
+      aria-hidden="true"
+      @click="mobileOpen = false"
+    />
     <aside
-      class="border-b border-gray-200 bg-white transition-[width] lg:fixed lg:inset-y-0 lg:border-b-0 lg:border-r dark:border-gray-800 dark:bg-gray-900"
-      :class="railCollapsed ? 'lg:w-16' : 'lg:w-64'"
+      class="fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col border-r border-gray-200 bg-white transition-transform duration-200 ease-out lg:inset-y-0 lg:z-auto dark:border-gray-800 dark:bg-gray-900"
+      :class="[
+        mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
+        railCollapsed ? 'lg:w-16' : 'lg:w-64',
+      ]"
     >
-      <div class="flex h-16 items-center justify-between gap-1 px-3">
+      <div class="flex h-16 shrink-0 items-center justify-between gap-1 px-3">
         <NuxtLink
           to="/dashboard"
           class="flex min-w-0 items-center gap-2 rounded-lg px-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500"
@@ -146,6 +242,16 @@ const menuItems = computed(() => [
           <UIcon name="i-lucide-church" class="size-6 shrink-0 text-primary-500" />
           <span v-if="!railCollapsed" class="truncate font-semibold">AFC Portal</span>
         </NuxtLink>
+        <button
+          type="button"
+          class="rounded-lg p-2 text-gray-500 hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 lg:hidden dark:text-gray-400 dark:hover:bg-gray-800"
+          :aria-label="mobileOpen ? 'Close menu' : 'Open menu'"
+          :aria-expanded="mobileOpen ? 'true' : 'false'"
+          aria-controls="portal-sections-nav"
+          @click="mobileOpen = !mobileOpen"
+        >
+          <UIcon :name="mobileOpen ? 'i-lucide-x' : 'i-lucide-menu'" class="size-5" />
+        </button>
       </div>
 
       <div class="hidden px-3 lg:block">
@@ -165,15 +271,18 @@ const menuItems = computed(() => [
         </button>
       </div>
 
-      <nav aria-label="Portal sections" class="px-3 pb-4 lg:pb-6">
-        <!-- Full menu: mobile always, desktop while expanded. -->
-        <div :class="railCollapsed ? 'lg:hidden' : ''">
+      <nav aria-label="Portal sections" class="min-h-0 flex-1 overflow-y-auto px-3 pb-4 lg:pb-6">
+        <!-- Full menu: overlay drawer on mobile, static sidebar on desktop. -->
+        <div
+          id="portal-sections-nav"
+          :class="railCollapsed ? 'lg:hidden' : ''"
+        >
           <div v-for="section in sections" :key="section.key" class="mt-4 first:mt-1">
             <div class="flex items-center gap-1">
               <NuxtLink
                 :to="section.to"
                 class="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-3 py-1 text-xs font-semibold uppercase tracking-wide text-gray-500 hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:text-gray-400 dark:hover:bg-gray-800"
-                :title="`${section.label} overview`"
+                :title="`Open ${section.label}`"
               >
                 <UIcon :name="section.icon" class="size-4 shrink-0" />
                 <span class="truncate">{{ section.label }}</span>
