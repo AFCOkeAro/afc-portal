@@ -56,6 +56,7 @@ watch(
         />
         <UButton
           :to="`/marriage-cases/${props.caseId}?print=1`"
+          target="_blank"
           color="neutral"
           variant="ghost"
           size="sm"

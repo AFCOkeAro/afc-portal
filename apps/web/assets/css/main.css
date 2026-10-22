@@ -107,6 +107,10 @@
     padding: 0 0 12mm;
   }
 
+  .print-sheet .print-page:last-child {
+    break-after: auto;
+  }
+
   .print-sheet h1 {
     font-size: 18pt;
     font-weight: 700;

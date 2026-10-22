@@ -185,10 +185,10 @@ const prefillNote = ref('')
 function blankFor(defs: FieldDef[]): Record<string, unknown> {
   const out: Record<string, unknown> = {}
   for (const def of defs) {
-    if (def.type === 'switch') out[def.name] = false
-    else if (def.type === 'answers') out[def.name] = Array.from({ length: def.count ?? 0 }, () => '')
-    else if (def.type === 'numbers') out[def.name] = []
-    else out[def.name] = ''
+    if (def.type === 'switch') setInto(out, def.name, false)
+    else if (def.type === 'answers') setInto(out, def.name, Array.from({ length: def.count ?? 0 }, () => ''))
+    else if (def.type === 'numbers') setInto(out, def.name, [])
+    else setInto(out, def.name, '')
   }
   if (formKey.value === 'engagement_list') out.spiritual_items = '1 White Holy Bible (KJV)'
   if (formKey.value === 'vows') out.vow_type = 'B'
@@ -243,6 +243,7 @@ function setInto(target: Record<string, unknown>, name: string, value: unknown) 
   let node = target
   for (let index = 0; index < parts.length - 1; index += 1) {
     const part = parts[index] as string
+    if (node[part] === null || typeof node[part] !== 'object') node[part] = {}
     node = node[part] as Record<string, unknown>
   }
   node[parts[parts.length - 1] as string] = value
@@ -309,15 +310,9 @@ async function prefillWeddingInfo() {
     for (const side of ['brother', 'sister'] as const) {
       const person = response.data[side]
       if (!person) continue
-      if (side === 'brother') {
-        next['brother.surname'] = person.surname ?? ''
-        next['brother.other_names'] = person.other_names ?? ''
-        next['brother.date_of_birth'] = person.date_of_birth ?? ''
-      } else {
-        next['sister.surname'] = person.surname ?? ''
-        next['sister.other_names'] = person.other_names ?? ''
-        next['sister.date_of_birth'] = person.date_of_birth ?? ''
-      }
+      setPath(`${side}.surname`, person.surname ?? '')
+      setPath(`${side}.other_names`, person.other_names ?? '')
+      setPath(`${side}.date_of_birth`, person.date_of_birth ?? '')
     }
     values.value = { ...next }
     prefillNote.value = 'Filled from the people records. Check every field, then tick verified.'

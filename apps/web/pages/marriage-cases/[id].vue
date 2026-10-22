@@ -180,6 +180,7 @@ onMounted(async () => {
           icon="i-lucide-printer"
           label="Print version"
           :to="`/marriage-cases/${id}?print=1`"
+          target="_blank"
         />
         <UButton
           color="neutral"
