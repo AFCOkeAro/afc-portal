@@ -32,6 +32,63 @@ export type MarriageType = (typeof MARRIAGE_TYPES)[number]
 export const MARRIAGE_STATUSES = ['open', 'in_progress', 'completed', 'closed'] as const
 export type MarriageStatus = (typeof MARRIAGE_STATUSES)[number]
 
+/**
+ * Marriage pipeline stages (AFC-674 scope A). Brother/sister language only --
+ * the pipeline never names a groom or a bride. Order is the user flow:
+ * branch introduction -> zonal pastor -> Area Overseer -> ... -> wedding ->
+ * reported, with `halted` (reason required, from any stage) and
+ * `transferred_out` (receiving branch required, sister out-of-area) as the
+ * terminal closes. Forward order is enforced by the routes (phase C), not
+ * by a CHECK -- the database owns only the closed vocabulary plus the
+ * actor-independent closes (halt reason, transfer destination, rehearsal
+ * lead time).
+ */
+export const MARRIAGE_CASE_STAGES = [
+  'introduction',
+  'zonal_review',
+  'overseer_review',
+  'proposal_male',
+  'counselling_prayer',
+  'parental_consent_brother',
+  'propose',
+  'sister_prayer',
+  'proposal_female',
+  'parental_consent_sister',
+  'terms_signatures',
+  'family_introduction',
+  'date_fixed',
+  'questionnaires_counselling',
+  'lga_certificate',
+  'engagement_schedule',
+  'wedding_info',
+  'music_selection',
+  'ministers_mail',
+  'attire_check',
+  'announcements_calendar',
+  'rehearsal',
+  'wedding',
+  'reported',
+  'halted',
+  'transferred_out',
+] as const
+export type MarriageCaseStage = (typeof MARRIAGE_CASE_STAGES)[number]
+
+/** Vow wording choice. Defaults to B; the wording source is transcribed in phase B. */
+export const MARRIAGE_VOW_DEFAULT = 'B' as const
+
+export const MARRIAGE_CERTIFICATE_TYPES = ['lga', 'fg', 'church', 'other'] as const
+export type MarriageCertificateType = (typeof MARRIAGE_CERTIFICATE_TYPES)[number]
+
+export const MARRIAGE_CASE_EVENT_TYPES = [
+  'created',
+  'stage_changed',
+  'halted',
+  'transferred_out',
+  'approved',
+  'note',
+] as const
+export type MarriageCaseEventType = (typeof MARRIAGE_CASE_EVENT_TYPES)[number]
+
 export const MINUTES_STATUSES = ['draft', 'final', 'published'] as const
 export type MinutesStatus = (typeof MINUTES_STATUSES)[number]
 
@@ -185,6 +242,73 @@ export const marriageFormSchema = z.object({
   notes: optionalNote(),
 })
 export type MarriageForm = z.infer<typeof marriageFormSchema>
+
+/**
+ * Marriage pipeline case (AFC-674 scope A). The create form names the
+ * brother (required anchor) and optionally the sister (nullable until she
+ * is linked in-DB); scope resolves server-side. Dates, files, vow choice
+ * and report columns are filled per stage by the routes, never all at once.
+ */
+export interface MarriageCase {
+  id: string
+  brother_person: string
+  sister_person: string | null
+  branch: string
+  zone: string | null
+  stage: MarriageCaseStage
+  halt_reason: string | null
+  transfer_to_branch: string | null
+  wedding_date: string | null
+  rehearsal_date: string | null
+  engagement_date: string | null
+  vow_type: string
+  wedding_info_verified: boolean
+  terms_signed: boolean
+  officiating_minister: string | null
+  bible_passage: string | null
+  certificate_type: MarriageCertificateType | null
+  notes: string | null
+  created_by: string | null
+}
+
+export const marriageCaseFormSchema = z.object({
+  brother_person: z.string().uuid('Choose the brother'),
+  sister_person: z.string().uuid().optional(),
+  branch: branchRef,
+  wedding_date: dateSchema.optional(),
+  rehearsal_date: dateSchema.optional(),
+  engagement_date: dateSchema.optional(),
+  vow_type: z.string().trim().min(1, 'Choose the vow wording').default(MARRIAGE_VOW_DEFAULT),
+  notes: optionalNote(),
+})
+export type MarriageCaseForm = z.infer<typeof marriageCaseFormSchema>
+
+/**
+ * Stage transition (phase C routes). `halted` requires a reason;
+ * `transferred_out` requires the receiving branch; the wedding-info
+ * verify checkbox must be ticked before leaving `wedding_info`.
+ * Forward order itself is a route rule with the contract suite.
+ */
+export const marriageCaseTransitionSchema = z
+  .object({
+    to_stage: z.enum(MARRIAGE_CASE_STAGES),
+    halt_reason: optionalNote(),
+    transfer_to_branch: optionalText(36),
+    wedding_info_verified: z.boolean().optional(),
+  })
+  .superRefine((v, ctx) => {
+    if (v.to_stage === 'halted' && !v.halt_reason) {
+      ctx.addIssue({ code: 'custom', path: ['halt_reason'], message: 'Give the reason for halting' })
+    }
+    if (v.to_stage === 'transferred_out' && !v.transfer_to_branch) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['transfer_to_branch'],
+        message: 'Name the receiving branch',
+      })
+    }
+  })
+export type MarriageCaseTransition = z.infer<typeof marriageCaseTransitionSchema>
 
 export const minutesFormSchema = z
   .object({

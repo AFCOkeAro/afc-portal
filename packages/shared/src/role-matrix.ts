@@ -653,6 +653,29 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     none: [NONE, 'none'],
     zone_admin: [R, 'own_zone'],
   },
+  // Marriage pipeline (AFC-674 scope A). Same holders as marriageMatters:
+  // the pipeline replaces single-matter CRUD for new couples but the
+  // ministry facts stay with the same readers (welfare-dept R and
+  // own-household R are policy/record-level, as above). No wider grant.
+  [COLLECTIONS.marriageCases]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [ALL, 'all'],
+    branch_admin: [CRU, 'own_branch', 'CRU (own)'],
+    department_leader: [R, 'assigned_departments', 'R (welfare dept via policy)'],
+    volunteer: [NONE, 'none'],
+    // "R (own)": household reads its own case; enforced record-level.
+    none: [R, 'public_only', 'R (own household via policy)'],
+    zone_admin: [CRU, 'own_zone'],
+  },
+  [COLLECTIONS.marriageCaseEvents]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [R, 'all'],
+    branch_admin: [R, 'own_branch'],
+    department_leader: [R, 'assigned_departments', 'assigned welfare'],
+    volunteer: [NONE, 'none'],
+    none: [NONE, 'none'],
+    zone_admin: [R, 'own_zone'],
+  },
   [COLLECTIONS.officeMinutes]: {
     super_admin: [ALL, 'all'],
     area_admin: [ALL, 'all'],

@@ -97,6 +97,15 @@ export const COLLECTIONS = {
   transferEvents: 'transfer_events',
   marriageMatters: 'marriage_matters',
   marriageMatterEvents: 'marriage_matter_events',
+  /**
+   * Marriage pipeline (AFC-674 scope A). `marriageCases` is the staged
+   * brother/sister pipeline (one row per couple); `marriageCaseEvents` is
+   * the explicit stage history (created/stage_changed/halted/
+   * transferred_out/approved/note), following the welfare_case_events
+   * precedent. `marriageMatters` (single-matter CRUD) stays for history.
+   */
+  marriageCases: 'marriage_cases',
+  marriageCaseEvents: 'marriage_case_events',
   officeMinutes: 'office_minutes',
   minutesAttendees: 'minutes_attendees',
   officeMinuteEvents: 'office_minute_events',
