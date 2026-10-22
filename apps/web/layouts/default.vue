@@ -83,14 +83,40 @@ function toggleSection(key: string): void {
   persistExpanded()
 }
 
-/** The section holding a path: exact item match, else longest prefix (so
- *  detail pages like /tasks/:id keep their section open). */
+/** A header tap is an explicit selection: open that section at once, even
+ *  when the route watcher cannot tell it apart (shared canonical routes,
+ *  or a page whose path matches no single item). */
+function selectSection(key: string): void {
+  expandedKeys.value = [key]
+  persistExpanded()
+}
+
+/** The section holding a path. Group canonical routes win first (the headers
+ *  navigate to those, and two groups share /departments): on an exact group
+ *  match the already-open group is kept so a tap never jumps sections.
+ *  Otherwise the longest item-prefix match wins, so detail pages like
+ *  /tasks/:id keep their section open. */
 function sectionForPath(path: string): string | null {
+  const exact = NAVIGATION_GROUPS.filter((group) => group.to === path).map(
+    (group) => group.key,
+  )
+  if (exact.length === 1) return exact[0]
+  if (exact.length > 1) {
+    return exact.find((key) => isExpanded(key)) ?? exact[0]
+  }
   let best: { key: string; length: number } | null = null
   for (const section of sections.value) {
     for (const item of section.items) {
       if (path === item.to || path.startsWith(`${item.to}/`)) {
-        if (!best || item.to.length > best.length) best = { key: section.key, length: item.to.length }
+        if (!best || item.to.length > best.length) {
+          best = { key: section.key, length: item.to.length }
+        } else if (
+          item.to.length === best.length &&
+          section.key !== best.key &&
+          isExpanded(section.key)
+        ) {
+          best = { key: section.key, length: item.to.length }
+        }
       }
     }
   }
@@ -263,6 +289,7 @@ const menuItems = computed(() => [
                 :to="section.to"
                 class="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-3 py-1 text-xs font-semibold uppercase tracking-wide text-gray-500 hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:text-gray-400 dark:hover:bg-gray-800"
                 :title="`Open ${section.label}`"
+                @click="selectSection(section.key)"
               >
                 <UIcon :name="section.icon" class="size-4 shrink-0" />
                 <span class="truncate">{{ section.label }}</span>
