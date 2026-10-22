@@ -297,6 +297,156 @@ describe('office — routes', () => {
   })
 })
 
+describe('office — minutes attendee attach (AFC-701 verdict B, AFC-702 F1–F4)', () => {
+  const ATTACH = 'apps/web/server/api/minutes/[id].attendees.post.ts'
+
+  it('update holders keep the existing path; no minutes_attendees grant is consulted', () => {
+    const src = codeOf(ATTACH)
+    assert.match(
+      src,
+      /can\(scope, 'office_minutes', 'update'\)/,
+      'update fast path present',
+    )
+    assert.match(
+      src,
+      /requireCan\(scope, 'office_minutes', 'update'\)/,
+      'existing 403 shape reused',
+    )
+    assert.doesNotMatch(
+      src,
+      /can\(scope, 'minutes_attendees'/,
+      'no minutes_attendees capability check',
+    )
+    assert.doesNotMatch(
+      src,
+      /requireCan\(scope, 'minutes_attendees'/,
+      'no minutes_attendees gate',
+    )
+  })
+
+  it('exception opens only for create + own scoped row + authorship + draft, else 403', () => {
+    const src = codeOf(ATTACH)
+    assert.match(src, /can\(scope, 'office_minutes', 'create'\)/, 'create check present')
+    assert.match(src, /scopeFilter\(scope\)/, 'same-branch scoped load unchanged')
+    assert.match(src, /created_by/, 'authorship is read from the row')
+    assert.match(
+      src,
+      /createdBy === scope\.session\.user\.id/,
+      'strict author match, NULL never passes',
+    )
+    assert.match(
+      src,
+      /row\.status !== 'draft'/,
+      'exact-draft match denies final/published',
+    )
+  })
+
+  it('positive shape: a create-only author reaching createItem has passed all three gates', () => {
+    const src = codeOf(ATTACH)
+    const createGate = src.indexOf("can(scope, 'office_minutes', 'create')")
+    const authorGate = src.indexOf('createdBy === scope.session.user.id')
+    const draftGate = src.indexOf("row.status !== 'draft'")
+    const write = src.indexOf("'minutes_attendees',")
+    assert.ok(
+      createGate !== -1 && authorGate !== -1 && draftGate !== -1,
+      'all gates present',
+    )
+    assert.ok(
+      createGate < write && authorGate < write && draftGate < write,
+      'all gates precede the minutes_attendees write',
+    )
+  })
+
+  it('negative shapes stay denied: other author, out-of-scope branch, non-draft, neither capability', () => {
+    const src = codeOf(ATTACH)
+    // Other author: strict author match fails -> falls through to requireCan(update) 403.
+    assert.match(src, /isAuthor/, 'other-author denial path present')
+    // Out-of-scope branch: scoped load 404s before any gate passes.
+    assert.match(
+      src,
+      /findScopedItem[\s\S]*office_minutes[\s\S]*scopeFilter\(scope\)/,
+      'scoped load 404s out-of-scope branches',
+    )
+    // Non-draft: exact-draft check denies -> requireCan(update) 403.
+    assert.match(src, /status.*draft/, 'non-draft denial path present')
+    // Neither create nor update: requireCan(update) throws the existing 403.
+    assert.match(
+      src,
+      /if \(!can\(scope, 'office_minutes', 'create'\)\)/,
+      'no-create no-update callers denied',
+    )
+  })
+
+  it('F4: uuid boundary guard and explicit fail-closed row fields', () => {
+    const src = codeOf(ATTACH)
+    assert.match(src, /assertUuidParam/, ':id validated before any store read')
+    assert.match(src, /invalid_minutes_id/, 'named invalid-id code')
+    assert.match(src, /'created_by', 'status'/, 'explicit row fields requested')
+  })
+
+  it('F2: attached person resolves in-scope and attendee_user existence is verified', () => {
+    const src = codeOf(ATTACH)
+    assert.match(
+      src,
+      /findScopedItem\(event, scope, 'people', parsed\.data\.person/,
+      'person resolves inside caller scope (404 otherwise)',
+    )
+    assert.match(
+      src,
+      /isUuid\(parsed\.data\.person\)/,
+      'malformed person id is 400, never SQL',
+    )
+    assert.match(
+      src,
+      /isUuid\(parsed\.data\.attendee_user\)/,
+      'malformed attendee_user id is 400, never SQL',
+    )
+    assert.match(src, /\/users\//, 'attendee_user existence is read, not trusted')
+    assert.match(
+      src,
+      /attendee_user_unverifiable/,
+      'unreadable user registry fails closed (503), never allows',
+    )
+  })
+
+  it('F3: every successful attach writes an audit row with a storable event type', () => {
+    const src = codeOf(ATTACH)
+    assert.match(src, /writeOfficeAudit/, 'audit helper used')
+    assert.match(src, /office_minute_events/, 'audit lands in the minute trail')
+    assert.match(src, /event_type: 'note'/, 'uses a CHECK-allowed event type')
+    assert.doesNotMatch(src, /attendee_added/, 'never writes the non-storable type')
+    const write = src.indexOf("'minutes_attendees',")
+    const audit = src.indexOf("writeOfficeAudit(event, scope, 'office_minute_events'")
+    assert.ok(write !== -1 && audit !== -1, 'write and audit calls present')
+    assert.ok(audit > write, 'audit follows the successful write')
+  })
+
+  it('F1: role matrix untouched — minutesAttendees grants no create path', () => {
+    const route = codeOf(ATTACH)
+    assert.doesNotMatch(route, /minutes_attendees.*create/, 'route adds no grant path')
+    const matrix = codeOf(SHARED.matrix)
+    assert.match(matrix, /\[COLLECTIONS\.minutesAttendees\]/, 'matrix row still present')
+    assert.doesNotMatch(
+      matrix,
+      /\[COLLECTIONS\.minutesAttendees\][\s\S]{0,400}branch_admin: \[ALL/,
+      'branch roles gain no write grant',
+    )
+  })
+
+  it('attendee body validation and createItem payload are unchanged', () => {
+    const src = codeOf(ATTACH)
+    assert.match(src, /attendeeFormSchema\.safeParse/, 'zod validation kept')
+    assert.match(src, /throwValidation\(parsed\.error\)/, 'validation error shape kept')
+    assert.match(src, /minute: id,/, 'minute linkage kept')
+    assert.match(src, /person: parsed\.data\.person \?\? null,/, 'person payload kept')
+    assert.match(
+      src,
+      /attendee_user: parsed\.data\.attendee_user \?\? null,/,
+      'attendee_user payload kept',
+    )
+  })
+})
+
 describe('office — pages', () => {
   it('each domain has a list page and details link to their audit', () => {
     for (const [name, rel] of Object.entries(PAGES)) {
