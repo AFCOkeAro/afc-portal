@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Church Portal — Wireframes v6 (member self-service portal) · AFC-594</title>
+<style>
+  :root{
+    --ink:#1b1b1b; --mut:#6b6b6b; --line:#c9c9c9; --bg:#f4f4f2;
+    --box:#e4e4e1; --box2:#efefec; --accent:#2f6f6f; --accent-soft:#d8e8e8;
+    --white:#fff; --warn:#f0e0c0; --stop:#f0d0d0;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:14px/1.45 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
+  header.top{position:sticky;top:0;z-index:5;background:var(--ink);color:#fff;padding:14px 22px;}
+  header.top h1{margin:0;font-size:16px;letter-spacing:.3px}
+  header.top p{margin:4px 0 0;color:#cfcfcf;font-size:12px}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;padding:12px 22px;border-bottom:1px solid var(--line);
+    background:#fafafa;font-size:12px;color:var(--mut)}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .sw{width:14px;height:14px;border:1px solid var(--line);display:inline-block;border-radius:2px}
+  .wrap{padding:22px;display:grid;gap:26px;grid-template-columns:repeat(auto-fill,minmax(430px,1fr))}
+  .frame{background:var(--white);border:1px solid var(--line);border-radius:10px;overflow:hidden;
+    box-shadow:0 1px 2px rgba(0,0,0,.05);display:flex;flex-direction:column}
+  .frame>figcaption{background:var(--box2);border-bottom:1px solid var(--line);padding:9px 12px;
+    display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+  .frame>figcaption b{font-size:13px}
+  .frame>figcaption code{font-size:11px;color:var(--mut);white-space:nowrap}
+  .screen{padding:14px;display:flex;flex-direction:column;gap:12px;min-height:300px}
+  .screen.wide{grid-column:1/-1}
+  .muted{color:var(--mut)}
+  .tiny{font-size:11px}
+  .bar{height:12px;background:var(--box);border-radius:3px}
+  .bar.s{width:38%} .bar.m{width:62%} .bar.l{width:88%} .bar.xs{width:24%}
+  .card{border:1px solid var(--line);border-radius:6px;padding:10px;background:#fff}
+  .card h4{margin:0 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--mut)}
+  .row{display:flex;gap:10px;align-items:center}
+  .row.between{justify-content:space-between}
+  .grow{flex:1}
+  .field{flex:1;display:flex;flex-direction:column;gap:5px}
+  .field .lab{font-size:11px;color:var(--mut)}
+  .input{height:30px;border:1px solid var(--line);border-radius:4px;background:#fff}
+  .input.area{height:52px}
+  .input.off{background:var(--box2);color:var(--mut)}
+  .btn{display:inline-flex;align-items:center;justify-content:center;height:30px;padding:0 14px;
+    border-radius:4px;font-size:12px;border:1px solid var(--ink);background:var(--ink);color:#fff;white-space:nowrap}
+  .btn.ghost{background:#fff;color:var(--ink)}
+  .btn.accent{background:var(--accent);border-color:var(--accent)}
+  .btn.sm{height:24px;padding:0 9px;font-size:11px}
+  .nav{display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line);padding-bottom:9px}
+  .logo{width:26px;height:26px;border-radius:5px;background:var(--ink)}
+  .pill{font-size:10px;padding:2px 8px;border-radius:999px;background:var(--box);color:var(--ink)}
+  .pill.on{background:var(--accent-soft);color:var(--accent);border:1px solid var(--accent)}
+  .stat{flex:1;border:1px solid var(--line);border-radius:6px;padding:9px;background:#fff}
+  .stat .n{font-size:20px;font-weight:700}
+  .stat .k{font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.4px}
+  .stat.link .n{color:var(--accent);text-decoration:underline}
+  .list{display:flex;flex-direction:column;gap:7px}
+  .item{display:flex;gap:9px;align-items:center;border:1px solid var(--line);border-radius:5px;padding:7px 9px;background:#fff}
+  .avatar{width:30px;height:30px;border-radius:50%;background:var(--box);flex:none}
+  .badge{font-size:10px;padding:2px 7px;border-radius:999px;border:1px solid var(--line);color:var(--mut);background:#fafafa}
+  .badge.g{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
+  .badge.w{background:var(--warn);color:#7a5a10;border-color:#d9c08a}
+  .badge.r{background:var(--stop);color:#8c2f2f;border-color:#d9a0a0}
+  .note{font-size:11px;color:var(--mut);border-left:3px solid var(--accent);padding:4px 9px;background:var(--accent-soft);border-radius:0 4px 4px 0}
+  .note.warn{border-left-color:#b58b2a;background:var(--warn);color:#6d5110}
+  .note.stop{border-left-color:#8c2f2f;background:var(--stop);color:#7a2b2b}
+  .phone{width:270px;border:2px solid var(--ink);border-radius:20px;padding:9px;background:#fff;flex:none;margin:0 auto}
+  .phone .notch{width:54px;height:5px;background:var(--line);border-radius:3px;margin:2px auto 8px}
+  footer{padding:16px 22px;color:var(--mut);font-size:12px;border-top:1px solid var(--line);background:#fafafa}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>Church Portal (Lagos North Area) — Wireframes v6 · member self-service portal</h1>
+  <p>AFC-594 · planning artifact · low-fidelity · not production UI · grey blocks = layout placeholders · synthetic names/numbers only · extends v5; replaces nothing</p>
+</header>
+<div class="legend">
+  <span><i class="sw" style="background:var(--box)"></i> content block</span>
+  <span><i class="sw" style="background:var(--accent-soft);border-color:var(--accent)"></i> active / primary / clickable count</span>
+  <span><i class="sw" style="background:#fff"></i> card surface</span>
+  <span><i class="sw" style="background:var(--warn);border-color:#d9c08a"></i> attention / pending / propose-for-approval</span>
+  <span><i class="sw" style="background:var(--stop);border-color:#d9a0a0"></i> blocked / minor safeguard / never</span>
+  <span>Breakpoints: member surfaces are mobile-first; staff approval queue stays desktop.</span>
+</div>
+
+<div class="wrap">
+
+<!-- ============ 1. MEMBER HOME ============ -->
+<figure class="frame">
+  <figcaption><b>1. Member home — 4 jobs, one profile</b><code>/me</code></figcaption>
+  <div class="screen">
+    <div class="phone"><div class="notch"></div>
+      <div class="nav"><div class="logo"></div><div class="grow"><b class="tiny">My Church Portal</b><div class="tiny muted">Ikeja Branch · Ada O. (adult)</div></div><span class="badge g">OTP verified</span></div>
+      <div class="row between"><div><b>Good morning, Ada</b><div class="tiny muted">Household: Okafor × 4 · guardian of 2</div></div><span class="btn sm ghost">Sign out</span></div>
+      <div class="row">
+        <div class="stat link"><div class="n">My record</div><div class="k">1 proposal pending</div></div>
+        <div class="stat link"><div class="n">Events</div><div class="k">3 upcoming · 1 registered</div></div>
+      </div>
+      <div class="row">
+        <div class="stat link"><div class="n">News</div><div class="k">2 this week</div></div>
+        <div class="stat link"><div class="n">My requests</div><div class="k">1 submitted · 1 approved</div></div>
+      </div>
+      <div class="card"><h4>Next up</h4>
+        <div class="item"><div class="avatar"></div><div class="grow"><b class="tiny">Youth Summit 2026</b><div class="tiny muted">Sat 24 Oct · registered · ticket YS-1042</div></div><span class="badge g">going</span></div>
+      </div>
+      <div class="note">Information Scent: the 4 labels match the board ask verbatim (records, events, news). Counts drill into data.</div>
+    </div>
+  </div>
+</figure>
+
+<!-- ============ 2. MY RECORD ============ -->
+<figure class="frame">
+  <figcaption><b>2. My record — instant vs approval, labelled inline</b><code>/me/record</code></figcaption>
+  <div class="screen">
+    <div class="phone"><div class="notch"></div>
+      <div class="nav"><div class="logo"></div><div class="grow"><b class="tiny">My record</b></div><span class="badge g">adult · self</span></div>
+      <div class="row"><div class="field"><div class="lab">Preferred name · <span class="badge g">saves instantly</span></div><div class="input tiny"> ⇢ Ada</div></div></div>
+      <div class="row"><div class="field"><div class="lab">Phone (OTP identity) · <span class="badge w">needs approval + re-check</span></div><div class="input off tiny"> ⇢ 0803 ••• 4417</div></div></div>
+      <div class="row"><div class="field"><div class="lab">Date of birth · <span class="badge w">needs approval</span></div><div class="input off tiny"> ⇢ 14 Mar 1990</div></div></div>
+      <div class="row"><div class="field"><div class="lab">Address · <span class="badge g">saves instantly</span></div><div class="input area tiny"> ⇢ 12 Allen Ave, Ikeja</div></div></div>
+      <div class="row"><span class="btn sm accent grow">Save changes</span><span class="btn sm ghost grow">Send for approval</span></div>
+      <div class="note warn">Propose sheet states reviewer (church office) + wait (~24h). Recognition over Recall: the rule sits on the field, never from memory.</div>
+      <div class="note stop">Never member-editable: safeguarding flag, notes, membership status — not shown here at all.</div>
+    </div>
+  </div>
+</figure>
+
+<!-- ============ 3. FAMILY ============ -->
+<figure class="frame">
+  <figcaption><b>3. Family — guardian propose-only, minor safeguard</b><code>/me/family</code></figcaption>
+  <div class="screen">
+    <div class="phone"><div class="notch"></div>
+      <div class="nav"><div class="logo"></div><div class="grow"><b class="tiny">My family · Okafor × 4</b></div><span class="badge">guardian</span></div>
+      <div class="list">
+        <div class="item"><div class="avatar"></div><div class="grow"><b class="tiny">Ada O. (you)</b><div class="tiny muted">adult · full record access</div></div><span class="btn sm ghost">Open</span></div>
+        <div class="item"><div class="avatar"></div><div class="grow"><b class="tiny">Chidi O. (spouse)</b><div class="tiny muted">adult · restricted fields masked</div></div><span class="btn sm ghost">Propose</span></div>
+        <div class="item"><div class="avatar"></div><div class="grow"><b class="tiny">Ngozi O. (13)</b><div class="tiny muted">minor · <b>propose-only, staff approval</b></div></div><span class="badge w">propose only</span></div>
+        <div class="item"><div class="avatar"></div><div class="grow"><b class="tiny">Ife O. (9)</b><div class="tiny muted">minor · <b>propose-only, staff approval</b></div></div><span class="badge w">propose only</span></div>
+      </div>
+      <div class="card"><h4>Propose for Ngozi (minor) — preferred name</h4>
+        <div class="tiny muted">Old: Ngozi · New: [ input ] · Reason (required): [ input ]</div>
+        <div class="row"><span class="btn sm accent grow">Submit proposal</span><span class="btn sm ghost">Withdraw</span></div>
+      </div>
+      <div class="note stop">Hard rule: a minor's record is NEVER directly editable — not by the minor, guardian, or head. Every write is a proposal. Forgiveness: withdrawable while submitted.</div>
+    </div>
+  </div>
+</figure>
+
+<!-- ============ 4. EVENTS ============ -->
+<figure class="frame">
+  <figcaption><b>4. Events + registration — member view, same flow</b><code>/me/events · /me/events/:id</code></figcaption>
+  <div class="screen">
+    <div class="phone"><div class="notch"></div>
+      <div class="nav"><div class="logo"></div><div class="grow"><b class="tiny">Events for you</b><div class="tiny muted">published · public + Ikeja + area-wide</div></div></div>
+      <div class="list">
+        <div class="item"><div class="avatar"></div><div class="grow"><b class="tiny">Youth Summit 2026</b><div class="tiny muted">Sat 24 Oct · Ikeja · open till 22 Oct</div></div><span class="badge g">registered</span></div>
+        <div class="item"><div class="avatar"></div><div class="grow"><b class="tiny">Night Vigil</b><div class="tiny muted">Fri 30 Oct · area-wide · no fee</div></div><span class="btn sm accent">Register</span></div>
+        <div class="item"><div class="avatar"></div><div class="grow"><b class="tiny">Camp Meeting (teens)</b><div class="tiny muted">guardian consent required · age gate 13–17</div></div><span class="btn sm ghost">Details</span></div>
+      </div>
+      <div class="card"><h4>Register — Night Vigil · for: [Ada ▾ · + family]</h4>
+        <div class="tiny muted">Reuses the registration flow: guardian block for minors, capacity + age gates, ticket-code confirmation. Cancel is a request, never a silent delete.</div>
+        <div class="row"><span class="btn sm accent grow">Confirm registration</span></div>
+      </div>
+      <div class="note">Mental Models: event detail → register → ticket, as the RockRMS reference. Branch-private events of other branches never appear (fail-closed).</div>
+    </div>
+  </div>
+</figure>
+
+<!-- ============ 5. NEWS ============ -->
+<figure class="frame">
+  <figcaption><b>5. News reader — scoped announcements, newest first</b><code>/me/news · /me/news/:id</code></figcaption>
+  <div class="screen">
+    <div class="phone"><div class="notch"></div>
+      <div class="nav"><div class="logo"></div><div class="grow"><b class="tiny">Church news</b><div class="tiny muted">published · in-window · Ikeja + area</div></div></div>
+      <div class="list">
+        <div class="item"><div class="avatar"></div><div class="grow"><b class="tiny">● Harvest Thanksgiving — workers rota out</b><div class="tiny muted">Ikeja · 19 Oct · Branch office</div></div></div>
+        <div class="item"><div class="avatar"></div><div class="grow"><b class="tiny">● Area vigil bus pickup points</b><div class="tiny muted">Area-wide · 18 Oct · Area office</div></div></div>
+        <div class="item"><div class="avatar"></div><div class="grow"><b class="tiny">Zone choir audition dates</b><div class="tiny muted">Ikeja · 12 Oct · Music dept</div></div></div>
+      </div>
+      <div class="card"><h4>Reader — Harvest Thanksgiving</h4>
+        <div class="tiny muted">Publisher · date · full body. Draft/scheduled/cancelled never appear; cross-branch items never leak. Unread dot is per-device local state — no server read-tracking in v1.</div>
+      </div>
+      <div class="note">Trust signals (Norman reflective): every item names its publisher + date so members know what is official.</div>
+    </div>
+  </div>
+</figure>
+
+</div>
+
+<footer>Extends wireframes, wireframes-expansion, wireframes-v3, wireframes-v4, wireframes-v5. Planning only — visual design, component library, and the WCAG 2.1 AA pass stay gated on the design system (AFC-152). Synthetic data only.</footer>
+</body>
+</html>

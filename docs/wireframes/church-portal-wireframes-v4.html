@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Church Portal — Wireframes v4 (workflow + form builder) · AFC-586</title>
+<style>
+  :root{
+    --ink:#1b1b1b; --mut:#6b6b6b; --line:#c9c9c9; --bg:#f4f4f2;
+    --box:#e4e4e1; --box2:#efefec; --accent:#2f6f6f; --accent-soft:#d8e8e8;
+    --white:#fff; --warn:#f0e0c0; --stop:#f0d0d0;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:14px/1.45 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
+  header.top{position:sticky;top:0;z-index:5;background:var(--ink);color:#fff;padding:14px 22px;}
+  header.top h1{margin:0;font-size:16px;letter-spacing:.3px}
+  header.top p{margin:4px 0 0;color:#cfcfcf;font-size:12px}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;padding:12px 22px;border-bottom:1px solid var(--line);
+    background:#fafafa;font-size:12px;color:var(--mut)}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .sw{width:14px;height:14px;border:1px solid var(--line);display:inline-block;border-radius:2px}
+  .wrap{padding:22px;display:grid;gap:26px;grid-template-columns:repeat(auto-fill,minmax(430px,1fr))}
+  .frame{background:var(--white);border:1px solid var(--line);border-radius:10px;overflow:hidden;
+    box-shadow:0 1px 2px rgba(0,0,0,.05);display:flex;flex-direction:column}
+  .frame>figcaption{background:var(--box2);border-bottom:1px solid var(--line);padding:9px 12px;
+    display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+  .frame>figcaption b{font-size:13px}
+  .frame>figcaption code{font-size:11px;color:var(--mut);white-space:nowrap}
+  .screen{padding:14px;display:flex;flex-direction:column;gap:12px;min-height:300px}
+  .screen.wide{grid-column:1/-1}
+  .muted{color:var(--mut)}
+  .tiny{font-size:11px}
+  .bar{height:12px;background:var(--box);border-radius:3px}
+  .bar.s{width:38%} .bar.m{width:62%} .bar.l{width:88%} .bar.xs{width:24%}
+  .box{background:var(--box);border-radius:4px}
+  .card{border:1px solid var(--line);border-radius:6px;padding:10px;background:#fff}
+  .card h4{margin:0 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--mut)}
+  .row{display:flex;gap:10px;align-items:center}
+  .row.between{justify-content:space-between}
+  .grow{flex:1}
+  .field{flex:1;display:flex;flex-direction:column;gap:5px}
+  .field .lab{font-size:11px;color:var(--mut)}
+  .input{height:30px;border:1px solid var(--line);border-radius:4px;background:#fff}
+  .input.area{height:52px}
+  .input.off{background:var(--box2);color:var(--mut)}
+  .btn{display:inline-flex;align-items:center;justify-content:center;height:30px;padding:0 14px;
+    border-radius:4px;font-size:12px;border:1px solid var(--ink);background:var(--ink);color:#fff;white-space:nowrap}
+  .btn.ghost{background:#fff;color:var(--ink)}
+  .btn.accent{background:var(--accent);border-color:var(--accent)}
+  .btn.danger{background:#fff;color:#8c2f2f;border-color:#8c2f2f}
+  .btn.sm{height:24px;padding:0 9px;font-size:11px}
+  .nav{display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line);padding-bottom:9px}
+  .logo{width:26px;height:26px;border-radius:5px;background:var(--ink)}
+  .pill{font-size:10px;padding:2px 8px;border-radius:999px;background:var(--box);color:var(--ink)}
+  .pill.on{background:var(--accent-soft);color:var(--accent);border:1px solid var(--accent)}
+  table{width:100%;border-collapse:collapse;font-size:11px}
+  th,td{text-align:left;padding:6px 7px;border-bottom:1px solid var(--line)}
+  th{color:var(--mut);font-weight:600;background:var(--box2)}
+  .stat{flex:1;border:1px solid var(--line);border-radius:6px;padding:9px;background:#fff}
+  .stat .n{font-size:20px;font-weight:700}
+  .stat .k{font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.4px}
+  .stat.link .n{color:var(--accent);text-decoration:underline}
+  .list{display:flex;flex-direction:column;gap:7px}
+  .item{display:flex;gap:9px;align-items:center;border:1px solid var(--line);border-radius:5px;padding:7px 9px;background:#fff}
+  .avatar{width:30px;height:30px;border-radius:50%;background:var(--box);flex:none}
+  .badge{font-size:10px;padding:2px 7px;border-radius:999px;border:1px solid var(--line);color:var(--mut);background:#fafafa}
+  .badge.g{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
+  .badge.w{background:var(--warn);color:#7a5a10;border-color:#d9c08a}
+  .badge.r{background:var(--stop);color:#8c2f2f;border-color:#d9a0a0}
+  .note{font-size:11px;color:var(--mut);border-left:3px solid var(--accent);padding:4px 9px;background:var(--accent-soft);border-radius:0 4px 4px 0}
+  .note.warn{border-left-color:#b58b2a;background:var(--warn);color:#6d5110}
+  .note.stop{border-left-color:#8c2f2f;background:var(--stop);color:#7a2b2b}
+  .split{display:flex;gap:12px;flex:1;min-height:0}
+  /* builder specifics */
+  .palette{display:flex;flex-direction:column;gap:6px;width:200px;flex:none}
+  .pal-item{border:1px dashed var(--accent);border-radius:5px;padding:7px 9px;font-size:11px;background:#fff;display:flex;gap:7px;align-items:center}
+  .pal-item .ic{width:22px;height:22px;border-radius:4px;background:var(--accent-soft);flex:none;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--accent);font-weight:700}
+  .canvas{flex:1;border:1px solid var(--line);border-radius:6px;background:var(--box2);padding:10px;display:flex;flex-direction:column;gap:8px;min-height:280px}
+  .frow{border:1px solid var(--line);border-radius:6px;background:#fff;padding:9px;display:flex;gap:9px;align-items:flex-start}
+  .frow.sel{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+  .frow .grip{color:var(--mut);font-size:12px;cursor:grab}
+  .req{font-size:10px;color:#8c2f2f;font-weight:700}
+  .opt{font-size:10px;color:var(--mut)}
+  .sect-h{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--mut);border-bottom:1px dashed var(--line);padding-bottom:5px}
+  .timeline{display:flex;flex-direction:column;gap:0;font-size:11px}
+  .trow{display:flex;gap:9px;padding:7px 0;border-bottom:1px dashed var(--line)}
+  .trow:last-child{border-bottom:0}
+  .tdot{width:11px;height:11px;border-radius:50%;background:var(--accent);flex:none;margin-top:4px}
+  .tdot.hold{background:#b58b2a}
+  .kanban{display:flex;gap:8px;overflow-x:auto}
+  .kcol{flex:1;min-width:150px;border:1px solid var(--line);border-radius:6px;background:var(--box2);padding:8px;display:flex;flex-direction:column;gap:7px}
+  .kcol h5{margin:0;font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--mut)}
+  .kcard{border:1px solid var(--line);border-radius:5px;background:#fff;padding:7px 8px;font-size:11px}
+  footer{padding:16px 22px;color:var(--mut);font-size:12px;border-top:1px solid var(--line);background:#fafafa}
+  @media (max-width:700px){.split{flex-direction:column}.palette{width:100%}}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>Church Portal (Lagos North Area) — Wireframes v4 · workflow + form builder</h1>
+  <p>AFC-586 · planning artifact · low-fidelity · not production UI · grey blocks = layout placeholders · extends the v3 set, replaces nothing</p>
+</header>
+<div class="legend">
+  <span><i class="sw" style="background:var(--box)"></i> content block</span>
+  <span><i class="sw" style="background:var(--accent-soft);border-color:var(--accent)"></i> active / primary / clickable count</span>
+  <span><i class="sw" style="background:#fff"></i> card surface</span>
+  <span><i class="sw" style="background:var(--warn);border-color:#d9c08a"></i> attention / pending / restricted</span>
+  <span><i class="sw" style="background:var(--stop);border-color:#d9a0a0"></i> blocked / no consent</span>
+  <span>Builder is desktop-first; respondent forms and the review queue are mobile-first.</span>
+</div>
+
+<div class="wrap">
+
+<!-- ============ 1. FORM BUILDER CANVAS ============ -->
+<figure class="frame">
+  <figcaption><b>1. Form builder — canvas, sections, ordering</b><code>/forms/:id/build</code></figcaption>
+  <div class="screen wide">
+    <div class="nav"><div class="logo"></div><div class="grow"><div class="bar m"></div>
+      <div class="tiny muted">Volunteer sign-up · v2 draft (v1 published) · scope: Ikeja Branch · category: volunteer_signup</div></div>
+      <span class="pill on">draft v2</span><span class="btn sm ghost">Preview</span><span class="btn sm accent">Publish v2</span></div>
+    <div class="split">
+      <div class="grow canvas">
+        <div class="sect-h">Section A — About you (3 of 7 max guideline)</div>
+        <div class="frow"><span class="grip">⠿</span><div class="grow">
+          <div class="t">Full name <span class="req">*required</span></div>
+          <div class="tiny muted">short_text · min 2 · max 80</div><div class="input off">e.g. Adaeze Okafor</div></div>
+          <span class="btn sm ghost">Edit</span></div>
+        <div class="frow sel"><span class="grip">⠿</span><div class="grow">
+          <div class="t">Phone (WhatsApp) <span class="req">*required</span></div>
+          <div class="tiny muted">phone · format check · used for dedupe hint</div><div class="input off">080…</div></div>
+          <span class="btn sm ghost">Edit</span></div>
+        <div class="frow"><span class="grip">⠿</span><div class="grow">
+          <div class="t">Serving interests <span class="opt">optional · pick up to 3</span></div>
+          <div class="tiny muted">multi_select · Ushering / Choir / Media / Welfare / Children / Other</div></div>
+          <span class="btn sm ghost">Edit</span></div>
+        <div class="sect-h">Section B — Availability &amp; consent (2 fields)</div>
+        <div class="frow"><span class="grip">⠿</span><div class="grow">
+          <div class="t">Available Sundays <span class="req">*required</span></div>
+          <div class="tiny muted">yes_no + date · basic validation</div></div>
+          <span class="btn sm ghost">Edit</span></div>
+        <div class="frow"><span class="grip">⠿</span><div class="grow">
+          <div class="t">Consent to be contacted <span class="req">*required · never pre-ticked</span></div>
+          <div class="tiny muted">consent_checkbox · timestamp + actor recorded</div></div>
+          <span class="btn sm ghost">Edit</span></div>
+        <div class="note warn">Section A is at 3 fields — the builder warns above ~7 per section (chunking). Publishing freezes v2; submissions on v1 stay bound to v1.</div>
+      </div>
+      <div class="card" style="width:280px">
+        <h4>Route &amp; lifecycle</h4>
+        <div class="field"><span class="lab">Default review role</span><div class="input">Branch admin ▾</div></div>
+        <div class="field" style="margin-top:8px"><span class="lab">Fallback assignee</span><div class="input">M. Bello (Ikeja) ▾</div></div>
+        <div class="field" style="margin-top:8px"><span class="lab">Status</span><div class="input">Draft v2 — v1 live ▾</div></div>
+        <div class="note" style="margin-top:8px">Linear workflow only in v1: new → in_review → approved / changes_requested / rejected → closed. No parallel branches, no timers.</div>
+        <div class="row" style="gap:6px;margin-top:8px"><span class="btn sm ghost">Version history</span><span class="btn sm ghost">Archive</span></div>
+      </div>
+    </div>
+  </div>
+</figure>
+
+<!-- ============ 2. FIELD PALETTE + CONFIGURE ============ -->
+<figure class="frame">
+  <figcaption><b>2. Field palette + configure — pick or drag, keyboard-first</b><code>/forms/:id/build?field=phone</code></figcaption>
+  <div class="screen wide">
+    <div class="split">
+      <div class="palette">
+        <div class="tiny muted">Field palette — pick (keyboard) or drag</div>
+        <div class="pal-item"><span class="ic">T</span> Short text</div>
+        <div class="pal-item"><span class="ic">¶</span> Long text</div>
+        <div class="pal-item"><span class="ic">#</span> Number</div>
+        <div class="pal-item"><span class="ic">☎</span> Phone <span class="badge g">selected</span></div>
+        <div class="pal-item"><span class="ic">@</span> Email</div>
+        <div class="pal-item"><span class="ic">◷</span> Date</div>
+        <div class="pal-item"><span class="ic">○</span> Single select</div>
+        <div class="pal-item"><span class="ic">☑</span> Multi select</div>
+        <div class="pal-item"><span class="ic">Y</span> Yes / No</div>
+        <div class="pal-item"><span class="ic">✓</span> Consent checkbox</div>
+        <div class="pal-item"><span class="ic">◈</span> Guardian block <span class="badge w">minors</span></div>
+        <div class="pal-item"><span class="ic">≣</span> File note <span class="badge">no upload</span></div>
+      </div>
+      <div class="grow card">
+        <h4>Configure — Phone (WhatsApp)</h4>
+        <div class="row"><div class="field"><span class="lab">Label</span><div class="input">Phone (WhatsApp)</div></div>
+          <div class="field"><span class="lab">Required?</span><div class="input">Required ▾</div></div></div>
+        <div class="field" style="margin-top:8px"><span class="lab">Help text (plain language)</span><div class="input area">We use this only to contact you about serving.</div></div>
+        <div class="row" style="margin-top:8px"><div class="field"><span class="lab">Format</span><div class="input">NG phone ▾</div></div>
+          <div class="field"><span class="lab">Sensitivity</span><div class="input">Normal ▾</div></div></div>
+        <div class="note warn" style="margin-top:8px">Respondent preview (390px): label + input + inline error “Enter a valid phone number” linked via aria-describedby. No color-only meaning; error is text + icon.</div>
+        <div class="row" style="gap:6px;margin-top:8px"><span class="btn sm accent">Save field</span><span class="btn sm ghost">Remove</span></div>
+      </div>
+      <div class="card" style="width:250px">
+        <h4>Respondent preview</h4>
+        <div class="field"><span class="lab">Phone (WhatsApp) *</span><div class="input">080…</div></div>
+        <div class="tiny" style="color:#8c2f2f">⚠ Enter a valid phone number.</div>
+        <div class="tiny muted" style="margin-top:6px">We use this only to contact you about serving.</div>
+      </div>
+    </div>
+  </div>
+</figure>
+
+<!-- ============ 3. SUBMISSION REVIEW QUEUE ============ -->
+<figure class="frame">
+  <figcaption><b>3. Submission review queue — oldest first, scoped</b><code>/forms/:id/submissions</code></figcaption>
+  <div class="screen wide">
+    <div class="row between"><div class="row" style="gap:6px"><span class="pill on">Volunteer sign-up v2 ▾</span><span class="pill">Status: all ▾</span><span class="pill">Scope: my branch ▾</span></div>
+      <span class="btn sm ghost">Export CSV</span></div>
+    <div class="card">
+      <table><tbody>
+        <tr><th>Submitted</th><th>Respondent</th><th>Version</th><th>Status</th><th>Assignee</th><th>Waiting</th></tr>
+        <tr><td>18 Oct 09:12</td><td>0801 ••• •234 (staff-entered)</td><td>v1</td><td><span class="badge w">in_review</span></td><td>M. Bello</td><td>3 days <span class="badge w">due</span></td></tr>
+        <tr><td>19 Oct 14:40</td><td>0809 ••• •881</td><td>v2</td><td><span class="badge">new</span></td><td><span class="tiny muted">unassigned</span></td><td>2 days</td></tr>
+        <tr><td>19 Oct 18:02</td><td>0703 ••• •119</td><td>v2</td><td><span class="badge w">changes_requested</span></td><td>M. Bello</td><td>awaiting correction</td></tr>
+        <tr><td>20 Oct 08:31</td><td>0816 ••• •420</td><td>v2</td><td><span class="badge g">approved</span></td><td>A. Sule</td><td>—</td></tr>
+        <tr><td>20 Oct 11:05</td><td>0902 ••• •773</td><td>v1</td><td><span class="badge r">rejected — duplicate</span></td><td>M. Bello</td><td>—</td></tr>
+      </tbody></table>
+    </div>
+    <div class="note warn">Unassigned &gt;3 days surfaces on the branch dashboard (same rule as newcomers). Phone values are masked; full values only for the assignee/approver. Dedupe hint: row 5 matched an existing person on phone — warned, not blocked.</div>
+  </div>
+</figure>
+
+<!-- ============ 4. SUBMISSION DETAIL + WORKFLOW ACTIONS ============ -->
+<figure class="frame">
+  <figcaption><b>4. Submission detail — answers vs frozen version + four actions</b><code>/forms/:id/submissions/:sid</code></figcaption>
+  <div class="screen wide">
+    <div class="row between"><div class="grow"><div class="bar m"></div>
+      <div class="tiny muted">Volunteer sign-up · v2 snapshot · submitted 19 Oct 14:40 · staff-entered by Usher T.</div></div>
+      <span class="badge w">in_review</span><span class="pill">assignee: M. Bello ▾</span></div>
+    <div class="split">
+      <div class="grow card">
+        <h4>Answers (bound to v2 — v3 draft does not affect this row)</h4>
+        <table><tbody>
+          <tr><td>Full name</td><td>Funke A.</td></tr>
+          <tr><td>Phone (WhatsApp)</td><td>0809 ••• •881 <span class="badge w">dedupe hint: 1 match</span></td></tr>
+          <tr><td>Serving interests</td><td>Ushering, Welfare</td></tr>
+          <tr><td>Available Sundays</td><td>Yes — from Nov</td></tr>
+          <tr><td>Consent to be contacted</td><td>☑ given 19 Oct 14:40</td></tr>
+        </tbody></table>
+        <div class="row" style="gap:6px;margin-top:10px;flex-wrap:wrap">
+          <span class="btn sm accent">Approve</span><span class="btn sm ghost">Request changes</span>
+          <span class="btn sm ghost">Reject</span><span class="btn sm ghost">Close</span></div>
+        <div class="tiny muted" style="margin-top:6px">At most four actions (Hick's law); the primary action is the largest target. Each action asks for or offers a note and is logged append-only.</div>
+      </div>
+      <div class="card" style="width:300px">
+        <h4>Workflow history (append-only)</h4>
+        <div class="timeline">
+          <div class="trow"><span class="tdot"></span><div><b>Submitted</b> · Usher T. · 19 Oct 14:40<br><span class="muted">channel: staff_entered · hook emitted</span></div></div>
+          <div class="trow"><span class="tdot hold"></span><div><b>Assigned → M. Bello</b> · Branch admin · 19 Oct 15:02<br><span class="muted">note: “welfare-adjacent interests, route to you”</span></div></div>
+          <div class="trow"><span class="tdot hold"></span><div><b>new → in_review</b> · M. Bello · 20 Oct 08:10</div></div>
+        </div>
+        <div class="note" style="margin-top:8px">Each transition emits a workflow_events hook row for the future center. No message is auto-sent in v1; staff send via the existing comms log.</div>
+      </div>
+    </div>
+  </div>
+</figure>
+
+<!-- ============ 5. WORKFLOW STATUS VIEW ============ -->
+<figure class="frame">
+  <figcaption><b>5. Workflow status view — per-form funnel with drill-down</b><code>/forms/workflows</code></figcaption>
+  <div class="screen wide">
+    <div class="row between"><div class="row" style="gap:6px"><span class="pill on">Scope: my branches ▾</span><span class="pill">Last 30 days ▾</span></div>
+      <span class="btn sm ghost">Export CSV</span></div>
+    <div class="row" style="gap:8px">
+      <div class="stat link"><div class="n">14</div><div class="k">New</div></div>
+      <div class="stat link"><div class="n">22</div><div class="k">In review</div></div>
+      <div class="stat link"><div class="n">61</div><div class="k">Approved</div></div>
+      <div class="stat link"><div class="n">6</div><div class="k">Changes req.</div></div>
+      <div class="stat link"><div class="n">3</div><div class="k">Rejected</div></div>
+      <div class="stat link"><div class="n">48</div><div class="k">Closed</div></div>
+    </div>
+    <div class="kanban">
+      <div class="kcol"><h5>Volunteer sign-up</h5>
+        <div class="kcard">new <b>6</b> · oldest 4d <span class="badge w">2 unassigned</span></div>
+        <div class="kcard">in_review <b>9</b> · M. Bello 5 · A. Sule 4</div>
+        <div class="kcard">approved <b>21</b> → closed 18</div></div>
+      <div class="kcol"><h5>Welfare intake</h5>
+        <div class="kcard">new <b>3</b> · oldest 1d</div>
+        <div class="kcard">in_review <b>8</b> · welfare officers only</div>
+        <div class="kcard">changes_req <b>4</b> · guardian data missing 2</div></div>
+      <div class="kcol"><h5>Visitor follow-up</h5>
+        <div class="kcard">new <b>5</b> · oldest 2d</div>
+        <div class="kcard">in_review <b>5</b></div>
+        <div class="kcard">approved <b>40</b> → visitor records linked</div></div>
+    </div>
+    <div class="note">Every count drills into the filtered queue (analytics-with-drill-down contract, v3 §1.1). Minors' rows are flagged, never exposed; CSV export is scope-checked. This view answers “where does work stall” at a glance (Peak-End + Goal-Gradient: oldest and closest-to-done surface first).</div>
+  </div>
+</figure>
+
+</div>
+
+<footer>
+  AFC-586 wireframes v4 · 5 screens · extends the AFC-147 14-screen set, the AFC-150 21-screen expanded set, and the AFC-151 12-screen v3 set — replaces nothing. Layout intent only — visual design, component library, and a WCAG 2.1 AA accessibility pass follow in implementation (gated on the design system, AFC-152). Companion doc: <code>prd-addendum-v5</code>. Planning only.
+</footer>
+</body>
+</html>
