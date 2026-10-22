@@ -61,6 +61,23 @@ const { data, pending, error, refresh } = await useAsyncData(
 
 const rows = computed(() => data.value?.data ?? [])
 
+// Preloaded caller-scoped option list for the searchable student picker.
+// No new endpoints: same list route the students page uses.
+const studentsQuery = await useAsyncData('campus-results-students', () =>
+  api.get<{
+    data: Array<{ id: string; course?: string | null; level?: string | null }>
+    meta: { total: number }
+  }>('/api/campus/students', { query: { limit: 100 } }),
+)
+
+const studentOptions = computed(() => [
+  { label: 'Choose a student', value: '' },
+  ...(studentsQuery.data.value?.data ?? []).map((row) => ({
+    label: `${row.course ?? 'Student record'} · ${(row.level ?? '').replace(/_/g, ' ')} · ${row.id.slice(0, 8)}`,
+    value: row.id,
+  })),
+])
+
 function scoreSummary(row: ResultRow): string {
   if (row.aggregate) return row.aggregate
   const scores = row.scores
@@ -73,6 +90,11 @@ function scoreSummary(row: ResultRow): string {
 async function saveResult() {
   saving.value = true
   formError.value = null
+  if (!form.campus_student) {
+    formError.value = 'Choose a student first.'
+    saving.value = false
+    return
+  }
   try {
     await api.post('/api/campus/results', {
       campus_student: form.campus_student || null,
@@ -127,11 +149,12 @@ async function saveResult() {
           class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3"
           @submit.prevent="saveResult"
         >
-          <UFormField label="Campus student id" required>
-            <UInput
+          <UFormField label="Campus student" required>
+            <EntitySelect
               v-model="form.campus_student"
-              placeholder="Student UUID"
-              required
+              :items="studentOptions"
+              placeholder="Select student…"
+              :loading="studentsQuery.pending"
               class="w-full"
             />
           </UFormField>

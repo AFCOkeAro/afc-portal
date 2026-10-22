@@ -254,7 +254,7 @@ async function markCompleted(): Promise<void> {
               :description="assignError"
             />
             <UFormField label="Person">
-              <USelect v-model="personId" :items="personOptions" class="w-full" />
+              <EntitySelect v-model="personId" :items="personOptions" placeholder="Select person…" class="w-full" />
             </UFormField>
             <UFormField label="Role">
               <USelect v-model="role" :items="roleOptions" class="w-full" />

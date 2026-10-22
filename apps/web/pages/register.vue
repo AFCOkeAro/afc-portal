@@ -45,6 +45,23 @@ const blankForm = (): RegistrationFormInput => ({
 
 const form = reactive<RegistrationFormInput>(blankForm())
 
+// Public event picker (AFC-631): same session-free /api/calendar/public feed
+// the public calendar page renders. Options are the public rows only.
+const { data: publicEvents, pending: eventsPending } = await useAsyncData(
+  'register-public-events',
+  () =>
+    $fetch<{ data: Array<{ id: string; title: string; date: string }> }>(
+      '/api/calendar/public',
+    ),
+)
+const eventOptions = computed(() => [
+  { label: 'Choose an event', value: '' },
+  ...(publicEvents.value?.data ?? []).map((row) => ({
+    label: `${row.title} · ${row.date}`,
+    value: row.id,
+  })),
+])
+
 const submitting = ref(false)
 const submitted = ref<{ ticket_code: string | null; registration_status: string } | null>(
   null,
@@ -137,12 +154,13 @@ function collectFieldErrors(error: {
     <UCard v-else>
       <form class="space-y-5" novalidate @submit.prevent="submit">
         <UFormField label="Event" name="event" required :error="fieldErrors.event">
-          <UInput
+          <EntitySelect
             v-model="form.event"
             name="event"
-            required
+            :items="eventOptions"
+            placeholder="Type to find your event…"
+            :loading="eventsPending"
             class="w-full"
-            placeholder="Event identifier"
           />
         </UFormField>
 

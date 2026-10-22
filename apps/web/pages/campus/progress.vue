@@ -47,6 +47,35 @@ const { data, pending, error, refresh } = await useAsyncData(
 
 const rows = computed(() => data.value?.data ?? [])
 
+// Preloaded caller-scoped option lists for the searchable pickers below.
+// No new endpoints: same list routes the timetable/students pages use.
+const programmesQuery = await useAsyncData('campus-progress-programmes', () =>
+  api.get<{
+    data: Array<{ id: string; name: string; exam: string; year?: number | null }>
+  }>('/api/campus/programmes', { query: { limit: 100 } }),
+)
+const studentsQuery = await useAsyncData('campus-progress-students', () =>
+  api.get<{
+    data: Array<{ id: string; course?: string | null; level?: string | null }>
+    meta: { total: number }
+  }>('/api/campus/students', { query: { limit: 100 } }),
+)
+
+const programmeOptions = computed(() => [
+  { label: 'All programmes', value: '' },
+  ...(programmesQuery.data.value?.data ?? []).map((row) => ({
+    label: `${row.name} (${row.exam.toUpperCase()}${row.year ? ` ${row.year}` : ''})`,
+    value: row.id,
+  })),
+])
+const studentOptions = computed(() => [
+  { label: 'All students', value: '' },
+  ...(studentsQuery.data.value?.data ?? []).map((row) => ({
+    label: `${row.course ?? 'Student record'} · ${(row.level ?? '').replace(/_/g, ' ')} · ${row.id.slice(0, 8)}`,
+    value: row.id,
+  })),
+])
+
 const csvHref = computed(() => {
   const params = new URLSearchParams()
   if (programme.value) params.set('programme', programme.value)
@@ -101,11 +130,23 @@ async function saveProgress() {
 
     <UCard class="mt-4">
       <div class="grid gap-3 sm:grid-cols-2">
-        <UFormField label="Programme id">
-          <UInput v-model="programme" placeholder="Programme UUID" class="w-full" />
+        <UFormField label="Programme">
+          <EntitySelect
+            v-model="programme"
+            :items="programmeOptions"
+            placeholder="Select programme…"
+            :loading="programmesQuery.pending"
+            class="w-full"
+          />
         </UFormField>
-        <UFormField label="Campus student id (optional)">
-          <UInput v-model="student" placeholder="Student UUID" class="w-full" />
+        <UFormField label="Campus student (optional)">
+          <EntitySelect
+            v-model="student"
+            :items="studentOptions"
+            placeholder="Select student…"
+            :loading="studentsQuery.pending"
+            class="w-full"
+          />
         </UFormField>
       </div>
     </UCard>

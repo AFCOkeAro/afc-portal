@@ -194,10 +194,10 @@ async function submit(): Promise<void> {
 
         <div class="grid gap-4 sm:grid-cols-2">
           <UFormField label="Branch" :error="fieldErrors.branch">
-            <USelect v-model="form.branch" :items="branchOptions" class="w-full" />
+            <EntitySelect v-model="form.branch" :items="branchOptions" placeholder="Select branch…" class="w-full" />
           </UFormField>
           <UFormField label="Linked person" :error="fieldErrors.person">
-            <USelect v-model="form.person" :items="personOptions" class="w-full" />
+            <EntitySelect v-model="form.person" :items="personOptions" placeholder="Select person…" class="w-full" />
           </UFormField>
         </div>
 

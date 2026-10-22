@@ -4,6 +4,7 @@ import {
   mergeFilters,
   requireCan,
   scopeZoneIds,
+  throwStoreUnavailable,
 } from '../utils/portal'
 
 export interface ZoneSummary {
@@ -30,17 +31,27 @@ export default defineEventHandler(async (event): Promise<ZoneSummary[]> => {
   const area =
     typeof query.area === 'string' && query.area.length > 0 ? query.area : undefined
 
-  const visibleZones = scope.isArea ? null : await scopeZoneIds(event, scope)
+  // AFC-639a: fail closed with a named error. Zones is a hierarchy-scoped
+  // list — a degraded empty [] would mislead scoping — so a Directus 401/403
+  // surfaces as zone_store_forbidden (403) and any other read failure as
+  // pending_migration_0002 (503), never a bare 500. Deliberate 4xx (unscoped
+  // session, out-of-scope) pass through untouched.
+  try {
+    const visibleZones = scope.isArea ? null : await scopeZoneIds(event, scope)
 
-  const result = await listItems<ZoneSummary>(event, scope, 'zones', {
-    filter: mergeFilters(
-      { status: { _eq: 'active' } },
-      area ? { area: { _eq: area } } : undefined,
-      visibleZones ? { id: { _in: visibleZones } } : undefined,
-    ),
-    fields: ['id', 'name', 'code', 'area', 'status'],
-    sort: 'sort,name',
-    limit: -1,
-  })
-  return result.data.map((zone) => ({ ...zone, id: String(zone.id) }))
+    const result = await listItems<ZoneSummary>(event, scope, 'zones', {
+      filter: mergeFilters(
+        { status: { _eq: 'active' } },
+        area ? { area: { _eq: area } } : undefined,
+        visibleZones ? { id: { _in: visibleZones } } : undefined,
+      ),
+      fields: ['id', 'name', 'code', 'area', 'status'],
+      sort: 'sort,name',
+      limit: -1,
+    })
+    return result.data.map((zone) => ({ ...zone, id: String(zone.id) }))
+  } catch (error) {
+    if ((error as { statusCode?: number })?.statusCode) throw error
+    throwStoreUnavailable(error, 'zone_store', '0002')
+  }
 })

@@ -68,7 +68,7 @@ function prettyKey(value: string | null): string {
     <UCard>
       <div class="grid gap-3 sm:grid-cols-2">
         <UFormField label="Branch">
-          <USelect v-model="branch" :items="branchOptions" class="w-full" />
+          <EntitySelect v-model="branch" :items="branchOptions" placeholder="Select branch…" class="w-full" />
         </UFormField>
         <div class="flex items-end">
           <UButton

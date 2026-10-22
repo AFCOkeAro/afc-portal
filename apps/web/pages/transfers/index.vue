@@ -4,6 +4,8 @@ import { COLLECTIONS } from '@afc/shared'
 definePageMeta({ middleware: 'staff' })
 
 const api = useApi()
+const { personOptions, personPending, onPersonSearch } = usePersonSearch()
+const { branchOptions, branchesPending } = useBranchOptions()
 const route = useRoute()
 
 function queryParam(name: string): string | null {
@@ -156,21 +158,37 @@ const stripItems = computed(() => [
         <h2 class="font-semibold">New transfer</h2>
       </template>
       <div class="grid gap-3 sm:grid-cols-2">
-        <UFormField label="Person id">
-          <UInput v-model="form.person" class="w-full" placeholder="Person id" />
+        <UFormField label="Person">
+          <EntitySelect
+            v-model="form.person"
+            :items="personOptions"
+            placeholder="Type a name to search…"
+            :loading="personPending"
+            server-search
+            class="w-full"
+            @update:search-term="onPersonSearch"
+          />
         </UFormField>
         <UFormField label="Effective date">
           <UInput v-model="form.effective_date" type="date" class="w-full" />
         </UFormField>
-        <UFormField label="From branch id">
-          <UInput
+        <UFormField label="From branch">
+          <EntitySelect
             v-model="form.from_branch"
+            :items="branchOptions"
+            placeholder="Select branch…"
+            :loading="branchesPending"
             class="w-full"
-            placeholder="From branch id"
           />
         </UFormField>
-        <UFormField label="To branch id">
-          <UInput v-model="form.to_branch" class="w-full" placeholder="To branch id" />
+        <UFormField label="To branch">
+          <EntitySelect
+            v-model="form.to_branch"
+            :items="branchOptions"
+            placeholder="Select branch…"
+            :loading="branchesPending"
+            class="w-full"
+          />
         </UFormField>
         <UFormField label="Reason" class="sm:col-span-2">
           <UTextarea v-model="form.reason" class="w-full" placeholder="Reason" />

@@ -148,7 +148,7 @@ async function submitCheckin(): Promise<void> {
               :description="checkinError"
             />
             <UFormField label="Person">
-              <USelect v-model="personId" :items="personOptions" class="w-full" />
+              <EntitySelect v-model="personId" :items="personOptions" placeholder="Select person…" class="w-full" />
             </UFormField>
             <UFormField label="Or type a name">
               <UInput

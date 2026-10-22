@@ -236,15 +236,17 @@ function formatDate(value: string, recurring: boolean): string {
 
     <UCard>
       <div class="grid gap-3 sm:grid-cols-3 xl:grid-cols-4">
-        <USelect
+        <EntitySelect
           v-model="branch"
           :items="branchOptions"
+          placeholder="Select branch…"
           class="w-full"
           aria-label="Filter by branch"
         />
-        <USelect
+        <EntitySelect
           v-model="zone"
           :items="zoneOptions"
+          placeholder="Select zone…"
           class="w-full"
           aria-label="Filter by zone"
         />

@@ -1,4 +1,5 @@
 import type {
+  BranchSectionWarning,
   DashboardAttendancePoint,
   DashboardCelebrationItem,
   DashboardData,
@@ -165,10 +166,42 @@ function personDisplayName(row: Record<string, unknown>): string {
   return preferred || base || 'Unnamed'
 }
 
+interface SettledSection<T> {
+  value: T
+  warning?: BranchSectionWarning
+}
+
+// AFC-639a (AFC-564 precedent): one failing section must not 500 the whole
+// dashboard. Each aggregation section settles independently: on failure the
+// original error is logged server-side, the section falls back to its empty
+// value, and a named warning travels in the response (degraded, never
+// silent). Core identity/scope resolution (getPortalScope) stays outside:
+// a scope that cannot load is still 404/403, never a degraded 200.
+async function settleSection<T>(
+  section: string,
+  work: Promise<T>,
+  fallback: T,
+): Promise<SettledSection<T>> {
+  try {
+    return { value: await work }
+  } catch (error) {
+    console.error('dashboard section failed (' + section + ')', error)
+    return { value: fallback, warning: { section, code: section + '_unavailable' } }
+  }
+}
+
 export default defineEventHandler(async (event): Promise<DashboardData> => {
   const scope = await getPortalScope(event)
   const now = new Date().toISOString()
-  const names = await branchNames(event, scope)
+  // AFC-639a: branch-name resolution degrades like any other section. A
+  // denied branches read leaves an empty map (labels fall back to null/ids)
+  // with a named warning, never a bare 500.
+  const namesResult = await settleSection(
+    'branchNames',
+    branchNames(event, scope),
+    new Map<string, string>(),
+  )
+  const names = namesResult.value
   const branchFilter = scopeFilter(scope)
   const eventFilter = eventScopeFilter(scope)
 
@@ -195,152 +228,221 @@ export default defineEventHandler(async (event): Promise<DashboardData> => {
       )
 
   const [
-    people,
-    branches,
-    upcomingEvents,
-    followUps,
-    currentSessions,
-    priorSessions,
-    trendSessions,
-    welfareCases,
-    peopleSummary,
-    sundayClasses,
-    sundaySessions,
+    peopleResult,
+    branchesResult,
+    upcomingEventsResult,
+    followUpsResult,
+    currentSessionsResult,
+    priorSessionsResult,
+    trendSessionsResult,
+    welfareCasesResult,
+    peopleSummaryResult,
+    sundayClassesResult,
+    sundaySessionsResult,
   ] = await Promise.all([
-    countItems(
-      event,
-      scope,
+    settleSection(
       'people',
-      mergeFilters({ status: { _eq: 'active' } }, branchFilter),
+      countItems(
+        event,
+        scope,
+        'people',
+        mergeFilters({ status: { _eq: 'active' } }, branchFilter),
+      ),
+      0,
     ),
-    listItems<Record<string, unknown>>(event, scope, 'branches', {
-      filter: mergeFilters({ status: { _eq: 'active' } }, branchFilter),
-      fields: ['id', 'name', 'code', 'branch_type', 'status'],
-      sort: 'sort,name',
-      limit: -1,
-    }),
-    listItems<EventRow>(event, scope, 'events', {
-      filter: mergeFilters(
-        { start_at: { _gte: now }, status: { _eq: 'published' } },
-        eventFilter,
-      ),
-      fields: EVENT_FIELDS,
-      sort: 'start_at',
-      limit: 5,
-    }),
-    listItems<VisitorRow>(event, scope, 'visitors', {
-      filter: mergeFilters({ status: { _in: ['new', 'follow_up'] } }, branchFilter),
-      fields: VISITOR_FIELDS,
-      sort: 'next_follow_up_date,visit_date',
-      limit: 5,
-    }),
-    listItems<{ headcount_total: number | null }>(event, scope, 'attendance_sessions', {
-      filter: mergeFilters(
-        {
-          session_date: {
-            _gte: dateDaysAgo(30),
-            _lte: dateDaysAgo(0),
+    settleSection(
+      'branches',
+      listItems<Record<string, unknown>>(event, scope, 'branches', {
+        filter: mergeFilters({ status: { _eq: 'active' } }, branchFilter),
+        fields: ['id', 'name', 'code', 'branch_type', 'status'],
+        sort: 'sort,name',
+        limit: -1,
+      }),
+      { data: [], meta: { total: 0, page: 1, limit: -1 } },
+    ),
+    settleSection(
+      'upcomingEvents',
+      listItems<EventRow>(event, scope, 'events', {
+        filter: mergeFilters(
+          { start_at: { _gte: now }, status: { _eq: 'published' } },
+          eventFilter,
+        ),
+        fields: EVENT_FIELDS,
+        sort: 'start_at',
+        limit: 5,
+      }),
+      { data: [], meta: { total: 0, page: 1, limit: 5 } },
+    ),
+    settleSection(
+      'followUps',
+      listItems<VisitorRow>(event, scope, 'visitors', {
+        filter: mergeFilters({ status: { _in: ['new', 'follow_up'] } }, branchFilter),
+        fields: VISITOR_FIELDS,
+        sort: 'next_follow_up_date,visit_date',
+        limit: 5,
+      }),
+      { data: [], meta: { total: 0, page: 1, limit: 5 } },
+    ),
+    settleSection(
+      'attendanceCurrent',
+      listItems<{ headcount_total: number | null }>(event, scope, 'attendance_sessions', {
+        filter: mergeFilters(
+          {
+            session_date: {
+              _gte: dateDaysAgo(30),
+              _lte: dateDaysAgo(0),
+            },
           },
-        },
-        branchFilter,
-      ),
-      fields: ['headcount_total'],
-      limit: -1,
-    }),
-    listItems<{ headcount_total: number | null }>(event, scope, 'attendance_sessions', {
-      filter: mergeFilters(
-        {
-          session_date: {
-            _gte: dateDaysAgo(60),
-            _lt: dateDaysAgo(30),
+          branchFilter,
+        ),
+        fields: ['headcount_total'],
+        limit: -1,
+      }),
+      { data: [], meta: { total: 0, page: 1, limit: -1 } },
+    ),
+    settleSection(
+      'attendancePrior',
+      listItems<{ headcount_total: number | null }>(event, scope, 'attendance_sessions', {
+        filter: mergeFilters(
+          {
+            session_date: {
+              _gte: dateDaysAgo(60),
+              _lt: dateDaysAgo(30),
+            },
           },
-        },
-        branchFilter,
-      ),
-      fields: ['headcount_total'],
-      limit: -1,
-    }),
-    listItems<{
-      id: string | number
-      session_date: string
-      headcount_total: number | null
-      branch: string | null
-    }>(event, scope, 'attendance_sessions', {
-      filter: mergeFilters({ session_date: { _gte: dateDaysAgo(84) } }, branchFilter),
-      fields: ['id', 'session_date', 'headcount_total', 'branch'],
-      sort: '-session_date',
-      limit: 16,
-    }),
-    can(scope, 'welfare_cases', 'read')
-      ? listItems<WelfareCaseRow>(event, scope, 'welfare_cases', {
-          filter: mergeFilters(
-            { status: { _in: ['open', 'in_progress'] } },
-            branchFilter,
-          ),
-          fields: WELFARE_FIELDS,
-          sort: '-opened_at',
-          limit: 5,
-        })
-      : Promise.resolve({ data: [], meta: { total: 0, page: 1, limit: 5 } }),
-    can(scope, 'people', 'read')
-      ? collectPeopleSummary(event, scope)
-      : Promise.resolve(null),
-    canSundaySchool
-      ? listItems<{
-          id: string | number
-          class_name: string
-          branch: string | null
-          students_count: number | null
-          status: string | null
-        }>(event, scope, 'sunday_school_classes', {
-          filter: sundayClassFilter,
-          fields: SUNDAY_SCHOOL_FIELDS,
-          sort: 'class_name',
-          limit: -1,
-        })
-      : Promise.resolve({ data: [], meta: { total: 0, page: 1, limit: -1 } }),
-    canSundaySchool && canSessions
-      ? listItems<{
-          id: string | number
-          session_date: string
-          session_name: string | null
-          headcount_total: number | null
-          branch: string | null
-        }>(event, scope, 'attendance_sessions', {
-          filter: mergeFilters({ session_type: { _eq: 'sunday_school' } }, branchFilter),
-          fields: ['id', 'session_date', 'session_name', 'headcount_total', 'branch'],
-          sort: '-session_date',
-          limit: 5,
-        })
-      : Promise.resolve({ data: [], meta: { total: 0, page: 1, limit: 5 } }),
+          branchFilter,
+        ),
+        fields: ['headcount_total'],
+        limit: -1,
+      }),
+      { data: [], meta: { total: 0, page: 1, limit: -1 } },
+    ),
+    settleSection(
+      'attendanceTrend',
+      listItems<{
+        id: string | number
+        session_date: string
+        headcount_total: number | null
+        branch: string | null
+      }>(event, scope, 'attendance_sessions', {
+        filter: mergeFilters({ session_date: { _gte: dateDaysAgo(84) } }, branchFilter),
+        fields: ['id', 'session_date', 'headcount_total', 'branch'],
+        sort: '-session_date',
+        limit: 16,
+      }),
+      { data: [], meta: { total: 0, page: 1, limit: 16 } },
+    ),
+    settleSection(
+      'welfareCases',
+      can(scope, 'welfare_cases', 'read')
+        ? listItems<WelfareCaseRow>(event, scope, 'welfare_cases', {
+            filter: mergeFilters(
+              { status: { _in: ['open', 'in_progress'] } },
+              branchFilter,
+            ),
+            fields: WELFARE_FIELDS,
+            sort: '-opened_at',
+            limit: 5,
+          })
+        : Promise.resolve({ data: [], meta: { total: 0, page: 1, limit: 5 } }),
+      { data: [], meta: { total: 0, page: 1, limit: 5 } },
+    ),
+    settleSection(
+      'peopleSummary',
+      can(scope, 'people', 'read')
+        ? collectPeopleSummary(event, scope)
+        : Promise.resolve(null),
+      null,
+    ),
+    settleSection(
+      'sundayClasses',
+      canSundaySchool
+        ? listItems<{
+            id: string | number
+            class_name: string
+            branch: string | null
+            students_count: number | null
+            status: string | null
+          }>(event, scope, 'sunday_school_classes', {
+            filter: sundayClassFilter,
+            fields: SUNDAY_SCHOOL_FIELDS,
+            sort: 'class_name',
+            limit: -1,
+          })
+        : Promise.resolve({ data: [], meta: { total: 0, page: 1, limit: -1 } }),
+      { data: [], meta: { total: 0, page: 1, limit: -1 } },
+    ),
+    settleSection(
+      'sundaySessions',
+      canSundaySchool && canSessions
+        ? listItems<{
+            id: string | number
+            session_date: string
+            session_name: string | null
+            headcount_total: number | null
+            branch: string | null
+          }>(event, scope, 'attendance_sessions', {
+            filter: mergeFilters({ session_type: { _eq: 'sunday_school' } }, branchFilter),
+            fields: ['id', 'session_date', 'session_name', 'headcount_total', 'branch'],
+            sort: '-session_date',
+            limit: 5,
+          })
+        : Promise.resolve({ data: [], meta: { total: 0, page: 1, limit: 5 } }),
+      { data: [], meta: { total: 0, page: 1, limit: 5 } },
+    ),
   ])
+  const people = peopleResult.value
+  const branches = branchesResult.value
+  const upcomingEvents = upcomingEventsResult.value
+  const followUps = followUpsResult.value
+  const currentSessions = currentSessionsResult.value
+  const priorSessions = priorSessionsResult.value
+  const trendSessions = trendSessionsResult.value
+  const welfareCases = welfareCasesResult.value
+  const peopleSummary = peopleSummaryResult.value
+  const sundayClasses = sundayClassesResult.value
+  const sundaySessions = sundaySessionsResult.value
 
   const upcomingIds = upcomingEvents.data.map((row) => String(row.id))
-  const upcomingRegistrations =
+  const upcomingRegistrationsResult = await settleSection(
+    'upcomingRegistrations',
     upcomingIds.length > 0
-      ? await countItems(event, scope, 'event_registrations', {
+      ? countItems(event, scope, 'event_registrations', {
           _and: [
             { event: { _in: upcomingIds } },
             { registration_status: { _neq: 'cancelled' } },
           ],
         })
-      : 0
-
-  const openFollowUps = await countItems(
-    event,
-    scope,
-    'visitors',
-    mergeFilters({ status: { _in: ['new', 'follow_up'] } }, branchFilter),
+      : Promise.resolve(0),
+    0,
   )
+  const upcomingRegistrations = upcomingRegistrationsResult.value
 
-  const openWelfare = can(scope, 'welfare_cases', 'read')
-    ? await countItems(
-        event,
-        scope,
-        'welfare_cases',
-        mergeFilters({ status: { _in: ['open', 'in_progress'] } }, branchFilter),
-      )
-    : 0
+  const openFollowUpsResult = await settleSection(
+    'openFollowUps',
+    countItems(
+      event,
+      scope,
+      'visitors',
+      mergeFilters({ status: { _in: ['new', 'follow_up'] } }, branchFilter),
+    ),
+    0,
+  )
+  const openFollowUps = openFollowUpsResult.value
+
+  const openWelfareResult = await settleSection(
+    'openWelfare',
+    can(scope, 'welfare_cases', 'read')
+      ? countItems(
+          event,
+          scope,
+          'welfare_cases',
+          mergeFilters({ status: { _in: ['open', 'in_progress'] } }, branchFilter),
+        )
+      : Promise.resolve(0),
+    0,
+  )
+  const openWelfare = openWelfareResult.value
 
   const currentAttendance = currentSessions.data.reduce(
     (sum, session) => sum + Number(session.headcount_total ?? 0),
@@ -360,26 +462,32 @@ export default defineEventHandler(async (event): Promise<DashboardData> => {
     }))
 
   const upcomingRegistrationCounts = new Map<string, number>()
-  if (upcomingIds.length > 0) {
-    const registrations = await listItems<{ event: string; registration_status: string }>(
-      event,
-      scope,
-      'event_registrations',
-      {
-        filter: {
-          _and: [
-            { event: { _in: upcomingIds } },
-            { registration_status: { _neq: 'cancelled' } },
-          ],
+  const registrationsBreakdownResult = await settleSection(
+    'registrationsBreakdown',
+    (async () => {
+      if (upcomingIds.length === 0) return []
+      const registrations = await listItems<{ event: string; registration_status: string }>(
+        event,
+        scope,
+        'event_registrations',
+        {
+          filter: {
+            _and: [
+              { event: { _in: upcomingIds } },
+              { registration_status: { _neq: 'cancelled' } },
+            ],
+          },
+          fields: ['event', 'registration_status'],
+          limit: -1,
         },
-        fields: ['event', 'registration_status'],
-        limit: -1,
-      },
-    )
-    for (const registration of registrations.data) {
-      const key = String(registration.event)
-      upcomingRegistrationCounts.set(key, (upcomingRegistrationCounts.get(key) ?? 0) + 1)
-    }
+      )
+      return registrations.data
+    })(),
+    [],
+  )
+  for (const registration of registrationsBreakdownResult.value) {
+    const key = String(registration.event)
+    upcomingRegistrationCounts.set(key, (upcomingRegistrationCounts.get(key) ?? 0) + 1)
   }
 
   const upcomingRows: EventRow[] = upcomingEvents.data.map((row) => ({
@@ -451,8 +559,14 @@ export default defineEventHandler(async (event): Promise<DashboardData> => {
   // full date of birth, birth year, or age in the payload.
   const windowFrom = dateDaysAgo(0)
   const windowTo = dateDaysAhead(30)
-  let celebrationItems: DashboardCelebrationItem[] = []
-  if (celebrationsVisible) {
+  // AFC-639a: celebrations (celebrations + people-DOB reads) degrade as one
+  // section. A denied celebrations/people read yields [] with a named
+  // warning; sibling sections stay intact.
+  const celebrationsResult = await settleSection(
+    'celebrations',
+    (async (): Promise<DashboardCelebrationItem[]> => {
+      if (!celebrationsVisible) return []
+      let celebrationItems: DashboardCelebrationItem[] = []
     // Celebrations half: scoped like the feed (area sees all; zone staff
     // see their zones; branch staff see their branches). Recurring rows are
     // read whole and projected in code because Directus cannot express
@@ -574,11 +688,15 @@ export default defineEventHandler(async (event): Promise<DashboardData> => {
         if (celebratedPersonIds.has(item.id)) continue
         celebrationItems.push(item)
       }
-    }
-    celebrationItems = celebrationItems
-      .sort((a, b) => a.date.localeCompare(b.date) || a.name.localeCompare(b.name))
-      .slice(0, 10)
-  }
+      }
+      celebrationItems = celebrationItems
+        .sort((a, b) => a.date.localeCompare(b.date) || a.name.localeCompare(b.name))
+        .slice(0, 10)
+      return celebrationItems
+    })(),
+    [],
+  )
+  const celebrationItems = celebrationsResult.value
 
   const family = peopleSummary?.family ?? {
     households: 0,
@@ -593,6 +711,29 @@ export default defineEventHandler(async (event): Promise<DashboardData> => {
         .map((id) => names.get(id) ?? id)
         .filter(Boolean)
         .join(', ') || 'No branch'
+
+  const warnings: BranchSectionWarning[] = []
+  for (const section of [
+    namesResult,
+    peopleResult,
+    branchesResult,
+    upcomingEventsResult,
+    followUpsResult,
+    currentSessionsResult,
+    priorSessionsResult,
+    trendSessionsResult,
+    welfareCasesResult,
+    peopleSummaryResult,
+    sundayClassesResult,
+    sundaySessionsResult,
+    upcomingRegistrationsResult,
+    openFollowUpsResult,
+    openWelfareResult,
+    registrationsBreakdownResult,
+    celebrationsResult,
+  ]) {
+    if (section.warning) warnings.push(section.warning)
+  }
 
   return {
     scope: {
@@ -636,5 +777,6 @@ export default defineEventHandler(async (event): Promise<DashboardData> => {
       ...(branch as unknown as DashboardData['branches'][number]),
       id: String(branch.id),
     })),
+    warnings,
   }
 })

@@ -175,7 +175,7 @@ const statusColor: Record<string, 'success' | 'warning' | 'neutral' | 'error'> =
           aria-label="Search visitors"
         />
         <USelect v-model="status" :items="statusOptions" class="w-full" />
-        <USelect v-model="branch" :items="branchOptions" class="w-full" />
+        <EntitySelect v-model="branch" :items="branchOptions" placeholder="Select branch…" class="w-full" />
       </div>
 
       <UAlert

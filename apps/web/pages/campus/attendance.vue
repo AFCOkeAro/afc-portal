@@ -15,6 +15,22 @@ interface Mark {
   present: boolean
 }
 
+interface Slot {
+  id: string
+  programme: string
+  subject: string
+  day_of_week?: string | null
+  start_time?: string | null
+  end_time?: string | null
+  status: string
+}
+
+interface StudentOption {
+  id: string
+  course?: string | null
+  level?: string | null
+}
+
 const programme = ref('')
 const classDate = ref(new Date().toISOString().slice(0, 10))
 const timetable = ref('')
@@ -39,6 +55,44 @@ const { data, pending, error, refresh } = await useAsyncData(
   { watch: [query] },
 )
 
+// Preloaded caller-scoped option lists for the searchable pickers below.
+// No new endpoints: same list routes the timetable/students pages use.
+const programmesQuery = await useAsyncData('campus-attendance-programmes', () =>
+  api.get<{
+    data: Array<{ id: string; name: string; exam: string; year?: number | null }>
+  }>('/api/campus/programmes', { query: { limit: 100 } }),
+)
+const slotsQuery = await useAsyncData('campus-attendance-slots', () =>
+  api.get<{ data: Slot[] }>('/api/campus/timetable', { query: { limit: 100 } }),
+)
+const studentsQuery = await useAsyncData('campus-attendance-students', () =>
+  api.get<{ data: StudentOption[]; meta: { total: number } }>('/api/campus/students', {
+    query: { limit: 100 },
+  }),
+)
+
+const programmeOptions = computed(() => [
+  { label: 'All programmes', value: '' },
+  ...(programmesQuery.data.value?.data ?? []).map((row) => ({
+    label: `${row.name} (${row.exam.toUpperCase()}${row.year ? ` ${row.year}` : ''})`,
+    value: row.id,
+  })),
+])
+const slotOptions = computed(() => [
+  { label: 'No slot', value: '' },
+  ...(slotsQuery.data.value?.data ?? []).map((row) => ({
+    label: `${row.subject} · ${(row.day_of_week ?? '?').replace(/_/g, ' ')} ${row.start_time ?? ''}–${row.end_time ?? ''}`,
+    value: row.id,
+  })),
+])
+const studentOptions = computed(() => [
+  { label: 'All students', value: '' },
+  ...(studentsQuery.data.value?.data ?? []).map((row) => ({
+    label: `${row.course ?? 'Student record'} · ${(row.level ?? '').replace(/_/g, ' ')} · ${row.id.slice(0, 8)}`,
+    value: row.id,
+  })),
+])
+
 const marks = computed(() => data.value?.data ?? [])
 const total = computed(() => data.value?.meta.total ?? 0)
 const presentCount = computed(
@@ -49,6 +103,11 @@ async function saveMark() {
   saving.value = true
   formError.value = null
   savedNote.value = null
+  if (!campusStudent.value) {
+    formError.value = 'Choose a student first.'
+    saving.value = false
+    return
+  }
   try {
     const response = await api.post<{ data: Mark; meta: { idempotent: boolean } }>(
       '/api/campus/attendance',
@@ -83,20 +142,33 @@ async function saveMark() {
     <PermissionGate :collection="COLLECTIONS.coachingClassAttendance" action="create">
       <UCard class="mt-4">
         <form class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5" @submit.prevent="saveMark">
-          <UFormField label="Programme id">
-            <UInput v-model="programme" placeholder="Programme UUID" class="w-full" />
+          <UFormField label="Programme">
+            <EntitySelect
+              v-model="programme"
+              :items="programmeOptions"
+              placeholder="Select programme…"
+              :loading="programmesQuery.pending"
+              class="w-full"
+            />
           </UFormField>
-          <UFormField label="Timetable slot id (optional)">
-            <UInput v-model="timetable" placeholder="Slot UUID" class="w-full" />
+          <UFormField label="Timetable slot (optional)">
+            <EntitySelect
+              v-model="timetable"
+              :items="slotOptions"
+              placeholder="Select slot…"
+              :loading="slotsQuery.pending"
+              class="w-full"
+            />
           </UFormField>
           <UFormField label="Class date" required>
             <UInput v-model="classDate" type="date" required class="w-full" />
           </UFormField>
-          <UFormField label="Campus student id" required>
-            <UInput
+          <UFormField label="Campus student" required>
+            <EntitySelect
               v-model="campusStudent"
-              placeholder="Student UUID"
-              required
+              :items="studentOptions"
+              placeholder="Select student…"
+              :loading="studentsQuery.pending"
               class="w-full"
             />
           </UFormField>

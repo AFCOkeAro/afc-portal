@@ -482,9 +482,9 @@ function fullName(person: PersonRow): string {
           placeholder="Search name, phone or email"
           aria-label="Search people"
         />
-        <USelect v-model="branch" :items="branchOptions" class="w-full" />
+        <EntitySelect v-model="branch" :items="branchOptions" placeholder="Select branch…" class="w-full" />
         <USelect v-model="membership" :items="membershipOptions" class="w-full" />
-        <USelect v-model="department" :items="departmentOptions" class="w-full" />
+        <EntitySelect v-model="department" :items="departmentOptions" placeholder="Select department…" class="w-full" />
         <USelect v-model="gender" :items="genderOptions" class="w-full" />
         <USelect v-model="ageBucket" :items="ageBucketOptions" class="w-full" />
         <USelect v-model="status" :items="statusOptions" class="w-full" />

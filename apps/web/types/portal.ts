@@ -419,6 +419,11 @@ export interface DashboardData {
    * follow-ups. Empty unless the caller holds both the celebrations and the
    * visitors read grants. */
   upcomingCelebrations: DashboardCelebrationItem[]
+  /** Per-section degradation warnings (AFC-639a, AFC-564 precedent): one
+   * entry per aggregation section that failed and fell back to its empty
+   * value. Core identity/scope stays fail-closed and never produces a
+   * degraded 200. */
+  warnings: BranchSectionWarning[]
 }
 
 export interface Paginated<T> {
