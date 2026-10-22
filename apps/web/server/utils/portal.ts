@@ -1,7 +1,8 @@
 import type { H3Event } from 'h3'
-import type { AuthSession, PermissionAction, StaffRole } from '@afc/shared'
+import type { AuthSession, Grant, PermissionAction, StaffRole } from '@afc/shared'
 import { grantsForRole, hiddenFieldsForRole } from '@afc/shared/role-matrix'
 import { DirectusAuthError, directusFetch } from './directus'
+import { customGrantsForRole } from './custom-grants'
 import { STUB_ACCESS_TOKEN, requireSession } from './session'
 
 /**
@@ -31,6 +32,12 @@ export interface PortalScope {
   zoneIds: string[]
   hiddenFields: Record<string, string[]>
   token: string
+  /**
+   * Grants for custom (non-built-in) staff roles, resolved from the role's
+   * Directus permissions (AFC-669). Empty for built-in roles, which resolve
+   * through the code matrix. Row scoping still comes from branchIds/zoneIds.
+   */
+  customGrants: Grant[]
 }
 
 type Filter = Record<string, unknown>
@@ -114,6 +121,7 @@ export async function getPortalScope(event: H3Event): Promise<PortalScope> {
     zoneIds,
     hiddenFields: hiddenFieldsForRole(role),
     token,
+    customGrants: await customGrantsForRole(event, role),
   }
 }
 
@@ -122,7 +130,13 @@ export function can(
   collection: string,
   action: PermissionAction,
 ): boolean {
-  return grantsForRole(scope.role).some(
+  if (
+    grantsForRole(scope.role).some(
+      (grant) => grant.collection === collection && grant.action === action,
+    )
+  )
+    return true
+  return scope.customGrants.some(
     (grant) => grant.collection === collection && grant.action === action,
   )
 }
