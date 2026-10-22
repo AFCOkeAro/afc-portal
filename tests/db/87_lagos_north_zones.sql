@@ -80,8 +80,8 @@ DECLARE
   v_mismatch integer;
 BEGIN
   PERFORM test_support.assert_true(
-    (SELECT count(*) FROM branches) = 32,
-    'zones578', 'thirty-two branches intact (30 mapped + satellite + kept Sango-Ota)');
+    (SELECT count(*) FROM branches) = 30,
+    'zones578', 'thirty branches intact (the 30 user-mapped rows)');
   PERFORM test_support.assert_true(
     (SELECT count(*) FROM bible_study_centres) = 9,
     'zones578', 'nine seeded BSCs intact');
@@ -90,16 +90,13 @@ BEGIN
     'zones578', 'no branch is zoneless after the rename');
 
   -- Branch>zone mapping: the rename corrects names; the user-confirmed map
-  -- (0028) re-homes LEGUN/MATOGUN/OLOMOWEWE to Z1. Oke-Aro, its satellite
-  -- and the three re-homed samples sit in Z1; kept SANGO-OTA stays in Z6.
-  -- The full 30-row map is pinned in suite 93.
+  -- (0028) re-homes LEGUN/MATOGUN/OLOMOWEWE to Z1. Oke-Aro and the three
+  -- re-homed samples sit in Z1. The full 30-row map is pinned in suite 93.
   PERFORM test_support.assert_true(
     (SELECT count(*) FROM branches b JOIN zones z ON z.id = b.zone
       WHERE (b.code = 'OKE-ARO' AND z.code = 'LAG-NORTH-Z1')
-         OR (b.code = 'OKE-ARO-SAT-1' AND z.code = 'LAG-NORTH-Z1')
-         OR (b.code IN ('LEGUN', 'MATOGUN', 'OLOMOWEWE') AND z.code = 'LAG-NORTH-Z1')
-         OR (b.code = 'SANGO-OTA' AND z.code = 'LAG-NORTH-Z6')) = 6,
-    'zones578', 'Oke-Aro, satellite, re-homed three in Z1; kept Sango-Ota in Z6');
+         OR (b.code IN ('LEGUN', 'MATOGUN', 'OLOMOWEWE') AND z.code = 'LAG-NORTH-Z1')) = 4,
+    'zones578', 'Oke-Aro and the three re-homed samples sit in Z1');
 
   -- Denorm consistency survives the rename (names changed, ids did not).
   SELECT count(*) INTO v_mismatch
@@ -156,13 +153,14 @@ END $$;
 \i services/directus/schema/migrations/20261020_0024_remove_abule_egba.sql
 \i services/directus/schema/migrations/20261020_0022_lagos_north_zones.sql
 \i services/directus/schema/migrations/20261020_0028_lagos_north_branches.sql
+\i services/directus/schema/migrations/20261020_0029_remove_sango_ota_and_satellite.sql
 
 DO $$
 BEGIN
   PERFORM test_support.assert_true((SELECT count(*) FROM zones) = 6,
     'zones578', 'rerun: still six zones');
-  PERFORM test_support.assert_true((SELECT count(*) FROM branches) = 32,
-    'zones578', 'rerun: still thirty-two branches');
+  PERFORM test_support.assert_true((SELECT count(*) FROM branches) = 30,
+    'zones578', 'rerun: still thirty branches');
   PERFORM test_support.assert_equals(
     (SELECT string_agg(name, '|' ORDER BY code) FROM zones),
     'Oke Aro Zone|Sango Zone|Ifo Zone|Itoki Zone|Ijoko Zone|Agege Zone',
@@ -181,7 +179,7 @@ BEGIN
     'Oke-Aro Zone|Legun Zone|Matogun Zone|Olomowewe Zone|Abule-Egba Zone|Sango-Ota Zone',
     'zones578', 'down script restores the six 0002 names by code');
   PERFORM test_support.assert_true(
-    (SELECT count(*) FROM branches) = 32,
+    (SELECT count(*) FROM branches) = 30,
     'zones578', 'down script deletes no branch row');
 END $$;
 
