@@ -12,6 +12,7 @@ import { z } from 'zod'
 export const STAFF_ROLES = [
   'super_admin',
   'area_admin',
+  'zone_admin',
   'branch_admin',
   'department_leader',
   'volunteer',

@@ -7,17 +7,10 @@
  *   member shape; technical error detail never reaches this page).
  * - "Ask staff to stop" = withdraw an unsent invite (existing route; members
  *   may withdraw their own unsent rows, staff any in-scope unsent row).
- * - Consent: the member profile surface is OTP-gated (503 until enablement).
- *   Channel consent changes are staff-recorded for now — this page states
- *   that and points at the branch admin instead of inventing a write path.
- *   (Stated choice: no new consent endpoint in this slice; consent writes
- *   arrive with the OTP member-role enablement.)
- *   AFC-538 finding 4 (owner: CTO MediaTech): own-consent self-service has no
- *   dedicated UI in this slice; tracked against the OTP member-role
- *   enablement. Until then consent changes go via the branch admin.
- *
- * Member surface: no `staff` middleware. Anchor sections per
- * prd-addendum-v4 §1.4.
+ * - This portal does not run member phone-OTP sessions. The former "My
+ *   consent" block read /api/member/profile, which is member-session-only and
+ *   therefore answered 503 for every staff user. Consent changes are recorded
+ *   by the branch admin; no member profile is fetched here.
  */
 
 const api = useApi()
@@ -35,14 +28,6 @@ interface MemberInvite {
   created_at: string | null
 }
 
-interface MemberProfile {
-  id: string
-  first_name: string | null
-  last_name: string | null
-  phone_redacted: string | null
-  branch: string | null
-}
-
 const {
   data: invites,
   pending,
@@ -50,9 +35,6 @@ const {
   refresh,
 } = await useAsyncData('me-invitations', () =>
   api.get<{ data: MemberInvite[] }>('/api/invites', { query: { limit: 50 } }),
-)
-const { data: profile, error: profileError } = await useAsyncData('me-profile', () =>
-  api.get<MemberProfile>('/api/member/profile'),
 )
 
 const withdrawing = ref<string | null>(null)
@@ -85,14 +67,8 @@ const stripItems = computed(() => {
 
 const sections = [
   { id: 'invitations', label: 'My invitations' },
-  { id: 'consent', label: 'My consent' },
   { id: 'stop', label: 'Ask staff to stop' },
 ]
-
-const profileDisabled = computed(() => {
-  const code = (profileError.value as { code?: string } | null)?.code
-  return code === 'member_otp_disabled'
-})
 
 function statusColor(status: string | null): 'success' | 'warning' | 'neutral' | 'error' {
   if (status === 'sent' || status === 'delivered' || status === 'registered')
@@ -217,42 +193,6 @@ async function withdraw(id: string): Promise<void> {
           variant="subtle"
           title="Done"
           :description="actionDone"
-        />
-      </UCard>
-    </section>
-
-    <section id="consent" class="mt-8 scroll-mt-28">
-      <h2 class="sr-only" tabindex="-1">My consent</h2>
-      <UCard>
-        <template #header>
-          <h2 class="text-base font-semibold" tabindex="-1">
-            My consent (WhatsApp / SMS)
-          </h2>
-        </template>
-        <UAlert
-          v-if="profileDisabled"
-          color="warning"
-          variant="subtle"
-          title="Member sign-in is not enabled yet"
-          description="Phone-OTP member sign-in stays behind the disabled flag until the security re-review and CTO approval land. Your branch admin records channel-consent changes for you in the meantime."
-        />
-        <div v-else-if="profile" class="text-sm">
-          <p>
-            <strong>{{ profile.first_name }} {{ profile.last_name }}</strong> ·
-            {{ profile.phone_redacted }}
-          </p>
-          <p class="mt-2 text-gray-600 dark:text-gray-300">
-            To change your WhatsApp or SMS consent, or to stop all messages (STOP),
-            contact your branch admin — the withdrawal is recorded permanently and
-            suppresses every campaign audience, including other campaigns.
-          </p>
-        </div>
-        <UAlert
-          v-else-if="profileError"
-          color="error"
-          variant="subtle"
-          title="Could not load your profile"
-          :description="profileError.message"
         />
       </UCard>
     </section>

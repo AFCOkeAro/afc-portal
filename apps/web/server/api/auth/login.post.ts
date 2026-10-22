@@ -70,6 +70,9 @@ interface DirectusUserResponse {
     branch_ids: string[] | null
     department_ids: string[] | null
     person: string | null
+    area: string | null
+    zone: string | null
+    zone_ids: string[] | null
   }
 }
 
@@ -108,6 +111,9 @@ async function directusSession(
         'branch_ids',
         'department_ids',
         'person',
+        'area',
+        'zone',
+        'zone_ids',
       ].join(','),
     },
   })
@@ -127,6 +133,9 @@ async function directusSession(
       branchIds: me.data.branch_ids ?? [],
       departmentIds: me.data.department_ids ?? [],
       personId: me.data.person,
+      areaId: me.data.area,
+      zoneId: me.data.zone,
+      zoneIds: me.data.zone_ids ?? [],
     },
   }
 }

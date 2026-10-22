@@ -54,6 +54,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [R, 'assigned_branches'],
     volunteer: [R, 'own_branch', 'own, minimal'],
     none: [NONE, 'none'],
+    zone_admin: [R, 'own_zone'],
   },
   [COLLECTIONS.departments]: {
     super_admin: [ALL, 'all'],
@@ -62,6 +63,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [RU, 'own_department', 'own dept'],
     volunteer: [R, 'own_branch'],
     none: [NONE, 'none'],
+    zone_admin: [R, 'own_zone'],
   },
   [COLLECTIONS.people]: {
     super_admin: [ALL, 'all'],
@@ -70,6 +72,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [RU, 'assigned_departments', 'assigned dept members'],
     volunteer: [R, 'own_branch', 'name/branch only, own'],
     none: [NONE, 'none'],
+    zone_admin: [ALL, 'own_zone'],
   },
   [COLLECTIONS.peopleDepartments]: {
     super_admin: [ALL, 'all'],
@@ -78,6 +81,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [CRU, 'own_department', 'own dept'],
     volunteer: [R, 'own_branch'],
     none: [NONE, 'none'],
+    zone_admin: [CRU, 'own_zone'],
   },
   [COLLECTIONS.households]: {
     super_admin: [ALL, 'all'],
@@ -86,6 +90,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [R, 'assigned_branches'],
     volunteer: [NONE, 'none'],
     none: [NONE, 'none'],
+    zone_admin: [ALL, 'own_zone'],
   },
   [COLLECTIONS.events]: {
     super_admin: [ALL, 'all'],
@@ -96,6 +101,19 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     // "R (public only)": the public role reads events whose visibility is
     // public. It is the only role with a read grant here.
     none: [R, 'public_only'],
+    zone_admin: [CRU, 'own_zone'],
+  },
+  // Invites (Slice 4). The §11 table predates this collection; grants mirror
+  // the event it belongs to: area-wide for board, scoped CRU for zone/branch
+  // staff, own intake for volunteers. Quota routes read the same collection.
+  [COLLECTIONS.eventInvites]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [ALL, 'all'],
+    branch_admin: [CRU, 'own_branch'],
+    department_leader: [R, 'assigned_branches'],
+    volunteer: [C, 'own_branch', 'C own invites'],
+    none: [NONE, 'none'],
+    zone_admin: [CRU, 'own_zone'],
   },
   [COLLECTIONS.eventRegistrations]: {
     super_admin: [ALL, 'all'],
@@ -111,6 +129,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     // AFC-174 update.
     volunteer: [U, 'own_branch', 'check-in fields only, own; read not granted here'],
     none: [C, 'allowlisted_fields'],
+    zone_admin: [ALL, 'own_zone'],
   },
   [COLLECTIONS.attendanceSessions]: {
     super_admin: [ALL, 'all'],
@@ -119,6 +138,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [CRU, 'assigned_branches'],
     volunteer: [CU, 'own_branch'],
     none: [NONE, 'none'],
+    zone_admin: [ALL, 'own_zone'],
   },
   [COLLECTIONS.attendanceRecords]: {
     super_admin: [ALL, 'all'],
@@ -127,6 +147,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [CRU, 'assigned_branches'],
     volunteer: [CU, 'own_branch'],
     none: [NONE, 'none'],
+    zone_admin: [ALL, 'own_zone'],
   },
   [COLLECTIONS.sundayServices]: {
     super_admin: [ALL, 'all'],
@@ -135,6 +156,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [R, 'assigned_branches'],
     volunteer: [R, 'own_branch'],
     none: [NONE, 'none'],
+    zone_admin: [ALL, 'own_zone'],
   },
   [COLLECTIONS.serviceAssignments]: {
     super_admin: [ALL, 'all'],
@@ -143,6 +165,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [CRU, 'assigned_departments', 'assigned dept roles'],
     volunteer: [R, 'own_branch'],
     none: [NONE, 'none'],
+    zone_admin: [ALL, 'own_zone'],
   },
   [COLLECTIONS.visitors]: {
     super_admin: [ALL, 'all'],
@@ -151,6 +174,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [CRU, 'assigned_departments', 'assigned, youth'],
     volunteer: [C, 'own_branch', 'own branch intake'],
     none: [NONE, 'none'],
+    zone_admin: [ALL, 'own_zone'],
   },
   // Newcomer journey (AFC-471, data-model-v4 §5). Stages are reference data:
   // branch admins manage their own branch rows, everyone else reads. The
@@ -166,6 +190,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [R, 'assigned_branches'],
     volunteer: [R, 'own_branch'],
     none: [NONE, 'none'],
+    zone_admin: [CRU, 'own_zone'],
   },
   [COLLECTIONS.visitorFollowUps]: {
     super_admin: [CRU, 'all'],
@@ -174,6 +199,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [CRU, 'assigned_departments', 'assigned, youth'],
     volunteer: [CR, 'own_branch', 'own branch intake follow-ups'],
     none: [NONE, 'none'],
+    zone_admin: [CRU, 'own_zone'],
   },
   [COLLECTIONS.visitorJourneyTransitions]: {
     super_admin: [CRU, 'all'],
@@ -182,6 +208,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [R, 'assigned_departments', 'assigned, youth'],
     volunteer: [R, 'own_branch'],
     none: [NONE, 'none'],
+    zone_admin: [CRU, 'own_zone'],
   },
   [COLLECTIONS.welfareCases]: {
     super_admin: [ALL, 'all'],
@@ -190,6 +217,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [R, 'assigned_departments', 'assigned, youth cases only'],
     volunteer: [NONE, 'none'],
     none: [NONE, 'none'],
+    zone_admin: [ALL, 'own_zone'],
   },
   [COLLECTIONS.welfareContributions]: {
     super_admin: [ALL, 'all'],
@@ -198,6 +226,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [NONE, 'none'],
     volunteer: [NONE, 'none'],
     none: [NONE, 'none'],
+    zone_admin: [ALL, 'own_zone'],
   },
   [COLLECTIONS.welfareCaseEvents]: {
     super_admin: [ALL, 'all'],
@@ -206,6 +235,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [R, 'assigned_departments', 'assigned youth'],
     volunteer: [NONE, 'none'],
     none: [NONE, 'none'],
+    zone_admin: [R, 'own_zone'],
   },
   [COLLECTIONS.users]: {
     super_admin: [ALL, 'all'],
@@ -214,6 +244,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [NONE, 'none'],
     volunteer: [NONE, 'none'],
     none: [NONE, 'none'],
+    zone_admin: [NONE, 'none'],
   },
   [COLLECTIONS.eventDepartments]: {
     // Not in the §10 table. It is the events↔departments junction, reachable
@@ -225,6 +256,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [R, 'assigned_branches'],
     volunteer: [R, 'own_branch'],
     none: [NONE, 'none'],
+    zone_admin: [CRU, 'own_zone'],
   },
   // Delivery log + consent (AFC-479, data-model-v4 §5, ADR-0009 decision 2).
   // One log for every message; the matrix below is the UI contract only --
@@ -239,6 +271,38 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [R, 'assigned_branches'],
     volunteer: [NONE, 'none'],
     none: [NONE, 'none'],
+    zone_admin: [CRU, 'own_zone'],
+  },
+  // Campaign catalogue (AFC-527). Read-only: this slice exposes no send,
+  // enqueue, pause or resume path. Steps and runs are children of a campaign;
+  // migration 0032 carries their branch/zone so the policy scopes them without
+  // relational metadata. Readers mirror the communications-read set.
+  [COLLECTIONS.campaigns]: {
+    super_admin: [R, 'all'],
+    area_admin: [R, 'all'],
+    branch_admin: [R, 'own_branch'],
+    department_leader: [R, 'assigned_branches'],
+    volunteer: [NONE, 'none'],
+    none: [NONE, 'none'],
+    zone_admin: [R, 'own_zone'],
+  },
+  [COLLECTIONS.campaignSteps]: {
+    super_admin: [R, 'all'],
+    area_admin: [R, 'all'],
+    branch_admin: [R, 'own_branch'],
+    department_leader: [R, 'assigned_branches'],
+    volunteer: [NONE, 'none'],
+    none: [NONE, 'none'],
+    zone_admin: [R, 'own_zone'],
+  },
+  [COLLECTIONS.campaignRuns]: {
+    super_admin: [R, 'all'],
+    area_admin: [R, 'all'],
+    branch_admin: [R, 'own_branch'],
+    department_leader: [R, 'assigned_branches'],
+    volunteer: [NONE, 'none'],
+    none: [NONE, 'none'],
+    zone_admin: [R, 'own_zone'],
   },
   [COLLECTIONS.communicationRecipients]: {
     super_admin: [ALL, 'all'],
@@ -247,6 +311,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [NONE, 'none'],
     volunteer: [NONE, 'none'],
     none: [NONE, 'none'],
+    zone_admin: [R, 'own_zone'],
   },
   [COLLECTIONS.messageTemplates]: {
     super_admin: [ALL, 'all'],
@@ -255,6 +320,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [R, 'assigned_branches'],
     volunteer: [R, 'own_branch'],
     none: [NONE, 'none'],
+    zone_admin: [CRU, 'own_zone'],
   },
   [COLLECTIONS.consentRecords]: {
     super_admin: [ALL, 'all'],
@@ -263,27 +329,29 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [NONE, 'none'],
     volunteer: [NONE, 'none'],
     none: [NONE, 'none'],
+    zone_admin: [CRU, 'own_zone'],
   },
   [COLLECTIONS.branchFinancialRecords]: {
     // data-model-expansion §11: CRUD / CRUD / R (zone) / CRU (own).
-    // `zone_admin` is not a StaffRole, so the zone column has no cell here;
-    // that grant lives in the Directus policy only. Recorded, not invented.
+    // Zone admin: R (zone) per data-model-expansion §11.
     super_admin: [ALL, 'all'],
     area_admin: [ALL, 'all'],
     branch_admin: [CRU, 'own_branch', 'own'],
     department_leader: [NONE, 'none'],
     volunteer: [NONE, 'none'],
     none: [NONE, 'none'],
+    zone_admin: [R, 'own_zone'],
   },
   [COLLECTIONS.wecaReturns]: {
     // data-model-expansion §11: CRUD / CRUD / R (zone) / R (own).
-    // Same zone_admin caveat as above.
+    // Zone admin: R (zone) per §11.
     super_admin: [ALL, 'all'],
     area_admin: [ALL, 'all'],
     branch_admin: [R, 'own_branch', 'own'],
     department_leader: [NONE, 'none'],
     volunteer: [NONE, 'none'],
     none: [NONE, 'none'],
+    zone_admin: [R, 'own_zone'],
   },
   [COLLECTIONS.wecaReturnFormulas]: {
     // In no permission matrix: the formulas table is new in ADR-0008, and
@@ -297,12 +365,11 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [R, 'assigned_branches'],
     volunteer: [NONE, 'none'],
     none: [NONE, 'none'],
+    zone_admin: [R, 'all'],
   },
-  // Hierarchy (AFC-461a, data-model-expansion §11). `zone_admin` is not a
-  // StaffRole, so the zone column's CRUD grant lives in the Directus policy
-  // only; the cells below give the closest portal-role reading and never
-  // invent a wider grant. Scopes use own_zone/assigned_zones (the zone
-  // analogue of own_branch/assigned_branches).
+  // Hierarchy (AFC-461a, data-model-expansion §11). Zone admin is a
+  // first-class role; scopes use own_zone/assigned_zones (the zone analogue
+  // of own_branch/assigned_branches).
   [COLLECTIONS.areas]: {
     super_admin: [ALL, 'all'],
     area_admin: [RU, 'all', 'R/U (zone area)'],
@@ -310,6 +377,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [R, 'assigned_branches'],
     volunteer: [NONE, 'none'],
     none: [NONE, 'none'],
+    zone_admin: [R, 'own_zone'],
   },
   [COLLECTIONS.zones]: {
     super_admin: [ALL, 'all'],
@@ -318,6 +386,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [R, 'assigned_branches'],
     volunteer: [NONE, 'none'],
     none: [NONE, 'none'],
+    zone_admin: [RU, 'own_zone'],
   },
   [COLLECTIONS.bibleStudyCentres]: {
     super_admin: [ALL, 'all'],
@@ -326,6 +395,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [R, 'assigned_branches'],
     volunteer: [R, 'own_branch', 'assigned BSC'],
     none: [NONE, 'none'],
+    zone_admin: [ALL, 'own_zone'],
   },
   [COLLECTIONS.conferenceCentres]: {
     super_admin: [ALL, 'all'],
@@ -334,6 +404,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [R, 'assigned_branches'],
     volunteer: [R, 'own_branch'],
     none: [NONE, 'none'],
+    zone_admin: [ALL, 'own_zone'],
   },
   [COLLECTIONS.sundaySchoolClasses]: {
     super_admin: [ALL, 'all'],
@@ -342,6 +413,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [RU, 'own_department', 'R/U (own dept)'],
     volunteer: [R, 'own_branch', 'R/U attendance via records'],
     none: [NONE, 'none'],
+    zone_admin: [ALL, 'own_zone'],
   },
   [COLLECTIONS.avsCentres]: {
     super_admin: [ALL, 'all'],
@@ -350,6 +422,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [R, 'assigned_branches', 'R (AVS dept via own dept only: policy)'],
     volunteer: [R, 'own_branch'],
     none: [NONE, 'none'],
+    zone_admin: [ALL, 'own_zone'],
   },
   [COLLECTIONS.campusInstitutions]: {
     // Reference only in Slice 1; readable, never written from the portal.
@@ -359,11 +432,11 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [R, 'assigned_branches'],
     volunteer: [R, 'own_branch'],
     none: [NONE, 'none'],
+    zone_admin: [R, 'all'],
   },
-  // Campus care (AFC-483, data-model-expansion §11). `zone_admin` is not a
-  // StaffRole, so the zone column's grant lives in the Directus policy only;
-  // the cells below give the closest portal-role reading and never invent a
-  // wider grant. campusInstitutions keeps the Slice 1 read-only posture (the
+  // Campus care (AFC-483, data-model-expansion §11). Zone admin is a
+  // first-class role; the cells below follow §11 and never invent a wider
+  // grant. campusInstitutions keeps the Slice 1 read-only posture (the
   // migration leaves its SELECT-only ceiling intact and suite 70.4 pins it),
   // even though §11 names CRUD for super/area admin -- a wider cell would
   // claim a write the database refuses with 42501.
@@ -374,6 +447,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [CRU, 'own_department', 'CRU (campus)'],
     volunteer: [R, 'own_branch', 'R (assigned)'],
     none: [NONE, 'none'],
+    zone_admin: [ALL, 'own_zone'],
   },
   [COLLECTIONS.coachingProgrammes]: {
     super_admin: [ALL, 'all'],
@@ -382,6 +456,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [CRU, 'own_department', 'CRU (campus)'],
     volunteer: [CRU, 'own_branch', 'CRU (assigned class)'],
     none: [NONE, 'none'],
+    zone_admin: [ALL, 'own_zone'],
   },
   [COLLECTIONS.coachingTimetable]: {
     super_admin: [ALL, 'all'],
@@ -390,6 +465,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [CRU, 'own_department', 'CRU (campus)'],
     volunteer: [CRU, 'own_branch', 'CRU (assigned class)'],
     none: [NONE, 'none'],
+    zone_admin: [ALL, 'own_zone'],
   },
   [COLLECTIONS.coachingFacilitators]: {
     super_admin: [ALL, 'all'],
@@ -398,6 +474,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [CRU, 'own_department', 'CRU (campus)'],
     volunteer: [CRU, 'own_branch', 'CRU (assigned class)'],
     none: [NONE, 'none'],
+    zone_admin: [ALL, 'own_zone'],
   },
   [COLLECTIONS.coachingStudents]: {
     super_admin: [ALL, 'all'],
@@ -406,6 +483,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [CRU, 'own_department', 'CRU (campus)'],
     volunteer: [CRU, 'own_branch', 'CRU (assigned class)'],
     none: [NONE, 'none'],
+    zone_admin: [ALL, 'own_zone'],
   },
   [COLLECTIONS.coachingClassAttendance]: {
     super_admin: [ALL, 'all'],
@@ -414,6 +492,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [CRU, 'own_department', 'CRU (campus)'],
     volunteer: [CRU, 'own_branch', 'CRU (assigned class)'],
     none: [NONE, 'none'],
+    zone_admin: [ALL, 'own_zone'],
   },
   [COLLECTIONS.coachingProgress]: {
     super_admin: [ALL, 'all'],
@@ -422,6 +501,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [CRU, 'own_department', 'CRU (campus)'],
     volunteer: [CRU, 'own_branch', 'CRU (assigned class)'],
     none: [NONE, 'none'],
+    zone_admin: [ALL, 'own_zone'],
   },
   [COLLECTIONS.examResults]: {
     super_admin: [ALL, 'all'],
@@ -430,6 +510,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [CRU, 'own_department', 'CRU (campus)'],
     volunteer: [CU, 'own_branch', 'C/U (own class)'],
     none: [NONE, 'none'],
+    zone_admin: [ALL, 'own_zone'],
   },
   [COLLECTIONS.coachingResources]: {
     super_admin: [ALL, 'all'],
@@ -438,6 +519,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [CRU, 'own_department', 'CRU (campus)'],
     volunteer: [CRU, 'own_branch', 'CRU (assigned class)'],
     none: [NONE, 'none'],
+    zone_admin: [ALL, 'own_zone'],
   },
   [COLLECTIONS.coachingFeedback]: {
     super_admin: [ALL, 'all'],
@@ -446,6 +528,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [CRU, 'own_department', 'CRU (campus)'],
     volunteer: [CRU, 'own_branch', 'CRU (assigned class)'],
     none: [NONE, 'none'],
+    zone_admin: [ALL, 'own_zone'],
   },
   [COLLECTIONS.campusFinancialSupport]: {
     super_admin: [ALL, 'all'],
@@ -454,6 +537,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [R, 'own_department', 'R (campus)'],
     volunteer: [NONE, 'none'],
     none: [NONE, 'none'],
+    zone_admin: [R, 'own_zone'],
   },
   [COLLECTIONS.nyscStatusTransitions]: {
     // Ratified NYSC graph, seeded by migration 0003; the routes read it,
@@ -464,12 +548,11 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [R, 'assigned_branches'],
     volunteer: [R, 'own_branch'],
     none: [NONE, 'none'],
+    zone_admin: [R, 'all'],
   },
   // Attendance split (AFC-468, data-model-expansion §11):
   // attendance_counts CRUD / CRUD / CRUD (zone) / CRUD (own) / CRU (dept) /
-  // C/U (assigned). `zone_admin` is not a StaffRole, so the zone column has
-  // no cell here; that grant lives in the Directus policy only. Recorded, not
-  // invented.
+  // C/U (assigned). Zone admin: CRUD (zone) per §11.
   [COLLECTIONS.attendanceCounts]: {
     super_admin: [ALL, 'all'],
     area_admin: [ALL, 'all'],
@@ -477,12 +560,12 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [CRU, 'own_department', 'CRU (dept)'],
     volunteer: [CU, 'own_branch', 'C/U (assigned)'],
     none: [NONE, 'none'],
+    zone_admin: [ALL, 'own_zone'],
   },
   // Blessings (AFC-474, data-model-expansion §11):
   // blessings CRUD / CRUD / CRUD (zone) / CRUD (own) / CRU (dept) /
-  // C/U (assigned). `zone_admin` is not a StaffRole, so the zone column has
-  // no cell here; that grant lives in the Directus policy only. Recorded, not
-  // invented. The audit trail is append-only in spirit (no D for any role --
+  // C/U (assigned). Zone admin: CRUD (zone) per §11. The audit trail is
+  // append-only in spirit (no D for any role --
   // corrections are new rows).
   [COLLECTIONS.blessings]: {
     super_admin: [ALL, 'all'],
@@ -491,6 +574,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [CRU, 'own_department', 'CRU (dept)'],
     volunteer: [CU, 'own_branch', 'C/U (assigned)'],
     none: [NONE, 'none'],
+    zone_admin: [ALL, 'own_zone'],
   },
   [COLLECTIONS.blessingEvents]: {
     super_admin: [ALL, 'all'],
@@ -499,6 +583,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [R, 'assigned_departments', 'assigned'],
     volunteer: [NONE, 'none'],
     none: [NONE, 'none'],
+    zone_admin: [R, 'own_zone'],
   },
   [COLLECTIONS.serviceTypeDefinitions]: {
     // Board config, not in the §11 table: the capture form reads it at every
@@ -512,11 +597,11 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [R, 'assigned_branches'],
     volunteer: [R, 'own_branch'],
     none: [NONE, 'none'],
+    zone_admin: [R, 'all'],
   },
-  // Office bundle (AFC-477, data-model-expansion §11). `zone_admin` is not a
-  // StaffRole, so the zone column's CRU/R grant lives in the Directus policy
-  // only; the cells below give the closest portal-role reading and never
-  // invent a wider grant. `welfare` (marriage R) is not a StaffRole either:
+  // Office bundle (AFC-477, data-model-expansion §11). Zone admin is a
+  // first-class role; the cells below follow §11 and never invent a wider
+  // grant. `welfare` (marriage R) is not a StaffRole either:
   // the dept cell carries the welfare-dept reading and the policy narrows it.
   [COLLECTIONS.transfers]: {
     super_admin: [ALL, 'all'],
@@ -525,6 +610,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [NONE, 'none'],
     volunteer: [NONE, 'none'],
     none: [NONE, 'none'],
+    zone_admin: [CRU, 'own_zone'],
   },
   [COLLECTIONS.transferEvents]: {
     super_admin: [ALL, 'all'],
@@ -533,6 +619,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [NONE, 'none'],
     volunteer: [NONE, 'none'],
     none: [NONE, 'none'],
+    zone_admin: [R, 'own_zone'],
   },
   [COLLECTIONS.marriageMatters]: {
     super_admin: [ALL, 'all'],
@@ -542,6 +629,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     volunteer: [NONE, 'none'],
     // "R (own)": household reads its own matters; enforced record-level.
     none: [R, 'public_only', 'R (own household via policy)'],
+    zone_admin: [CRU, 'own_zone'],
   },
   [COLLECTIONS.marriageMatterEvents]: {
     super_admin: [ALL, 'all'],
@@ -550,6 +638,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [R, 'assigned_departments', 'assigned welfare'],
     volunteer: [NONE, 'none'],
     none: [NONE, 'none'],
+    zone_admin: [R, 'own_zone'],
   },
   [COLLECTIONS.officeMinutes]: {
     super_admin: [ALL, 'all'],
@@ -558,6 +647,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [R, 'assigned_branches', 'R (dept)'],
     volunteer: [NONE, 'none'],
     none: [NONE, 'none'],
+    zone_admin: [R, 'own_zone'],
   },
   [COLLECTIONS.minutesAttendees]: {
     super_admin: [ALL, 'all'],
@@ -566,6 +656,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [R, 'assigned_branches'],
     volunteer: [NONE, 'none'],
     none: [NONE, 'none'],
+    zone_admin: [R, 'own_zone'],
   },
   [COLLECTIONS.officeMinuteEvents]: {
     super_admin: [ALL, 'all'],
@@ -574,6 +665,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [R, 'assigned_branches'],
     volunteer: [NONE, 'none'],
     none: [NONE, 'none'],
+    zone_admin: [R, 'own_zone'],
   },
   // "R/C own": volunteers create tasks assigned to themselves and read their
   // own; household reads its own. Assignee-scoped views are route-enforced
@@ -585,6 +677,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [CRU, 'own_department', 'CRU (dept)'],
     volunteer: [CR, 'own_branch', 'R/C own'],
     none: [R, 'public_only', 'R own via policy'],
+    zone_admin: [ALL, 'own_zone'],
   },
   [COLLECTIONS.taskEvents]: {
     super_admin: [ALL, 'all'],
@@ -593,6 +686,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [R, 'assigned_departments', 'assigned'],
     volunteer: [R, 'own_branch', 'own tasks'],
     none: [NONE, 'none'],
+    zone_admin: [R, 'own_zone'],
   },
   // "R (public ones)": household/volunteer/public read published rows in
   // scope; the publish window (publish_from/to) is route-enforced.
@@ -603,6 +697,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [R, 'assigned_branches', 'R (dept)'],
     volunteer: [R, 'own_branch'],
     none: [R, 'public_only', 'R (public ones)'],
+    zone_admin: [CRU, 'own_zone'],
   },
   [COLLECTIONS.announcementEvents]: {
     super_admin: [ALL, 'all'],
@@ -611,6 +706,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [R, 'assigned_branches'],
     volunteer: [NONE, 'none'],
     none: [NONE, 'none'],
+    zone_admin: [R, 'own_zone'],
   },
   [COLLECTIONS.eventReferrals]: {
     super_admin: [ALL, 'all'],
@@ -619,14 +715,14 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [CRU, 'own_department', 'CRU (dept)'],
     volunteer: [C, 'own_branch', 'C (own)'],
     none: [C, 'allowlisted_fields', 'C (public reg)'],
+    zone_admin: [CRU, 'own_zone'],
   },
   // Youth profiles + celebrations (AFC-476, data-model-expansion §11):
   // youth_profiles CRUD / CRUD / CRUD (zone) / CRUD (own) / CRU (youth dept)
   // / R / R (own); celebrations CRUD / CRUD / CRUD (zone) / CRUD (own) /
-  // CRU (dept) / R / R (own) / R (public ones). `zone_admin` and the
-  // household role are not StaffRoles, so the zone column's grant and the
-  // household R (own) cell live in the Directus policy only; the cells
-  // below give the closest portal-role reading and never invent a wider
+  // CRU (dept) / R / R (own) / R (public ones). The household role is not a
+  // StaffRole, so its R (own) cell lives in the Directus policy only; the
+  // cells below never invent a wider grant.
   // grant. The audit trails are append-only in spirit (no D for any role --
   // corrections are new rows). History tables follow the youth profile's
   // grants: a reader of the profile reads its history.
@@ -637,6 +733,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [CRU, 'own_department', 'CRU (youth dept)'],
     volunteer: [R, 'own_branch'],
     none: [NONE, 'none'],
+    zone_admin: [ALL, 'own_zone'],
   },
   [COLLECTIONS.youthProfileEvents]: {
     super_admin: [ALL, 'all'],
@@ -645,6 +742,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [R, 'assigned_departments', 'assigned'],
     volunteer: [NONE, 'none'],
     none: [NONE, 'none'],
+    zone_admin: [R, 'own_zone'],
   },
   [COLLECTIONS.celebrations]: {
     super_admin: [ALL, 'all'],
@@ -655,6 +753,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     // "R (public ones)": the public role reads celebrations whose visibility
     // is public. It is the only read grant here, mirroring events.
     none: [R, 'public_only'],
+    zone_admin: [ALL, 'own_zone'],
   },
   [COLLECTIONS.celebrationEvents]: {
     super_admin: [ALL, 'all'],
@@ -663,6 +762,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [R, 'assigned_departments', 'assigned'],
     volunteer: [NONE, 'none'],
     none: [NONE, 'none'],
+    zone_admin: [R, 'own_zone'],
   },
   [COLLECTIONS.personPreviousBranches]: {
     super_admin: [ALL, 'all'],
@@ -671,6 +771,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [CRU, 'own_department', 'CRU (youth dept)'],
     volunteer: [R, 'own_branch'],
     none: [NONE, 'none'],
+    zone_admin: [ALL, 'own_zone'],
   },
   [COLLECTIONS.personMilestones]: {
     super_admin: [ALL, 'all'],
@@ -679,6 +780,7 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     department_leader: [CRU, 'own_department', 'CRU (youth dept)'],
     volunteer: [R, 'own_branch'],
     none: [NONE, 'none'],
+    zone_admin: [ALL, 'own_zone'],
   },
 }
 

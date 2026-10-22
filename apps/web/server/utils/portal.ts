@@ -58,19 +58,6 @@ export async function getPortalScope(event: H3Event): Promise<PortalScope> {
     ),
   ]
 
-  // data-model §9 rule 5, extended to hierarchy scopes (data-model-expansion
-  // §10: "Fail-closed — a user with no scope values sees nothing"). No branch
-  // and no zone and no area grant means the account sees nothing. Failing here
-  // with an explanation is safer than returning an empty list that looks like
-  // a working page.
-  if (!isArea && branchIds.length === 0 && zoneIds.length === 0) {
-    throw createError({
-      statusCode: 403,
-      statusMessage: 'Your account has no branch or zone scope',
-      data: { code: 'unscoped_session' },
-    })
-  }
-
   const config = useRuntimeConfig(event)
   const token =
     accessToken && accessToken !== STUB_ACCESS_TOKEN
@@ -81,6 +68,40 @@ export async function getPortalScope(event: H3Event): Promise<PortalScope> {
       statusCode: 503,
       statusMessage: 'No Directus token is configured for portal reads',
       data: { code: 'directus_not_configured' },
+    })
+  }
+
+  // A zone admin holds a zone grant, not a branch list (data-model-expansion
+  // §8.5/§11). Expand the zone set to its branches so every existing
+  // branch-scoped helper and Directus filter keeps working, and so the
+  // fail-closed rule below sees real values. One read of `branches`, bounded
+  // by the explicit zone grant.
+  if (!isArea && branchIds.length === 0 && zoneIds.length > 0) {
+    const rows = await directusFetch<{ data: Array<{ id: string }> }>(
+      event,
+      '/items/branches',
+      {
+        accessToken: token,
+        query: {
+          fields: 'id',
+          limit: -1,
+          filter: { zone: { _in: zoneIds } },
+        },
+      },
+    )
+    branchIds.push(...rows.data.map((row) => row.id))
+  }
+
+  // data-model §9 rule 5, extended to hierarchy scopes (data-model-expansion
+  // §10: "Fail-closed — a user with no scope values sees nothing"). No branch
+  // and no zone and no area grant means the account sees nothing. Failing here
+  // with an explanation is safer than returning an empty list that looks like
+  // a working page.
+  if (!isArea && branchIds.length === 0 && zoneIds.length === 0) {
+    throw createError({
+      statusCode: 403,
+      statusMessage: 'Your account has no branch or zone scope',
+      data: { code: 'unscoped_session' },
     })
   }
 

@@ -310,7 +310,9 @@ export async function programmeChildFilter(
   if (scope.isArea) return undefined
   const ids = await visibleProgrammeIds(event, scope)
   // Fail-closed: a session with no visible programmes sees no child rows.
-  if (ids.length === 0) return { programme: { _eq: '__none__' } }
+  // Empty `_in` is the fail-closed predicate; a text sentinel breaks on a
+  // uuid column (Directus 500s trying to cast '__none__').
+  if (ids.length === 0) return { programme: { _eq: '00000000-0000-0000-0000-000000000000' } }
   return { programme: { _in: ids } }
 }
 
@@ -324,17 +326,19 @@ export async function programmeChildFilter(
  */
 export function studentRelationScope(
   scope: PortalScope,
-  relation: 'campus_student' | 'student' | 'person' | 'guardian',
+  // Kept in the signature for callers' readability. The scope now lives on
+  // the row itself: 0030 denormalised branch/zone onto every campus child, so
+  // the filter is flat and does not depend on Directus relation metadata
+  // (which staging has none of).
+  _relation: 'campus_student' | 'student' | 'person' | 'guardian',
 ): Record<string, unknown> | undefined {
   if (scope.isArea) return undefined
   if (scope.zoneIds.length > 0) {
     return {
-      [relation]: {
-        _or: [{ zone: { _in: scope.zoneIds } }, { branch: { _in: scope.branchIds } }],
-      },
+      _or: [{ zone: { _in: scope.zoneIds } }, { branch: { _in: scope.branchIds } }],
     }
   }
-  return { [relation]: { branch: { _in: scope.branchIds } } }
+  return { branch: { _in: scope.branchIds } }
 }
 
 /**
@@ -356,21 +360,8 @@ export async function campusAttendanceScopeFilter(
   // Fail-closed: no visible programmes means no attendance rows, even when
   // the student side would match.
   const sessionPart: Record<string, unknown> =
-    ids.length > 0
-      ? {
-          _or: [{ programme: { _in: ids } }, { timetable: { programme: { _in: ids } } }],
-        }
-      : { programme: { _eq: '__none__' } }
-  const studentPaths = [
-    studentRelationScope(scope, 'campus_student'),
-    studentRelationScope(scope, 'person'),
-  ].filter((path): path is Record<string, unknown> => Boolean(path))
-  const studentPart: Record<string, unknown> =
-    studentPaths.length === 0
-      ? { id: { _eq: '__none__' } }
-      : studentPaths.length === 1
-        ? (studentPaths[0] as Record<string, unknown>)
-        : { _or: studentPaths }
+    ids.length > 0 ? { programme: { _in: ids } } : { programme: { _eq: '00000000-0000-0000-0000-000000000000' } }
+  const studentPart = studentRelationScope(scope, 'campus_student') ?? {}
   return mergeFilters(sessionPart, studentPart)
 }
 
@@ -386,16 +377,7 @@ export async function campusProgressScopeFilter(
 ): Promise<Record<string, unknown> | undefined> {
   if (scope.isArea) return undefined
   const programmePart = await programmeChildFilter(event, scope)
-  const studentPaths = [
-    studentRelationScope(scope, 'campus_student'),
-    studentRelationScope(scope, 'person'),
-  ].filter((path): path is Record<string, unknown> => Boolean(path))
-  const studentPart: Record<string, unknown> | undefined =
-    studentPaths.length === 0
-      ? { id: { _eq: '__none__' } }
-      : studentPaths.length === 1
-        ? (studentPaths[0] as Record<string, unknown>)
-        : { _or: studentPaths }
+  const studentPart = studentRelationScope(scope, 'campus_student')
   return mergeFilters(programmePart, studentPart)
 }
 
@@ -553,15 +535,10 @@ export async function assertPersonGuardian(
  */
 export function campusOutcomeScopeFilter(
   scope: PortalScope,
-  relations: ReadonlyArray<'campus_student' | 'student' | 'person'>,
+  _relations: ReadonlyArray<'campus_student' | 'student' | 'person'>,
 ): Record<string, unknown> | undefined {
   if (scope.isArea) return undefined
-  const paths = relations
-    .map((relation) => studentRelationScope(scope, relation))
-    .filter((path): path is Record<string, unknown> => Boolean(path))
-  if (paths.length === 0) return { id: { _eq: '__none__' } }
-  if (paths.length === 1) return paths[0]
-  return { _or: paths }
+  return studentRelationScope(scope, 'campus_student')
 }
 
 export interface TimetableSlot {

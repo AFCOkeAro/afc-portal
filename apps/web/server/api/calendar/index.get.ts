@@ -38,8 +38,8 @@ export default defineEventHandler(async (event) => {
     }),
     tryListDomain<Record<string, unknown>>(event, scope, 'celebrations', {
       filter: { ...scopeFilter(scope) },
-      fields: ['id', 'title', 'celebration_date', 'branch', 'zone'],
-      sort: 'celebration_date',
+      fields: ['id', 'title', 'event_date', 'branch', 'zone'],
+      sort: 'event_date',
     }),
   ])
 
@@ -69,7 +69,7 @@ export default defineEventHandler(async (event) => {
         id: String(row.id),
         item_type: 'celebration' as const,
         title: String(row.title ?? 'Celebration'),
-        date: String(row.celebration_date ?? '').slice(0, 10),
+        date: String(row.event_date ?? '').slice(0, 10),
         starts_at: null,
         branch: row.branch ? String(row.branch) : null,
         zone: row.zone ? String(row.zone) : null,
