@@ -361,6 +361,102 @@ export async function writeImpersonationAudit(
   }
 }
 
+/**
+ * Server-token audit write for the exit path (AFC-692).
+ *
+ * The exit route no longer holds a trustworthy actor `PortalScope`: the
+ * sealed session at exit time is the narrowed preview, so `getPortalScope`
+ * returns the preview's branches/zones, not the actor's. Building a fake
+ * scope (`isArea: true`, empty token) to satisfy the `PortalScope` shape
+ * bypassed the token fallback in `directusFetch` (empty string is not
+ * nullish, so the server token was skipped and the write went out
+ * unauthenticated). Write with the configured server token explicitly
+ * instead — the audit row is a system write, not an actor-scoped read.
+ */
+export async function writeImpersonationAuditAsServer(
+  event: H3Event,
+  row: {
+    actor: string
+    target_user: string | null
+    target_branch: string | null
+    target_zone: string | null
+    action: 'started' | 'stopped'
+    reason: string
+  },
+): Promise<void> {
+  const config = useRuntimeConfig(event)
+  const serverToken = String(config.directusServerToken ?? '')
+  if (!serverToken) {
+    throw createError({
+      statusCode: 503,
+      statusMessage: 'No Directus token is configured for portal reads',
+      data: { code: 'directus_not_configured' },
+    })
+  }
+  try {
+    await directusFetch(event, `/items/${IMPERSONATION_AUDIT_COLLECTION}`, {
+      method: 'POST',
+      accessToken: serverToken,
+      body: row,
+    })
+  } catch (error) {
+    if (error instanceof DirectusAuthError) {
+      throw createError({
+        statusCode: 403,
+        statusMessage: 'The impersonation log refused this write — sign in again',
+        data: { code: 'impersonation_log_forbidden' },
+      })
+    }
+    throwStoreUnavailable(error, 'impersonation_log', '0037')
+  }
+}
+
+/**
+ * Re-read the actor's live user row on exit (AFC-692).
+ *
+ * The `impersonatedBy` claim carries identity only, and `getPortalScope` at
+ * exit time resolves the *preview* session — restoring from that scope
+ * narrows a multi-zone actor to the previewed zone until re-login
+ * (fail-closed, but wrong). Read the actor row with the preserved outer
+ * token so exit restores full branch/zone grants. Callers treat any throw
+ * as "scope unknown" and restore a minimal identity (fail-closed, forcing
+ * re-login to rehydrate) while still letting the exit succeed.
+ */
+export async function readActorPortalUser(
+  event: H3Event,
+  token: string,
+  actorId: string,
+): Promise<PortalUser> {
+  const row = await readTargetUser(event, token, actorId)
+  const branchIds = [
+    ...new Set(
+      [row.branch, ...(row.branch_ids ?? [])].filter(
+        (v): v is string => typeof v === 'string' && v.length > 0,
+      ),
+    ),
+  ]
+  const zoneIds = [
+    ...new Set(
+      [row.zone, ...(row.zone_ids ?? [])].filter(
+        (v): v is string => typeof v === 'string' && v.length > 0,
+      ),
+    ),
+  ]
+  return {
+    id: row.id,
+    email: row.email,
+    firstName: row.first_name,
+    staffRole: row.staff_role ?? 'none',
+    branchId: row.branch,
+    branchIds,
+    departmentIds: row.department_ids ?? [],
+    personId: row.person,
+    areaId: row.area,
+    zoneId: row.zone,
+    zoneIds,
+  }
+}
+
 export function buildImpersonatedSession(
   actorSession: AuthSession,
   effectiveUser: PortalUser,
