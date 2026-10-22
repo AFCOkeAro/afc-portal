@@ -21,6 +21,8 @@ const searchInput = ref('')
 const search = ref('')
 const series = ref('all')
 const year = ref('all')
+/* US-3 AC5: type (series), branch, status and date (Upcoming/Past) filters. */
+const status = ref('all')
 const branch = ref(
   typeof route.query.branch === 'string' && route.query.branch.length > 0
     ? route.query.branch
@@ -40,6 +42,7 @@ const baseQuery = computed(() => ({
   ...(search.value ? { search: search.value } : {}),
   ...(series.value !== 'all' ? { event_type: series.value } : {}),
   ...(branch.value !== 'all' ? { branch: branch.value } : {}),
+  ...(status.value !== 'all' ? { status: status.value } : {}),
 }))
 
 const { data: upcoming, pending: upcomingPending } = await useAsyncData(
@@ -78,6 +81,14 @@ const seriesOptions = [
   { label: 'Outreach', value: 'outreach' },
   { label: 'Social', value: 'social' },
   { label: 'Other', value: 'other' },
+]
+
+const statusOptions = [
+  { label: 'Any status', value: 'all' },
+  { label: 'Draft', value: 'draft' },
+  { label: 'Published', value: 'published' },
+  { label: 'Closed', value: 'closed' },
+  { label: 'Cancelled', value: 'cancelled' },
 ]
 
 function eventYear(value: string): string {
@@ -131,12 +142,13 @@ function formatDates(row: EventRow): string {
   return `${day(start)} – ${day(end)}`
 }
 
-/** "Tomorrow" badge mirrors the reference: starts within the next 48h. */
+/** "Tomorrow" badge (review item 7): starts within the next 30h, so the
+ * day after tomorrow never reads "Tomorrow". */
 function isImminent(row: EventRow): boolean {
   const start = new Date(row.start_at).getTime()
   if (Number.isNaN(start)) return false
   const delta = start - Date.now()
-  return delta > 0 && delta < 48 * 3600 * 1000
+  return delta > 0 && delta < 30 * 3600 * 1000
 }
 
 function registrationState(row: EventRow): { label: string; open: boolean } {
@@ -195,6 +207,11 @@ async function refreshAll(): Promise<void> {
             aria-label="Filter by series"
           />
           <USelect v-model="year" :items="yearOptions" aria-label="Filter by year" />
+          <USelect
+            v-model="status"
+            :items="statusOptions"
+            aria-label="Filter by status"
+          />
         </div>
       </div>
       <div class="mt-3">

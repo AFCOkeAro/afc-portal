@@ -29,7 +29,7 @@
  */
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 
@@ -81,10 +81,11 @@ describe('list shell (§A): Upcoming/Past cards, filters, scope pill', () => {
     assert.match(src, /pastRows/)
   })
 
-  it('has search plus series and year filters and a scope pill', () => {
+  it('has search plus series, year and status filters and a scope pill', () => {
     assert.match(src, /Search by theme, name or code/)
     assert.match(src, /series/)
     assert.match(src, /yearOptions/)
+    assert.match(src, /statusOptions/)
     assert.match(src, /scopeLabel/)
   })
 
@@ -126,11 +127,33 @@ describe('detail shell (§A): hero plus 6 tabs', () => {
     assert.match(src, /goTab/)
   })
 
-  it('hero has back link, status pill, dates, scope and public link', () => {
+  it('hero has back link, status pill, dates, scope and event-scoped public link', () => {
     assert.match(src, /All programmes/)
     assert.match(src, /isUpcoming/)
     assert.match(src, /publicLink/)
     assert.match(src, /copyPublicLink/)
+  })
+
+  it('review fix 2: public link carries the event id, and register preselects it', () => {
+    assert.match(src, /`\/register\?event=\$\{id\}`/)
+    const register = read('apps/web/pages/register.vue')
+    assert.match(register, /preselectedEvent/)
+    assert.match(register, /form\.event = preselectedEvent/)
+  })
+
+  it('review fix 1: blessings count is labelled blessings, never unit reports', () => {
+    assert.match(src, /label="Blessings linked"/)
+    assert.doesNotMatch(src, /label="Unit reports"/)
+  })
+
+  it('review item 10: detail scope pill uses the list wording', () => {
+    assert.match(src, /scopePill/)
+    assert.match(src, /Showing all in your scope/)
+    assert.doesNotMatch(src, /Whole scope in view/)
+  })
+
+  it('review item 9: tab and sub-tab buttons meet the touch target', () => {
+    assert.match(src, /py-2\.5/)
   })
 
   it('coordinator status actions stay on the hero behind the update grant', () => {
@@ -166,17 +189,37 @@ describe('overview (§B): scoped aggregates only, no new endpoint', () => {
       (read('apps/web/pages/events/[id].vue').match(/EmptyState/g) ?? []).length >= 6,
     )
   })
+
+  it('review item 5: chart endpoints labelled plus a screen-reader table', () => {
+    assert.match(src, /overTime\[0\]\[0\]/)
+    assert.match(src, /overTime\[overTime\.length - 1\]\[0\]/)
+    assert.match(src, /sr-only/)
+  })
+
+  it('review item 4: data-blocked panels named, not silently dropped', () => {
+    assert.match(src, /Breakdowns not shown/)
+  })
 })
 
 describe('registrations tab (§C): reference columns and bulk actions', () => {
   const src = read('apps/web/pages/events/[id].vue')
 
-  it('columns are reg-no, name, phone, home church, registered, check-in', () => {
+  it('columns are reg-no, name, phone, branch, registered, check-in', () => {
     assert.match(src, /Reg no/)
-    assert.match(src, /Home church/)
+    assert.match(src, />Branch</)
     assert.match(src, /ticket_code/)
     assert.match(src, /branchNameOf/)
     assert.match(src, /Check-in/)
+  })
+
+  it('review fix 3: no Home church header without a home-church field', () => {
+    assert.doesNotMatch(src, /Home church/)
+  })
+
+  it('review item 8: checked-in filter plus newest-first sort', () => {
+    assert.match(src, /regCheckin/)
+    assert.match(src, /regSort/)
+    assert.match(src, /Newest first/)
   })
 
   it('keeps Export CSV, Add registrant, group registration and bulk select', () => {
@@ -201,6 +244,11 @@ describe('check-in / reports / schedule / materials (§D)', () => {
     assert.match(src, /Arrival \(accreditation\)/)
     assert.match(src, /checkinMode/)
     assert.match(src, /deviceCheckins/)
+  })
+
+  it('review item 6: big number is the session total, device count is you', () => {
+    assert.match(src, /event\.attended_count/)
+    assert.match(src, /you: \{\{ deviceCheckins\.length \}\}/)
   })
 
   it('scanner degrades honestly to typed ticket codes (no fake camera)', () => {
@@ -304,5 +352,87 @@ describe('mass registration (§G): branch-scoped batch with error report', () =>
   it('states the no-single-transaction limit instead of hiding it', () => {
     assert.match(src, /no multi-row transaction/)
     assert.match(src, /group_partial_failure/)
+  })
+})
+
+describe('PRD remainder sweep (§H): every events requirement line-by-line', () => {
+  it('US-2 public registration: no-login form, row + ticket, minor guardian, capacity/waitlist', () => {
+    const page = read('apps/web/pages/register.vue')
+    assert.match(page, /registrationFormSchema/)
+    assert.match(page, /ticket_code/)
+    assert.match(page, /guardian_consent/)
+    const route = read('apps/web/server/api/register.post.ts')
+    assert.match(route, /ticket_code/)
+    assert.match(route, /event_full/)
+    assert.match(route, /waitlist_enabled/)
+  })
+
+  it('US-3 create/publish: required fields, own-branch, visibility, cancel/close, full filters', () => {
+    const post = codeOf('apps/web/server/api/events/index.post.ts')
+    assert.match(post, /eventFormSchema/)
+    assert.match(post, /resolveBranch/)
+    assert.match(post, /registration_open/)
+    const list = read('apps/web/pages/events/index.vue')
+    assert.match(list, /event_type/)
+    assert.match(list, /statusOptions/)
+    assert.match(list, /branchOptions/)
+    assert.match(list, /upcomingRows/)
+    assert.match(list, /pastRows/)
+  })
+
+  it('US-4 area oversight: cross-branch list, null-branch area-wide, edit guards', () => {
+    const detail = codeOf('apps/web/server/api/events/[id].get.ts')
+    assert.match(detail, /eventScopeFilter/)
+    const patch = codeOf('apps/web/server/api/events/[id].patch.ts')
+    assert.match(patch, /eventScopeFilter|requireCan/)
+  })
+
+  it('US-5 staff walk-in: staff source, status edges, manual money', () => {
+    const util = read('apps/web/server/utils/event-registration-completion.ts')
+    assert.match(util, /STAFF_SOURCE = 'staff'/)
+    const create = codeOf('apps/web/server/api/events/[id]/registrations.post.ts')
+    assert.match(create, /toStaffPayload/)
+    assert.match(create, /registrationFormSchema/)
+  })
+
+  it('US-6 export: scoped CSV with medical gating', () => {
+    const csv = codeOf('apps/web/server/api/events/[id]/registrations.csv.get.ts')
+    assert.match(csv, /medical_notes|visibleFields/)
+  })
+
+  it('OQ-8: no online payment — money is recorded and reconciled manually', () => {
+    const patch = codeOf('apps/web/server/api/events/registrations/[id].patch.ts')
+    assert.match(patch, /amount_paid|payment_status/)
+    assert.doesNotMatch(patch, /paystack|flutterwave|stripe|pay\/|checkout/i)
+  })
+
+  it('camp fields: guardian consent, medical and emergency contact collected', () => {
+    const schema = read('packages/shared/src/schemas/registration.ts')
+    assert.match(schema, /guardian_consent/)
+    assert.match(schema, /medical_notes/)
+    assert.match(schema, /emergency_contact/)
+  })
+
+  it('KNOWN GAP 1: target departments — events_departments junction exists but no route reads it', () => {
+    const hit = []
+    const walk = (dir) => {
+      for (const name of readdirSync(dir)) {
+        const full = path.join(dir, name)
+        if (statSync(full).isDirectory()) walk(full)
+        else if (
+          full.endsWith('.ts') &&
+          read(path.relative(root, full)).includes('events_departments')
+        )
+          hit.push(full)
+      }
+    }
+    walk(path.join(root, 'apps/web/server'))
+    assert.deepEqual(hit, [])
+  })
+
+  it('KNOWN GAP 2: no event-triggered email Flow (confirmation/reminder/follow-up)', () => {
+    const flowsDir = path.join(root, 'services/directus/flows')
+    const names = readdirSync(flowsDir).join('\n')
+    assert.doesNotMatch(names, /event.*(confirm|remind|regist)/i)
   })
 })

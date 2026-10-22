@@ -72,6 +72,8 @@ const reportSubtab = ref<(typeof REPORT_SUBTABS)[number]>('Unit reports')
 /* Registrations tab state (AFC-649 §C): filter bar + bulk select. */
 const regSearch = ref('')
 const regStatus = ref('all')
+const regCheckin = ref('all')
+const regSort = ref('newest')
 const selectedRegs = ref<Set<string>>(new Set())
 
 const tab = computed<TabId>(() => {
@@ -143,7 +145,14 @@ const isUpcoming = computed(() => {
   return Number.isNaN(start) || start >= Date.now()
 })
 
-const publicLink = computed(() => `/register`)
+/** Scope pill wording matches the programmes list (review item 10). */
+const scopePill = computed(() =>
+  event.value?.branch_name
+    ? `Showing ${event.value.branch_name}`
+    : 'Showing all in your scope',
+)
+
+const publicLink = computed(() => `/register?event=${id}`)
 
 function formatDay(value: string | null | undefined): string {
   if (!value) return '—'
@@ -246,9 +255,11 @@ function share(count: number): string {
 
 const filteredRegs = computed<RegistrationRow[]>(() => {
   const needle = regSearch.value.trim().toLowerCase()
-  return (event.value?.registrations ?? []).filter((row: RegistrationRow) => {
+  const rows = (event.value?.registrations ?? []).filter((row: RegistrationRow) => {
     if (regStatus.value !== 'all' && row.registration_status !== regStatus.value)
       return false
+    if (regCheckin.value === 'in' && row.registration_status !== 'attended') return false
+    if (regCheckin.value === 'not' && row.registration_status === 'attended') return false
     if (!needle) return true
     const haystack = [
       row.ticket_code,
@@ -261,6 +272,16 @@ const filteredRegs = computed<RegistrationRow[]>(() => {
       .join(' ')
       .toLowerCase()
     return haystack.includes(needle)
+  })
+  /* Review item 8: Newest-first is the reference order. */
+  return [...rows].sort((a: RegistrationRow, b: RegistrationRow) => {
+    if (regSort.value === 'name') {
+      return (a.person_name ?? '').localeCompare(b.person_name ?? '')
+    }
+    const at = a.created_at ?? ''
+    const bt = b.created_at ?? ''
+    if (at === bt) return 0
+    return regSort.value === 'oldest' ? (at < bt ? -1 : 1) : at < bt ? 1 : -1
   })
 })
 
@@ -296,6 +317,19 @@ const regStatusOptions = [
   { label: 'Waitlisted', value: 'waitlisted' },
   { label: 'Cancelled', value: 'cancelled' },
   { label: 'No show', value: 'no_show' },
+]
+
+/* Review item 8: checked-in filter + sort stay to 2–3 options. */
+const regCheckinOptions = [
+  { label: 'Check-in: all', value: 'all' },
+  { label: 'Checked in', value: 'in' },
+  { label: 'Not yet', value: 'not' },
+]
+
+const regSortOptions = [
+  { label: 'Newest first', value: 'newest' },
+  { label: 'Oldest first', value: 'oldest' },
+  { label: 'Name A–Z', value: 'name' },
 ]
 
 /* ---------- Actions (unchanged paths) ---------- */
@@ -528,7 +562,7 @@ async function afterRegistrationSaved(): Promise<void> {
             type="button"
             :aria-current="tab === entry.id ? 'page' : undefined"
             :class="[
-              'flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm',
+              'flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2.5 text-sm',
               tab === entry.id
                 ? 'bg-primary-950 font-medium text-white'
                 : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800',
@@ -545,9 +579,7 @@ async function afterRegistrationSaved(): Promise<void> {
         <p class="mb-3 text-xs text-gray-500 dark:text-gray-400">
           At a glance
           <span class="float-right">
-            <UIcon name="i-lucide-map-pin" class="mr-1 inline size-3" />{{
-              event.branch_name || 'Whole scope in view'
-            }}
+            <UIcon name="i-lucide-map-pin" class="mr-1 inline size-3" />{{ scopePill }}
           </span>
         </p>
         <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -563,9 +595,9 @@ async function afterRegistrationSaved(): Promise<void> {
             hint="Confirmed registrations"
           />
           <StatCard
-            label="Unit reports"
+            label="Blessings linked"
             :value="`${event.blessings.length}`"
-            hint="Linked blessing records"
+            hint="Blessing records on this event"
           />
           <template v-if="canReadRegistrations && rollups">
             <StatCard
@@ -613,6 +645,25 @@ async function afterRegistrationSaved(): Promise<void> {
                   :title="`${day}: ${count}`"
                 />
               </div>
+              <!-- Review item 5: axis endpoints readable without hover/touch. -->
+              <div
+                class="mt-1 flex justify-between text-xs text-gray-500"
+                aria-hidden="true"
+              >
+                <span>{{ overTime[0][0] }}</span>
+                <span>{{ overTime[overTime.length - 1][0] }}</span>
+              </div>
+              <table class="sr-only">
+                <caption>
+                  Registrations per day
+                </caption>
+                <tbody>
+                  <tr v-for="[day, count] in overTime" :key="day">
+                    <th scope="row">{{ day }}</th>
+                    <td>{{ count }}</td>
+                  </tr>
+                </tbody>
+              </table>
               <div class="mt-2 flex justify-between text-xs text-gray-500">
                 <span
                   >Last 7 days:
@@ -766,6 +817,20 @@ async function afterRegistrationSaved(): Promise<void> {
             </ul>
           </UCard>
         </div>
+
+        <!-- Review item 4: reference panels we cannot fold — named, not silent. -->
+        <UCard class="mt-4">
+          <template #header
+            ><h2 class="text-sm font-semibold">Breakdowns not shown</h2></template
+          >
+          <p class="text-sm text-gray-600 dark:text-gray-300">
+            Gender, marital status, membership status, mode of attendance,
+            education/career, class, role and position splits from the reference need
+            fields registrations do not collect — they are omitted rather than guessed.
+            The area drill-down and unit-report coverage need a follow-up aggregate with
+            its own scoping decision.
+          </p>
+        </UCard>
       </section>
 
       <!-- REGISTRATIONS -->
@@ -775,9 +840,7 @@ async function afterRegistrationSaved(): Promise<void> {
             <strong class="tabular-nums">{{ filteredRegs.length }}</strong> registrations
           </p>
           <span class="text-xs text-gray-500">
-            <UIcon name="i-lucide-map-pin" class="mr-1 inline size-3" />{{
-              event.branch_name || 'Whole scope in view'
-            }}
+            <UIcon name="i-lucide-map-pin" class="mr-1 inline size-3" />{{ scopePill }}
           </span>
           <span class="ml-auto flex gap-2">
             <UButton
@@ -814,6 +877,16 @@ async function afterRegistrationSaved(): Promise<void> {
               :items="regStatusOptions"
               aria-label="Filter by status"
             />
+            <USelect
+              v-model="regCheckin"
+              :items="regCheckinOptions"
+              aria-label="Filter by check-in"
+            />
+            <USelect
+              v-model="regSort"
+              :items="regSortOptions"
+              aria-label="Sort registrations"
+            />
           </div>
 
           <UAlert
@@ -846,7 +919,7 @@ async function afterRegistrationSaved(): Promise<void> {
                   <th class="px-3 py-2 font-medium">Reg no</th>
                   <th class="px-3 py-2 font-medium">Name</th>
                   <th class="px-3 py-2 font-medium">Phone</th>
-                  <th class="px-3 py-2 font-medium">Home church</th>
+                  <th class="px-3 py-2 font-medium">Branch</th>
                   <th class="px-3 py-2 font-medium">Registered</th>
                   <th class="px-3 py-2 font-medium">Check-in</th>
                   <th v-if="canUpdateRegistrations" class="px-3 py-2">
@@ -954,7 +1027,7 @@ async function afterRegistrationSaved(): Promise<void> {
                 </UFormField>
                 <div class="pb-0.5 text-right">
                   <p class="text-2xl font-bold tabular-nums">
-                    {{ deviceCheckins.length }}
+                    {{ event.attended_count }}
                   </p>
                   <p class="text-xs text-gray-500">
                     checked in · you: {{ deviceCheckins.length }}
@@ -974,7 +1047,7 @@ async function afterRegistrationSaved(): Promise<void> {
                 role="tab"
                 :aria-selected="checkinMode === 'scan'"
                 :class="[
-                  'rounded-lg px-3 py-1.5 text-sm',
+                  'rounded-lg px-3 py-2.5 text-sm',
                   checkinMode === 'scan'
                     ? 'bg-gray-100 font-medium dark:bg-gray-800'
                     : 'text-gray-500',
@@ -988,7 +1061,7 @@ async function afterRegistrationSaved(): Promise<void> {
                 role="tab"
                 :aria-selected="checkinMode === 'type'"
                 :class="[
-                  'rounded-lg px-3 py-1.5 text-sm',
+                  'rounded-lg px-3 py-2.5 text-sm',
                   checkinMode === 'type'
                     ? 'bg-gray-100 font-medium dark:bg-gray-800'
                     : 'text-gray-500',
@@ -1108,7 +1181,7 @@ async function afterRegistrationSaved(): Promise<void> {
               role="tab"
               :aria-selected="reportSubtab === sub"
               :class="[
-                'shrink-0 rounded-lg px-3 py-1.5 text-sm',
+                'shrink-0 rounded-lg px-3 py-2.5 text-sm',
                 reportSubtab === sub
                   ? 'bg-primary-950 font-medium text-white'
                   : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800',
@@ -1119,9 +1192,7 @@ async function afterRegistrationSaved(): Promise<void> {
             </button>
           </div>
           <span class="ml-auto text-xs text-gray-500">
-            <UIcon name="i-lucide-map-pin" class="mr-1 inline size-3" />{{
-              event.branch_name || 'Whole scope in view'
-            }}
+            <UIcon name="i-lucide-map-pin" class="mr-1 inline size-3" />{{ scopePill }}
           </span>
         </div>
 
