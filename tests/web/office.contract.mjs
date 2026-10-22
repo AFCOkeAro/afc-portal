@@ -345,7 +345,7 @@ describe('minutes create — DDL (AFC-670 §A)', () => {
     const src = sqlOf(MINUTES_670.migration)
     assert.match(
       src,
-      /GRANT INSERT \(start_time, end_time, location\)/,
+      /GRANT INSERT \(id, title, meeting_date, body, file, status, branch, zone, created_by, created_at, updated_at, start_time, end_time, location\)/,
       'insert list extended',
     )
     assert.match(

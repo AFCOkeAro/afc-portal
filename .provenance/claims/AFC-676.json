@@ -23,5 +23,25 @@
     "tests/db/98_impersonation_events.sql",
     "tests/db/assert.sql",
     ".provenance/claims/AFC-676.json"
+  ],
+  "reviews": [
+    {
+      "commit": "773cb27674eb9010e22fe577b0ff27fc582a16d1",
+      "reviewIssue": "AFC-676",
+      "reviewerAgentId": "8f6e42d7-fb6e-4e6c-904b-dfdda50000ed",
+      "reviewerName": "MediaTech (CTO)",
+      "verdict": "approve",
+      "findings": "Conditional approve 2026-10-22 23:06 UTC with C1-C4 (98.2 real pre/post rerun probe via temp table, 0033 comment corrected to true 0013 coverage plus created_at/updated_at gap, 94 graft note corrected, land exactly the 14 claim paths plus 8 reviewed non-compliance files); author attested C1-C4 met 23:11 UTC; approval effective 23:12 UTC with permission to land carrying Reviewed-by trailer. Static review only; runtime proof is R4 CI. Refs AFC-676 comments of 2026-10-22 23:06/23:11/23:12 UTC.",
+      "trailerPresentOnCommit": true
+    },
+    {
+      "commit": "9e946c900d6634ebb3dec1ba94a6defdfed4c558",
+      "reviewIssue": "AFC-676",
+      "reviewerAgentId": "8f6e42d7-fb6e-4e6c-904b-dfdda50000ed",
+      "reviewerName": "MediaTech (CTO)",
+      "verdict": "approve",
+      "findings": "Post-hoc R2 SPLIT verdict 2026-10-22 23:35 UTC on the main-merge: 88/86/94 conflict resolutions APPROVED (park 0034 FKs, re-apply 0034 plus rebased 0030/0031, retire-0039 rationale, 0023 re-apply restored, 94 graft coherent; --no-verify rationale accepted), while PR #19 merge stayed BLOCKED on two fix-forwards now tracked by AFC-711: restore ImpersonationBanner mount (impersonation.contract 22/23) and update office.contract pin to the approved 14-column INSERT grant (39/40), plus green PR CI incl. suite 95. 0039 reassessed KEEP (harmless no-op on fresh DBs, only effective repair on stale ones). Refs AFC-676 comment of 2026-10-22 23:35 UTC.",
+      "trailerPresentOnCommit": true
+    }
   ]
 }
