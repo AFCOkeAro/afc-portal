@@ -75,8 +75,7 @@ const BLESSING_FIELDS = [
   'id',
   'blessing_type',
   'other_label',
-  'male_count',
-  'female_count',
+  'count',
   'total_count',
   'branch',
   'service_date',
@@ -184,7 +183,7 @@ export default defineEventHandler(async (event): Promise<EventDetail> => {
     registrations,
     blessings,
     blessings_total: blessings.reduce(
-      (sum, row) => sum + Number(row.total_count ?? 0),
+      (sum, row) => sum + Number(row.count ?? row.total_count ?? 0),
       0,
     ),
   }

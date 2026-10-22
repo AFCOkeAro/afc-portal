@@ -360,20 +360,24 @@ async function upsertBlessing(
       { service_date: { _eq: values.service_date } },
       { blessing_type: { _eq: values.blessing_type } },
     ),
-    fields: ['id', 'male_count', 'female_count', 'other_label'],
+    fields: ['id', 'count', 'male_count', 'female_count', 'other_label'],
     limit: 2,
   })
   const match = existing.data.find(
     (row) => String(row.other_label ?? '') === values.other_label,
   )
+  // Single-count (AFC-671): imports still carry male/female columns; the
+  // count is their sum and male mirrors it so GENERATED total agrees.
+  const count = Number(values.male_count) + Number(values.female_count)
   const body = {
     branch: branchId,
     zone: zoneId,
     service_date: values.service_date,
     blessing_type: values.blessing_type,
     other_label: values.other_label || null,
-    male_count: Number(values.male_count),
-    female_count: Number(values.female_count),
+    count,
+    male_count: count,
+    female_count: 0,
     notes: values.notes || null,
   }
   if (!match) {
@@ -381,12 +385,12 @@ async function upsertBlessing(
     return 'imported'
   }
   const same =
-    Number(match.male_count) === body.male_count &&
-    Number(match.female_count) === body.female_count
+    Number(match.count ?? match.male_count) === body.count
   if (same) return 'skipped'
   await updateItem(event, scope, 'blessings', String(match.id), {
-    male_count: body.male_count,
-    female_count: body.female_count,
+    count: body.count,
+    male_count: body.count,
+    female_count: 0,
   })
   return 'updated'
 }

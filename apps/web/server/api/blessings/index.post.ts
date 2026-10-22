@@ -13,12 +13,18 @@ import {
  * POST /api/blessings — record blessings for a service/program (US-B1).
  *
  * One row per blessing type; a program records multiple types by calling
- * once per type. Branch resolves to the caller's own branch for branch
- * staff; area staff must name a branch, because a blessing with no branch
- * has no scope and would be invisible fail-closed. total_count is never
- * accepted in the body -- Postgres derives it (migration 0011 GENERATED
- * choice). The create writes the audit row (blessing_events `created`) in
- * the same request -- the portal is the writer, the table is the trail.
+ * once per type (single) or once for all types (POST /api/blessings/batch).
+ * Branch resolves to the caller's own branch for branch staff; area staff
+ * must name a branch, because a blessing with no branch has no scope and
+ * would be invisible fail-closed. total_count is never accepted in the
+ * body -- Postgres derives it (migration 0011 GENERATED choice).
+ *
+ * Single-count (AFC-671): the form sends `count`. The route mirrors
+ * male_count = count, female_count = 0 so GENERATED total stays equal to
+ * count; legacy male/female inputs are accepted for import compat and
+ * summed only when `count` is absent. The create writes the audit row
+ * (blessing_events `created`) in the same request -- the portal is the
+ * writer, the table is the trail.
  */
 export default defineEventHandler(async (event) => {
   const scope = await getPortalScope(event)
@@ -52,12 +58,23 @@ export default defineEventHandler(async (event) => {
     })
   }
 
+  // Single-count mirror (AFC-671): male carries the count, female stays 0,
+  // so GENERATED total_count always equals the entered count. Legacy
+  // male/female inputs are summed only when no count is sent (imports).
+  const hasCount = form.count !== undefined && form.count !== null
+  const count = hasCount
+    ? Number(form.count ?? 0)
+    : Number(form.male_count ?? 0) + Number(form.female_count ?? 0)
+  const maleCount = hasCount ? count : Number(form.male_count ?? 0)
+  const femaleCount = hasCount ? 0 : Number(form.female_count ?? 0)
+
   const now = new Date().toISOString()
   const created = await createItem<Record<string, unknown>>(event, scope, 'blessings', {
     blessing_type: form.blessing_type,
     other_label: form.other_label ?? null,
-    male_count: form.male_count ?? 0,
-    female_count: form.female_count ?? 0,
+    count,
+    male_count: maleCount,
+    female_count: femaleCount,
     branch,
     zone: form.zone ?? null,
     bsc: form.bsc ?? null,

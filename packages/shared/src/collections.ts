@@ -37,6 +37,8 @@ export const COLLECTIONS = {
    */
   blessings: 'blessings',
   blessingEvents: 'blessing_events',
+  /** Individual blessings mapped to a DB person/user (AFC-671 §C). */
+  blessingRecipients: 'blessing_recipients',
   sundayServices: 'sunday_services',
   serviceAssignments: 'service_assignments',
   visitors: 'visitors',

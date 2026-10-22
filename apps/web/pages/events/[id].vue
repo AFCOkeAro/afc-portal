@@ -1230,9 +1230,7 @@ async function afterRegistrationSaved(): Promise<void> {
                   <tr class="text-left text-xs uppercase tracking-wide text-gray-500">
                     <th class="px-3 py-2 font-medium">Blessing</th>
                     <th class="px-3 py-2 font-medium">Date</th>
-                    <th class="px-3 py-2 font-medium">Male</th>
-                    <th class="px-3 py-2 font-medium">Female</th>
-                    <th class="px-3 py-2 font-medium">Total</th>
+                    <th class="px-3 py-2 font-medium">Count</th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
@@ -1250,14 +1248,8 @@ async function afterRegistrationSaved(): Promise<void> {
                       </NuxtLink>
                     </td>
                     <td class="px-3 py-3 text-gray-600">{{ blessing.service_date }}</td>
-                    <td class="px-3 py-3 tabular-nums text-gray-600">
-                      {{ blessing.male_count }}
-                    </td>
-                    <td class="px-3 py-3 tabular-nums text-gray-600">
-                      {{ blessing.female_count }}
-                    </td>
                     <td class="px-3 py-3 font-medium tabular-nums">
-                      {{ blessing.total_count }}
+                      {{ blessing.count ?? blessing.total_count }}
                     </td>
                   </tr>
                 </tbody>

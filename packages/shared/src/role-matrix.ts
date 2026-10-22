@@ -585,6 +585,19 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     none: [NONE, 'none'],
     zone_admin: [R, 'own_zone'],
   },
+  // Individual blessings (AFC-671 §C): same holders as blessings — the
+  // recipient row carries a branch, so the same hierarchy predicate
+  // applies. The matrix row is the portal half; the database ceiling
+  // (no DELETE) lives in migration 0034.
+  [COLLECTIONS.blessingRecipients]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [ALL, 'all'],
+    branch_admin: [ALL, 'own_branch', 'CRUD (own)'],
+    department_leader: [CRU, 'own_department', 'CRU (dept)'],
+    volunteer: [CU, 'own_branch', 'C/U (assigned)'],
+    none: [NONE, 'none'],
+    zone_admin: [ALL, 'own_zone'],
+  },
   [COLLECTIONS.serviceTypeDefinitions]: {
     // Board config, not in the §11 table: the capture form reads it at every
     // level, the board edits it at area level. Definitions are area-wide

@@ -3,6 +3,7 @@ import type {
   AttendanceSession,
   Blessing,
   BlessingEvent,
+  BlessingRecipient,
   Branch,
   Celebration,
   CelebrationEvent,
@@ -33,6 +34,13 @@ export interface BranchSummary {
   type_label?: string | null
   zone?: string | null
   area?: string | null
+  /** AFC-672: geo + contact for the merged Churches map/tooltips. */
+  geo_lat?: number | null
+  geo_lng?: number | null
+  address?: string | null
+  phone?: string | null
+  email?: string | null
+  pastor?: string | null
 }
 
 export interface ZoneSummary {
@@ -41,6 +49,26 @@ export interface ZoneSummary {
   code: string
   area: string | null
   status: string
+  /** AFC-672: geo + contact for the merged Churches map/tooltips. */
+  geo_lat?: number | null
+  geo_lng?: number | null
+  address?: string | null
+  leader?: string | null
+}
+
+export interface BscSummary {
+  id: string
+  name: string
+  code: string
+  parent_branch: string
+  zone: string | null
+  status: string
+  /** AFC-672: geo + contact for the merged Churches map/tooltips. */
+  geo_lat?: number | null
+  geo_lng?: number | null
+  address?: string | null
+  location?: string | null
+  leader?: string | null
 }
 
 export interface BranchSectionWarning {
@@ -236,13 +264,19 @@ export interface BlessingRow extends Blessing {
 
 export interface BlessingBreakdownRow {
   blessing_type: string
-  male: number
-  female: number
-  total: number
+  /** Single count per type (AFC-671, no male/female split). */
+  count: number
 }
 
 export interface BlessingDetail extends BlessingRow {
   events: BlessingEvent[]
+  recipients: BlessingRecipientRow[]
+  standalone_recipients: BlessingRecipientRow[]
+}
+
+/** Individual blessing row (AFC-671): the shared recipient plus a resolved name when known. */
+export interface BlessingRecipientRow extends BlessingRecipient {
+  person_name?: string | null
 }
 
 /** Youth directory row (AFC-476): the shared YouthProfile plus resolved names. */
