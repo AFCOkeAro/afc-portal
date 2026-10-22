@@ -208,9 +208,13 @@ export const NAVIGATION: readonly NavigationItem[] = [
     inSidebar: true,
   },
   {
-    label: 'Branches',
-    to: '/branches',
-    icon: 'i-lucide-building-2',
+    // AFC-672: merged Churches surface (zones + branches + BSC in one menu
+    // with kind filter + map). Replaces the worship Branches entry; every
+    // staff role holds the branches read grant so the menu resolves for all
+    // staff, and the page gates each kind by its own capability.
+    label: 'Churches',
+    to: '/churches',
+    icon: 'i-lucide-church',
     requires: ['branches', 'read'],
     group: 'worship',
     inSidebar: true,
@@ -323,30 +327,12 @@ export const NAVIGATION: readonly NavigationItem[] = [
   },
 
   // Admin
-  {
-    label: 'Branches',
-    to: '/branches',
-    icon: 'i-lucide-building-2',
-    requires: ['branches', 'read'],
-    group: 'admin',
-    inSidebar: true,
-  },
-  {
-    label: 'Zones',
-    to: '/zones',
-    icon: 'i-lucide-map',
-    requires: ['zones', 'read'],
-    group: 'admin',
-    inSidebar: true,
-  },
-  {
-    label: 'Bible Study Centres',
-    to: '/bscs',
-    icon: 'i-lucide-book-marked',
-    requires: ['bible_study_centres', 'read'],
-    group: 'admin',
-    inSidebar: true,
-  },
+  // AFC-672: the admin Branches / Zones / Bible Study Centres entries are
+  // removed — the single worship Churches entry above is the only sidebar
+  // path to those registers. The old routes still resolve as deep-link
+  // redirects into the filtered Churches view (pages/branches/index.vue,
+  // pages/zones/index.vue); the outreach AVS entry is untouched (separate
+  // centres register, not the BSC kind filter).
   {
     label: 'AVS',
     to: '/bscs',
