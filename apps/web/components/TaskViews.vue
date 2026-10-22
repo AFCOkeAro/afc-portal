@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { isTaskOverdue } from '@afc/shared'
+import { COLLECTIONS, isTaskOverdue } from '@afc/shared'
 
 /**
  * Notion-style multi-view task board (AFC-666): one scoped task list rendered
@@ -24,6 +24,12 @@ const props = defineProps<{
   branchId?: string | null
   /** Small caption shown under the view switcher. */
   description?: string
+  /** Checklist template to offer (e.g. event_programme on the event tab). */
+  templateId?: string | null
+  /** tasks.related_id stamped on generated rows. */
+  relatedId?: string | null
+  /** Base date (YYYY-MM-DD) offsets count from. */
+  baseDate?: string | null
 }>()
 
 const api = useApi()
@@ -71,6 +77,36 @@ const {
 
 const rows = computed<TaskItem[]>(() => data.value?.data ?? [])
 const total = computed(() => data.value?.meta.total ?? rows.value.length)
+
+/** One-click recurring checklist (AFC-668): applies the configured template
+ *  for this scope (branch + related record + base date). */
+const applying = ref(false)
+const appliedCount = ref<number | null>(null)
+const applyError = ref('')
+async function applyChecklist() {
+  if (!props.templateId) return
+  applying.value = true
+  applyError.value = ''
+  appliedCount.value = null
+  try {
+    const res = await api.post<{ data: { created: number; ids: string[] } }>(
+      '/api/tasks/from-template',
+      {
+        template: props.templateId,
+        ...(props.branchId ? { branch: props.branchId } : {}),
+        base_date: props.baseDate ?? null,
+        related_id: props.relatedId ?? null,
+      },
+    )
+    appliedCount.value = res.data.created
+    await refresh()
+  } catch (cause) {
+    applyError.value =
+      (cause as { message?: string }).message ?? 'Could not apply the checklist'
+  } finally {
+    applying.value = false
+  }
+}
 const filtered = computed(() =>
   statusFilter.value === 'all'
     ? rows.value
@@ -232,6 +268,21 @@ const timelineGroups = computed(() => {
       <span class="text-xs text-gray-500 tabular-nums dark:text-gray-400">
         {{ filtered.length }} of {{ total }}
       </span>
+      <PermissionGate
+        v-if="props.templateId"
+        :collection="COLLECTIONS.tasks"
+        action="create"
+      >
+        <UButton
+          label="Apply checklist"
+          icon="i-lucide-clipboard-list"
+          size="xs"
+          color="neutral"
+          variant="outline"
+          :loading="applying"
+          @click="applyChecklist()"
+        />
+      </PermissionGate>
       <NuxtLink
         v-if="props.branchId"
         :to="`/tasks?branch=${props.branchId}`"
@@ -241,6 +292,12 @@ const timelineGroups = computed(() => {
         <UIcon name="i-lucide-arrow-right" class="size-3" />
       </NuxtLink>
     </div>
+    <p v-if="appliedCount !== null" class="mt-2 text-xs font-medium text-green-700 dark:text-green-400">
+      Checklist applied — {{ appliedCount }} tasks created.
+    </p>
+    <p v-if="applyError !== ''" class="mt-2 text-xs font-medium text-red-600 dark:text-red-400">
+      {{ applyError }}
+    </p>
     <p v-if="props.description" class="mt-2 text-xs text-gray-500 dark:text-gray-400">
       {{ props.description }}
     </p>

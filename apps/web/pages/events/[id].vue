@@ -1379,11 +1379,14 @@ async function afterRegistrationSaved(): Promise<void> {
         </UCard>
       </section>
 
-      <!-- TASKS (AFC-666): branch-scoped multi-view task board -->
+      <!-- TASKS (AFC-666 board; AFC-668 recurring checklist) -->
       <section v-if="tab === 'tasks'" aria-label="Programme tasks" class="mt-4">
         <TaskViews
           :branch-id="event.branch"
           description="Tasks filed under this programme's branch — one list, six views."
+          template-id="event_programme"
+          :related-id="String(event.id)"
+          :base-date="event.start_at.slice(0, 10)"
         />
       </section>
 

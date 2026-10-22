@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { COLLECTIONS, isTaskOverdue } from '@afc/shared'
+import { COLLECTIONS, isTaskOverdue, TASK_TEMPLATES, expandTaskTemplate, getTaskTemplate } from '@afc/shared'
 
 definePageMeta({ middleware: 'staff' })
 
@@ -27,6 +27,62 @@ const form = ref({
   priority: 'normal',
 })
 const error = ref('')
+
+/** Recurring checklist templates (AFC-668): one modal fans a template out
+ *  to ordinary task rows via POST /api/tasks/from-template. */
+const showTemplate = ref(false)
+const templateForm = ref({
+  template: 'event_programme',
+  branch: '',
+  base_date: '',
+  assignee_user: '',
+  assignee_person: '',
+})
+const templateError = ref('')
+const templateCreated = ref<number | null>(null)
+
+const templateOptions = TASK_TEMPLATES.map((entry) => ({
+  label: entry.label,
+  value: entry.id,
+  description: entry.description,
+}))
+
+const templatePreview = computed(() => {
+  const template = getTaskTemplate(templateForm.value.template)
+  if (!template) return []
+  return expandTaskTemplate(
+    template,
+    templateForm.value.base_date === '' ? null : templateForm.value.base_date,
+  )
+})
+
+async function applyTemplate() {
+  templateError.value = ''
+  templateCreated.value = null
+  try {
+    const res = await api.post<{ data: { created: number; ids: string[] } }>(
+      '/api/tasks/from-template',
+      {
+        template: templateForm.value.template,
+        branch: templateForm.value.branch === '' ? undefined : templateForm.value.branch,
+        base_date:
+          templateForm.value.base_date === '' ? null : templateForm.value.base_date,
+        assignee_user:
+          templateForm.value.assignee_user.trim() === ''
+            ? null
+            : templateForm.value.assignee_user.trim(),
+        assignee_person:
+          templateForm.value.assignee_person === '' ? null : templateForm.value.assignee_person,
+      },
+    )
+    templateCreated.value = res.data.created
+    showTemplate.value = false
+    await refresh()
+  } catch (cause) {
+    templateError.value =
+      (cause as { message?: string }).message ?? 'Could not apply the template'
+  }
+}
 
 const query = computed(() => ({
   ...(status.value !== 'all' ? { status: status.value } : {}),
@@ -175,11 +231,36 @@ function isOverdue(row: Record<string, unknown>): boolean {
         />
         <PermissionGate :collection="COLLECTIONS.tasks" action="create">
           <UButton label="New task" icon="i-lucide-plus" @click="showForm = !showForm" />
+          <UButton
+            label="From template"
+            icon="i-lucide-clipboard-list"
+            color="neutral"
+            variant="outline"
+            class="ml-2"
+            @click="showTemplate = true"
+          />
         </PermissionGate>
       </template>
     </PageHeader>
 
     <DashboardStrip :items="stripItems" />
+
+    <div
+      v-if="templateCreated !== null"
+      class="mb-4 flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800 dark:border-green-900 dark:bg-green-950/40 dark:text-green-300"
+    >
+      <UIcon name="i-lucide-check" class="size-4 shrink-0" />
+      <span>{{ templateCreated }} tasks created from template.</span>
+      <UButton
+        color="neutral"
+        variant="ghost"
+        size="xs"
+        icon="i-lucide-x"
+        aria-label="Dismiss"
+        class="ml-auto"
+        @click="templateCreated = null"
+      />
+    </div>
 
     <UCard v-if="showForm" class="mb-4">
       <template #header>
@@ -235,6 +316,86 @@ function isOverdue(row: Record<string, unknown>): boolean {
         <UButton label="Save" icon="i-lucide-check" @click="create" />
       </div>
     </UCard>
+
+    <UModal
+      :open="showTemplate"
+      title="New tasks from template"
+      description="Pick a recurring checklist, a branch and a base date — every step becomes a task."
+      @update:open="showTemplate = $event"
+    >
+      <template #body>
+        <div class="grid gap-3 sm:grid-cols-2">
+          <UFormField label="Template" class="sm:col-span-2">
+            <USelect
+              v-model="templateForm.template"
+              :items="templateOptions"
+              class="w-full"
+            />
+          </UFormField>
+          <UFormField label="Branch">
+            <EntitySelect
+              v-model="templateForm.branch"
+              :items="branchOptions"
+              placeholder="Select branch…"
+              :loading="branchesPending"
+              class="w-full"
+            />
+          </UFormField>
+          <UFormField label="Base date">
+            <UInput v-model="templateForm.base_date" type="date" class="w-full" />
+          </UFormField>
+          <UFormField label="Assignee user id (optional — defaults to you)">
+            <UInput
+              v-model="templateForm.assignee_user"
+              class="w-full"
+              placeholder="Assignee user id"
+            />
+          </UFormField>
+          <UFormField label="Assignee person (optional)">
+            <EntitySelect
+              v-model="templateForm.assignee_person"
+              :items="personOptions"
+              placeholder="Type a name to search…"
+              :loading="personPending"
+              server-search
+              class="w-full"
+              @update:search-term="onPersonSearch"
+            />
+          </UFormField>
+        </div>
+        <ul class="mt-4 space-y-1.5 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm dark:border-gray-800 dark:bg-gray-900/40">
+          <li
+            v-for="(step, index) in templatePreview"
+            :key="index"
+            class="flex items-center gap-2"
+          >
+            <span class="text-gray-400 tabular-nums">{{ index + 1 }}.</span>
+            <span class="min-w-0 flex-1 truncate font-medium text-gray-900 dark:text-white">
+              {{ step.title }}
+            </span>
+            <UBadge color="neutral" variant="subtle" size="xs">{{ step.priority }}</UBadge>
+            <span class="text-xs text-gray-500 tabular-nums">{{ step.due_date ?? 'no date' }}</span>
+          </li>
+        </ul>
+        <UAlert
+          v-if="templateError"
+          class="mt-4"
+          color="error"
+          variant="subtle"
+          title="Could not apply the template"
+          :description="templateError"
+        />
+        <div class="mt-4 flex justify-end gap-2">
+          <UButton
+            label="Cancel"
+            color="neutral"
+            variant="ghost"
+            @click="showTemplate = false"
+          />
+          <UButton label="Create tasks" icon="i-lucide-check" @click="applyTemplate" />
+        </div>
+      </template>
+    </UModal>
 
     <UCard>
       <div class="grid gap-3 sm:grid-cols-[220px_220px_1fr]">

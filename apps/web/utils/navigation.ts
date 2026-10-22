@@ -132,6 +132,15 @@ export const NAVIGATION: readonly NavigationItem[] = [
     inSidebar: true,
   },
   {
+    // My assignments (AFC-668): same list pre-filtered to the session user.
+    label: 'My tasks',
+    to: '/tasks?mine=1',
+    icon: 'i-lucide-user-check',
+    requires: ['tasks', 'read'],
+    group: 'office',
+    inSidebar: true,
+  },
+  {
     // No dedicated automation surface yet; tasks is the closest working page.
     label: 'Workflow and Automation',
     to: '/tasks',
