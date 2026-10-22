@@ -35,7 +35,10 @@ function typeLabel(): string {
   return row.blessing_type.replace(/_/g, ' ')
 }
 
-function recipientLabel(row: { blessing_type: string; other_label: string | null }): string {
+function recipientLabel(row: {
+  blessing_type: string
+  other_label: string | null
+}): string {
   if (row.blessing_type === 'other' && row.other_label) return row.other_label
   return row.blessing_type.replace(/_/g, ' ')
 }
@@ -129,7 +132,10 @@ async function addRecipient(): Promise<void> {
         />
         <StatCard
           label="Individuals linked"
-          :value="(blessing.recipients?.length ?? 0) + (blessing.standalone_recipients?.length ?? 0)"
+          :value="
+            (blessing.recipients?.length ?? 0) +
+            (blessing.standalone_recipients?.length ?? 0)
+          "
           hint="People mapped to this blessing"
         />
       </div>
@@ -215,6 +221,10 @@ async function addRecipient(): Promise<void> {
               />
             </PermissionGate>
           </div>
+          <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+            Linking people does not change the aggregate count above — the count is
+            recorded per type, and linked names map individual testimonies to people.
+          </p>
         </template>
 
         <div v-if="showRecipientForm" class="mb-4 grid gap-3 sm:grid-cols-3">
@@ -230,10 +240,25 @@ async function addRecipient(): Promise<void> {
             />
           </UFormField>
           <UFormField label="Blessing type">
-            <USelect v-model="recipientForm.blessing_type" :items="recipientTypeOptions" class="w-full" />
+            <USelect
+              v-model="recipientForm.blessing_type"
+              :items="recipientTypeOptions"
+              class="w-full"
+            />
           </UFormField>
           <div class="flex items-end gap-2">
-            <UButton label="Link" :loading="recipientSaving" @click="addRecipient" />
+            <UButton
+              label="Link"
+              :loading="recipientSaving"
+              :disabled="!recipientForm.person || recipientSaving"
+              @click="addRecipient"
+            />
+            <UButton
+              color="neutral"
+              variant="ghost"
+              label="Cancel"
+              @click="showRecipientForm = false"
+            />
           </div>
           <UAlert
             v-if="recipientError"
@@ -245,23 +270,30 @@ async function addRecipient(): Promise<void> {
         </div>
 
         <EmptyState
-          v-if="(blessing.recipients?.length ?? 0) + (blessing.standalone_recipients?.length ?? 0) === 0"
+          v-if="
+            (blessing.recipients?.length ?? 0) +
+              (blessing.standalone_recipients?.length ?? 0) ===
+            0
+          "
           title="No individuals linked yet"
           description="Link people to this blessing so individual testimonies map to a DB person."
         />
 
         <ul v-else class="divide-y divide-gray-100 dark:divide-gray-800">
           <li
-            v-for="item in [...(blessing.recipients ?? []), ...(blessing.standalone_recipients ?? [])]"
+            v-for="item in [
+              ...(blessing.recipients ?? []),
+              ...(blessing.standalone_recipients ?? []),
+            ]"
             :key="item.id"
             class="flex items-center justify-between gap-4 py-3"
           >
             <div>
-              <p class="text-sm font-medium capitalize">
-                {{ recipientLabel(item) }}
+              <p class="text-sm font-medium">
+                {{ item.person_name || 'Unnamed person' }}
               </p>
-              <p class="text-xs text-gray-500 dark:text-gray-400">
-                {{ formatDate(item.service_date) }}
+              <p class="text-xs capitalize text-gray-500 dark:text-gray-400">
+                {{ recipientLabel(item) }} · {{ formatDate(item.service_date) }}
               </p>
             </div>
             <NuxtLink

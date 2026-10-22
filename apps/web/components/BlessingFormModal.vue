@@ -47,7 +47,10 @@ function defaults() {
     eventSel: '',
     notes: '',
     other_label: '',
-    counts: Object.fromEntries(BLESSING_TYPES.map((type) => [type, 0])) as Record<string, number>,
+    counts: Object.fromEntries(BLESSING_TYPES.map((type) => [type, 0])) as Record<
+      string,
+      number
+    >,
   }
 }
 
@@ -71,6 +74,12 @@ const grandTotal = computed(() =>
     0,
   ),
 )
+
+function clampCount(type: string): void {
+  const value = Number(form.counts[type] ?? 0)
+  if (Number.isNaN(value) || value < 0) form.counts[type] = 0
+  else form.counts[type] = Math.floor(value)
+}
 
 const linkedProgram = computed(() => {
   const preset = props.preset
@@ -110,15 +119,15 @@ async function submit(): Promise<void> {
 
   type BulkRow = { blessing_type: string; other_label?: string; count: number }
   const rows: BulkRow[] = BLESSING_TYPES.flatMap((blessing_type): BulkRow[] => {
-      const count = Number(form.counts[blessing_type] ?? 0)
-      if (blessing_type === 'other') {
-        const label = form.other_label.trim()
-        if (!label && count <= 0) return []
-        return [{ blessing_type, other_label: label || undefined, count }]
-      }
-      if (count <= 0) return []
-      return [{ blessing_type, count }]
-    })
+    const count = Number(form.counts[blessing_type] ?? 0)
+    if (blessing_type === 'other') {
+      const label = form.other_label.trim()
+      if (!label && count <= 0) return []
+      return [{ blessing_type, other_label: label || undefined, count }]
+    }
+    if (count <= 0) return []
+    return [{ blessing_type, count }]
+  })
 
   if (rows.length === 0) {
     formError.value = 'Enter at least one blessing count'
@@ -148,8 +157,7 @@ async function submit(): Promise<void> {
       rows,
     })
     const failed = response.data.filter((row) => row.error)
-    resultSummary.value =
-      `${response.meta.created} recorded · ${response.meta.updated} updated · ${response.meta.skipped} skipped`
+    resultSummary.value = `${response.meta.created} recorded · ${response.meta.updated} updated · ${response.meta.skipped} skipped`
     if (failed.length > 0) {
       rowErrors.value = failed.map((row) => ({
         blessing_type: row.blessing_type,
@@ -205,24 +213,50 @@ async function submit(): Promise<void> {
           :description="row.error"
         />
 
+        <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Context</h3>
         <div class="grid gap-4 sm:grid-cols-2">
           <UFormField label="Branch" :error="fieldErrors.branch">
-            <EntitySelect v-model="form.branch" :items="branchOptions" placeholder="Select branch…" class="w-full" />
+            <EntitySelect
+              v-model="form.branch"
+              :items="branchOptions"
+              placeholder="Select branch…"
+              class="w-full"
+            />
           </UFormField>
           <UFormField label="Service date" required :error="fieldErrors.service_date">
             <UInput v-model="form.service_date" type="date" class="w-full" />
           </UFormField>
         </div>
 
-        <div v-if="showPickers" class="grid gap-4 sm:grid-cols-2">
-          <UFormField v-if="serviceOptions.length > 0" label="Sunday service (optional)">
-            <EntitySelect v-model="form.service" :items="serviceOptions" placeholder="No service link…" class="w-full" />
-          </UFormField>
-          <UFormField v-if="eventOptions.length > 0" label="Event (optional)">
-            <EntitySelect v-model="form.eventSel" :items="eventOptions" placeholder="No event link…" class="w-full" />
-          </UFormField>
+        <div v-if="showPickers">
+          <div class="grid gap-4 sm:grid-cols-2">
+            <UFormField
+              v-if="serviceOptions.length > 0"
+              label="Sunday service (optional)"
+            >
+              <EntitySelect
+                v-model="form.service"
+                :items="serviceOptions"
+                placeholder="No service link…"
+                class="w-full"
+              />
+            </UFormField>
+            <UFormField v-if="eventOptions.length > 0" label="Event (optional)">
+              <EntitySelect
+                v-model="form.eventSel"
+                :items="eventOptions"
+                placeholder="No event link…"
+                class="w-full"
+              />
+            </UFormField>
+          </div>
+          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            Link these blessings to the service or event they belong to; leave both empty
+            only for branch-level records.
+          </p>
         </div>
 
+        <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Counts</h3>
         <div class="grid gap-4 sm:grid-cols-3">
           <UFormField
             v-for="type in typeOptions"
@@ -233,12 +267,19 @@ async function submit(): Promise<void> {
             <UInput
               v-model="form.counts[type.value]"
               type="number"
+              inputmode="numeric"
               min="0"
+              step="1"
               class="w-full"
               :aria-label="`${type.label} count`"
+              @change="clampCount(type.value)"
+              @blur="clampCount(type.value)"
             />
           </UFormField>
         </div>
+        <p class="text-xs text-gray-500 dark:text-gray-400">
+          Leave 0 to skip — only types above 0 are saved.
+        </p>
 
         <UFormField
           v-if="Number(form.counts.other ?? 0) > 0 || form.other_label"
@@ -253,6 +294,7 @@ async function submit(): Promise<void> {
           />
         </UFormField>
 
+        <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Notes</h3>
         <UFormField label="Notes" :error="fieldErrors.notes">
           <UTextarea
             v-model="form.notes"
@@ -262,7 +304,12 @@ async function submit(): Promise<void> {
         </UFormField>
 
         <p class="text-sm text-gray-500 dark:text-gray-400">
-          {{ resultSummary || `${grandTotal} blessings in total` }}
+          {{
+            resultSummary ||
+            (grandTotal > 0
+              ? `${grandTotal} blessings in total`
+              : 'Leave 0 to skip — only types above 0 are saved.')
+          }}
         </p>
       </form>
     </template>
