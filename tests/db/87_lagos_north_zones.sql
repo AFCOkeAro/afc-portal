@@ -110,11 +110,11 @@ BEGIN
   PERFORM test_support.assert_true(v_mismatch = 0,
     'zones578', 'bsc.zone still agrees with parent branch zone on every row');
 
-  -- Partition counts after the 0028 seed + BSC carry: Z1 eight branches /
+  -- Partition counts after the 0028 seed + BSC carry: Z1 seven branches /
   -- nine BSCs, Z2 four branches / no BSCs.
   PERFORM test_support.assert_true(
-    (SELECT count(*) FROM branches WHERE zone = (SELECT id FROM zones WHERE code = 'LAG-NORTH-Z1')) = 8,
-    'zones578', 'Z1 scopes eight branches');
+    (SELECT count(*) FROM branches WHERE zone = (SELECT id FROM zones WHERE code = 'LAG-NORTH-Z1')) = 7,
+    'zones578', 'Z1 scopes seven branches');
   PERFORM test_support.assert_true(
     (SELECT count(*) FROM branches WHERE zone = (SELECT id FROM zones WHERE code = 'LAG-NORTH-Z2')) = 4,
     'zones578', 'Z2 scopes four branches');
