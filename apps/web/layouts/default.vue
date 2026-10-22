@@ -10,6 +10,7 @@ import type { NavigationItem } from '~/utils/navigation'
 
 const { user, logout } = useAuth()
 const permissions = usePermissions()
+const route = useRoute()
 
 const items = computed(() =>
   NAVIGATION.filter(
@@ -30,13 +31,21 @@ const sections = computed(() =>
 )
 
 /**
- * Collapsible sidebar state (AFC-565). All groups render collapsed on fresh
- * load; the expanded set persists per browser in localStorage so users are
- * not forced to re-expand on every navigation. SSR renders collapsed (empty
- * set) and hydration restores the stored set on mount.
+ * Accordion sidebar state. Exactly one section is open at a time: opening a
+ * section closes the others, and the choice persists per browser in
+ * localStorage. SSR renders collapsed and hydration restores on mount. The
+ * section holding the current route opens automatically on navigation, so
+ * the menu always reflects where the account is.
  */
 const SIDEBAR_EXPANDED_KEY = 'afc:sidebar-expanded-v1'
 const expandedKeys = ref<string[]>([])
+
+/**
+ * Mobile drawer state. Below the lg breakpoint the menu lives behind a
+ * hamburger button in the brand row instead of pushing content down the
+ * page; it closes on every navigation. Desktop is unaffected.
+ */
+const mobileOpen = ref(false)
 
 /**
  * Icon-rail state. On large screens the sidebar collapses to a narrow rail
@@ -70,22 +79,52 @@ function persistExpanded(): void {
 }
 
 function toggleSection(key: string): void {
-  expandedKeys.value = isExpanded(key)
-    ? expandedKeys.value.filter((k: string) => k !== key)
-    : [...expandedKeys.value, key]
+  expandedKeys.value = isExpanded(key) ? [] : [key]
   persistExpanded()
 }
+
+/** The section holding a path: exact item match, else longest prefix (so
+ *  detail pages like /tasks/:id keep their section open). */
+function sectionForPath(path: string): string | null {
+  let best: { key: string; length: number } | null = null
+  for (const section of sections.value) {
+    for (const item of section.items) {
+      if (path === item.to || path.startsWith(`${item.to}/`)) {
+        if (!best || item.to.length > best.length) best = { key: section.key, length: item.to.length }
+      }
+    }
+  }
+  return best?.key ?? null
+}
+
+watch(
+  () => route.path,
+  (path) => {
+    mobileOpen.value = false
+    const current = sectionForPath(path)
+    if (current !== null && !isExpanded(current)) {
+      expandedKeys.value = [current]
+      persistExpanded()
+    }
+  },
+)
 
 onMounted(() => {
   try {
     const raw = window.localStorage.getItem(SIDEBAR_EXPANDED_KEY)
     if (raw) {
       const parsed: unknown = JSON.parse(raw)
-      if (Array.isArray(parsed))
-        expandedKeys.value = parsed.filter((k): k is string => typeof k === 'string')
+      if (Array.isArray(parsed)) {
+        const keys = parsed.filter((k): k is string => typeof k === 'string')
+        if (keys.length > 0) expandedKeys.value = [keys[0]]
+      }
     }
   } catch {
     expandedKeys.value = []
+  }
+  if (expandedKeys.value.length === 0) {
+    const current = sectionForPath(route.path)
+    if (current !== null) expandedKeys.value = [current]
   }
 
   try {
@@ -146,6 +185,16 @@ const menuItems = computed(() => [
           <UIcon name="i-lucide-church" class="size-6 shrink-0 text-primary-500" />
           <span v-if="!railCollapsed" class="truncate font-semibold">AFC Portal</span>
         </NuxtLink>
+        <button
+          type="button"
+          class="rounded-lg p-2 text-gray-500 hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 lg:hidden dark:text-gray-400 dark:hover:bg-gray-800"
+          :aria-label="mobileOpen ? 'Close menu' : 'Open menu'"
+          :aria-expanded="mobileOpen ? 'true' : 'false'"
+          aria-controls="portal-sections-nav"
+          @click="mobileOpen = !mobileOpen"
+        >
+          <UIcon :name="mobileOpen ? 'i-lucide-x' : 'i-lucide-menu'" class="size-5" />
+        </button>
       </div>
 
       <div class="hidden px-3 lg:block">
@@ -166,8 +215,11 @@ const menuItems = computed(() => [
       </div>
 
       <nav aria-label="Portal sections" class="px-3 pb-4 lg:pb-6">
-        <!-- Full menu: mobile always, desktop while expanded. -->
-        <div :class="railCollapsed ? 'lg:hidden' : ''">
+        <!-- Full menu: mobile behind the hamburger, desktop while expanded. -->
+        <div
+          id="portal-sections-nav"
+          :class="[railCollapsed ? 'lg:hidden' : '', mobileOpen ? 'block' : 'hidden lg:block']"
+        >
           <div v-for="section in sections" :key="section.key" class="mt-4 first:mt-1">
             <div class="flex items-center gap-1">
               <NuxtLink
