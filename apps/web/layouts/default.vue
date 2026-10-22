@@ -173,7 +173,7 @@ const menuItems = computed(() => [
               <NuxtLink
                 :to="section.to"
                 class="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-3 py-1 text-xs font-semibold uppercase tracking-wide text-gray-500 hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:text-gray-400 dark:hover:bg-gray-800"
-                :title="`${section.label} overview`"
+                :title="`Open ${section.label}`"
               >
                 <UIcon :name="section.icon" class="size-4 shrink-0" />
                 <span class="truncate">{{ section.label }}</span>

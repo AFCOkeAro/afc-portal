@@ -20,9 +20,10 @@ export interface NavigationItem {
 }
 
 /**
- * Sidebar sections in render order. The header of each section is a link to
- * its own landing page (`/sections/<key>`, rendered by pages/sections/[group].vue)
- * and the chevron beside it only collapses the section. A section with no
+ * Sidebar sections in render order. The header of each section links straight
+ * to the group's canonical page (a real route, not an index), and the chevron
+ * beside it only collapses the section. The old `/sections/<key>` URLs redirect
+ * to the same canonical page so bookmarks keep working. A section with no
  * permitted items is dropped, so capability-gating stays per item.
  */
 export type NavigationGroup =
@@ -41,21 +42,21 @@ export interface NavigationGroupDef {
   key: NavigationGroup
   label: string
   icon: string
-  /** Landing page for the section header. */
+  /** Canonical page the section header links to. */
   to: string
 }
 
 export const NAVIGATION_GROUPS: readonly NavigationGroupDef[] = [
-  { key: 'dashboard', label: 'Dashboard', icon: 'i-lucide-layout-dashboard', to: '/sections/dashboard' },
-  { key: 'office', label: 'Office Admin', icon: 'i-lucide-briefcase', to: '/sections/office' },
-  { key: 'outreach', label: 'Outreach', icon: 'i-lucide-radar', to: '/sections/outreach' },
-  { key: 'welfare', label: 'Welfare', icon: 'i-lucide-heart-handshake', to: '/sections/welfare' },
-  { key: 'worship', label: 'Worship', icon: 'i-lucide-church', to: '/sections/worship' },
-  { key: 'people', label: 'People', icon: 'i-lucide-users', to: '/sections/people' },
-  { key: 'youth', label: 'Youth', icon: 'i-lucide-sparkles', to: '/sections/youth' },
-  { key: 'events', label: 'Events', icon: 'i-lucide-calendar-days', to: '/sections/events' },
-  { key: 'communications', label: 'Communications', icon: 'i-lucide-send', to: '/sections/communications' },
-  { key: 'admin', label: 'Admin', icon: 'i-lucide-shield-check', to: '/sections/admin' },
+  { key: 'dashboard', label: 'Dashboard', icon: 'i-lucide-layout-dashboard', to: '/dashboard' },
+  { key: 'office', label: 'Office Admin', icon: 'i-lucide-briefcase', to: '/minutes' },
+  { key: 'outreach', label: 'Outreach', icon: 'i-lucide-radar', to: '/departments' },
+  { key: 'welfare', label: 'Welfare', icon: 'i-lucide-heart-handshake', to: '/visitors' },
+  { key: 'worship', label: 'Worship', icon: 'i-lucide-church', to: '/departments' },
+  { key: 'people', label: 'People', icon: 'i-lucide-users', to: '/people' },
+  { key: 'youth', label: 'Youth', icon: 'i-lucide-sparkles', to: '/campus' },
+  { key: 'events', label: 'Events', icon: 'i-lucide-calendar-days', to: '/events' },
+  { key: 'communications', label: 'Communications', icon: 'i-lucide-send', to: '/campaigns' },
+  { key: 'admin', label: 'Admin', icon: 'i-lucide-shield-check', to: '/branches' },
 ]
 
 export const NAVIGATION: readonly NavigationItem[] = [
