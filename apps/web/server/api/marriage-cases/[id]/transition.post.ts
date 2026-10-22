@@ -23,6 +23,9 @@ import { officeZoneScope, writeOfficeAudit } from '../../../utils/office'
  *   required) close from any stage; every other move must step forward
  *   (to-index > from-index, no skips backward, no jumps over the
  *   zonal/overseer gates).
+ * - Entering `announcements_calendar` is allowed only from `attire_check`
+ *   (AFC-679 phase D): the attire-check gate cannot be jumped over, so the
+ *   announce route's stage floor IS the passed gate.
  * - Leaving `wedding_info` requires the verify checkbox.
  * - Entering `rehearsal`/`wedding` re-checks the 3-day lead.
  *
@@ -81,6 +84,20 @@ export default defineEventHandler(async (event) => {
         },
       })
     }
+  }
+
+  if (
+    toStage === 'announcements_calendar' &&
+    fromStage !== 'attire_check'
+  ) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'The attire check must pass before announcements run',
+      data: {
+        code: 'validation_error',
+        fields: { to_stage: 'Pass the attire check first' },
+      },
+    })
   }
 
   if (

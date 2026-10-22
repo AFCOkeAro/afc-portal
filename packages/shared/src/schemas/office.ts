@@ -535,6 +535,59 @@ export const marriageCaseLinkSisterSchema = z.object({
 })
 export type MarriageCaseLinkSister = z.infer<typeof marriageCaseLinkSisterSchema>
 
+/**
+ * Phase-D notifications (AFC-679). The Music Director is notified on the
+ * portal (a tasks row the director sees at sign-in) once the case reaches
+ * `wedding_info`; ministers are mailed ahead once the case reaches
+ * `ministers_mail`. Both floors are route rules (the DB cannot know the
+ * actor); the route re-checks them against MARRIAGE_FLOW_INDEX.
+ */
+export const MARRIAGE_NOTIFY_CHANNELS = ['music_director', 'ministers'] as const
+export type MarriageNotifyChannel = (typeof MARRIAGE_NOTIFY_CHANNELS)[number]
+
+export const MARRIAGE_NOTIFY_STAGE_FLOOR: Record<MarriageNotifyChannel, string> = {
+  music_director: 'wedding_info',
+  ministers: 'ministers_mail',
+}
+
+export const marriageCaseNotifySchema = z.object({
+  channel: z.enum(MARRIAGE_NOTIFY_CHANNELS),
+  note: optionalNote(),
+})
+export type MarriageCaseNotify = z.infer<typeof marriageCaseNotifySchema>
+
+/**
+ * Phase-D schedule (AFC-679). Sets the wedding and rehearsal dates without
+ * moving the stage. The 3-day rehearsal lead is re-checked here with the
+ * {code, fields} failure shape; the migration-0035 CHECK is the backstop a
+ * crafted request cannot skip.
+ */
+export const marriageCaseScheduleSchema = z
+  .object({
+    wedding_date: dateSchema.optional(),
+    rehearsal_date: dateSchema.optional(),
+  })
+  .refine((v) => v.wedding_date !== undefined || v.rehearsal_date !== undefined, {
+    message: 'Set the wedding date, the rehearsal date, or both',
+    path: ['wedding_date'],
+  })
+export type MarriageCaseSchedule = z.infer<typeof marriageCaseScheduleSchema>
+
+/**
+ * Phase-D announcements + calendar (AFC-679). Runs at
+ * `announcements_calendar` (the attire-check gate passes first: the
+ * transition route refuses any skip into this stage). Writes three Sunday
+ * announcement rows (defaults: the three Sundays before the wedding date)
+ * plus a wedding event row so the calendar feed carries the date. The
+ * caller may name extra branches (both families' sides); every named
+ * branch must sit inside the caller scope.
+ */
+export const marriageCaseAnnounceSchema = z.object({
+  branches: z.array(z.string().uuid()).max(8).optional(),
+  publish_sundays: z.array(dateSchema).max(3).optional(),
+})
+export type MarriageCaseAnnounce = z.infer<typeof marriageCaseAnnounceSchema>
+
 export const minutesFormSchema = z
   .object({
     title: z.string().trim().min(1, 'Title is required').max(200),
