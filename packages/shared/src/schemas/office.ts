@@ -15,6 +15,7 @@ import {
   listQuerySchema,
   optionalNote,
   optionalText,
+  timeSchema,
 } from './common'
 
 export const TRANSFER_STATUSES = [
@@ -95,6 +96,9 @@ export interface OfficeMinute {
   id: string
   title: string
   meeting_date: string
+  start_time: string | null
+  end_time: string | null
+  location: string | null
   body: string | null
   file: string | null
   status: MinutesStatus
@@ -182,13 +186,24 @@ export const marriageFormSchema = z.object({
 })
 export type MarriageForm = z.infer<typeof marriageFormSchema>
 
-export const minutesFormSchema = z.object({
-  title: z.string().trim().min(1, 'Title is required').max(200),
-  meeting_date: dateSchema,
-  body: optionalNote(),
-  file: optionalText(36),
-  branch: branchRef,
-})
+export const minutesFormSchema = z
+  .object({
+    title: z.string().trim().min(1, 'Title is required').max(200),
+    meeting_date: dateSchema,
+    start_time: timeSchema.optional(),
+    end_time: timeSchema.optional(),
+    location: optionalText(255),
+    // Markdown body (AFC-670): the existing 4000-char cap stays the sane
+    // maximum — a rendered minute with tables fits comfortably inside it,
+    // and the column is unbounded text, so the form is the bound.
+    body: optionalNote(),
+    file: optionalText(36),
+    branch: branchRef,
+  })
+  .refine((v) => !v.start_time || !v.end_time || v.end_time > v.start_time, {
+    message: 'The end time must be after the start time',
+    path: ['end_time'],
+  })
 export type MinutesForm = z.infer<typeof minutesFormSchema>
 
 export const attendeeFormSchema = z
