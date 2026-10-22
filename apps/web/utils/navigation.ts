@@ -46,15 +46,45 @@ export interface NavigationGroupDef {
 }
 
 export const NAVIGATION_GROUPS: readonly NavigationGroupDef[] = [
-  { key: 'dashboard', label: 'Dashboard', icon: 'i-lucide-layout-dashboard', to: '/sections/dashboard' },
-  { key: 'office', label: 'Office Admin', icon: 'i-lucide-briefcase', to: '/sections/office' },
-  { key: 'outreach', label: 'Outreach', icon: 'i-lucide-radar', to: '/sections/outreach' },
-  { key: 'welfare', label: 'Welfare', icon: 'i-lucide-heart-handshake', to: '/sections/welfare' },
+  {
+    key: 'dashboard',
+    label: 'Dashboard',
+    icon: 'i-lucide-layout-dashboard',
+    to: '/sections/dashboard',
+  },
+  {
+    key: 'office',
+    label: 'Office Admin',
+    icon: 'i-lucide-briefcase',
+    to: '/sections/office',
+  },
+  {
+    key: 'outreach',
+    label: 'Outreach',
+    icon: 'i-lucide-radar',
+    to: '/sections/outreach',
+  },
+  {
+    key: 'welfare',
+    label: 'Welfare',
+    icon: 'i-lucide-heart-handshake',
+    to: '/sections/welfare',
+  },
   { key: 'worship', label: 'Worship', icon: 'i-lucide-church', to: '/sections/worship' },
   { key: 'people', label: 'People', icon: 'i-lucide-users', to: '/sections/people' },
   { key: 'youth', label: 'Youth', icon: 'i-lucide-sparkles', to: '/sections/youth' },
-  { key: 'events', label: 'Events', icon: 'i-lucide-calendar-days', to: '/sections/events' },
-  { key: 'communications', label: 'Communications', icon: 'i-lucide-send', to: '/sections/communications' },
+  {
+    key: 'events',
+    label: 'Events',
+    icon: 'i-lucide-calendar-days',
+    to: '/sections/events',
+  },
+  {
+    key: 'communications',
+    label: 'Communications',
+    icon: 'i-lucide-send',
+    to: '/sections/communications',
+  },
   { key: 'admin', label: 'Admin', icon: 'i-lucide-shield-check', to: '/sections/admin' },
 ]
 
@@ -198,9 +228,13 @@ export const NAVIGATION: readonly NavigationItem[] = [
     inSidebar: true,
   },
   {
-    label: 'Branches',
-    to: '/branches',
-    icon: 'i-lucide-building-2',
+    // AFC-672: merged Churches surface (zones + branches + BSC in one menu
+    // with kind filter + map). Replaces the worship Branches entry; every
+    // staff role holds the branches read grant so the menu resolves for all
+    // staff, and the page gates each kind by its own capability.
+    label: 'Churches',
+    to: '/churches',
+    icon: 'i-lucide-church',
     requires: ['branches', 'read'],
     group: 'worship',
     inSidebar: true,
@@ -313,30 +347,12 @@ export const NAVIGATION: readonly NavigationItem[] = [
   },
 
   // Admin
-  {
-    label: 'Branches',
-    to: '/branches',
-    icon: 'i-lucide-building-2',
-    requires: ['branches', 'read'],
-    group: 'admin',
-    inSidebar: true,
-  },
-  {
-    label: 'Zones',
-    to: '/zones',
-    icon: 'i-lucide-map',
-    requires: ['zones', 'read'],
-    group: 'admin',
-    inSidebar: true,
-  },
-  {
-    label: 'Bible Study Centres',
-    to: '/bscs',
-    icon: 'i-lucide-book-marked',
-    requires: ['bible_study_centres', 'read'],
-    group: 'admin',
-    inSidebar: true,
-  },
+  // AFC-672: the admin Branches / Zones / Bible Study Centres entries are
+  // removed — the single worship Churches entry above is the only sidebar
+  // path to those registers. The old routes still resolve as deep-link
+  // redirects into the filtered Churches view (pages/branches/index.vue,
+  // pages/zones/index.vue); the outreach AVS entry is untouched (separate
+  // centres register, not the BSC kind filter).
   {
     label: 'AVS',
     to: '/bscs',
