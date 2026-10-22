@@ -19,6 +19,9 @@ export * from './permissions'
 export * from './schemas'
 export * from './types'
 export * from './office-feed'
+export * from './markdown'
+export * from './minutes-samples'
+export * from './impersonation'
 
 /**
  * `role-matrix` is deliberately NOT re-exported from here.

@@ -427,7 +427,7 @@ function isOverdue(row: Record<string, unknown>): boolean {
           placeholder="All branches"
           :loading="branchesPending"
           class="w-full"
-          ariaLabel="Filter by branch"
+          aria-label="Filter by branch"
         />
         <UCheckbox v-model="mine" label="Assigned to me" name="mine" />
       </div>

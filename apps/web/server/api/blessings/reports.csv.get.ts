@@ -7,11 +7,11 @@ import {
 import { csvResponse, getPortalScope } from '../../utils/portal'
 
 /**
- * Blessings CSV export (US-B2 AC2). Serialises exactly the rows of the
- * shared filtered collection -- the list and the export cannot drift
- * because both read `collectBlessings` with the same filters and the same
- * scope. Columns: branch, zone, service, date, blessing_type, male, female,
- * total. Permission-scoped: a branch export contains only its own branch.
+ * Blessings CSV export (US-B2 AC2, AFC-671 single-count). Serialises exactly
+ * the rows of the shared filtered collection -- the list and the export
+ * cannot drift because both read `collectBlessings` with the same filters
+ * and the same scope. Columns: branch, zone, service, date, blessing_type,
+ * count. Permission-scoped: a branch export contains only its own branch.
  *
  * US-A4 compare (AFC-485): `compare_prior_year=true` appends the prior-year
  * side (same query, one year back) with a delta line, mirroring the
@@ -47,28 +47,13 @@ export default defineEventHandler(async (event): Promise<string> => {
     breakdown,
   })
   if (compare) {
-    const male = breakdown.reduce((sum, line) => sum + line.male, 0)
-    const female = breakdown.reduce((sum, line) => sum + line.female, 0)
+    const currentCount = breakdown.reduce((sum, line) => sum + line.count, 0)
     body.push(
       [],
-      ['section', 'from', 'to', 'male', 'female', 'total'],
-      [
-        'current',
-        filters.date_from ?? '',
-        filters.date_to ?? '',
-        String(male),
-        String(female),
-        String(total),
-      ],
-      [
-        'prior',
-        compare.from,
-        compare.to,
-        String(compare.male),
-        String(compare.female),
-        String(compare.total),
-      ],
-      ['delta', '', '', '', '', String(compare.delta_total)],
+      ['section', 'from', 'to', 'count'],
+      ['current', filters.date_from ?? '', filters.date_to ?? '', String(currentCount)],
+      ['prior', compare.from, compare.to, String(compare.total)],
+      ['delta', '', '', String(compare.delta_total)],
     )
   }
 

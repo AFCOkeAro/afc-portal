@@ -416,9 +416,7 @@ async function markCompleted(): Promise<void> {
               >
                 <th class="px-3 py-2 font-medium">Blessing</th>
                 <th class="px-3 py-2 font-medium">Date</th>
-                <th class="px-3 py-2 font-medium">Male</th>
-                <th class="px-3 py-2 font-medium">Female</th>
-                <th class="px-3 py-2 font-medium">Total</th>
+                <th class="px-3 py-2 font-medium">Count</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
@@ -438,14 +436,8 @@ async function markCompleted(): Promise<void> {
                 <td class="px-3 py-3 text-gray-600 dark:text-gray-300">
                   {{ blessing.service_date }}
                 </td>
-                <td class="px-3 py-3 tabular-nums text-gray-600 dark:text-gray-300">
-                  {{ blessing.male_count }}
-                </td>
-                <td class="px-3 py-3 tabular-nums text-gray-600 dark:text-gray-300">
-                  {{ blessing.female_count }}
-                </td>
                 <td class="px-3 py-3 font-medium tabular-nums">
-                  {{ blessing.total_count }}
+                  {{ blessing.count ?? blessing.total_count }}
                 </td>
               </tr>
             </tbody>

@@ -72,3 +72,87 @@
     break-inside: avoid;
   }
 }
+
+/* Marriage file print (AFC-677 phase B): A4 sheet per form matching the
+ * shared-document layout -- header, fields, signature line. On screen the
+ * sheet stays hidden; in print only the sheet prints. */
+.print-sheet {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 18mm 15mm;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  .print-sheet,
+  .print-sheet * {
+    visibility: visible;
+  }
+
+  .print-sheet {
+    display: block;
+    position: absolute;
+    inset: 0;
+    color: #000;
+  }
+
+  .print-sheet .print-page {
+    break-after: page;
+    padding: 0 0 12mm;
+  }
+
+  .print-sheet .print-page:last-child {
+    break-after: auto;
+  }
+
+  .print-sheet h1 {
+    font-size: 18pt;
+    font-weight: 700;
+    margin-bottom: 2mm;
+  }
+
+  .print-sheet h2 {
+    font-size: 14pt;
+    font-weight: 700;
+    border-bottom: 1pt solid #000;
+    padding-bottom: 2mm;
+    margin-bottom: 4mm;
+  }
+
+  .print-sheet dl > div {
+    display: flex;
+    gap: 4mm;
+    padding: 1.2mm 0;
+    border-bottom: 0.5pt dotted #666;
+  }
+
+  .print-sheet dt {
+    flex: 0 0 55mm;
+    font-weight: 600;
+    text-transform: capitalize;
+  }
+
+  .print-sheet dd {
+    flex: 1;
+  }
+
+  .print-sheet pre {
+    white-space: pre-wrap;
+    font-size: 10.5pt;
+    line-height: 1.5;
+  }
+
+  .print-sheet .print-outstanding {
+    font-style: italic;
+  }
+
+  .print-sheet .print-sign {
+    margin-top: 8mm;
+  }
+}

@@ -1,0 +1,29 @@
+{
+ "authorAgentId": "7b4aae3b-0da5-4de2-a1d8-4737943ef561",
+ "authorName": "Coder",
+ "claimedAt": "2026-10-22T16:30:00+01:00",
+ "doesNotClaimR2": "There is no `reviews[]` entry here and there will not be one from me. R2 wants a named reviewer who is not the author, and I am the author of every path below. Reviewer designation for a Coder compliance-path commit is the CTO (MediaTech). There is no independent security reviewer on this team (board declined the seat on cost), so a CTO review is a recorded degradation, not independent review. This migration touches people-linked personal data (the church served includes minors) and the Directus grant ceiling, so per the Coder instructions it goes to the CTO regardless. PENDING at claim time: the CTO verdict.",
+ "issue": "AFC-674",
+ "notClaimedPaths": "The working tree at claim time carries concurrent held work I did not write and do not stage: the AFC-670 office-minutes slice (0033 migration + rollback, suite 95, claim AFC-670.json) and the AFC-671 blessings slice (0034 migration + rollback, suite 79_blessings_count_recipients, claim AFC-671.json), both authored by me on their own issues and held for the same CTO review. Their files apply cleanly underneath 0035 (verified in the standalone run) and are named here, left untouched. No other agent's files were touched.",
+ "paths": [
+  "services/directus/schema/migrations/20261022_0035_marriage_cases.sql",
+  "services/directus/schema/migrations/rollback/20261022_0035_marriage_cases.down.sql",
+  "tests/db/96_marriage_cases.sql",
+  ".provenance/claims/AFC-674.json"
+ ],
+ "reviews": [
+  {
+   "commit": "a3a0f67cd3949837af8887fb53a00271957748e3",
+   "findings": "CTO R2 review AFC-682: 31 assert calls counted; privilege gate 0; retention gate 0; rollback gate zero findings on 0035; numbering clean after landed 0033/0034; no changes requested. Degradation recorded: no independent security reviewer; route-layer order/approval gates remain phase-C work on AFC-674.",
+   "reviewIssue": "AFC-682",
+   "reviewerAgentId": "8f6e42d7-fb6e-4e6c-904b-dfdda50000ed",
+   "reviewerName": "MediaTech",
+   "trailerPresentOnCommit": true,
+   "verdict": "approve"
+  }
+ ],
+ "scopeOfTheClaim": "R1 only: authorship of the listed paths on AFC-674 scope A (marriage_cases pipeline table + marriage_case_events trail + suite 96). It asserts nothing about whether they are correct, and it carries no `reviews[]` entry. It is not clearance of the retention gate (plan \u00a70.10.5), which only the CEO can clear.",
+ "verificationRecorded": "Standalone PGlite verification (full runner cannot boot in this sandbox: pre-existing 0030 temp-table failure, unrelated -- same evidence standard as the AFC-670 claim): bootstrap + migrations 0001-0029, 0031-0035 applied (0030 skipped as recorded; 0032 fails standalone only because it needs 0030's function -- unrelated to this slice). Suite 96: 31/31 green covering stage vocab, branch/brother required, halt-reason, transfer-branch, rehearsal 3-day lead, vow default B, verify-flag default, zone backfill, branch/brother RESTRICT, sister SET NULL, trail CASCADE, app ceiling (no DELETE 42501), rerun stability, shipped down-script refusal shape. migration-privilege gate exit 0; retention-literal gate exit 0; rollback-control gate: zero findings on 0035 (26 pre-existing FAILs all on 0030, unchanged from clean tree). Shared + web typecheck green.",
+ "whatTheChangeActuallyDoes": "Migration 0035 creates marriage_cases (brother required RESTRICT, sister nullable SET NULL, branch required + zone denorm, 24 flow stages + halted + transferred_out closed CHECK, halted-needs-reason CHECK, transferred_out-needs-branch CHECK, rehearsal <= wedding-3 CHECK, vow_type text DEFAULT 'B' deliberately open until phase-B transcription, wedding_info_verified default false, report columns minister/passage/certificate-type, nine bare-uuid file slots, engagement/terms flags) + marriage_case_events trail (from/to stage, created/stage_changed/halted/transferred_out/approved/note), conditional FIXED-name FKs, rerunnable zone backfill, directus_app SELECT + INSERT/UPDATE over operational columns only, NO DELETE, REVOKE PUBLIC. Rollback refuses while either table holds rows, then drops trail + cases with no CASCADE. Suite 96 pins all of the above. Held uncommitted for CTO review with this claim.",
+ "whatThisFileIs": "An R1 authorship claim, and nothing else."
+}

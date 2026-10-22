@@ -372,6 +372,11 @@ END $$;
 -- Leave the registers present, as the forward migration leaves them.
 \i services/directus/schema/migrations/20261020_0020_households_departments.sql
 
+-- The 0020 down/up cycle above recreates departments without the zone
+-- column 0027 added; re-apply 0027 (idempotent) so later suites see the
+-- enforced tree.
+\i services/directus/schema/migrations/20261020_0027_groups_multilevel_departments.sql
+
 DO $$
 BEGIN
   PERFORM test_support.assert_true(

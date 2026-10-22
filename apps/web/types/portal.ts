@@ -3,6 +3,7 @@ import type {
   AttendanceSession,
   Blessing,
   BlessingEvent,
+  BlessingRecipient,
   Branch,
   Celebration,
   CelebrationEvent,
@@ -263,13 +264,19 @@ export interface BlessingRow extends Blessing {
 
 export interface BlessingBreakdownRow {
   blessing_type: string
-  male: number
-  female: number
-  total: number
+  /** Single count per type (AFC-671, no male/female split). */
+  count: number
 }
 
 export interface BlessingDetail extends BlessingRow {
   events: BlessingEvent[]
+  recipients: BlessingRecipientRow[]
+  standalone_recipients: BlessingRecipientRow[]
+}
+
+/** Individual blessing row (AFC-671): the shared recipient plus a resolved name when known. */
+export interface BlessingRecipientRow extends BlessingRecipient {
+  person_name?: string | null
 }
 
 /** Youth directory row (AFC-476): the shared YouthProfile plus resolved names. */

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { BLESSING_TYPES, COLLECTIONS } from '@afc/shared'
 import type { BlessingDetail } from '~/types/portal'
 
 definePageMeta({ middleware: 'staff' })
@@ -6,18 +7,38 @@ definePageMeta({ middleware: 'staff' })
 const route = useRoute()
 const id = String(route.params.id)
 const api = useApi()
+const { personOptions, personPending, onPersonSearch } = usePersonSearch()
 
 const {
   data: blessing,
   pending,
   error,
+  refresh,
 } = await useAsyncData(`blessing-${id}`, () =>
   api.get<BlessingDetail>(`/api/blessings/${id}`),
 )
 
+const showRecipientForm = ref(false)
+const recipientSaving = ref(false)
+const recipientError = ref('')
+const recipientForm = ref({ person: '', blessing_type: 'salvation' })
+
+const recipientTypeOptions = BLESSING_TYPES.map((value) => ({
+  label: value.replace(/_/g, ' '),
+  value,
+}))
+
 function typeLabel(): string {
   const row = blessing.value
   if (!row) return 'Blessing'
+  if (row.blessing_type === 'other' && row.other_label) return row.other_label
+  return row.blessing_type.replace(/_/g, ' ')
+}
+
+function recipientLabel(row: {
+  blessing_type: string
+  other_label: string | null
+}): string {
   if (row.blessing_type === 'other' && row.other_label) return row.other_label
   return row.blessing_type.replace(/_/g, ' ')
 }
@@ -37,6 +58,38 @@ function formatDate(value: string | null | undefined): string {
 
 function eventLabel(eventType: string): string {
   return eventType.replace(/_/g, ' ')
+}
+
+async function addRecipient(): Promise<void> {
+  recipientError.value = ''
+  const row = blessing.value
+  if (!row || !recipientForm.value.person) {
+    recipientError.value = 'Choose a person for this blessing'
+    return
+  }
+  recipientSaving.value = true
+  try {
+    await api.post('/api/blessing-recipients', {
+      blessing: row.id,
+      blessing_type: recipientForm.value.blessing_type,
+      person: recipientForm.value.person,
+      branch: row.branch,
+      zone: row.zone ?? undefined,
+      bsc: row.bsc ?? undefined,
+      session: row.session ?? undefined,
+      event: row.event ?? undefined,
+      sunday_service: row.sunday_service ?? undefined,
+      service_date: row.service_date,
+    })
+    showRecipientForm.value = false
+    recipientForm.value = { person: '', blessing_type: 'salvation' }
+    await refresh()
+  } catch (cause) {
+    recipientError.value =
+      (cause as { message?: string }).message ?? 'Could not link that person'
+  } finally {
+    recipientSaving.value = false
+  }
 }
 </script>
 
@@ -71,21 +124,19 @@ function eventLabel(eventType: string): string {
         :description="`${formatDate(blessing.service_date)} · ${blessing.branch_name || 'No branch'}`"
       />
 
-      <div class="grid gap-4 sm:grid-cols-3">
+      <div class="grid gap-4 sm:grid-cols-2">
         <StatCard
-          label="Male"
-          :value="blessing.male_count"
-          hint="Male blessings recorded"
+          label="Count"
+          :value="blessing.count ?? blessing.total_count"
+          hint="Blessings recorded"
         />
         <StatCard
-          label="Female"
-          :value="blessing.female_count"
-          hint="Female blessings recorded"
-        />
-        <StatCard
-          label="Total"
-          :value="blessing.total_count"
-          hint="Derived male plus female"
+          label="Individuals linked"
+          :value="
+            (blessing.recipients?.length ?? 0) +
+            (blessing.standalone_recipients?.length ?? 0)
+          "
+          hint="People mapped to this blessing"
         />
       </div>
 
@@ -155,6 +206,106 @@ function eventLabel(eventType: string): string {
           </ol>
         </UCard>
       </div>
+
+      <UCard class="mt-6">
+        <template #header>
+          <div class="flex items-center justify-between">
+            <h2 class="text-base font-semibold">Individual blessings</h2>
+            <PermissionGate :collection="COLLECTIONS.blessingRecipients" action="create">
+              <UButton
+                size="xs"
+                variant="outline"
+                icon="i-lucide-plus"
+                label="Link a person"
+                @click="showRecipientForm = !showRecipientForm"
+              />
+            </PermissionGate>
+          </div>
+          <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+            Linking people does not change the aggregate count above — the count is
+            recorded per type, and linked names map individual testimonies to people.
+          </p>
+        </template>
+
+        <div v-if="showRecipientForm" class="mb-4 grid gap-3 sm:grid-cols-3">
+          <UFormField label="Person" required>
+            <EntitySelect
+              v-model="recipientForm.person"
+              :items="personOptions"
+              placeholder="Type a name to search…"
+              :loading="personPending"
+              server-search
+              class="w-full"
+              @update:search-term="onPersonSearch"
+            />
+          </UFormField>
+          <UFormField label="Blessing type">
+            <USelect
+              v-model="recipientForm.blessing_type"
+              :items="recipientTypeOptions"
+              class="w-full"
+            />
+          </UFormField>
+          <div class="flex items-end gap-2">
+            <UButton
+              label="Link"
+              :loading="recipientSaving"
+              :disabled="!recipientForm.person || recipientSaving"
+              @click="addRecipient"
+            />
+            <UButton
+              color="neutral"
+              variant="ghost"
+              label="Cancel"
+              @click="showRecipientForm = false"
+            />
+          </div>
+          <UAlert
+            v-if="recipientError"
+            class="sm:col-span-3"
+            color="error"
+            variant="subtle"
+            :description="recipientError"
+          />
+        </div>
+
+        <EmptyState
+          v-if="
+            (blessing.recipients?.length ?? 0) +
+              (blessing.standalone_recipients?.length ?? 0) ===
+            0
+          "
+          title="No individuals linked yet"
+          description="Link people to this blessing so individual testimonies map to a DB person."
+        />
+
+        <ul v-else class="divide-y divide-gray-100 dark:divide-gray-800">
+          <li
+            v-for="item in [
+              ...(blessing.recipients ?? []),
+              ...(blessing.standalone_recipients ?? []),
+            ]"
+            :key="item.id"
+            class="flex items-center justify-between gap-4 py-3"
+          >
+            <div>
+              <p class="text-sm font-medium">
+                {{ item.person_name || 'Unnamed person' }}
+              </p>
+              <p class="text-xs capitalize text-gray-500 dark:text-gray-400">
+                {{ recipientLabel(item) }} · {{ formatDate(item.service_date) }}
+              </p>
+            </div>
+            <NuxtLink
+              v-if="item.person"
+              :to="`/people/${item.person}`"
+              class="text-sm text-primary-600 hover:underline dark:text-primary-400"
+            >
+              View person
+            </NuxtLink>
+          </li>
+        </ul>
+      </UCard>
     </template>
   </div>
 </template>

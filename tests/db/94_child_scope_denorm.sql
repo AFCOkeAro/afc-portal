@@ -89,6 +89,19 @@ END $$;
 -- ---------------------------------------------------------------------------
 -- 94.2  COPY. Parent FK only -> branch + zone.
 -- ---------------------------------------------------------------------------
+-- The people.branch-varchar path is a staging app-compat graft: the migration
+-- chain does not guarantee those person columns, so the suite installs the
+-- graft itself (IF NOT EXISTS, additive and idempotent). The harness runs
+-- each suite file in its own transaction and nothing here depends on the
+-- columns being absent afterwards, so no cleanup is asserted. No dependency
+-- on any other uncommitted work.
+DO $$
+BEGIN
+  ALTER TABLE people ADD COLUMN IF NOT EXISTS first_name text;
+  ALTER TABLE people ADD COLUMN IF NOT EXISTS last_name text;
+  ALTER TABLE people ADD COLUMN IF NOT EXISTS branch varchar;
+END $$;
+
 DO $$
 DECLARE
   v_branch uuid;

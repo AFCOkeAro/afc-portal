@@ -20,6 +20,15 @@ export const dateTimeSchema = z
   .string()
   .refine((value) => !Number.isNaN(Date.parse(value)), 'Expected an ISO 8601 timestamp')
 
+/**
+ * `HH:MM` 24-hour, the wire format for a Postgres `time` written from a
+ * `<input type="time">`. Zero-padded, so lexicographic order is time order
+ * and an end-after-start refine can compare strings directly.
+ */
+export const timeSchema = z
+  .string()
+  .regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Expected a 24-hour HH:MM time')
+
 /** Postgres `numeric(12,2)` arrives as a string; it is not a float. */
 export const moneySchema = z
   .string()

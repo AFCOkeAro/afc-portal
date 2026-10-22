@@ -1,5 +1,5 @@
 import type { H3Event } from 'h3'
-import type { AuthSession } from '@afc/shared'
+import type { AuthSession, ImpersonatedBy } from '@afc/shared'
 import { SESSION_COOKIE_NAME } from '@afc/shared'
 
 /**
@@ -20,6 +20,12 @@ export interface PortalSessionData {
   accessToken: string
   refreshToken: string | null
   session: AuthSession
+  /**
+   * Distinct impersonation claim (AFC-684). When set, `session.user` is the
+   * effective (previewed) scope and this claim retains the original actor,
+   * the reason, and the hard expiry. Absent means "not impersonating".
+   */
+  impersonatedBy?: ImpersonatedBy
 }
 
 /** Set when `NUXT_STUB_AUTH` is on: the cookie carries a synthetic token. */

@@ -501,10 +501,10 @@ function formatDateTime(value: string | null | undefined): string {
                     {{ group.blessing_type.replace(/_/g, ' ') }}
                   </p>
                   <p class="text-xs text-gray-500 dark:text-gray-400">
-                    {{ group.male }} male · {{ group.female }} female
+                    {{ group.count }} recorded
                   </p>
                 </div>
-                <span class="text-sm font-semibold tabular-nums">{{ group.total }}</span>
+                <span class="text-sm font-semibold tabular-nums">{{ group.count }}</span>
               </NuxtLink>
             </li>
           </ul>

@@ -37,6 +37,8 @@ export const COLLECTIONS = {
    */
   blessings: 'blessings',
   blessingEvents: 'blessing_events',
+  /** Individual blessings mapped to a DB person/user (AFC-671 §C). */
+  blessingRecipients: 'blessing_recipients',
   sundayServices: 'sunday_services',
   serviceAssignments: 'service_assignments',
   visitors: 'visitors',
@@ -95,6 +97,27 @@ export const COLLECTIONS = {
   transferEvents: 'transfer_events',
   marriageMatters: 'marriage_matters',
   marriageMatterEvents: 'marriage_matter_events',
+  /**
+   * Marriage pipeline (AFC-674 scope A). `marriageCases` is the staged
+   * brother/sister pipeline (one row per couple); `marriageCaseEvents` is
+   * the explicit stage history (created/stage_changed/halted/
+   * transferred_out/approved/note), following the welfare_case_events
+   * precedent. `marriageMatters` (single-matter CRUD) stays for history.
+   */
+  marriageCases: 'marriage_cases',
+  marriageCaseEvents: 'marriage_case_events',
+  /**
+   * Marriage phase-B form submissions (AFC-677). One row per filled source
+   * form; payloads validated by the phase-B routes. Same readers as the
+   * pipeline rows below.
+   */
+  marriageCaseForms: 'marriage_case_forms',
+  /**
+   * Scoped impersonation audit (AFC-684). One row per start/stop with actor,
+   * target (user XOR branch XOR zone), action, reason, and timestamp.
+   * Created by migration 0037; read by area admins, written by the portal.
+   */
+  impersonationEvents: 'impersonation_events',
   officeMinutes: 'office_minutes',
   minutesAttendees: 'minutes_attendees',
   officeMinuteEvents: 'office_minute_events',

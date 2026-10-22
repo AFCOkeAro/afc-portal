@@ -43,7 +43,17 @@ export interface PortalScope {
 type Filter = Record<string, unknown>
 
 export async function getPortalScope(event: H3Event): Promise<PortalScope> {
-  const { session, accessToken } = await requireSession(event)
+  const { session, accessToken, impersonatedBy } = await requireSession(event)
+  // An expired preview never serves scoped rows: force the caller to exit and
+  // start again. The outer session expiry is enforced by the cookie lifetime;
+  // the preview TTL is enforced here, on every scoped read.
+  if (impersonatedBy && new Date(impersonatedBy.expiresAt).getTime() <= Date.now()) {
+    throw createError({
+      statusCode: 401,
+      statusMessage: 'The impersonation preview expired — start it again',
+      data: { code: 'impersonation_expired' },
+    })
+  }
   const role = session.user.staffRole
   const isArea = role === 'area_admin' || role === 'super_admin'
   const branchIds = [

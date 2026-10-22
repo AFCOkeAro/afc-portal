@@ -35,6 +35,9 @@ export default defineEventHandler(async (event) => {
     {
       title: form.title,
       meeting_date: form.meeting_date,
+      start_time: form.start_time ?? null,
+      end_time: form.end_time ?? null,
+      location: form.location ?? null,
       body: form.body ?? null,
       file: form.file ?? null,
       status: 'draft',

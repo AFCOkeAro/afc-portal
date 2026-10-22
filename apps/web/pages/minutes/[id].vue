@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { COLLECTIONS } from '@afc/shared'
+import { COLLECTIONS, renderMarkdownSafe } from '@afc/shared'
 
 definePageMeta({ middleware: 'staff' })
 
@@ -36,6 +36,20 @@ async function addAttendee() {
 
 const title = computed(() => String(data.value?.data?.title ?? 'Minutes'))
 const attendees = computed(() => data.value?.attendees ?? [])
+
+/**
+ * The body is stored as Markdown and rendered through the shared XSS-safe
+ * renderer: raw HTML in the source is escaped before any Markdown construct
+ * is recognised, so this v-html can only emit the allowlisted tags.
+ */
+const bodyHtml = computed(() => renderMarkdownSafe(String(data.value?.data?.body ?? '')))
+const hasBody = computed(() => String(data.value?.data?.body ?? '').trim().length > 0)
+function timeRange(row: Record<string, unknown>): string {
+  const start = typeof row.start_time === 'string' ? row.start_time.slice(0, 5) : ''
+  const end = typeof row.end_time === 'string' ? row.end_time.slice(0, 5) : ''
+  if (start && end) return `${start}–${end}`
+  return start || end || '—'
+}
 </script>
 
 <template>
@@ -79,6 +93,14 @@ const attendees = computed(() => data.value?.attendees ?? [])
             <dd>{{ data.data.meeting_date }}</dd>
           </div>
           <div class="flex justify-between gap-4">
+            <dt class="text-gray-500">Time</dt>
+            <dd>{{ timeRange(data.data) }}</dd>
+          </div>
+          <div class="flex justify-between gap-4">
+            <dt class="text-gray-500">Location</dt>
+            <dd>{{ data.data.location ?? '—' }}</dd>
+          </div>
+          <div class="flex justify-between gap-4">
             <dt class="text-gray-500">Status</dt>
             <dd>
               <UBadge color="neutral" variant="subtle">{{ data.data.status }}</UBadge>
@@ -86,7 +108,11 @@ const attendees = computed(() => data.value?.attendees ?? [])
           </div>
           <div class="col-span-2">
             <dt class="text-gray-500">Body</dt>
-            <dd class="mt-1">{{ data.data.body ?? '—' }}</dd>
+            <!-- bodyHtml comes from the shared XSS-safe renderer
+              (escape-first, allowlisted tags), never from raw user HTML. -->
+            <!-- eslint-disable-next-line vue/no-v-html -->
+            <dd v-if="hasBody" class="markdown-body mt-1" v-html="bodyHtml" />
+            <dd v-else class="mt-1">—</dd>
           </div>
           <div v-if="data.data.file" class="col-span-2">
             <dt class="text-gray-500">File</dt>
@@ -165,3 +191,67 @@ const attendees = computed(() => data.value?.attendees ?? [])
     />
   </div>
 </template>
+
+<style scoped>
+.markdown-body :deep(h1),
+.markdown-body :deep(h2),
+.markdown-body :deep(h3) {
+  font-weight: 700;
+  margin: 0.75rem 0 0.375rem;
+}
+.markdown-body :deep(h1) {
+  font-size: 1.25rem;
+}
+.markdown-body :deep(h2) {
+  font-size: 1.125rem;
+}
+.markdown-body :deep(h3) {
+  font-size: 1rem;
+}
+.markdown-body :deep(p) {
+  margin: 0.375rem 0;
+}
+.markdown-body :deep(ul),
+.markdown-body :deep(ol) {
+  margin: 0.375rem 0 0.375rem 1.25rem;
+}
+.markdown-body :deep(ul) {
+  list-style: disc;
+}
+.markdown-body :deep(ol) {
+  list-style: decimal;
+}
+.markdown-body :deep(blockquote) {
+  border-left: 3px solid var(--ui-border-accented);
+  padding-left: 0.75rem;
+  color: var(--ui-text-muted);
+  margin: 0.5rem 0;
+}
+.markdown-body :deep(table) {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.5rem 0;
+  font-size: 0.875rem;
+}
+.markdown-body :deep(th),
+.markdown-body :deep(td) {
+  border: 1px solid var(--ui-border);
+  padding: 0.375rem 0.625rem;
+  text-align: left;
+}
+.markdown-body :deep(th) {
+  font-weight: 600;
+}
+.markdown-body :deep(code) {
+  font-family: ui-monospace, monospace;
+  font-size: 0.875em;
+}
+.markdown-body :deep(pre) {
+  overflow-x: auto;
+  padding: 0.625rem;
+  border-radius: 0.375rem;
+}
+.markdown-body :deep(a) {
+  text-decoration: underline;
+}
+</style>

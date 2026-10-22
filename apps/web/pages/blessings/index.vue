@@ -32,8 +32,6 @@ interface BlessingsCompare {
   from: string
   to: string
   total: number
-  male: number
-  female: number
   has_data: boolean
   delta_total: number
 }
@@ -72,6 +70,37 @@ const zones = await useAsyncData('blessings-zones', () =>
   api.get<Array<{ id: string; name: string }>>('/api/zones'),
 )
 
+const servicesList = await useAsyncData('blessings-services', () =>
+  api.get<{
+    data: Array<{
+      id: string
+      service_date: string
+      theme: string | null
+      service_type: string
+    }>
+  }>('/api/services', { query: { limit: 50 } }),
+)
+
+const eventsList = await useAsyncData('blessings-events', () =>
+  api.get<{ data: Array<{ id: string; title: string }> }>('/api/events', {
+    query: { limit: 50 },
+  }),
+)
+
+const serviceOptions = computed(() =>
+  (servicesList.data.value?.data ?? []).map((row) => ({
+    label: `${row.service_date} · ${row.theme || row.service_type}`,
+    value: String(row.id),
+  })),
+)
+
+const eventOptions = computed(() =>
+  (eventsList.data.value?.data ?? []).map((row) => ({
+    label: row.title,
+    value: String(row.id),
+  })),
+)
+
 const csvHref = computed(() => {
   const params = new URLSearchParams()
   for (const [key, value] of Object.entries(query.value)) {
@@ -87,7 +116,7 @@ const breakdown = computed(() => data.value?.breakdown ?? [])
 const pageCount = computed(() => Math.max(1, Math.ceil(total.value / limit)))
 const grandTotal = computed(() =>
   breakdown.value.reduce(
-    (sum: number, group: BlessingBreakdownRow) => sum + group.total,
+    (sum: number, group: BlessingBreakdownRow) => sum + group.count,
     0,
   ),
 )
@@ -176,8 +205,8 @@ function formatDate(value: string): string {
         v-for="group in breakdown"
         :key="group.blessing_type"
         :label="group.blessing_type.replace(/_/g, ' ')"
-        :value="group.total"
-        :hint="`${group.male} male · ${group.female} female`"
+        :value="group.count"
+        :hint="`${group.count} recorded`"
       />
     </div>
 
@@ -266,9 +295,7 @@ function formatDate(value: string): string {
               <th class="px-3 py-2 font-medium">Blessing</th>
               <th class="px-3 py-2 font-medium">Date</th>
               <th class="px-3 py-2 font-medium">Branch</th>
-              <th class="px-3 py-2 font-medium">Male</th>
-              <th class="px-3 py-2 font-medium">Female</th>
-              <th class="px-3 py-2 font-medium">Total</th>
+              <th class="px-3 py-2 font-medium">Count</th>
               <th class="px-3 py-2"><span class="sr-only">Open</span></th>
             </tr>
           </thead>
@@ -298,13 +325,9 @@ function formatDate(value: string): string {
               <td class="px-3 py-3 text-gray-600 dark:text-gray-300">
                 {{ row.branch_name || '—' }}
               </td>
-              <td class="px-3 py-3 tabular-nums text-gray-600 dark:text-gray-300">
-                {{ row.male_count }}
+              <td class="px-3 py-3 font-medium tabular-nums">
+                {{ row.count ?? row.total_count }}
               </td>
-              <td class="px-3 py-3 tabular-nums text-gray-600 dark:text-gray-300">
-                {{ row.female_count }}
-              </td>
-              <td class="px-3 py-3 font-medium tabular-nums">{{ row.total_count }}</td>
               <td class="px-3 py-3 text-right">
                 <UButton
                   :to="`/blessings/${row.id}`"
@@ -348,6 +371,8 @@ function formatDate(value: string): string {
     <BlessingFormModal
       v-model:open="showForm"
       :branches="branches.data.value ?? []"
+      :services="serviceOptions"
+      :events-list="eventOptions"
       @saved="refresh()"
     />
   </div>

@@ -225,6 +225,7 @@ END $$;
 \i services/directus/schema/migrations/20261020_0002_hierarchy.sql
 
 \i services/directus/schema/migrations/20261020_0024_remove_abule_egba.sql
+\i services/directus/schema/migrations/20261020_0029_remove_sango_ota_and_satellite.sql
 
 \i services/directus/schema/migrations/20261020_0029_remove_sango_ota_and_satellite.sql
 
@@ -317,6 +318,10 @@ BEGIN
     'pre-rollback: empty registers (probes above cleaned up; 71 fixtures retired in 71.9)');
 END $$;
 
+-- 0034 links blessing_recipients to attendance_sessions/events; those FKs
+-- would block the register drops below, so they are parked and re-added after.
+ALTER TABLE blessing_recipients DROP CONSTRAINT IF EXISTS blessing_recipients_session_fkey;
+ALTER TABLE blessing_recipients DROP CONSTRAINT IF EXISTS blessing_recipients_event_fkey;
 \i services/directus/schema/migrations/rollback/20261020_0023_attendance_sessions.down.sql
 
 DO $$
@@ -338,8 +343,12 @@ END $$;
 -- or suite 94's shape contract fails on these tables.
 \i services/directus/schema/migrations/20261020_0023_attendance_sessions.sql
 
+-- The register rollback above drops the 0030/0031 scope triggers; re-apply
+-- them (rebased idempotent forwards from AFC-698) plus the 0034 links parked
+-- for the drops, so later suites see the enforced tree. 0039 is retired:
+-- the rebased 0031 no longer fills departments, so there is nothing to drop.
+\i services/directus/schema/migrations/20261020_0034_blessings_count_recipients.sql
 \i services/directus/schema/migrations/20261020_0030_child_scope_denorm.sql
-
 \i services/directus/schema/migrations/20261020_0031_fill_scope_zone.sql
 
 DO $$

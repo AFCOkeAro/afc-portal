@@ -38,6 +38,13 @@ export default defineEventHandler(async (event) => {
     typeof query.search === 'string' ? query.search.trim().slice(0, 120) : undefined
   const branch = typeof query.branch === 'string' ? query.branch : undefined
   const status = typeof query.status === 'string' ? query.status : 'open'
+  // AFC-660: ?event= badge filter was dead server-side (AFC-649 follow-up).
+  // Fail-closed: the event predicate joins the _and with scopeFilter below,
+  // so an out-of-scope event id matches nothing instead of leaking rows.
+  const eventId =
+    typeof query.event === 'string' && query.event.trim()
+      ? query.event.trim().slice(0, 120)
+      : undefined
 
   const filter =
     status === 'all'
@@ -58,6 +65,7 @@ export default defineEventHandler(async (event) => {
       filter: mergeFilters(
         filter,
         branch ? { branch: { _eq: branch } } : undefined,
+        eventId ? { event: { _eq: eventId } } : undefined,
         scopeFilter(scope),
       ),
       fields: FIELDS,

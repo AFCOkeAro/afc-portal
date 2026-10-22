@@ -20,6 +20,7 @@ const BLESSING_FIELDS = [
   'id',
   'blessing_type',
   'other_label',
+  'count',
   'male_count',
   'female_count',
   'total_count',
@@ -191,9 +192,8 @@ export interface BlessingRow extends Blessing {
 
 export interface BlessingBreakdown {
   blessing_type: string
-  male: number
-  female: number
-  total: number
+  /** Single count per type (AFC-671, no male/female split). */
+  count: number
 }
 
 /**
@@ -256,17 +256,16 @@ export async function collectBlessings(
   const byType = new Map<string, BlessingBreakdown>()
   for (const row of typed) {
     const key = row.blessing_type
+    // Single-count (AFC-671): reports sum `count`; legacy rows carry the
+    // mirrored male = count so both agree.
+    const count = Number((row as BlessingRow).count ?? row.total_count ?? 0)
     const existing = byType.get(key)
     if (existing) {
-      existing.male += Number(row.male_count ?? 0)
-      existing.female += Number(row.female_count ?? 0)
-      existing.total += Number(row.total_count ?? 0)
+      existing.count += count
     } else {
       byType.set(key, {
         blessing_type: key,
-        male: Number(row.male_count ?? 0),
-        female: Number(row.female_count ?? 0),
-        total: Number(row.total_count ?? 0),
+        count,
       })
     }
   }
@@ -281,8 +280,6 @@ export interface BlessingCompare {
   from: string
   to: string
   total: number
-  male: number
-  female: number
   has_data: boolean
   delta_total: number
 }
@@ -321,25 +318,21 @@ export async function collectBlessingsCompare(
     page: 1,
     limit: 200,
   })
-  const male = prior.breakdown.reduce((sum, line) => sum + line.male, 0)
-  const female = prior.breakdown.reduce((sum, line) => sum + line.female, 0)
   return {
     from: shiftYear(from, -1),
     to: shiftYear(end, -1),
     total: prior.total,
-    male,
-    female,
     has_data: prior.rows.length > 0,
     delta_total: current.total - prior.total,
   }
 }
 
-/** CSV body (US-B2 AC2): branch, zone, service, date, type, male, female, total. */
+/** CSV body (US-B2 AC2, AFC-671 single-count): branch, zone, service, date, type, count. */
 export function blessingsToCsv(rows: BlessingRow[]): string[][] {
   const serviceOf = (row: BlessingRow): string =>
     (row.sunday_service ?? row.event ?? row.session ?? '') as string
   return [
-    ['branch', 'zone', 'service', 'date', 'blessing_type', 'male', 'female', 'total'],
+    ['branch', 'zone', 'service', 'date', 'blessing_type', 'count'],
     ...rows.map((row) => [
       row.branch_name ?? String(row.branch ?? ''),
       row.zone_name ?? (row.zone ? String(row.zone) : ''),
@@ -348,9 +341,7 @@ export function blessingsToCsv(rows: BlessingRow[]): string[][] {
       row.other_label && row.blessing_type === 'other'
         ? `other:${row.other_label}`
         : row.blessing_type,
-      String(row.male_count ?? 0),
-      String(row.female_count ?? 0),
-      String(row.total_count ?? 0),
+      String((row as BlessingRow).count ?? row.total_count ?? 0),
     ]),
   ]
 }
@@ -388,29 +379,25 @@ export async function blessingsRollup(
   for (;;) {
     const result = await listItems<{
       blessing_type: string
-      male_count: number | null
-      female_count: number | null
+      count: number | null
       total_count: number | null
     }>(event, scope, 'blessings', {
       filter,
-      fields: ['blessing_type', 'male_count', 'female_count', 'total_count'],
+      fields: ['blessing_type', 'count', 'total_count'],
       page,
       limit: 200,
     })
     for (const row of result.data) {
-      counted += Number(row.total_count ?? 0)
+      const count = Number(row.count ?? row.total_count ?? 0)
+      counted += count
       const key = row.blessing_type
       const existing = byType.get(key)
       if (existing) {
-        existing.male += Number(row.male_count ?? 0)
-        existing.female += Number(row.female_count ?? 0)
-        existing.total += Number(row.total_count ?? 0)
+        existing.count += count
       } else {
         byType.set(key, {
           blessing_type: key,
-          male: Number(row.male_count ?? 0),
-          female: Number(row.female_count ?? 0),
-          total: Number(row.total_count ?? 0),
+          count,
         })
       }
     }

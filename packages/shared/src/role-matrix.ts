@@ -585,6 +585,19 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     none: [NONE, 'none'],
     zone_admin: [R, 'own_zone'],
   },
+  // Individual blessings (AFC-671 §C): same holders as blessings — the
+  // recipient row carries a branch, so the same hierarchy predicate
+  // applies. The matrix row is the portal half; the database ceiling
+  // (no DELETE) lives in migration 0034.
+  [COLLECTIONS.blessingRecipients]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [ALL, 'all'],
+    branch_admin: [ALL, 'own_branch', 'CRUD (own)'],
+    department_leader: [CRU, 'own_department', 'CRU (dept)'],
+    volunteer: [CU, 'own_branch', 'C/U (assigned)'],
+    none: [NONE, 'none'],
+    zone_admin: [ALL, 'own_zone'],
+  },
   [COLLECTIONS.serviceTypeDefinitions]: {
     // Board config, not in the §11 table: the capture form reads it at every
     // level, the board edits it at area level. Definitions are area-wide
@@ -639,6 +652,55 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     volunteer: [NONE, 'none'],
     none: [NONE, 'none'],
     zone_admin: [R, 'own_zone'],
+  },
+  // Marriage pipeline (AFC-674 scope A). Same holders as marriageMatters:
+  // the pipeline replaces single-matter CRUD for new couples but the
+  // ministry facts stay with the same readers (welfare-dept R and
+  // own-household R are policy/record-level, as above). No wider grant.
+  [COLLECTIONS.marriageCases]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [ALL, 'all'],
+    branch_admin: [CRU, 'own_branch', 'CRU (own)'],
+    department_leader: [R, 'assigned_departments', 'R (welfare dept via policy)'],
+    volunteer: [NONE, 'none'],
+    // "R (own)": household reads its own case; enforced record-level.
+    none: [R, 'public_only', 'R (own household via policy)'],
+    zone_admin: [CRU, 'own_zone'],
+  },
+  [COLLECTIONS.marriageCaseEvents]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [R, 'all'],
+    branch_admin: [R, 'own_branch'],
+    department_leader: [R, 'assigned_departments', 'assigned welfare'],
+    volunteer: [NONE, 'none'],
+    none: [NONE, 'none'],
+    zone_admin: [R, 'own_zone'],
+  },
+  // Marriage phase-B form submissions (AFC-677). Same holders as the
+  // pipeline rows: the staff who move a case fill its forms. No wider
+  // grant; `none` (household self-service) is read-own via policy.
+  [COLLECTIONS.marriageCaseForms]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [ALL, 'all'],
+    branch_admin: [CRU, 'own_branch', 'CRU (own)'],
+    department_leader: [R, 'assigned_departments', 'R (welfare dept via policy)'],
+    volunteer: [NONE, 'none'],
+    // "R (own)": household reads its own submissions; enforced record-level.
+    none: [R, 'public_only', 'R (own household via policy)'],
+    zone_admin: [CRU, 'own_zone'],
+  },
+  // Scoped impersonation audit (AFC-684). Area-only read (the log list view);
+  // the portal writes start/stop rows with the server token, not with a role
+  // grant, so no role holds a write here. Zone/branch staff start previews
+  // but never read the area-wide log.
+  [COLLECTIONS.impersonationEvents]: {
+    super_admin: [R, 'all'],
+    area_admin: [R, 'all'],
+    branch_admin: [NONE, 'none'],
+    department_leader: [NONE, 'none'],
+    volunteer: [NONE, 'none'],
+    none: [NONE, 'none'],
+    zone_admin: [NONE, 'none'],
   },
   [COLLECTIONS.officeMinutes]: {
     super_admin: [ALL, 'all'],
