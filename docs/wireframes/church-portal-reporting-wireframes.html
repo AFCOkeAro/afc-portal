@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Church Portal — Reporting Wireframes (AFC-587)</title>
+<style>
+  :root{
+    --ink:#1b1b1b; --mut:#6b6b6b; --line:#c9c9c9; --bg:#f4f4f2;
+    --box:#e4e4e1; --box2:#efefec; --accent:#2f6f6f; --accent-soft:#d8e8e8;
+    --white:#fff; --warn:#f0e0c0; --rose:#f3d2d2;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:14px/1.45 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
+  header.top{position:sticky;top:0;z-index:5;background:var(--ink);color:#fff;padding:14px 22px;}
+  header.top h1{margin:0;font-size:16px;letter-spacing:.3px}
+  header.top p{margin:4px 0 0;color:#cfcfcf;font-size:12px}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;padding:12px 22px;border-bottom:1px solid var(--line);
+    background:#fafafa;font-size:12px;color:var(--mut)}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .sw{width:14px;height:14px;border:1px solid var(--line);display:inline-block;border-radius:2px}
+  .wrap{padding:22px;display:grid;gap:26px;grid-template-columns:repeat(auto-fill,minmax(430px,1fr))}
+  .frame{background:var(--white);border:1px solid var(--line);border-radius:10px;overflow:hidden;
+    box-shadow:0 1px 2px rgba(0,0,0,.05);display:flex;flex-direction:column}
+  .frame>figcaption{background:var(--box2);border-bottom:1px solid var(--line);padding:9px 12px;
+    display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+  .frame>figcaption b{font-size:13px}
+  .frame>figcaption code{font-size:11px;color:var(--mut)}
+  .screen{padding:14px;display:flex;flex-direction:column;gap:12px;min-height:300px}
+  .muted{color:var(--mut)}
+  .tiny{font-size:11px}
+  .bar{height:12px;background:var(--box);border-radius:3px}
+  .bar.s{width:38%} .bar.m{width:62%} .bar.l{width:88%} .bar.xs{width:24%}
+  .box{background:var(--box);border-radius:4px}
+  .card{border:1px solid var(--line);border-radius:6px;padding:10px;background:#fff}
+  .card h4{margin:0 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--mut)}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .row.between{justify-content:space-between}
+  .grow{flex:1}
+  .field{flex:1;display:flex;flex-direction:column;gap:5px;min-width:120px}
+  .field .lab{font-size:11px;color:var(--mut)}
+  .input{height:30px;border:1px solid var(--line);border-radius:4px;background:#fff}
+  .input.area{height:58px}
+  .btn{display:inline-flex;align-items:center;justify-content:center;height:30px;padding:0 14px;
+    border-radius:4px;font-size:12px;border:1px solid var(--ink);background:var(--ink);color:#fff;white-space:nowrap}
+  .btn.ghost{background:#fff;color:var(--ink)}
+  .btn.accent{background:var(--accent);border-color:var(--accent)}
+  .btn.sm{height:24px;padding:0 9px;font-size:11px}
+  .nav{display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line);padding-bottom:9px}
+  .logo{width:26px;height:26px;border-radius:5px;background:var(--ink)}
+  .nav .sp{flex:1}
+  .pill{font-size:10px;padding:2px 8px;border-radius:999px;background:var(--box);color:var(--ink)}
+  .pill.on{background:var(--accent-soft);color:var(--accent);border:1px solid var(--accent)}
+  .tabs{display:flex;gap:6px;border-bottom:1px solid var(--line);padding-bottom:6px;flex-wrap:wrap}
+  .tabs .t{font-size:11px;padding:3px 9px;border-radius:4px 4px 0 0;color:var(--mut)}
+  .tabs .t.on{background:var(--box2);color:var(--ink);font-weight:600;border-bottom:2px solid var(--accent)}
+  table{width:100%;border-collapse:collapse;font-size:11px}
+  th,td{text-align:left;padding:6px 7px;border-bottom:1px solid var(--line)}
+  th{color:var(--mut);font-weight:600;background:var(--box2)}
+  .skel{height:9px;background:var(--box);border-radius:3px}
+  .stat{flex:1;border:1px solid var(--line);border-radius:6px;padding:9px;background:#fff;min-width:96px}
+  .stat .n{font-size:20px;font-weight:700}
+  .stat .k{font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.4px}
+  .stat.link .n{color:var(--accent);text-decoration:underline}
+  .list{display:flex;flex-direction:column;gap:7px}
+  .item{display:flex;gap:9px;align-items:center;border:1px solid var(--line);border-radius:5px;padding:7px 9px;background:#fff}
+  .avatar{width:30px;height:30px;border-radius:50%;background:var(--box);flex:none}
+  .badge{font-size:10px;padding:2px 7px;border-radius:999px;border:1px solid var(--line);color:var(--mut);background:#fafafa}
+  .badge.g{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
+  .badge.w{background:var(--warn);color:#7a5a10;border-color:#d9c08a}
+  .badge.r{background:var(--rose);color:#8a2b2b;border-color:#d9a0a0}
+  .note{font-size:11px;color:var(--mut);border-left:3px solid var(--accent);padding:4px 9px;background:var(--accent-soft);border-radius:0 4px 4px 0}
+  .chart{display:flex;align-items:flex-end;gap:6px;height:96px;padding-top:6px}
+  .chart .b{flex:1;background:var(--accent-soft);border:1px solid var(--accent);border-radius:3px 3px 0 0}
+  .chart .b.m{background:var(--accent);opacity:.75}
+  .legend-inline{display:flex;gap:14px;font-size:10px;color:var(--mut)}
+  .dot{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:4px}
+  footer{padding:16px 22px;color:var(--mut);font-size:12px;border-top:1px solid var(--line);background:#fafafa}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>Church Portal (Lagos North Area) — Reporting Wireframes</h1>
+  <p>AFC-587 · planning artifact · low-fidelity · not production UI · grey blocks = layout placeholders · extends the AFC-147 14-screen set + AFC-150 v2 (21) + AFC-151 v3 (12)</p>
+</header>
+<div class="legend">
+  <span><i class="sw" style="background:var(--box)"></i> content block</span>
+  <span><i class="sw" style="background:var(--accent-soft);border-color:var(--accent)"></i> active / primary / clickable count</span>
+  <span><i class="sw" style="background:#fff"></i> card surface</span>
+  <span><i class="sw" style="background:var(--warn);border-color:#d9c08a"></i> attention / restricted / pending</span>
+  <span><i class="sw" style="background:var(--rose);border-color:#d9a0a0"></i> no-consent / blocked send</span>
+  <span>Breakpoints: staff desktop + mobile; lists and fix-queues stack to one column on narrow screens.</span>
+</div>
+
+<div class="wrap">
+
+<!-- R1. REPORTING LANDING -->
+<figure class="frame">
+  <figcaption><b>R1. Reporting landing — one home for all 8 items</b><code>/reporting</code></figcaption>
+  <div class="screen">
+    <div class="nav"><div class="logo"></div><div class="grow"><div class="bar xs"></div></div><span class="pill on">Reporting</span><span class="badge">Area admin · Lagos North</span></div>
+    <div class="row between"><div class="tiny muted">Scope: <b>Area ▾</b> · Period: <b>Last 8 weeks ▾</b></div><span class="btn sm ghost">Manage schedules</span></div>
+    <div class="row" style="gap:8px">
+      <div class="stat link"><div class="n">92%</div><div class="k">Sessions captured ▸</div></div>
+      <div class="stat link"><div class="n">68%</div><div class="k">Follow-up SLA ▸</div></div>
+      <div class="stat link"><div class="n">14</div><div class="k">Open flags ▸</div></div>
+    </div>
+    <div class="card"><h4>Measure (4)</h4>
+      <div class="list">
+        <div class="item"><div class="grow"><b class="tiny">Data Views</b><div class="tiny muted">Saved scoped lists — “unassigned newcomers &gt; 3 days”</div></div><span class="badge g">4 recent</span></div>
+        <div class="item"><div class="grow"><b class="tiny">Metrics</b><div class="tiny muted">KPI cards + trends — are we healthy?</div></div><span class="badge g">6 cards</span></div>
+        <div class="item"><div class="grow"><b class="tiny">Attendance Analytics</b><div class="tiny muted">Breakdowns + compare, beyond the raw report</div></div><span class="badge g">Updated Sun</span></div>
+        <div class="item"><div class="grow"><b class="tiny">Reports</b><div class="tiny muted">Governed packs — run now or on schedule</div></div><span class="badge">2 due Fri</span></div>
+      </div>
+    </div>
+    <div class="card"><h4>Trust (4)</h4>
+      <div class="list">
+        <div class="item"><div class="grow"><b class="tiny">Data Integrity</b><div class="tiny muted">14 flags need a fix — duplicates, gaps</div></div><span class="badge w">14 open</span></div>
+        <div class="item"><div class="grow"><b class="tiny">Interactions</b><div class="tiny muted">Who we contacted, channel + consent basis</div></div><span class="badge">128 touches</span></div>
+        <div class="item"><div class="grow"><b class="tiny">Insights</b><div class="tiny muted">Narrative highlights with source links</div></div><span class="badge g">3 new</span></div>
+          <div class="item"><div class="grow"><b class="tiny">Website</b><div class="tiny muted">Public-site visits + registration funnel (confirmed A)</div></div><span class="badge g">Scoped</span></div>
+      </div>
+    </div>
+    <div class="note">IA lens: each tile states its question (Information Scent). Website shows as pending — no assumed meaning. A role without permission never sees the tile.</div>
+  </div>
+</figure>
+
+<!-- R2. DATA VIEW -->
+<figure class="frame">
+  <figcaption><b>R2. Data View — saved scoped list</b><code>/reporting/views/:id</code></figcaption>
+  <div class="screen">
+    <div class="nav"><div class="logo"></div><div class="grow"><div class="bar xs"></div></div><span class="pill on">Reporting</span><span class="badge">Branch admin · Ikeja</span></div>
+    <div class="row between"><div><b>Unassigned newcomers &gt; 3 days</b><div class="tiny muted">Saved view · scope: Ikeja branch · shared with branch</div></div><span class="row"><span class="btn sm ghost">Duplicate</span><span class="btn sm ghost">Save as</span></span></div>
+    <div class="row">
+      <div class="field"><div class="lab">Stage</div><div class="input"></div></div>
+      <div class="field"><div class="lab">Days waiting</div><div class="input"></div></div>
+      <div class="field"><div class="lab">Columns</div><div class="input"></div></div>
+      <span class="btn sm accent">Run</span>
+    </div>
+    <table><tr><th>Name</th><th>Stage</th><th>Wait</th><th>Consent</th><th></th></tr>
+      <tr><td><div class="skel" style="width:90px"></div></td><td>Welcome</td><td>5d</td><td><span class="badge g">WhatsApp</span></td><td><span class="btn sm ghost">Assign</span></td></tr>
+      <tr><td><div class="skel" style="width:70px"></div></td><td>Welcome</td><td>4d</td><td><span class="badge">SMS</span></td><td><span class="btn sm ghost">Assign</span></td></tr>
+      <tr><td><div class="skel" style="width:100px"></div></td><td>Identify</td><td>6d</td><td><span class="badge r">None — no send</span></td><td><span class="btn sm ghost">Capture consent</span></td></tr>
+    </table>
+    <div class="row between"><span class="tiny muted">23 rows · scope enforced server-side · CSV respects filters</span><span class="row"><span class="btn sm ghost">Export CSV</span><span class="btn sm">Assign all</span></span></div>
+    <div class="note">Recognition over Recall: the weekly slice is saved, not rebuilt. Rose = no-consent (never a bug); names are synthetic placeholders.</div>
+  </div>
+</figure>
+
+<!-- R3. REPORT RUN / EXPORT -->
+<figure class="frame">
+  <figcaption><b>R3. Report run + export — governed pack</b><code>/reporting/reports/:id/runs/:runId</code></figcaption>
+  <div class="screen">
+    <div class="nav"><div class="logo"></div><div class="grow"><div class="bar xs"></div></div><span class="pill on">Reporting</span><span class="badge">Area admin</span></div>
+    <div class="row between"><div><b>Monthly attendance pack — Sep 2026</b><div class="tiny muted">Schedule: monthly · formats: CSV + PDF · scope: Area</div></div><span class="badge g">Run #41 · ok</span></div>
+    <div class="row" style="gap:8px">
+      <div class="stat"><div class="n">17</div><div class="k">Branches</div></div>
+      <div class="stat"><div class="n">3,214</div><div class="k">Rows</div></div>
+      <div class="stat"><div class="n">48s</div><div class="k">Duration</div></div>
+      <div class="stat"><div class="n">Sep 1–30</div><div class="k">Period</div></div>
+    </div>
+    <div class="card"><h4>Run history (immutable)</h4>
+      <table><tr><th>Run</th><th>By / schedule</th><th>Rows</th><th>Status</th></tr>
+        <tr><td>#41 · Sep pack</td><td>Scheduled · Oct 1</td><td>3,214</td><td><span class="badge g">Filed</span></td></tr>
+        <tr><td>#40 · Sep retry</td><td>Area admin · Sep 30</td><td>3,209</td><td><span class="badge">Superseded</span></td></tr>
+        <tr><td>#39 · Aug pack</td><td>Scheduled · Sep 1</td><td>3,102</td><td><span class="badge g">Filed</span></td></tr>
+      </table>
+    </div>
+    <div class="row"><span class="btn sm accent">Download CSV</span><span class="btn sm ghost">Download PDF</span><span class="btn sm ghost">Retry (idempotent)</span><span class="tiny muted">Assumptions note attached</span></div>
+    <div class="note">Forgiveness + audit: one idempotent retry; history never rewrites; pausing a schedule needs a reason. Mirrors campaign run report (v3 S12).</div>
+  </div>
+</figure>
+
+<!-- R4. ATTENDANCE ANALYTICS -->
+<figure class="frame">
+  <figcaption><b>R4. Attendance Analytics — beyond the report</b><code>/reporting/attendance</code></figcaption>
+  <div class="screen">
+    <div class="nav"><div class="logo"></div><div class="grow"><div class="bar xs"></div></div><span class="pill on">Reporting</span><span class="badge">Area admin</span></div>
+    <div class="row">
+      <div class="field"><div class="lab">Scope</div><div class="input"></div></div>
+      <div class="field"><div class="lab">Group by</div><div class="input"></div></div>
+      <div class="field"><div class="lab">Period / compare</div><div class="input"></div></div>
+      <span class="btn sm accent">Apply</span>
+    </div>
+    <div class="card"><h4>Attendance by zone (male / female) — Sep vs Aug</h4>
+      <div class="chart"><div class="b" style="height:52%"></div><div class="b m" style="height:64%"></div><div class="b" style="height:44%"></div><div class="b m" style="height:58%"></div><div class="b" style="height:70%"></div><div class="b m" style="height:78%"></div></div>
+      <div class="legend-inline"><span><i class="dot" style="background:var(--box);border:1px solid var(--accent)"></i>Aug</span><span><i class="dot" style="background:var(--accent)"></i>Sep</span><span>Every bar drills to its filtered list.</span></div>
+    </div>
+    <div class="row" style="gap:8px">
+      <div class="stat link"><div class="n">+6.2%</div><div class="k">Sep vs Aug ▸</div></div>
+      <div class="stat link"><div class="n">41%</div><div class="k">Newcomer→member ▸</div></div>
+      <div class="stat"><div class="n">2</div><div class="k">Branches down 2 wks</div></div>
+    </div>
+    <div class="note">Does not replace <code>/reports/attendance</code>. Drill-through preserves the UI contract: counts are links to the data that produced them.</div>
+  </div>
+</figure>
+
+<!-- R5. DATA INTEGRITY FLAGS -->
+<figure class="frame">
+  <figcaption><b>R5. Data Integrity — fix queue</b><code>/reporting/integrity</code></figcaption>
+  <div class="screen">
+    <div class="nav"><div class="logo"></div><div class="grow"><div class="bar xs"></div></div><span class="pill on">Reporting</span><span class="badge">Branch admin · Ikeja</span></div>
+    <div class="row" style="gap:8px">
+      <div class="stat"><div class="n">3</div><div class="k">Errors</div></div>
+      <div class="stat"><div class="n">8</div><div class="k">Warnings</div></div>
+      <div class="stat"><div class="n">3</div><div class="k">Info</div></div>
+      <div class="stat link"><div class="n">14</div><div class="k">Open ▸</div></div>
+    </div>
+    <div class="list">
+      <div class="item"><span class="badge r">Error</span><div class="grow"><b class="tiny">Possible duplicate — T. A. + same phone (2 records)</b><div class="tiny muted">Suggested fix: merge · no PII in flag log</div></div><span class="btn sm">Review merge</span></div>
+      <div class="item"><span class="badge w">Warn</span><div class="grow"><b class="tiny">Minor without guardian consent (1 record)</b><div class="tiny muted">Suggested fix: capture consent · send blocked until fixed</div></div><span class="btn sm">Capture</span></div>
+      <div class="item"><span class="badge w">Warn</span><div class="grow"><b class="tiny">Stale follow-up &gt; 7 days (5 records)</b><div class="tiny muted">Suggested fix: assign owner</div></div><span class="btn sm ghost">Assign</span></div>
+      <div class="item"><span class="badge">Info</span><div class="grow"><b class="tiny">Missing household link (3 records)</b><div class="tiny muted">Suggested fix: link household</div></div><span class="btn sm ghost">Suppress + reason</span></div>
+    </div>
+    <div class="note">Forgiveness: every flag has one fix action; suppress needs a reason and is audited. Area sees aggregates only — no cross-branch PII.</div>
+  </div>
+</figure>
+
+<!-- R6. METRIC DETAIL (Rock RMS borrowing) -->
+<figure class="frame">
+  <figcaption><b>R6. Metric detail — catalogue + partitioned chart + values</b><code>/reporting/metrics/:key</code></figcaption>
+  <div class="screen">
+    <div class="nav"><div class="logo"></div><div class="grow"><div class="bar xs"></div></div><span class="pill on">Reporting</span><span class="badge">Area admin</span></div>
+    <div class="row between"><div><b>Weekly attendance — total</b><div class="tiny muted">Catalogue: Attendance · unit: persons · source: derived + prior-year import seed</div></div><span class="row"><span class="btn sm ghost">Edit catalogue (stewards)</span></span></div>
+    <div class="row">
+      <div class="card" style="flex:1;min-width:170px"><h4>Catalogue tree</h4>
+        <div class="list">
+          <div class="item"><div class="grow tiny"><b>Attendance</b></div><span class="badge g">3</span></div>
+          <div class="item"><div class="grow tiny">Blessings</div><span class="badge">2</span></div>
+          <div class="item"><div class="grow tiny">Giving &amp; returns</div><span class="badge">2</span></div>
+          <div class="item"><div class="grow tiny">Newcomer care</div><span class="badge">2</span></div>
+          <div class="item"><div class="grow tiny">Welfare</div><span class="badge">1</span></div>
+        </div>
+      </div>
+      <div class="card grow"><h4>Trend — partitioned by branch (last 8 weeks) · prior-year seed shaded</h4>
+        <div class="chart"><div class="b" style="height:44%"></div><div class="b m" style="height:56%"></div><div class="b" style="height:52%"></div><div class="b m" style="height:66%"></div><div class="b" style="height:60%"></div><div class="b m" style="height:74%"></div><div class="b" style="height:70%"></div><div class="b m" style="height:82%"></div></div>
+        <div class="legend-inline"><span><i class="dot" style="background:var(--accent)"></i>Ikeja</span><span><i class="dot" style="background:var(--box);border:1px solid var(--accent)"></i>Surulere</span><span>Partition ▾ branch / zone / service type · every point drills to source rows.</span></div>
+      </div>
+    </div>
+    <div class="card"><h4>Values table — one row per week × branch</h4>
+      <table><tr><th>Week</th><th>Branch</th><th>Value</th><th>Origin</th><th></th></tr>
+        <tr><td>Sep 22–28</td><td>Ikeja</td><td>812</td><td><span class="badge g">Derived</span></td><td></td></tr>
+        <tr><td>Sep 22–28</td><td>Surulere</td><td>—</td><td><span class="badge w">Missing</span></td><td><span class="btn sm">Enter value (steward)</span></td></tr>
+        <tr><td>Sep 15–21</td><td>Ikeja</td><td>798*</td><td><span class="badge">Manual · by steward · reason logged</span></td><td><span class="btn sm ghost">History</span></td></tr>
+      </table>
+    </div>
+    <div class="note">Rock RMS borrowing: catalogue tree + partitioned chart + values table. Manual entries are permission-gated (stewards only), need a reason, and append immutable audit history — corrections never overwrite. First seeds come from the prior-year import pipeline (US-U2).</div>
+  </div>
+</figure>
+
+</div>
+<footer>Planning only — low-fidelity layout intent. Interactions / Insights detail screens follow the R2 list-detail and R3 run-history patterns; Website detail follows the R2/R4 card pattern (defined, not drawn to keep review tight). All names synthetic.</footer>
+</body>
+</html>

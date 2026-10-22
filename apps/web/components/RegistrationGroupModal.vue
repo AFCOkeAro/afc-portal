@@ -1,17 +1,29 @@
 <script setup lang="ts">
 /**
- * Staff group registration modal (AFC-470 §4): one `group_code` plus N
- * members in a single submission.
+ * Branch-scoped group mass registration (AFC-470 §4, AFC-649 §G): one
+ * `group_code` plus N members in a single submission.
  *
  * Client validation is deliberately thin (names present, code present) —
  * the route validates every member against `registrationFormSchema` and
- * answers per-member errors, which are shown against the row index.
- * Retries are safe: the route's idempotency split skips already-written
- * members instead of duplicating them.
+ * answers per-member errors, which are shown against the row index AND in
+ * the row-level error report below the form. Retries are safe: the route's
+ * idempotency split skips already-written members instead of duplicating
+ * them. Branch is picked with the searchable EntitySelect (AFC-631, no
+ * manual IDs); empty means the event's own branch.
+ *
+ * Stated limit: Directus REST has no multi-row transaction, so a
+ * mid-batch failure returns the ids already written and the same payload
+ * retried skips them instead of duplicating (group_partial_failure 502).
+ * A single-transaction batch needs a DB function outside this route —
+ * not claimed here.
  */
+import type { BranchSummary } from '~/types/portal'
+
 const props = defineProps<{
   open: boolean
   eventId: string
+  branches: BranchSummary[]
+  eventBranch: string | null
 }>()
 
 const emit = defineEmits<{
@@ -24,6 +36,14 @@ const saving = ref(false)
 const formError = ref('')
 const fieldErrors = ref<Record<string, string>>({})
 const groupCode = ref('')
+const branch = ref('')
+
+/** Row-level report of the last submit (AFC-649 §G). */
+const lastReport = ref<{
+  created: Array<{ index: number; ticket: string | null }>
+  skipped: number[]
+  errors: Array<{ index: number; message: string }>
+} | null>(null)
 
 interface GroupMember {
   registrant_first_name: string
@@ -46,6 +66,11 @@ function removeMember(index: number): void {
   if (members.length > 1) members.splice(index, 1)
 }
 
+const branchOptions = computed(() => [
+  { label: 'Event branch', value: '' },
+  ...props.branches.map((row) => ({ label: row.name, value: row.id })),
+])
+
 watch(
   () => props.open,
   (open: boolean) => {
@@ -53,10 +78,21 @@ watch(
     formError.value = ''
     fieldErrors.value = {}
     groupCode.value = ''
+    branch.value = ''
+    lastReport.value = null
     members.splice(0, members.length, blankMember(), blankMember())
   },
   { immediate: true },
 )
+
+/** Row-level report rows with a real error (script-side so the template stays typeless). */
+const reportErrorRows = computed<Array<{ index: number; message: string }>>(() =>
+  (lastReport.value?.errors ?? []).filter(
+    (entry: { index: number; message: string }) =>
+      entry.message !== 'No error reported for this row.',
+  ),
+)
+const hasReportErrors = computed(() => reportErrorRows.value.length > 0)
 
 function close(): void {
   emit('update:open', false)
@@ -83,7 +119,7 @@ async function submit(): Promise<void> {
   saving.value = true
   try {
     const result = await api.post<{
-      data: unknown[]
+      data: Array<{ id: string; ticket_code?: string | null }>
       meta: { created: number; skipped: number; total: number }
     }>(`/api/events/${props.eventId}/group-registrations`, {
       group_code: groupCode.value.trim(),
@@ -92,10 +128,21 @@ async function submit(): Promise<void> {
         registrant_last_name: member.registrant_last_name.trim(),
         phone: member.phone.trim() || undefined,
         email: member.email.trim() || undefined,
+        // Branch-scoped mass registration: one branch for the whole batch
+        // (server resolves + scope-checks per member; empty → event branch).
+        branch: branch.value || undefined,
       })),
     })
     formError.value = ''
     fieldErrors.value = {}
+    lastReport.value = {
+      created: result.data.map((row, index) => ({
+        index,
+        ticket: row.ticket_code ?? null,
+      })),
+      skipped: [],
+      errors: [],
+    }
     if (result.meta.skipped > 0 && result.meta.created === 0) {
       formError.value =
         'All members were already registered under this code — nothing new was added.'
@@ -107,6 +154,22 @@ async function submit(): Promise<void> {
     const error = cause as { message?: string; fields?: Record<string, string> }
     formError.value = error.message ?? 'Could not register that group'
     fieldErrors.value = error.fields ?? {}
+    lastReport.value = {
+      created: [],
+      skipped: [],
+      errors: members.map((member: GroupMember, index: number) => {
+        const messages = Object.entries(error.fields ?? {})
+          .filter(
+            ([key]) => key === `members.${index}` || key.startsWith(`members.${index}.`),
+          )
+          .map(([, message]) => message)
+        return {
+          index,
+          message:
+            messages.length > 0 ? messages.join('; ') : 'No error reported for this row.',
+        }
+      }),
+    }
   } finally {
     saving.value = false
   }
@@ -134,6 +197,18 @@ async function submit(): Promise<void> {
             v-model="groupCode"
             class="w-full"
             placeholder="e.g. YOUTH-CAMP-BUS-3"
+          />
+        </UFormField>
+
+        <UFormField
+          label="Branch for this batch"
+          help="Every member registers under this branch. Empty means the event's own branch."
+        >
+          <EntitySelect
+            v-model="branch"
+            :items="branchOptions"
+            placeholder="Event branch"
+            class="w-full"
           />
         </UFormField>
 
@@ -187,6 +262,21 @@ async function submit(): Promise<void> {
           :disabled="members.length >= 50"
           @click="addMember()"
         />
+
+        <div v-if="hasReportErrors" aria-live="polite">
+          <h3 class="text-sm font-semibold">
+            Row-level error report — nothing was registered
+          </h3>
+          <ul class="mt-1 space-y-1 text-sm">
+            <li
+              v-for="entry in reportErrorRows"
+              :key="entry.index"
+              class="rounded border border-red-200 bg-red-50 px-2 py-1 dark:border-red-900 dark:bg-red-950"
+            >
+              Row {{ entry.index + 1 }}: {{ entry.message }}
+            </li>
+          </ul>
+        </div>
       </form>
     </template>
 

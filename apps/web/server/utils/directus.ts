@@ -268,8 +268,20 @@ function mapDirectusError(cause: unknown, path: string): Error {
   }
 
   const detail = first?.message ?? error?.statusMessage
+  // AFC-654: a 5xx from Directus can embed raw SQL (e.g. `invalid input
+  // syntax for type uuid` with the failed statement). Never copy upstream
+  // detail into a 5xx statusMessage; the named store error downstream names
+  // the migration instead. Client-error (4xx) detail passes through so
+  // scope 404s keep their explanation.
+  if (status >= 500 || status < 400) {
+    return createError({
+      statusCode: status >= 500 && status < 600 ? status : 502,
+      statusMessage: `Directus request to ${path} failed`,
+      data: { code: first?.extensions?.code ?? 'directus_error' },
+    })
+  }
   return createError({
-    statusCode: status >= 400 && status < 600 ? status : 502,
+    statusCode: status,
     statusMessage: detail
       ? `Directus request to ${path} failed: ${detail}`
       : `Directus request to ${path} failed`,

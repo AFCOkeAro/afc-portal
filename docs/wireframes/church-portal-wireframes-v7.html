@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Church Portal — Wireframes v7 (shell UX: mobile nav, icon rail, record third column) · AFC-628</title>
+<style>
+  :root{
+    --ink:#1b1b1b; --mut:#6b6b6b; --line:#c9c9c9; --bg:#f4f4f2;
+    --box:#e4e4e1; --box2:#efefec; --accent:#2f6f6f; --accent-soft:#d8e8e8;
+    --white:#fff; --warn:#f0e0c0; --stop:#f0d0d0;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:14px/1.45 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
+  header.top{position:sticky;top:0;z-index:5;background:var(--ink);color:#fff;padding:14px 22px;}
+  header.top h1{margin:0;font-size:16px;letter-spacing:.3px}
+  header.top p{margin:4px 0 0;color:#cfcfcf;font-size:12px}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;padding:12px 22px;border-bottom:1px solid var(--line);
+    background:#fafafa;font-size:12px;color:var(--mut)}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .sw{width:14px;height:14px;border:1px solid var(--line);display:inline-block;border-radius:2px}
+  .wrap{padding:22px;display:grid;gap:26px;grid-template-columns:repeat(auto-fill,minmax(430px,1fr))}
+  .frame{background:var(--white);border:1px solid var(--line);border-radius:10px;overflow:hidden;
+    box-shadow:0 1px 2px rgba(0,0,0,.05);display:flex;flex-direction:column}
+  .frame>figcaption{background:var(--box2);border-bottom:1px solid var(--line);padding:9px 12px;
+    display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+  .frame>figcaption b{font-size:13px}
+  .frame>figcaption code{font-size:11px;color:var(--mut);white-space:nowrap}
+  .screen{padding:14px;display:flex;flex-direction:column;gap:12px;min-height:300px}
+  .screen.wide{grid-column:1/-1}
+  .muted{color:var(--mut)} .tiny{font-size:11px} .small{font-size:12px}
+  .bar{height:12px;background:var(--box);border-radius:3px}
+  .bar.s{width:38%} .bar.m{width:62%} .bar.l{width:88%} .bar.xs{width:24%}
+  .card{border:1px solid var(--line);border-radius:6px;padding:10px;background:#fff}
+  .card h4{margin:0 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--mut)}
+  .row{display:flex;gap:10px;align-items:center}
+  .row.between{justify-content:space-between}
+  .grow{flex:1}
+  .btn{display:inline-flex;align-items:center;justify-content:center;height:30px;padding:0 14px;
+    border-radius:4px;font-size:12px;border:1px solid var(--ink);background:var(--ink);color:#fff;white-space:nowrap}
+  .btn.ghost{background:#fff;color:var(--ink)}
+  .btn.accent{background:var(--accent);border-color:var(--accent)}
+  .btn.sm{height:24px;padding:0 9px;font-size:11px}
+  .nav{display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line);padding-bottom:9px}
+  .logo{width:26px;height:26px;border-radius:5px;background:var(--ink);flex:none}
+  .pill{font-size:10px;padding:2px 8px;border-radius:999px;background:var(--box);color:var(--ink)}
+  .pill.on{background:var(--accent-soft);color:var(--accent);border:1px solid var(--accent)}
+  .stat{flex:1;border:1px solid var(--line);border-radius:6px;padding:9px;background:#fff}
+  .stat .n{font-size:20px;font-weight:700}
+  .stat .k{font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.4px}
+  .list{display:flex;flex-direction:column;gap:7px}
+  .item{display:flex;gap:9px;align-items:center;border:1px solid var(--line);border-radius:5px;padding:7px 9px;background:#fff}
+  .avatar{width:30px;height:30px;border-radius:50%;background:var(--box);flex:none}
+  .badge{font-size:10px;padding:2px 7px;border-radius:999px;border:1px solid var(--line);color:var(--mut);background:#fafafa}
+  .badge.g{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
+  .badge.w{background:var(--warn);color:#7a5a10;border-color:#d9c08a}
+  .note{font-size:11px;color:var(--mut);border-left:3px solid var(--accent);padding:4px 9px;background:var(--accent-soft);border-radius:0 4px 4px 0}
+  .note.warn{border-left-color:#b58b2a;background:var(--warn);color:#6d5110}
+  .phone{width:270px;border:2px solid var(--ink);border-radius:20px;padding:9px;background:#fff;flex:none;margin:0 auto}
+  .phone .notch{width:54px;height:5px;background:var(--line);border-radius:3px;margin:2px auto 8px}
+  /* shell-specific demo pieces */
+  .shell{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;min-height:340px;background:#fff}
+  .rail{width:64px;background:var(--ink);color:#fff;display:flex;flex-direction:column;align-items:center;gap:8px;padding:10px 6px;flex:none}
+  .rail .ic{width:40px;height:40px;border-radius:8px;background:#333;display:flex;align-items:center;justify-content:center;font-size:15px}
+  .rail .ic.on{background:var(--accent)}
+  .sidewide{width:200px;background:#fafafa;border-right:1px solid var(--line);padding:10px;display:flex;flex-direction:column;gap:8px;flex:none}
+  .seclab{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--mut);margin-top:6px}
+  .navlink{border:1px solid var(--line);border-radius:5px;padding:6px 8px;font-size:12px;background:#fff;display:flex;gap:7px;align-items:center}
+  .navlink.on{border-color:var(--accent);background:var(--accent-soft)}
+  .maincol{flex:1;padding:12px;display:flex;flex-direction:column;gap:10px;min-width:0}
+  .third{width:230px;border-left:1px solid var(--line);background:#fafafa;padding:12px;display:flex;flex-direction:column;gap:8px;flex:none}
+  .drawer{border:1px solid var(--ink);border-radius:10px;background:#fff;overflow:hidden}
+  .drawer .dhead{background:var(--ink);color:#fff;padding:8px 12px;font-size:12px;display:flex;justify-content:space-between;align-items:center}
+  .scrim{font-size:10px;color:var(--mut);text-align:center}
+  footer{padding:16px 22px;color:var(--mut);font-size:12px;border-top:1px solid var(--line);background:#fafafa}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>Church Portal (Lagos North Area) — Wireframes v7 · shell UX (mobile nav + icon rail + record third column)</h1>
+  <p>AFC-628 · parent AFC-460 · planning artifact · low-fidelity · not production UI · grey blocks = layout placeholders · synthetic names/numbers only · extends v6; replaces nothing</p>
+</header>
+<div class="legend">
+  <span><i class="sw" style="background:var(--box)"></i> content block</span>
+  <span><i class="sw" style="background:var(--accent-soft);border-color:var(--accent)"></i> active / primary / recommended path</span>
+  <span><i class="sw" style="background:#fff"></i> card surface</span>
+  <span><i class="sw" style="background:var(--warn);border-color:#d9c08a"></i> attention / capability-gated (hidden when no grant)</span>
+  <span>Viewports in this set: mobile 390×844 · desktop 1440×900. Dark-mode + motion tokens deferred to build (AFC kit).</span>
+</div>
+
+<div class="wrap">
+
+<!-- ============ 1. MOBILE: RECOMMENDED DRAWER ============ -->
+<figure class="frame">
+  <figcaption><b>1. Mobile — recommended: left drawer (390px)</b><code>all pages · replaces top-block stack</code></figcaption>
+  <div class="screen">
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="nav"><div class="logo"></div><div class="grow"><div class="bar m"></div></div><span class="btn sm ghost">☰ Menu</span></div>
+      <div class="card">
+        <h4>Page — e.g. People list</h4>
+        <div class="bar l"></div><div class="bar m"></div>
+        <div class="list">
+          <div class="item"><div class="avatar"></div><div class="grow"><div class="bar m"></div></div><span class="btn sm ghost">Open</span></div>
+          <div class="item"><div class="avatar"></div><div class="grow"><div class="bar s"></div></div><span class="btn sm ghost">Open</span></div>
+        </div>
+      </div>
+      <p class="tiny muted">Header: hamburger (44px) left · search icon · avatar. Content never shifts behind nav; drawer is an overlay with scrim. Safe-area padding bottom; landscape keeps drawer, adds two-pane list where width allows.</p>
+    </div>
+    <div class="note">RECOMMENDED over bottom-bar (25 items do not fit 5 tabs) and over always-expanded sections (pushes content below fold). One pattern for all 25 grouped items; capability filter identical to desktop — sections with zero grants render nothing, not a disabled row. Lenses: Hick's Law (5 group heads, not 25 rows); Fitts's Law (44px rows, thumb zone); Progressive Disclosure; Recognition over Recall (search + recent).</div>
+  </div>
+</figure>
+
+<!-- ============ 2. MOBILE DRAWER OPEN ============ -->
+<figure class="frame">
+  <figcaption><b>2. Mobile — drawer open (overlay + scrim)</b><code>focus trap · Esc closes · recent + search</code></figcaption>
+  <div class="screen">
+    <div class="drawer">
+      <div class="dhead"><span>☰ &nbsp;AFC Portal — search + sections</span><span class="badge g">Esc ✕</span></div>
+      <div style="padding:10px;display:flex;flex-direction:column;gap:8px">
+        <div class="item"><span>🔍</span><div class="grow small muted">Search people, events, tasks… (same index as header search)</div></div>
+        <div class="card"><h4>Recent (max 3, per device)</h4><div class="small">T. Alade — Person · Youth Night — Event · Fix tap — Task</div></div>
+        <div class="seclab">Overview (2)</div>
+        <div class="navlink on">▦ Dashboard</div><div class="navlink">📅 Calendar</div>
+        <div class="seclab">People and Care (4 of 7 — volunteer view)</div>
+        <div class="navlink">👥 People</div><div class="navlink">🏠 Households</div>
+        <div class="note warn">Welfare · Youth · Celebrations · Campus hidden — no grant on this account (fail-closed, same rule as desktop §13-7). Never a greyed row.</div>
+        <div class="seclab">Gatherings ▸ (collapsed, chevron)</div>
+        <div class="seclab">Communications ▸</div>
+        <div class="seclab">Office ▸</div>
+        <p class="scrim">Scrim tap · swipe-from-edge · Esc all close · focus returns to hamburger · body scroll locked</p>
+      </div>
+    </div>
+    <div class="note">Bottom-bar rejected: 25 items ÷ 5 tabs = endless "More" bucket, breaking Information Scent. Expandable-inline-sections rejected: pushes the page's first content 3+ viewports down on a 390px phone (Cognitive Load, F-pattern). Drawer keeps page stable (Pragnanz, Doherty &lt;400ms open).</div>
+  </div>
+</figure>
+
+<!-- ============ 3. DESKTOP EXPANDED ============ -->
+<figure class="frame">
+  <figcaption><b>3. Desktop — expanded sidebar (256px, default)</b><code>lg:pl-64 · grouped + collapsible sections (AFC-565 kept)</code></figcaption>
+  <div class="screen">
+    <div class="shell">
+      <div class="sidewide">
+        <div class="row"><div class="logo"></div><b class="small">AFC Portal</b><span class="grow"></span><span class="btn sm ghost" title="Collapse to icons [ ]">❮❮</span></div>
+        <div class="seclab">Overview ▾</div>
+        <div class="navlink on">▦ Dashboard</div><div class="navlink">📅 Calendar</div><div class="navlink">🔍 Search</div>
+        <div class="seclab">People and Care ▾</div>
+        <div class="navlink">👥 People</div><div class="navlink">🏠 Households</div>
+        <div class="seclab">Gatherings ▸ (3 collapsed)</div>
+        <div class="tiny muted">Collapse control: pinned above sections, 44px, `aria-expanded`, shortcut `[`</div>
+      </div>
+      <div class="maincol"><div class="bar l"></div><div class="bar m"></div><div class="card"><h4>Page content (reflows lg:pl-64 → lg:pl-[76px])</h4><div class="bar s"></div></div></div>
+    </div>
+    <div class="note">Existing AFC-565 section collapse (per-group chevrons + localStorage) is kept inside both widths. The new control collapses the whole rail, not the groups — two independent axes.</div>
+  </div>
+</figure>
+
+<!-- ============ 4. DESKTOP COLLAPSED RAIL ============ -->
+<figure class="frame">
+  <figcaption><b>4. Desktop — collapsed icon rail (68px)</b><code>tooltips · badge dots · persisted + keyboard</code></figcaption>
+  <div class="screen">
+    <div class="shell">
+      <div class="rail" aria-label="Collapsed portal nav demo">
+        <div class="ic" title="Expand sidebar [">❯❯</div>
+        <div class="ic on" title="Dashboard — Overview">▦<span class="pill on" style="position:absolute;margin:22px 0 0 22px"> </span></div>
+        <div class="ic" title="People — People and Care">👥</div>
+        <div class="ic" title="Events — Gatherings (3 more)">📅</div>
+        <div class="ic" title="Comms — Communications (2 unread)">✉</div>
+        <div class="ic" title="Office — Office (5)">🗄</div>
+        <div style="flex:1"></div>
+        <div class="ic" title="Search (/)">🔍</div>
+        <div class="ic" title="Account">●</div>
+      </div>
+      <div class="maincol">
+        <div class="bar l"></div>
+        <div class="card"><h4>Content reflow rule</h4><div class="small muted">Container keeps max-width; grid columns gain ~188px. Tables keep sticky first column; charts stretch, never re-query. Section jump-nav (person/event pages) stays visible — it lives in content, not the rail.</div></div>
+        <div class="card"><h4>Behaviour (build contract)</h4><div class="tiny">Persist <code>afc:shell-rail-v1 = expanded|collapsed</code> (localStorage, SSR default expanded). Toggle is a real <code>&lt;button aria-expanded&gt;</code>, focus-visible ring, shortcut <code>[</code>, tooltip = label + group on hover AND focus. Active item: accent left bar + label in tooltip + `aria-current`. Groups collapse to their first-letter stack? No — rail shows one icon per top-level destination (Dashboard + most-used per group, max 8), overflow behind "···" opening the full drawer. Badges are dots + counts in tooltip, never colour-only.</div></div>
+      </div>
+    </div>
+    <div class="note">A11y: icon-only never ships without accessible names (Von Restorff risk — icons alone overload Working Memory). Reduced-motion: width transition 240ms AFC ease, collapsed to none via token. Lenses: Miller's 7±2 (≤8 rail icons); Recognition over Recall (tooltip + recent); Uniform Connectedness (accent bar binds icon to page).</div>
+  </div>
+</figure>
+
+<!-- ============ 5. RECORD: PEOPLE ============ -->
+<figure class="frame">
+  <figcaption><b>5. Record — Person (exemplar 1)</b><code>/people/[id] · 3-col ≥1280px · rail below</code></figcaption>
+  <div class="screen">
+    <div class="shell">
+      <div class="maincol">
+        <div class="row"><span class="btn sm ghost">← People</span><div class="grow"></div><span class="pill on">active · Ikeja Branch</span></div>
+        <div class="bar l"></div><div class="tiny muted">PageHeader (name + status) · SectionNav: Overview / Attendance / Registrations / Welfare* / Leadership* (*capability-gated)</div>
+        <div class="card"><h4>Profile + timeline (existing, unchanged)</h4><div class="bar m"></div><div class="bar s"></div></div>
+      </div>
+      <div class="third">
+        <h4 class="tiny muted" style="margin:0">AT-A-GLANCE (sticky)</h4>
+        <div class="card"><h4>Next actions</h4><div class="small">• Follow-up due Thu (visitor V-118)<br>• Welfare W-042 awaiting visit</div><span class="btn sm accent">Open full record ⤢</span></div>
+        <div class="card"><h4>Key facts</h4><div class="tiny">Household H-07 · Group 2 · Dept: Choir<br>Sun-School 11/12 · Consent: SMS ✓ WA ✓</div></div>
+        <div class="card"><h4>Restricted on this account</h4><div class="tiny muted">DOB hidden — same `hiddenFields` rule, shown as a row, never blank space.</div></div>
+        <p class="tiny muted">"Fuller" = expanded layout: same page, rail content merges into a full-width dossier (profile + all gated sections + audit). Deep-link `?view=full`. No modal — dossier is shareable/printable.</p>
+      </div>
+    </div>
+    <div class="note">Why right rail here: the person page is long (6 anchor sections). Rail answers "what needs me?" in &lt;2s (Hierarchy visible, Peak-End). Edit/archive stay in header — rail never duplicates destructive actions (Forgiveness).</div>
+  </div>
+</figure>
+
+<!-- ============ 6. RECORD: EVENT ============ -->
+<figure class="frame">
+  <figcaption><b>6. Record — Event (exemplar 2)</b><code>/events/[id] · rollups live in rail</code></figcaption>
+  <div class="screen">
+    <div class="shell">
+      <div class="maincol">
+        <div class="row"><span class="btn sm ghost">← Events</span><div class="grow"></div><span class="pill on">published · 14 Dec</span></div>
+        <div class="card"><h4>Registrations table + check-in (existing, unchanged)</h4><div class="bar l"></div><div class="bar m"></div></div>
+      </div>
+      <div class="third">
+        <h4 class="tiny muted" style="margin:0">AT-A-GLANCE (sticky)</h4>
+        <div class="card"><h4>Counts (deep links)</h4><div class="small">Registered <b>184</b> · Confirmed <b>151</b> · Attended <b>0</b><br>Collected ₦— · Outstanding ₦—</div><div class="tiny muted">Each count drills to its filtered list (dashboard-strip pattern).</div></div>
+        <div class="card"><h4>Needs attention</h4><div class="small">• 12 pending approvals · 4 waitlisted<br>• Check-in opens in 2d</div><span class="btn sm accent">Open full record ⤢</span></div>
+        <p class="tiny muted">"Fuller" = expanded layout + linked sections: rollups + registration log + blessing queue on one scroll (`?view=full`), each card linking its source list. Modal rejected — ops staff compare counts side-by-side with the table.</p>
+      </div>
+    </div>
+    <div class="note">Lenses: Goal-Gradient (counts toward capacity); Chunking (4 numbers, not the 8-field rollup object); Information Scent (clickable counts smell like their lists). Medical-notes masking follows `isFieldVisible` — masked cells show "Restricted", never empty.</div>
+  </div>
+</figure>
+
+<!-- ============ 7. RECORD: OFFICE TASK + GENERAL RULE ============ -->
+<figure class="frame">
+  <figcaption><b>7. Record — Office task (exemplar 3) + the general rule</b><code>/tasks/[id] · modal variant · rule below</code></figcaption>
+  <div class="screen">
+    <div class="shell">
+      <div class="maincol">
+        <div class="row"><span class="btn sm ghost">← Tasks</span><div class="grow"></div><span class="pill">open · due Fri</span></div>
+        <div class="card"><h4>Task + Move-status + audit (existing)</h4><div class="bar m"></div></div>
+      </div>
+      <div class="third">
+        <h4 class="tiny muted" style="margin:0">AT-A-GLANCE</h4>
+        <div class="card"><h4>Context</h4><div class="tiny">Owner: B. Ojo · Minutes M-09 §3<br>Blocks: Youth Night setup</div></div>
+        <span class="btn sm accent">Open full record ⤢ (modal)</span>
+        <p class="tiny muted">"Fuller" here = modal dossier: task + parent minutes excerpt + linked audit + status actions, closable (Esc, focus return). Chosen because tasks are triaged from lists — a page navigation would lose list context (Paradox of the Active User).</p>
+      </div>
+    </div>
+    <div class="card"><h4>General third-column rule (all [id] pages — coder contract)</h4>
+      <div class="tiny">
+      1) Breakpoint: 3 columns ≥1280px (main + 280px rail); 1024–1279 rail collapses to a disclosure under the header; &lt;1024 rail stacks after content.<br>
+      2) Rail content = summary + next actions + restricted-notice only. Never the editor, never destructive actions, never a second copy of the main table.<br>
+      3) Fuller-record affordance is always an explicit <b>“Open full record ⤢”</b> button (44px, keyboard reachable, `aria-haspopup` = dialog only for the modal variant). Two variants only: <b>(a) expanded layout</b> (`?view=full`, people/events/minutes/welfare) for reference dossiers; <b>(b) modal dossier</b> (tasks/transfers/announcements) for triage-from-list. No third variant without a UX proposal.<br>
+      4) Capability filtering identical in rail + fuller views: a section the session cannot read is absent (not masked, not disabled) — same `permissions.can` gates as the page.<br>
+      5) Persistence: rail open/collapsed per record-type in localStorage (`afc:record-rail-v1`); `view=full` is URL state (shareable), never stored.<br>
+      6) Tokens/components at build: AFC kit (`afc-tokens.css` + `afc-components.css`), Nuxt UI `UCard`/`UDrawer`/`UModal`/`UTooltip`; no one-off colours, spacing from the 4px scale, 44px targets, reduced-motion via tokens.
+      </div>
+    </div>
+  </div>
+</figure>
+
+</div>
+
+<footer>Wireframes v7 · AFC-628 · low-fidelity shell spec · synthetic data only · extends v6, replaces nothing · lenses cited in wireframes-v7.md · build follows this set (coder owns implementation PRs).</footer>
+</body>
+</html>

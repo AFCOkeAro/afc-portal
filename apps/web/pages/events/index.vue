@@ -2,6 +2,16 @@
 import { COLLECTIONS } from '@afc/shared'
 import type { BranchSummary, EventRow, Paginated } from '~/types/portal'
 
+/**
+ * Programmes list (AFC-649 §A): card grid matching the reference —
+ * Upcoming / Past sections, search + series/year filters, scope pill,
+ * registration state + counts per card.
+ *
+ * Data path unchanged: GET /api/events (when/search/event_type/branch/
+ * status, scope-filtered server-side). "Series" reuses the existing
+ * `event_type` field and "year" is derived client-side from `start_at` —
+ * no schema change (staging DDL is frozen, do not re-migrate).
+ */
 definePageMeta({ middleware: 'staff' })
 
 const api = useApi()
@@ -9,17 +19,15 @@ const route = useRoute()
 const showForm = ref(false)
 const searchInput = ref('')
 const search = ref('')
-const when = ref('upcoming')
-const type = ref('all')
-/** Drill-down contract: dashboard/branch pages link here with ?branch=. */
-function queryParam(name: string): string | null {
-  const value = route.query[name]
-  return typeof value === 'string' && value.length > 0 ? value : null
-}
-const branch = ref(queryParam('branch') ?? 'all')
-const status = ref(queryParam('status') ?? 'all')
-const page = ref(1)
-const limit = 25
+const series = ref('all')
+const year = ref('all')
+/* US-3 AC5: type (series), branch, status and date (Upcoming/Past) filters. */
+const status = ref('all')
+const branch = ref(
+  typeof route.query.branch === 'string' && route.query.branch.length > 0
+    ? route.query.branch
+    : 'all',
+)
 
 let searchTimer: ReturnType<typeof setTimeout> | undefined
 watch(searchInput, (value: string) => {
@@ -29,97 +37,43 @@ watch(searchInput, (value: string) => {
   }, 300)
 })
 
-watch([when, type, branch, status, search], () => {
-  page.value = 1
-})
-
-/** Same-page strip navigation (AFC-588): query-only link, sync the filters. */
-watch(
-  () => route.query,
-  (next: typeof route.query) => {
-    const whenNext = typeof next.when === 'string' ? next.when : null
-    if (whenNext && whenNext !== when.value) when.value = whenNext
-    const statusNext = typeof next.status === 'string' ? next.status : null
-    if (statusNext && statusNext !== status.value) status.value = statusNext
-  },
-)
-
-const query = computed(() => ({
-  page: page.value,
-  limit,
-  when: when.value,
+const baseQuery = computed(() => ({
+  limit: 50,
   ...(search.value ? { search: search.value } : {}),
-  ...(type.value !== 'all' ? { event_type: type.value } : {}),
+  ...(series.value !== 'all' ? { event_type: series.value } : {}),
   ...(branch.value !== 'all' ? { branch: branch.value } : {}),
   ...(status.value !== 'all' ? { status: status.value } : {}),
 }))
 
-const { data, pending, error, refresh } = await useAsyncData(
-  'events-list',
-  () => api.get<Paginated<EventRow>>('/api/events', { query: query.value }),
-  { watch: [query] },
+const { data: upcoming, pending: upcomingPending } = await useAsyncData(
+  'programmes-upcoming',
+  () =>
+    api.get<Paginated<EventRow>>('/api/events', {
+      query: { ...baseQuery.value, page: 1, when: 'upcoming' },
+    }),
+  { watch: [baseQuery] },
+)
+
+const { data: past, pending: pastPending } = await useAsyncData(
+  'programmes-past',
+  () =>
+    api.get<Paginated<EventRow>>('/api/events', {
+      query: { ...baseQuery.value, page: 1, when: 'past' },
+    }),
+  { watch: [baseQuery] },
 )
 
 const branches = await useAsyncData('events-branches', () =>
   api.get<BranchSummary[]>('/api/branches'),
 )
 
-/** Dashboard strip (AFC-588): figures from list-meta counts, no new backend. */
-async function countEvents(params: Record<string, string>): Promise<number> {
-  const res = await api.get<Paginated<EventRow>>('/api/events', {
-    query: { page: 1, limit: 1, ...params },
-  })
-  return res.meta.total
-}
-
-const { data: stripCounts } = await useAsyncData('events-strip', () =>
-  Promise.all([
-    countEvents({ when: 'upcoming' }),
-    countEvents({ when: 'past' }),
-    countEvents({ when: 'all', status: 'published' }),
-    countEvents({ when: 'all', status: 'draft' }),
-  ]),
-)
-
-const stripItems = computed(() => [
-  {
-    label: 'Upcoming',
-    value: stripCounts.value?.[0] ?? null,
-    to: '/events?when=upcoming',
-    hint: 'Open filtered list',
-  },
-  {
-    label: 'Past',
-    value: stripCounts.value?.[1] ?? null,
-    to: '/events?when=past',
-    hint: 'Open filtered list',
-  },
-  {
-    label: 'Published',
-    value: stripCounts.value?.[2] ?? null,
-    to: '/events?when=all&status=published',
-    hint: 'Open filtered list',
-  },
-  {
-    label: 'Draft',
-    value: stripCounts.value?.[3] ?? null,
-    to: '/events?when=all&status=draft',
-    hint: 'Open filtered list',
-  },
+const branchOptions = computed(() => [
+  { label: 'All in scope', value: 'all' },
+  ...(branches.data.value ?? []).map((row) => ({ label: row.name, value: row.id })),
 ])
 
-const rows = computed(() => data.value?.data ?? [])
-const total = computed(() => data.value?.meta.total ?? 0)
-const pageCount = computed(() => Math.max(1, Math.ceil(total.value / limit)))
-
-const whenOptions = [
-  { label: 'Upcoming', value: 'upcoming' },
-  { label: 'Past', value: 'past' },
-  { label: 'All dates', value: 'all' },
-]
-
-const typeOptions = [
-  { label: 'Any type', value: 'all' },
+const seriesOptions = [
+  { label: 'All series', value: 'all' },
   { label: 'Service', value: 'service' },
   { label: 'Summit', value: 'summit' },
   { label: 'Camp', value: 'camp' },
@@ -137,185 +91,256 @@ const statusOptions = [
   { label: 'Cancelled', value: 'cancelled' },
 ]
 
-const branchOptions = computed(() => [
-  { label: 'All branches', value: 'all' },
-  ...(branches.data.value ?? []).map((row) => ({ label: row.name, value: row.id })),
-])
-
-function formatDateTime(value: string): string {
+function eventYear(value: string): string {
   const date = new Date(value)
-  return Number.isNaN(date.getTime())
-    ? value
-    : date.toLocaleString(undefined, {
-        weekday: 'short',
-        day: 'numeric',
-        month: 'short',
-        hour: '2-digit',
-        minute: '2-digit',
-      })
+  return Number.isNaN(date.getTime()) ? '' : String(date.getFullYear())
 }
 
-const statusColor: Record<string, 'success' | 'warning' | 'neutral' | 'error'> = {
-  published: 'success',
-  draft: 'neutral',
-  closed: 'warning',
-  cancelled: 'error',
+/** Year options come from the loaded rows — no new endpoint. */
+const yearOptions = computed(() => {
+  const years = new Set<string>()
+  for (const row of [...(upcoming.value?.data ?? []), ...(past.value?.data ?? [])]) {
+    const y = eventYear(row.start_at)
+    if (y) years.add(y)
+  }
+  const sorted = [...years].sort().reverse()
+  return [
+    { label: 'Any year', value: 'all' },
+    ...sorted.map((y) => ({ label: y, value: y })),
+  ]
+})
+
+function inYear(row: EventRow): boolean {
+  return year.value === 'all' || eventYear(row.start_at) === year.value
+}
+
+const upcomingRows = computed(() => (upcoming.value?.data ?? []).filter(inYear))
+const pastRows = computed(() => (past.value?.data ?? []).filter(inYear))
+
+const scopeLabel = computed(() => {
+  if (branch.value === 'all') return 'Showing all in your scope'
+  const match = (branches.data.value ?? []).find((row) => row.id === branch.value)
+  return `Showing ${match?.name ?? 'selected branch'}`
+})
+
+function formatDates(row: EventRow): string {
+  const start = new Date(row.start_at)
+  const end = row.end_at ? new Date(row.end_at) : null
+  const day = (date: Date): string =>
+    date.toLocaleDateString(undefined, {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    })
+  if (Number.isNaN(start.getTime())) return row.start_at
+  if (!end || Number.isNaN(end.getTime()) || day(start) === day(end)) return day(start)
+  const sameMonth =
+    start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear()
+  if (sameMonth) {
+    return `${start.getDate()} – ${day(end)}`
+  }
+  return `${day(start)} – ${day(end)}`
+}
+
+/** "Tomorrow" badge (review item 7): starts within the next 30h, so the
+ * day after tomorrow never reads "Tomorrow". */
+function isImminent(row: EventRow): boolean {
+  const start = new Date(row.start_at).getTime()
+  if (Number.isNaN(start)) return false
+  const delta = start - Date.now()
+  return delta > 0 && delta < 30 * 3600 * 1000
+}
+
+function registrationState(row: EventRow): { label: string; open: boolean } {
+  if (row.status === 'cancelled') return { label: 'Cancelled', open: false }
+  if (row.status === 'closed') return { label: 'Registration closed', open: false }
+  if (row.registration_open) return { label: 'Registration open', open: true }
+  return { label: 'No registration', open: false }
+}
+
+function seriesLine(row: EventRow): string {
+  const type = row.event_type
+    ? row.event_type.charAt(0).toUpperCase() + row.event_type.slice(1)
+    : 'Event'
+  const y = eventYear(row.start_at)
+  return y ? `${y} ${type}` : type
+}
+
+async function refreshAll(): Promise<void> {
+  await Promise.all([
+    refreshNuxtData('programmes-upcoming'),
+    refreshNuxtData('programmes-past'),
+  ])
 }
 </script>
 
 <template>
   <div>
     <PageHeader
-      title="Events"
-      description="Services, summits, camps, training and outreach across the area."
+      title="Programmes"
+      description="Plan, register, check in and report on every programme in one place."
     >
       <template #actions>
-        <UButton
-          to="/register"
-          color="neutral"
-          variant="ghost"
-          icon="i-lucide-external-link"
-          label="Public form"
-        />
         <PermissionGate :collection="COLLECTIONS.events" action="create">
-          <UButton
-            label="Create event"
-            icon="i-lucide-calendar-plus"
-            @click="showForm = true"
-          />
+          <UButton label="New programme" icon="i-lucide-plus" @click="showForm = true" />
         </PermissionGate>
       </template>
     </PageHeader>
 
-    <DashboardStrip :items="stripItems" />
+    <p class="mb-3 text-xs text-gray-500 dark:text-gray-400">
+      <UIcon name="i-lucide-map-pin" class="mr-1 inline size-3" />{{ scopeLabel }}
+    </p>
 
     <UCard>
-      <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <div class="flex flex-col gap-3 lg:flex-row">
         <UInput
           v-model="searchInput"
           icon="i-lucide-search"
-          placeholder="Search events"
-          aria-label="Search events"
+          placeholder="Search by theme, name or code"
+          aria-label="Search programmes"
+          class="flex-1"
         />
-        <USelect v-model="when" :items="whenOptions" class="w-full" />
-        <USelect v-model="type" :items="typeOptions" class="w-full" />
-        <EntitySelect v-model="branch" :items="branchOptions" placeholder="Select branch…" class="w-full" />
-        <USelect v-model="status" :items="statusOptions" class="w-full" />
-      </div>
-
-      <UAlert
-        v-if="error"
-        class="mt-4"
-        color="error"
-        variant="subtle"
-        title="Could not load events"
-        :description="error.message"
-      />
-
-      <div v-if="pending" class="mt-8 flex justify-center py-10">
-        <UIcon name="i-lucide-loader-circle" class="size-6 animate-spin text-gray-400" />
-      </div>
-
-      <EmptyState
-        v-else-if="rows.length === 0"
-        title="No events match these filters"
-        description="Try a different date range or create the first event."
-      >
-        <PermissionGate :collection="COLLECTIONS.events" action="create">
-          <UButton class="mt-4" label="Create event" @click="showForm = true" />
-        </PermissionGate>
-      </EmptyState>
-
-      <div v-else class="mt-4 overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
-          <thead>
-            <tr
-              class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400"
-            >
-              <th class="px-3 py-2 font-medium">Event</th>
-              <th class="px-3 py-2 font-medium">Starts</th>
-              <th class="px-3 py-2 font-medium">Branch</th>
-              <th class="px-3 py-2 font-medium">Registered</th>
-              <th class="px-3 py-2 font-medium">Status</th>
-              <th class="px-3 py-2"><span class="sr-only">Open</span></th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-            <tr
-              v-for="event in rows"
-              :key="event.id"
-              class="hover:bg-gray-50 dark:hover:bg-gray-900/60"
-            >
-              <td class="px-3 py-3">
-                <NuxtLink
-                  :to="`/events/${event.id}`"
-                  class="font-medium text-gray-900 hover:text-primary-600 dark:text-white"
-                >
-                  {{ event.title }}
-                </NuxtLink>
-                <p class="text-xs text-gray-500 dark:text-gray-400">
-                  {{ event.event_type }} · {{ event.location || 'No location' }}
-                </p>
-              </td>
-              <td class="px-3 py-3 text-gray-600 dark:text-gray-300">
-                {{ formatDateTime(event.start_at) }}
-              </td>
-              <td class="px-3 py-3 text-gray-600 dark:text-gray-300">
-                {{ event.branch_name || 'Area-wide' }}
-              </td>
-              <td class="px-3 py-3 tabular-nums text-gray-600 dark:text-gray-300">
-                {{ event.registered_count
-                }}<span v-if="event.capacity"> / {{ event.capacity }}</span>
-              </td>
-              <td class="px-3 py-3">
-                <UBadge :color="statusColor[event.status] ?? 'neutral'" variant="subtle">
-                  {{ event.status }}
-                </UBadge>
-              </td>
-              <td class="px-3 py-3 text-right">
-                <UButton
-                  :to="`/events/${event.id}`"
-                  color="neutral"
-                  variant="ghost"
-                  size="xs"
-                  icon="i-lucide-arrow-right"
-                  aria-label="Open event"
-                />
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div v-if="total > limit" class="mt-4 flex items-center justify-between text-sm">
-        <p class="text-gray-500 dark:text-gray-400">
-          {{ total }} events · page {{ page }} of {{ pageCount }}
-        </p>
-        <div class="flex gap-2">
-          <UButton
-            color="neutral"
-            variant="outline"
-            size="sm"
-            label="Previous"
-            :disabled="page <= 1"
-            @click="page -= 1"
+        <div class="flex gap-3">
+          <USelect
+            v-model="series"
+            :items="seriesOptions"
+            aria-label="Filter by series"
           />
-          <UButton
-            color="neutral"
-            variant="outline"
-            size="sm"
-            label="Next"
-            :disabled="page >= pageCount"
-            @click="page += 1"
+          <USelect v-model="year" :items="yearOptions" aria-label="Filter by year" />
+          <USelect
+            v-model="status"
+            :items="statusOptions"
+            aria-label="Filter by status"
           />
         </div>
       </div>
+      <div class="mt-3">
+        <EntitySelect
+          v-model="branch"
+          :items="branchOptions"
+          placeholder="Select branch…"
+          class="w-full sm:max-w-xs"
+        />
+      </div>
     </UCard>
+
+    <div v-if="upcomingPending || pastPending" class="mt-8 flex justify-center py-10">
+      <UIcon name="i-lucide-loader-circle" class="size-6 animate-spin text-gray-400" />
+    </div>
+
+    <template v-else>
+      <section aria-label="Upcoming programmes" class="mt-6">
+        <h2
+          class="mb-3 flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-300"
+        >
+          <UIcon name="i-lucide-calendar-days" class="size-4" />Upcoming
+          <UBadge color="neutral" variant="subtle">{{ upcomingRows.length }}</UBadge>
+        </h2>
+        <EmptyState
+          v-if="upcomingRows.length === 0"
+          title="No upcoming programmes"
+          description="Publish an event with a future start date and it will appear here."
+        />
+        <div v-else class="grid gap-4 md:grid-cols-2">
+          <NuxtLink
+            v-for="row in upcomingRows"
+            :key="row.id"
+            :to="`/events/${row.id}`"
+            class="overflow-hidden rounded-xl border border-gray-200 bg-white transition hover:shadow-md dark:border-gray-800 dark:bg-gray-900"
+          >
+            <div
+              class="relative h-24 bg-gradient-to-br from-primary-950 via-primary-900 to-primary-950"
+            >
+              <UBadge
+                v-if="isImminent(row)"
+                color="neutral"
+                variant="solid"
+                size="xs"
+                class="absolute right-3 top-3"
+              >
+                Tomorrow
+              </UBadge>
+            </div>
+            <div class="space-y-1.5 p-4">
+              <p class="font-semibold text-gray-900 dark:text-white">{{ row.title }}</p>
+              <p class="text-xs text-gray-500 dark:text-gray-400">
+                {{ seriesLine(row) }}
+              </p>
+              <p class="text-xs text-gray-600 dark:text-gray-300">
+                <UIcon name="i-lucide-calendar" class="mr-1 inline size-3" />{{
+                  formatDates(row)
+                }}
+              </p>
+              <div
+                class="flex items-center justify-between border-t border-gray-100 pt-2 text-xs dark:border-gray-800"
+              >
+                <UBadge
+                  :color="registrationState(row).open ? 'success' : 'neutral'"
+                  variant="subtle"
+                >
+                  {{ registrationState(row).label }}
+                </UBadge>
+                <p class="text-gray-500 dark:text-gray-400">
+                  <span class="font-medium tabular-nums">{{ row.registered_count }}</span>
+                  registered
+                  <span class="ml-2 font-medium tabular-nums">{{
+                    row.attended_count
+                  }}</span>
+                  in
+                </p>
+              </div>
+            </div>
+          </NuxtLink>
+        </div>
+      </section>
+
+      <section aria-label="Past programmes" class="mt-8">
+        <h2
+          class="mb-3 flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-300"
+        >
+          <UIcon name="i-lucide-history" class="size-4" />Past
+          <UBadge color="neutral" variant="subtle">{{ pastRows.length }}</UBadge>
+        </h2>
+        <EmptyState
+          v-if="pastRows.length === 0"
+          title="No past programmes"
+          description="Finished programmes will appear here for reporting."
+        />
+        <div v-else class="grid gap-4 md:grid-cols-2">
+          <NuxtLink
+            v-for="row in pastRows"
+            :key="row.id"
+            :to="`/events/${row.id}`"
+            class="overflow-hidden rounded-xl border border-gray-200 bg-white transition hover:shadow-md dark:border-gray-800 dark:bg-gray-900"
+          >
+            <div
+              class="h-24 bg-gradient-to-br from-primary-950 via-primary-900 to-primary-950"
+            />
+            <div class="space-y-1.5 p-4">
+              <p class="font-semibold text-gray-900 dark:text-white">{{ row.title }}</p>
+              <p class="text-xs text-gray-500 dark:text-gray-400">
+                {{ seriesLine(row) }}
+              </p>
+              <p class="text-xs text-gray-600 dark:text-gray-300">
+                <UIcon name="i-lucide-calendar" class="mr-1 inline size-3" />{{
+                  formatDates(row)
+                }}
+              </p>
+              <div class="border-t border-gray-100 pt-2 text-xs dark:border-gray-800">
+                <UBadge color="neutral" variant="subtle">{{
+                  registrationState(row).label
+                }}</UBadge>
+              </div>
+            </div>
+          </NuxtLink>
+        </div>
+      </section>
+    </template>
 
     <EventFormModal
       v-model:open="showForm"
       :branches="branches.data.value ?? []"
-      @saved="refresh()"
+      @saved="refreshAll()"
     />
   </div>
 </template>

@@ -45,6 +45,16 @@ const blankForm = (): RegistrationFormInput => ({
 
 const form = reactive<RegistrationFormInput>(blankForm())
 
+// AFC-649 review fix 2: programme heroes link here with ?event=<id> so the
+// registrant lands on the right event instead of re-finding it. An unknown
+// id (or a non-public event, which the public feed never lists) falls back
+// to the picker — never a stuck invalid selection.
+const route = useRoute()
+const preselectedEvent =
+  typeof route.query.event === 'string' && route.query.event.length > 0
+    ? route.query.event
+    : ''
+
 // Public event picker (AFC-631): same session-free /api/calendar/public feed
 // the public calendar page renders. Options are the public rows only.
 const { data: publicEvents, pending: eventsPending } = await useAsyncData(
@@ -61,6 +71,23 @@ const eventOptions = computed(() => [
     value: row.id,
   })),
 ])
+
+watch(
+  publicEvents,
+  (
+    feed: { data: Array<{ id: string; title: string; date: string }> } | null | undefined,
+  ) => {
+    if (!preselectedEvent || form.event) return
+    if (
+      (feed?.data ?? []).some(
+        (row: { id: string; title: string; date: string }) => row.id === preselectedEvent,
+      )
+    ) {
+      form.event = preselectedEvent
+    }
+  },
+  { immediate: true },
+)
 
 const submitting = ref(false)
 const submitted = ref<{ ticket_code: string | null; registration_status: string } | null>(

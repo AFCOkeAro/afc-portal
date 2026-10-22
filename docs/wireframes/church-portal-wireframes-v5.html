@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en" data-dept="afc">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Church Portal — Wireframes v5 · comms expansion (hi-fi, AFC-596)</title>
+<link rel="stylesheet" href="../../design-system/tokens/afc-tokens.css">
+<link rel="stylesheet" href="../../design-system/components/afc-components.css">
+<style>
+  body{margin:0;background:var(--afc-paper-100);color:var(--afc-text-primary);
+    font-family:var(--afc-font-sans);font-size:14px;line-height:1.5}
+  .top{position:sticky;top:0;z-index:5;background:var(--afc-ink-900);color:#fff;padding:14px 22px}
+  .top h1{margin:0;font-size:16px;letter-spacing:.3px}
+  .top p{margin:4px 0 0;color:#c9cfdd;font-size:12px}
+  .wrap{padding:22px;display:grid;gap:26px;grid-template-columns:repeat(auto-fill,minmax(440px,1fr));max-width:1720px;margin:0 auto}
+  .frame{background:var(--afc-paper-0);border:1px solid var(--afc-border-subtle);border-radius:var(--afc-radius-lg,10px);overflow:hidden;box-shadow:var(--afc-shadow-1,0 1px 2px rgba(0,0,0,.06))}
+  .frame>figcaption{background:var(--afc-paper-50);border-bottom:1px solid var(--afc-border-subtle);padding:9px 14px;display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+  .frame>figcaption b{font-size:13px}
+  .frame>figcaption code{font-size:11px;color:var(--afc-text-secondary);white-space:nowrap}
+  .screen{padding:16px;display:flex;flex-direction:column;gap:12px;min-height:300px}
+  .screen.wide{grid-column:1/-1}
+  .muted{color:var(--afc-text-secondary)} .tiny{font-size:11px} .small{font-size:12px}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap} .between{justify-content:space-between}
+  .grow{flex:1} .stack{display:flex;flex-direction:column;gap:8px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  @media (max-width:640px){.grid2,.grid3{grid-template-columns:1fr}}
+  .kpi{border:1px solid var(--afc-border-subtle);border-radius:8px;padding:10px;background:#fff;flex:1;min-width:120px}
+  .kpi .n{font-size:22px;font-weight:700} .kpi .k{font-size:10px;color:var(--afc-text-secondary);text-transform:uppercase;letter-spacing:.4px}
+  .kpi a.n{color:var(--afc-action-600)}
+  table.afc-grid{width:100%;border-collapse:collapse;font-size:12px}
+  table.afc-grid th,table.afc-grid td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--afc-border-subtle)}
+  table.afc-grid th{color:var(--afc-text-secondary);font-weight:600;background:var(--afc-paper-50)}
+  .list{display:flex;flex-direction:column;gap:7px}
+  .thread{border:1px solid var(--afc-border-subtle);border-radius:8px;padding:9px 10px;background:#fff;display:flex;gap:9px;align-items:center}
+  .thread[aria-current="true"]{border-color:var(--afc-action-600);box-shadow:0 0 0 1px var(--afc-action-600)}
+  .avatar{width:32px;height:32px;border-radius:50%;background:var(--afc-ink-50);flex:none;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--afc-text-secondary)}
+  .inbox{display:grid;grid-template-columns:240px 1fr;gap:12px;min-height:280px}
+  @media (max-width:640px){.inbox{grid-template-columns:1fr}}
+  .pane{border:1px solid var(--afc-border-subtle);border-radius:8px;background:#fff;padding:10px;display:flex;flex-direction:column;gap:8px;min-width:0}
+  .bubble{border:1px solid var(--afc-border-subtle);border-radius:10px 10px 10px 2px;padding:8px 10px;font-size:12px;background:var(--afc-paper-50);max-width:100%}
+  .bubble.in{background:#fff;border-radius:10px 10px 2px 10px}
+  .bubble.wa-out{background:#e9f4ec;border-color:#7bb98c}
+  .bubble .meta{font-size:10px;color:var(--afc-text-secondary);margin-top:4px}
+  .palette{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .block{border:1px dashed var(--afc-border-strong);border-radius:8px;padding:8px;font-size:12px;background:var(--afc-paper-50);text-align:center}
+  .canvas{border:1px solid var(--afc-border-subtle);border-radius:8px;background:
+    repeating-linear-gradient(0deg,#fff 0 22px,#f6f8fc 22px 23px),
+    repeating-linear-gradient(90deg,#fff 0 22px,#f6f8fc 22px 23px);padding:12px;display:flex;flex-direction:column;gap:8px;min-height:220px}
+  .canvas .erow{border:1.5px solid var(--afc-ink-900);border-radius:8px;background:#fff;padding:8px 10px;font-size:12px}
+  .canvas .erow.cols{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .canvas .eh{font-size:10px;color:var(--afc-text-secondary);text-transform:uppercase;letter-spacing:.4px}
+  .kanban{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
+  .lane{flex:1;min-width:130px;border:1px solid var(--afc-border-subtle);border-radius:8px;background:var(--afc-paper-50);padding:8px;display:flex;flex-direction:column;gap:6px}
+  .lane h5{margin:0;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--afc-text-secondary)}
+  .lane .count{font-size:18px;font-weight:700;color:var(--afc-action-700)}
+  .lane .mini{border:1px solid var(--afc-border-subtle);border-radius:6px;background:#fff;padding:6px;font-size:11px}
+  .steps{display:flex;gap:0;align-items:center;flex-wrap:wrap}
+  .step{border:1px solid var(--afc-border-strong);background:#fff;border-radius:999px;padding:5px 12px;font-size:12px}
+  .step[aria-current="step"]{background:var(--afc-ink-900);color:#fff;border-color:var(--afc-ink-900)}
+  .step.done{background:var(--afc-paper-200)}
+  .step-sep{color:var(--afc-text-secondary);padding:0 6px}
+  .bars{display:flex;gap:6px;align-items:flex-end;height:96px;padding:8px 4px 0}
+  .bars .bar{flex:1;background:var(--afc-action-300);border-radius:3px 3px 0 0;min-width:14px}
+  .bars .bar.avg{background:var(--afc-ink-150)}
+  .phone{max-width:300px;border:2px solid var(--afc-ink-900);border-radius:20px;padding:10px;background:#fff}
+  .phone .notch{width:54px;height:5px;background:var(--afc-ink-100);border-radius:3px;margin:2px auto 8px}
+  .toggle{display:flex;align-items:center;gap:8px;font-size:12px}
+  footer{padding:16px 22px;color:var(--afc-text-secondary);font-size:12px;border-top:1px solid var(--afc-border-subtle);background:var(--afc-paper-50)}
+  .cols2{display:grid;grid-template-columns:200px 1fr;gap:12px}
+  @media (max-width:640px){.cols2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>Church Portal (Lagos North Area) — Wireframes v5 · comms expansion · HI-FI</h1>
+  <p>AFC-596 (reconciles AFC-592) · AFC kit: afc-tokens + afc-components · Rock RMS patterns redrawn in our layout, not a clone · synthetic data only</p>
+</header>
+
+<div class="wrap">
+
+<!-- ============ 1. COMMS HUB ============ -->
+<figure class="frame">
+  <figcaption><b>1. Comms hub — 7 sections, one post office</b><code>/comms · unchanged index</code></figcaption>
+  <div class="screen wide">
+    <div class="row between">
+      <div><b>Communications</b><div class="tiny muted">One hub — Email, SMS/WhatsApp, Conversations, Pipeline, Push, Flows, Analytics. Counts drill into data. Scope: <b>Ikeja Branch</b> · role: <b>Branch admin (Ada O.)</b></div></div>
+      <span><button class="afc-btn afc-btn--primary afc-btn--sm" type="button">+ New send</button></span>
+    </div>
+    <div class="row">
+      <div class="kpi"><a class="n" href="#s2">Email</a><div class="k">first-class builder · 3 queued</div></div>
+      <div class="kpi"><a class="n" href="#s2">SMS/WhatsApp</a><div class="k">unified send · 12 queued</div></div>
+      <div class="kpi"><a class="n" href="#s3">Conversations</a><div class="k">5 open · 2 unassigned &gt;3d</div></div>
+      <div class="kpi"><a class="n" href="#s4">Pipeline</a><div class="k">4 failed need retry</div></div>
+    </div>
+    <div class="row">
+      <div class="kpi"><a class="n" href="#s7">Push</a><div class="k">new channel · 214 devices</div></div>
+      <div class="kpi"><a class="n" href="#s5">Flows</a><div class="k">visual builder · 9 active</div></div>
+      <div class="kpi"><a class="n" href="#s6">Analytics</a><div class="k">delivery 94% · STOP 0.4%</div></div>
+    </div>
+    <div class="afc-alert afc-alert--warn"><div><div class="afc-alert__title">Quiet hours 20:00–07:00 Africa/Lagos</div><div class="afc-alert__body">Steps due inside the window shift to 08:00 unless the campaign is <b>operational_essential</b>. Caps: marketing ≤3/person/week/family · fallback SMS ≤1/person/24h · per-channel daily cap enforced at enqueue. Collections: <span class="tiny">communication_channels.daily_cap · campaign_runs · communication_recipients</span></div></div></div>
+    <div class="afc-alert afc-alert--danger"><div><div class="afc-alert__title">Kill switch — visible on every send surface</div><div class="afc-alert__body">Campaign <span class="afc-badge">status = active</span> · Channel SMS <span class="afc-badge afc-badge--success">enabled</span> · WhatsApp <span class="afc-badge afc-badge--success">enabled</span> · Email <span class="afc-badge afc-badge--success">enabled</span> · Push <span class="afc-badge afc-badge--success">enabled</span>. Pausing a campaign holds pending enrollments; disabling a channel holds the whole channel within one tick. All transitions audit-logged with actor + reason.</div></div></div>
+    <div class="afc-alert"><div><div class="afc-alert__title">Consent gate — explicit_opt_in stays mandatory</div><div class="afc-alert__body">Excluded recipients show a reason (no_consent / opted_out / minor_no_guardian / invalid_contact). No override send exists. Basis: <span class="tiny">consent_records → communication_recipients.consent_basis</span>. No AI assistant on this surface — replies are staff-written from approved templates (see screen notes).</div></div></div>
+  </div>
+</figure>
+
+<!-- ============ 2. EMAIL BUILDER + UNIFIED SEND ============ -->
+<figure class="frame" id="s2">
+  <figcaption><b>2. Compose — block email builder · unified SMS/WhatsApp</b><code>/comms/send · Rock: builder pattern</code></figcaption>
+  <div class="screen">
+    <div class="steps" aria-label="Send progress">
+      <span class="step done">1 Audience</span><span class="step-sep">›</span>
+      <span class="step" aria-current="step">2 Build</span><span class="step-sep">›</span>
+      <span class="step">3 Review &amp; confirm</span>
+    </div>
+    <div class="row" role="tablist" aria-label="Channel">
+      <button class="afc-btn afc-btn--primary afc-btn--sm" type="button" role="tab" aria-selected="true">Email (blocks)</button>
+      <button class="afc-btn afc-btn--secondary afc-btn--sm" type="button" role="tab" aria-selected="false">SMS / WhatsApp (unified)</button>
+    </div>
+    <div class="cols2">
+      <div class="stack" aria-label="Block palette">
+        <span class="tiny muted">BLOCK PALETTE — click to append</span>
+        <div class="palette">
+          <div class="block">Title</div><div class="block">Paragraph</div>
+          <div class="block">Image</div><div class="block">Button</div>
+          <div class="block">Video link</div><div class="block">Divider</div>
+          <div class="block">2-col row</div><div class="block">RSVP card</div>
+        </div>
+        <label class="afc-field"><span class="afc-field__label">Merge tags</span>
+          <select class="afc-input afc-select"><option>{{first_name}}</option><option>{{branch}}</option><option>{{event_date}}</option><option>{{guardian_name}}</option></select></label>
+        <div class="tiny muted">WhatsApp stays provider-template-only; free-form body is Email-only (v6 §1). RSVP block writes to <span class="tiny">event_registrations</span>.</div>
+      </div>
+      <div class="stack" aria-label="Email canvas">
+        <div class="canvas">
+          <div class="erow"><span class="eh">Subject</span><br><b>Youth Summit holds Sat 14 Nov, 10:00 — {{first_name}}, you are invited</b></div>
+          <div class="erow"><span class="eh">Title block</span><br><b style="font-size:17px">A special invitation from Ikeja Branch</b></div>
+          <div class="erow cols"><div><span class="eh">Column A · paragraph</span><br>Hello {{first_name}}, join us with your household…</div><div><span class="eh">Column B · image</span><br>[ youth-summit.jpg · alt text required ]</div></div>
+          <div class="erow"><span class="eh">Button block</span><br><button class="afc-btn afc-btn--primary afc-btn--sm" type="button">RSVP for my household</button></div>
+        </div>
+        <div class="row"><span class="afc-badge afc-badge--info">test send ✓ to self</span><span class="afc-badge afc-badge--warn">bulk &gt;200 needs area approval</span></div>
+        <div class="row">
+          <div class="kpi"><div class="n">71</div><div class="k">eligible</div></div>
+          <div class="kpi"><div class="n">15</div><div class="k">excluded (reason shown)</div></div>
+        </div>
+        <table class="afc-grid"><tr><th>Reason</th><th>n</th><th>Action</th></tr>
+          <tr><td>no_consent</td><td>9</td><td><button class="afc-btn afc-btn--secondary afc-btn--sm" type="button">Capture</button></td></tr>
+          <tr><td>minor_no_guardian</td><td>4</td><td><span class="afc-badge afc-badge--danger">guardian required</span></td></tr>
+          <tr><td>opted_out</td><td>2</td><td><span class="afc-badge afc-badge--danger">blocked</span></td></tr></table>
+        <div class="afc-alert afc-alert--warn"><div class="afc-alert__body">Review-and-confirm (Rock pattern): exact frozen text + eligible/excluded counts are shown before <b>Queue send</b>. Frozen snapshot lands on <span class="tiny">communication_recipients</span> with consent basis. No send without a resolvable basis.</div></div>
+        <div class="row"><button class="afc-btn afc-btn--secondary afc-btn--sm" type="button">Test send</button><button class="afc-btn afc-btn--primary afc-btn--sm" type="button">Review &amp; queue</button></div>
+      </div>
+    </div>
+  </div>
+</figure>
+
+<!-- ============ 3. CONVERSATIONS INBOX ============ -->
+<figure class="frame" id="s3">
+  <figcaption><b>3. Conversations — two-way inbox (threads + pane + reply)</b><code>/comms/conversations · Rock: thread-pane pattern</code></figcaption>
+  <div class="screen">
+    <div class="row"><label class="afc-field grow"><span class="afc-field__label">Search threads</span><input class="afc-input" value="adaeze" aria-label="Search threads"></label>
+      <span class="afc-badge">5 open</span><span class="afc-badge afc-badge--warn">2 unassigned &gt;3d</span><span class="afc-badge afc-badge--danger">1 STOP today</span></div>
+    <div class="inbox">
+      <div class="list" aria-label="Thread list">
+        <div class="thread" aria-current="true"><div class="avatar">AO</div><div class="grow"><b class="small">Adaeze O.</b><div class="tiny muted">Can I come with my sister (15)? · 12m</div></div><span class="afc-badge afc-badge--warn">triage</span></div>
+        <div class="thread"><div class="avatar">FA</div><div class="grow"><b class="small">Femi A.</b><div class="tiny muted">STOP · terminal · 1h</div></div><span class="afc-badge afc-badge--danger">STOP</span></div>
+        <div class="thread"><div class="avatar">NG</div><div class="grow"><b class="small">Ngozi E. (guardian)</b><div class="tiny muted">Minor thread · guardian-held · 3h</div></div><span class="afc-badge afc-badge--info">minor</span></div>
+        <div class="thread"><div class="avatar">TO</div><div class="grow"><b class="small">Tunde O.</b><div class="tiny muted">Thank you, we moved house · 1d</div></div><span class="afc-badge">open</span></div>
+      </div>
+      <div class="pane" aria-label="Message pane">
+        <div class="row between"><div><b class="small">Adaeze O. · 0801 ••• •234</b><div class="tiny muted">WhatsApp · Ikeja · consent whatsapp ✓ sms ✓ · basis explicit_opt_in · assigned: Welfare Officer Ngozi</div></div><span class="afc-badge afc-badge--warn">needs triage</span></div>
+        <div class="bubble wa-out">Hello Adaeze, Youth Summit holds Sat 14 Nov, 10:00 at Ikeja.<div class="meta">out · delivered ✓✓ · link → communications #C-1042</div></div>
+        <div class="bubble in">Thank you! Can I come with my sister (15)?<div class="meta">in · reply · flagged: possible minor — guardian rule applies</div></div>
+        <div class="bubble wa-out">Yes — for under-18 we message the guardian. Please share the guardian number.<div class="meta">out · staff reply · template-bound (visitor_weekly_checkin)</div></div>
+        <label class="afc-field"><span class="afc-field__label">Reply (template-bound for WhatsApp; SMS free-form)</span><textarea class="afc-input" rows="2">Hello Adaeze, …</textarea></label>
+        <div class="row"><button class="afc-btn afc-btn--secondary afc-btn--sm" type="button">Log outcome</button><button class="afc-btn afc-btn--secondary afc-btn--sm" type="button">Assign</button><button class="afc-btn afc-btn--secondary afc-btn--sm" type="button">Open welfare case</button><button class="afc-btn afc-btn--primary afc-btn--sm" type="button">Send reply</button></div>
+        <div class="tiny muted">STOP writes a <span class="tiny">consent_records</span> denial + exits enrollments; thread shows STOP terminally. Inbound bodies stored only if board/DPCO approve OQ-M1; otherwise timestamps + classification. Collections: <span class="tiny">conversation_threads · conversation_messages · visitor_follow_ups</span>. No AI drafting — staff write replies.</div>
+      </div>
+    </div>
+  </div>
+</figure>
+
+<!-- ============ 4. PIPELINE + AUTOMATIONS ============ -->
+<figure class="frame" id="s4">
+  <figcaption><b>4. Pipeline — lifecycle board + automation detail</b><code>/comms/pipeline · Rock: pipeline-detail pattern</code></figcaption>
+  <div class="screen wide">
+    <div class="row between"><div class="tiny"><b>Week 42 · Ikeja · all channels</b> <span class="muted">— over the single delivery log (communications + communication_recipients). Read = sub-state of delivered.</span></div>
+      <span class="row"><span class="afc-badge">Filters: channel · campaign · reason · date</span><button class="afc-btn afc-btn--secondary afc-btn--sm" type="button">Hold queued</button></span></div>
+    <div class="kanban">
+      <div class="lane"><h5>Draft</h5><div class="count">3</div><div class="mini">Anniversary greeting · draft</div><div class="mini">Meeting reminder · draft</div></div>
+      <div class="lane"><h5>Queued</h5><div class="count">12</div><div class="mini">Weekly check-in · 8 <span class="afc-badge afc-badge--warn">quiet-hrs → 08:00</span></div><div class="mini">Service reminder · 4</div></div>
+      <div class="lane"><h5>Sent</h5><div class="count">48</div><div class="mini">Welcome SMS <span class="afc-badge afc-badge--info">fallback_pending</span></div></div>
+      <div class="lane"><h5>Delivered</h5><div class="count">210</div><div class="mini">✓ 196 delivered · 88 read <span class="afc-badge afc-badge--success">read</span></div></div>
+      <div class="lane"><h5>Failed</h5><div class="count">4</div><div class="mini">invalid_contact ×2 <button class="afc-btn afc-btn--sm" type="button">Retry once</button></div><div class="mini">provider error ×2 <button class="afc-btn afc-btn--sm" type="button">Retry once</button></div></div>
+    </div>
+    <div class="grid2">
+      <div class="afc-card"><div class="afc-card__head"><b class="small">Inbound detail — selected: Adaeze O. reply</b></div><div class="afc-card__body stack">
+        <div class="tiny">question → <span class="afc-badge afc-badge--warn">route to officer</span> · linked thread #T-88 · recipient row #R-7712 (consent basis frozen)</div>
+        <div class="tiny muted">Automation actions (Rock pattern, mapped to our collections — not a clone):</div>
+        <div class="list">
+          <div class="thread"><div class="grow"><b class="small">Assign group / connect response</b><div class="tiny muted">→ thread assignee = Welfare Officer (conversation_threads.assignee)</div></div><button class="afc-btn afc-btn--secondary afc-btn--sm" type="button">Apply</button></div>
+          <div class="thread"><div class="grow"><b class="small">Launch workflow</b><div class="tiny muted">→ enroll in flow_definitions “Welcome drip” (compiles to campaigns + steps)</div></div><button class="afc-btn afc-btn--secondary afc-btn--sm" type="button">Enroll</button></div>
+          <div class="thread"><div class="grow"><b class="small">Record giving / outcome</b><div class="tiny muted">→ visitor_follow_ups outcome (reached / needs_support / declined); needs_support offers welfare case</div></div><button class="afc-btn afc-btn--secondary afc-btn--sm" type="button">Log</button></div>
+        </div>
+      </div></div>
+      <div class="afc-card"><div class="afc-card__head"><b class="small">Automation + filter rules (allowlist only)</b></div><div class="afc-card__body stack">
+        <table class="afc-grid"><tr><th>Rule</th><th>Effect</th><th>Status</th></tr>
+          <tr><td>reply = STOP</td><td>denial + exit enrollments</td><td><span class="afc-badge afc-badge--danger">terminal</span></td></tr>
+          <tr><td>reply has question</td><td>assign officer + 24h triage</td><td><span class="afc-badge afc-badge--success">on</span></td></tr>
+          <tr><td>no activity 4h</td><td>SMS fallback (≤1/24h, sms consent req.)</td><td><span class="afc-badge afc-badge--success">on</span></td></tr>
+          <tr><td>failure &gt;5%</td><td>Telegram staff alert + hold channel</td><td><span class="afc-badge afc-badge--success">on</span></td></tr></table>
+        <div class="tiny muted">Conditions from the allowlist only (whatsapp_registered_no_activity · consent_sms · stage_equals · has_milestone · not_opted_out) — never raw SQL. Retry is single + idempotent; queued rows are held/cancelled, never edited.</div>
+      </div></div>
+    </div>
+  </div>
+</figure>
+
+<!-- ============ 5. FLOWS WIZARD ============ -->
+<figure class="frame" id="s5">
+  <figcaption><b>5. Flows — stepped wizard + message canvas</b><code>/comms/flows/:id · Rock: stepped-builder pattern</code></figcaption>
+  <div class="screen wide">
+    <div class="steps" aria-label="Flow builder steps">
+      <span class="step done">1 Getting started</span><span class="step-sep">›</span>
+      <span class="step done">2 Conversion goal</span><span class="step-sep">›</span>
+      <span class="step" aria-current="step">3 Message flow</span><span class="step-sep">›</span>
+      <span class="step">4 Exit rules &amp; publish</span>
+    </div>
+    <div class="grid3">
+      <div class="afc-card"><div class="afc-card__head"><b class="small">1 · Getting started ✓</b></div><div class="afc-card__body stack small">
+        <div>Name: <b>Welcome drip + reply branch</b></div><div>Trigger: <span class="afc-badge">visitor enters Welcome</span></div>
+        <div>Audience: Follow-up newcomers · Ikeja · <b>86</b></div><div class="tiny muted">Compiles to campaigns + campaign_steps; runtime stays the campaign-tick (ADR-0009 D3).</div>
+      </div></div>
+      <div class="afc-card"><div class="afc-card__head"><b class="small">2 · Conversion goal ✓</b></div><div class="afc-card__body stack small">
+        <div>Goal: <b>newcomer integrated</b> (milestone)</div><div>Window: <b>21 days</b> from enrollment</div>
+        <div class="tiny muted">Analytics funnel ends at this goal (screen 6). Exit on convert = archive enrollment, keep log.</div>
+      </div></div>
+      <div class="afc-card"><div class="afc-card__head"><b class="small">4 · Exit rules (preview)</b></div><div class="afc-card__body stack small">
+        <div>STOP → exit + denial · convert → exit converted · bounce ×3 → hold · CNY cap → hold</div>
+        <div class="tiny muted">Publish freezes version (flow_definitions v3 + campaign snapshot). Unapproved WhatsApp template blocks publish.</div>
+      </div></div>
+    </div>
+    <div class="afc-card"><div class="afc-card__head"><b class="small">3 · Message flow — add Email / SMS / Push, waits between</b></div><div class="afc-card__body">
+      <div class="canvas" style="flex-direction:row;align-items:stretch;overflow-x:auto">
+        <div class="erow"><span class="eh">Message · WhatsApp</span><br>D0 welcome (approved ✓)</div>
+        <div class="erow"><span class="eh">Wait</span><br>4h → fallback check</div>
+        <div class="erow"><span class="eh">Branch (allowlist)</span><br>no activity → SMS · reply → officer</div>
+        <div class="erow"><span class="eh">Message · SMS</span><br>D2 service reminder</div>
+        <div class="erow"><span class="eh">Message · Push</span><br>T-24h nudge (opt-in devices)</div>
+        <div class="erow"><span class="eh">Exit</span><br>integrated / dormant</div>
+      </div>
+      <div class="row" style="margin-top:8px"><button class="afc-btn afc-btn--secondary afc-btn--sm" type="button">+ Add Email</button><button class="afc-btn afc-btn--secondary afc-btn--sm" type="button">+ Add SMS</button><button class="afc-btn afc-btn--secondary afc-btn--sm" type="button">+ Add Push</button><button class="afc-btn afc-btn--secondary afc-btn--sm" type="button">+ Add wait</button><span class="grow"></span><button class="afc-btn afc-btn--secondary afc-btn--sm" type="button">Preview eligible/excluded</button><button class="afc-btn afc-btn--primary afc-btn--sm" type="button">Publish v3</button></div>
+      <div class="tiny muted">Quiet hours 20:00–07:00 apply to every wait/step unless operational_essential. Push nodes send only to per-device opt-in tokens.</div>
+    </div></div>
+  </div>
+</figure>
+
+<!-- ============ 6. ANALYTICS ============ -->
+<figure class="frame" id="s6">
+  <figcaption><b>6. Analytics — rates, over-time, instance-vs-average, log</b><code>/comms/analytics · Rock: analytics pattern</code></figcaption>
+  <div class="screen wide">
+    <div class="row">
+      <div class="kpi"><div class="n">9.4%</div><div class="k">conversion (goal reached)</div></div>
+      <div class="kpi"><div class="n">94%</div><div class="k">delivered</div></div>
+      <div class="kpi"><div class="n">41%</div><div class="k">read (of delivered)</div></div>
+      <div class="kpi"><div class="n">6.2%</div><div class="k">reply rate</div></div>
+      <div class="kpi"><div class="n">0.4%</div><div class="k">STOP rate · normal</div></div>
+      <div class="kpi"><div class="n">₦18.2k</div><div class="k">spend / ₦40k cap · 46%</div></div>
+    </div>
+    <div class="grid2">
+      <div class="afc-card"><div class="afc-card__head"><b class="small">Performance over time — delivered % by week (bars) vs family average (grey)</b></div><div class="afc-card__body">
+        <div class="bars" aria-hidden="true"><span class="bar" style="height:62%"></span><span class="bar" style="height:70%"></span><span class="bar" style="height:66%"></span><span class="bar avg" style="height:74%"></span><span class="bar" style="height:80%"></span><span class="bar" style="height:88%"></span><span class="bar" style="height:91%"></span><span class="bar" style="height:94%"></span></div>
+        <div class="tiny muted">Blue = this view (all channels, Ikeja) · grey = family average. Von Restorff: a breaching week renders amber with the reason.</div>
+      </div></div>
+      <div class="afc-card"><div class="afc-card__head"><b class="small">Instance vs average — this run against the family</b></div><div class="afc-card__body">
+        <table class="afc-grid"><tr><th></th><th>This run</th><th>Family avg</th><th>Δ</th></tr>
+          <tr><td>Delivered</td><td>94%</td><td>91%</td><td><span class="afc-badge afc-badge--success">+3</span></td></tr>
+          <tr><td>Read</td><td>41%</td><td>38%</td><td><span class="afc-badge afc-badge--success">+3</span></td></tr>
+          <tr><td>Converted</td><td>9.4%</td><td>7.1%</td><td><span class="afc-badge afc-badge--success">+2.3</span></td></tr>
+          <tr><td>STOP</td><td>0.4%</td><td>0.6%</td><td><span class="afc-badge afc-badge--success">−0.2</span></td></tr></table>
+      </div></div>
+    </div>
+    <table class="afc-grid"><tr><th>Family</th><th>Sent</th><th>Delivered</th><th>Read</th><th>Replied</th><th>Converted</th><th>Cost</th></tr>
+      <tr><td>New-visitor welcome drip</td><td>182</td><td>171</td><td>96</td><td>21</td><td>9 integrated</td><td>₦3.1k</td></tr>
+      <tr><td>Service reminders</td><td>410</td><td>392</td><td>140</td><td>—</td><td>—</td><td>₦6.4k</td></tr>
+      <tr><td>Event invitations</td><td>64</td><td>58</td><td>31</td><td>12</td><td>7 registered</td><td>₦0.9k</td></tr></table>
+    <div class="afc-card"><div class="afc-card__head"><b class="small">Recipient log (drill-down — every count above lands here)</b></div><div class="afc-card__body">
+      <table class="afc-grid"><tr><th>Recipient</th><th>Channel</th><th>State</th><th>Basis</th><th>Cost</th></tr>
+        <tr><td>Adaeze O. · 0801 ••• •234</td><td>WhatsApp</td><td><span class="afc-badge afc-badge--success">delivered · read</span></td><td>explicit_opt_in</td><td>₦0</td></tr>
+        <tr><td>Femi A. · 0803 ••• •118</td><td>SMS</td><td><span class="afc-badge afc-badge--danger">STOP → exited</span></td><td>withdrawn</td><td>₦4</td></tr>
+        <tr><td>Tunde O. · 0705 ••• •902</td><td>SMS fallback</td><td><span class="afc-badge afc-badge--info">fallback_sent</span></td><td>explicit_opt_in</td><td>₦4</td></tr></table>
+      <div class="tiny muted">Scoped CSV export (permission-scoped; contact values masked for welfare slice). Alert rules: failure &gt;5% · STOP spike &gt;3× median · cap 80/100%. Read model over existing log tables — no new PII collected.</div>
+    </div></div>
+  </div>
+</figure>
+
+<!-- ============ 7. PUSH OPT-IN (member) ============ -->
+<figure class="frame" id="s7">
+  <figcaption><b>7. Push opt-in — per-device, member side</b><code>/me/notifications · unchanged index</code></figcaption>
+  <div class="screen">
+    <div class="row"><div class="avatar">ME</div><div><b class="small">My notifications</b><div class="tiny muted">Member-authenticated (OTP) · own devices only · operational reminders in v1</div></div></div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="thread"><div class="grow"><b class="small">Reminders on this device</b><div class="tiny muted">Service + meeting reminders · explicit opt-in, off by default</div></div><span class="afc-badge afc-badge--success">ON</span></div>
+      <div class="thread"><div class="grow"><b class="small">Chrome on Android</b><div class="tiny muted">registered 14 Oct · last delivered 19 Oct</div></div><button class="afc-btn afc-btn--secondary afc-btn--sm" type="button">Remove</button></div>
+      <div class="thread"><div class="grow"><b class="small">SMS + WhatsApp consent</b><div class="tiny muted">whatsapp ✓ · sms ✓ · managed separately</div></div><button class="afc-btn afc-btn--secondary afc-btn--sm" type="button">Manage</button></div>
+    </div>
+    <div class="afc-alert"><div class="afc-alert__body">Ethics: toggle defaults OFF; withdrawing is as easy as subscribing (no roach-motel). No silent registration, no marketing push in v1. Tokens stored as hashes (<span class="tiny">push_device_tokens.token_hash</span>); off/invalidated token = excluded, never queued.</div></div>
+  </div>
+</figure>
+
+</div>
+<footer>Wireframes v5 · HI-FI (AFC-596, reconciles AFC-592) · AFC kit (tokens + components) · Rock RMS interaction patterns redrawn in our layout — builder, two-pane inbox, pipeline automations, stepped flows, analytics-with-log · Constraints visible: explicit opt-in, quiet hours 20:00–07:00, caps, kill switch, permission scope · <b>No AI assistant surface</b> — no provider, cost, or data-governance decision exists, so AI stays out of scope · synthetic data only.</footer>
+</body>
+</html>
