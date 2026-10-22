@@ -676,6 +676,19 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     none: [NONE, 'none'],
     zone_admin: [R, 'own_zone'],
   },
+  // Marriage phase-B form submissions (AFC-677). Same holders as the
+  // pipeline rows: the staff who move a case fill its forms. No wider
+  // grant; `none` (household self-service) is read-own via policy.
+  [COLLECTIONS.marriageCaseForms]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [ALL, 'all'],
+    branch_admin: [CRU, 'own_branch', 'CRU (own)'],
+    department_leader: [R, 'assigned_departments', 'R (welfare dept via policy)'],
+    volunteer: [NONE, 'none'],
+    // "R (own)": household reads its own submissions; enforced record-level.
+    none: [R, 'public_only', 'R (own household via policy)'],
+    zone_admin: [CRU, 'own_zone'],
+  },
   // Scoped impersonation audit (AFC-684). Area-only read (the log list view);
   // the portal writes start/stop rows with the server token, not with a role
   // grant, so no role holds a write here. Zone/branch staff start previews

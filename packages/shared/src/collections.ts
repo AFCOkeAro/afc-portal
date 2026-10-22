@@ -107,6 +107,12 @@ export const COLLECTIONS = {
   marriageCases: 'marriage_cases',
   marriageCaseEvents: 'marriage_case_events',
   /**
+   * Marriage phase-B form submissions (AFC-677). One row per filled source
+   * form; payloads validated by the phase-B routes. Same readers as the
+   * pipeline rows below.
+   */
+  marriageCaseForms: 'marriage_case_forms',
+  /**
    * Scoped impersonation audit (AFC-684). One row per start/stop with actor,
    * target (user XOR branch XOR zone), action, reason, and timestamp.
    * Created by migration 0037; read by area admins, written by the portal.

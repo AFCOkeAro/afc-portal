@@ -75,6 +75,95 @@ async function linkSister() {
       (cause as { message?: string }).message ?? 'Could not link the sister'
   }
 }
+
+/** Print version (?print=1): A4 sheet per the shared-document layout. */
+const printMode = computed(() => route.query.print === '1')
+const printForms = ref<Record<string, Record<string, unknown> | null>>({})
+const printVow = ref('')
+const printReady = ref(false)
+
+const PRINT_KEYS = [
+  'proposal_male',
+  'proposal_female',
+  'form_a',
+  'premarital_q1',
+  'premarital_q2',
+  'engagement_list',
+  'form_c_guideline',
+  'wedding_programme',
+  'wedding_info',
+  'music_selection',
+  'requirements_dressing',
+  'engagement_procedures',
+  'counselling_curriculum',
+  'documentation_checklist',
+  'couple_orientation',
+  'vows',
+] as const
+const PRINT_LABELS: Record<string, string> = {
+  proposal_male: 'Proposal record (brother)',
+  proposal_female: 'Proposal record (sister)',
+  form_a: 'Form A',
+  premarital_q1: 'Pre-marital questionnaire 1',
+  premarital_q2: 'Pre-marital questionnaire 2',
+  engagement_list: 'Family introduction + bridal list',
+  form_c_guideline: 'LGA / FG Form C guideline',
+  wedding_programme: 'Engagement programme schedule',
+  wedding_info: 'Wedding information form',
+  music_selection: 'Music selection',
+  requirements_dressing: 'Requirements + dressing pledge',
+  engagement_procedures: 'Engagement ceremony procedures',
+  counselling_curriculum: 'Counselling curriculum + checklist',
+  documentation_checklist: 'Documentation checklist',
+  couple_orientation: 'Couple orientation',
+  vows: 'Wedding vows wording',
+}
+
+function flatEntries(payload: unknown): Array<[string, string]> {
+  if (payload === null || typeof payload !== 'object' || Array.isArray(payload)) {
+    return Array.isArray(payload)
+      ? payload.map((item, index) => [`${index + 1}`, String(item ?? '')])
+      : []
+  }
+  const out: Array<[string, string]> = []
+  for (const [key, value] of Object.entries(payload as Record<string, unknown>)) {
+    if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+      for (const [sub, subValue] of Object.entries(value as Record<string, unknown>)) {
+        out.push([`${key} ${sub}`.replace(/_/g, ' '), String(subValue ?? '')])
+      }
+    } else if (Array.isArray(value)) {
+      out.push([key.replace(/_/g, ' '), value.map((item) => String(item ?? '')).filter(Boolean).join('; ') || '—'])
+    } else if (typeof value === 'boolean') {
+      out.push([key.replace(/_/g, ' '), value ? 'Yes' : 'No'])
+    } else {
+      out.push([key.replace(/_/g, ' '), String(value ?? '') || '—'])
+    }
+  }
+  return out
+}
+
+onMounted(async () => {
+  if (!printMode.value) return
+  try {
+    const formsResponse = await api.get<{
+      data: Record<string, Record<string, unknown> | null>
+    }>(`/api/marriage-cases/${id}/forms`)
+    printForms.value = formsResponse.data
+  } catch {
+    printForms.value = {}
+  }
+  try {
+    const vowResponse = await api.get<{ data: { text: string } }>(
+      `/api/marriage-cases/${id}/vow`,
+    )
+    printVow.value = vowResponse.data.text
+  } catch {
+    printVow.value = ''
+  }
+  printReady.value = true
+  await nextTick()
+  window.print()
+})
 </script>
 
 <template>
@@ -84,6 +173,14 @@ async function linkSister() {
       description="Pipeline stage, approvals and the task checklist."
     >
       <template #actions>
+        <UButton
+          color="neutral"
+          variant="ghost"
+          size="sm"
+          icon="i-lucide-printer"
+          label="Print version"
+          :to="`/marriage-cases/${id}?print=1`"
+        />
         <UButton
           color="neutral"
           variant="ghost"
@@ -201,6 +298,16 @@ async function linkSister() {
         </div>
       </UCard>
 
+      <MarriageFormPanel
+        :case-id="id"
+        :case-stage="String(data.data.stage ?? 'introduction')"
+        @refreshed="refresh"
+      />
+
+      <MarriageVowCard :case-id="id" :vow-type="String(data.data.vow_type ?? 'B')" />
+
+      <MarriageUploadsCard :case-id="id" :linked="data.data" @linked="refresh" />
+
       <UAlert v-if="actionError" color="error" variant="subtle" :title="actionError" />
 
       <UCard>
@@ -228,6 +335,38 @@ async function linkSister() {
         </ul>
         <p v-else class="text-sm text-gray-500">No trail rows.</p>
       </UCard>
+      </div>
+
+      <div v-if="printMode" class="print-sheet">
+        <section class="print-page">
+          <h1>The Apostolic Faith Church — Marriage File</h1>
+          <p>
+            Case {{ id }} · Stage {{ data.data.stage }} · Branch
+            {{ data.data.branch }}
+          </p>
+        </section>
+        <section v-for="key in PRINT_KEYS" :key="key" class="print-page">
+          <h2>{{ PRINT_LABELS[key] }}</h2>
+          <dl v-if="printForms[key]">
+            <div v-for="[label, value] in flatEntries((printForms[key] as Record<string, unknown>).payload)" :key="label">
+              <dt>{{ label }}</dt>
+              <dd>{{ value }}</dd>
+            </div>
+          </dl>
+          <p v-else class="print-outstanding">Outstanding — not yet submitted.</p>
+          <p class="print-sign">
+            Signature ______________________ Date __________
+          </p>
+        </section>
+        <section class="print-page">
+          <h2>Wedding vow</h2>
+          <pre v-if="printVow">{{ printVow }}</pre>
+          <p v-else class="print-outstanding">
+            Outstanding — fill the vows or wedding-information form first.
+          </p>
+          <p v-if="!printReady">Preparing…</p>
+        </section>
+      </div>
     </div>
   </div>
 </template>
