@@ -352,6 +352,10 @@ BEGIN
     'pre-rollback: 79 fixture event parked (its referral cascaded with it)');
 END $$;
 
+-- 0034 links blessing_recipients to attendance_sessions/events; those FKs
+-- would block the register drops below, so they are parked and re-added after.
+ALTER TABLE blessing_recipients DROP CONSTRAINT IF EXISTS blessing_recipients_session_fkey;
+ALTER TABLE blessing_recipients DROP CONSTRAINT IF EXISTS blessing_recipients_event_fkey;
 \i services/directus/schema/migrations/rollback/20261020_0023_attendance_sessions.down.sql
 
 DO $$
@@ -383,6 +387,10 @@ END $$;
 \i services/directus/schema/migrations/20261020_0021_events_registrations.sql
 
 \i services/directus/schema/migrations/20261020_0023_attendance_sessions.sql
+\i services/directus/schema/migrations/20261020_0034_blessings_count_recipients.sql
+\i services/directus/schema/migrations/20261020_0030_child_scope_denorm.sql
+\i services/directus/schema/migrations/20261020_0031_fill_scope_zone.sql
+\i services/directus/schema/migrations/20261022_0039_departments_fill_scope_drop.sql
 
 DO $$
 BEGIN

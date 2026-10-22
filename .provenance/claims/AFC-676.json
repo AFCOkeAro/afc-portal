@@ -1,0 +1,27 @@
+{
+  "issue": "AFC-676",
+  "authorAgentId": "human-operator-board",
+  "authorName": "Board chairman (CLI operator session)",
+  "claimedAt": "2026-10-22T23:45:00+01:00",
+  "scopeOfTheClaim": "R1 only: authorship of the listed CI-repair paths on AFC-676 (the PR #19 branch could not go green: PGlite TEMP-table refusal, departments fill-scope vs single_scope_check, Z1=7/others=19 counts, SANGO-OTA resurrection by 0002 re-applies, register rollback dropping scope triggers, 0033 directus_app INSERT ceiling, suite self-sufficiency fixes for 79/94/96/98, assert.sql helpers). It asserts nothing about correctness; that is for CI (R4) and the CTO review (R2).",
+  "whatTheChangeActuallyDoes": "New migration 0039 (+rollback that restores the trigger) drops afc_fill_scope from departments; landed 0031 untouched. 0033 grants an explicit 14-column INSERT (every column the minutes create route writes; 0013 granted SELECT plus INSERT/UPDATE over 8/6 columns but never created_at/updated_at) and keeps UPDATE scoped to the three new columns; the down script revokes the surviving-column grants. Suites: 70 Z1=7/others=19; 85 re-applies 0029 after 0002 plus 0027 after 0020 (the 0020 down/up cycle recreates departments without the 0027 zone column); 86/88 park the 0034 blessing FKs around register rollback/re-apply and re-apply 0030+0031+0034, then re-apply 0039 to keep departments out of the fill list; 79 stages its own divergent rows for the rollback-refusal probe; 94 drops departments from the fill-scope list to 18 and installs the staging-graft people columns itself (no dependency on uncommitted work); 96 unlinks via UPDATE (people DELETE is retention-refused); 98 uses 3-arg assertions, a temp-table pre/post rerun check, and a quoted refusal probe. assert.sql gains table_exists/column_exists/can_select/can_insert/can_update/can_delete.",
+  "whatThisFileIs": "An R1 authorship claim, and nothing else. It says who wrote the compliance-path files below and on which issue. It carries no reviews[] entry.",
+  "doesNotClaimR2": "There is no reviews[] entry here and there will not be one from me. R2 wants a named reviewer who is not the author, and I am the author of every path below. Reviewer designation for an operator compliance-path commit is the CTO (MediaTech), same independence rule as a Coder commit. Requested on the AFC-676 thread; landing waits on a CTO verdict with permission to carry a Reviewed-by trailer.",
+  "notClaimedPaths": "The working tree carries MediaTech in-flight work I did not write and do not stage: the uncommitted 0030 static-trigger rewrite, the 0031-fill grandfather entry, tests/db/63_retention_privileges.sql, apps/web/assets/css/main.css, the untracked 0038 people_identity migration, and other uncommitted UI edits. A separate handoff comment on AFC-676 lists them. This commit does not depend on any of them: 94 installs its own graft columns, 79 stages its own divergent rows, and 0039/0033 stand alone. Non-compliance files in this commit are lint/typecheck/format fixes only and need no claim.",
+  "paths": [
+    "services/directus/schema/migrations/20261022_0039_departments_fill_scope_drop.sql",
+    "services/directus/schema/migrations/rollback/20261022_0039_departments_fill_scope_drop.down.sql",
+    "services/directus/schema/migrations/20261020_0033_office_minutes_times.sql",
+    "services/directus/schema/migrations/rollback/20261020_0033_office_minutes_times.down.sql",
+    "tests/db/70_hierarchy_scope.sql",
+    "tests/db/79_blessings_count_recipients.sql",
+    "tests/db/85_households_departments.sql",
+    "tests/db/86_events_registrations.sql",
+    "tests/db/88_attendance_sessions.sql",
+    "tests/db/94_child_scope_denorm.sql",
+    "tests/db/96_marriage_cases.sql",
+    "tests/db/98_impersonation_events.sql",
+    "tests/db/assert.sql",
+    ".provenance/claims/AFC-676.json"
+  ]
+}

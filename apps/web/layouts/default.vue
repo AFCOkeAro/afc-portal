@@ -90,7 +90,8 @@ function sectionForPath(path: string): string | null {
   for (const section of sections.value) {
     for (const item of section.items) {
       if (path === item.to || path.startsWith(`${item.to}/`)) {
-        if (!best || item.to.length > best.length) best = { key: section.key, length: item.to.length }
+        if (!best || item.to.length > best.length)
+          best = { key: section.key, length: item.to.length }
       }
     }
   }
@@ -99,7 +100,7 @@ function sectionForPath(path: string): string | null {
 
 watch(
   () => route.path,
-  (path) => {
+  (path: string) => {
     mobileOpen.value = false
     const current = sectionForPath(path)
     if (current !== null && !isExpanded(current)) {
@@ -115,7 +116,7 @@ function onEscape(event: KeyboardEvent): void {
   if (event.key === 'Escape') mobileOpen.value = false
 }
 
-watch(mobileOpen, (open) => {
+watch(mobileOpen, (open: boolean) => {
   try {
     document.body.style.overflow = open ? 'hidden' : ''
   } catch {
@@ -201,7 +202,9 @@ const menuItems = computed(() => [
   <div class="min-h-screen lg:flex">
     <!-- Mobile app bar: persistent brand + menu button. The drawer slides
       away when closed, so the control that opens it must live outside it. -->
-    <div class="sticky top-0 z-30 flex h-16 items-center justify-between gap-1 border-b border-gray-200 bg-white/95 px-3 backdrop-blur lg:hidden dark:border-gray-800 dark:bg-gray-900/95">
+    <div
+      class="sticky top-0 z-30 flex h-16 items-center justify-between gap-1 border-b border-gray-200 bg-white/95 px-3 backdrop-blur lg:hidden dark:border-gray-800 dark:bg-gray-900/95"
+    >
       <NuxtLink
         to="/dashboard"
         class="flex min-w-0 items-center gap-2 rounded-lg px-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500"
@@ -271,12 +274,12 @@ const menuItems = computed(() => [
         </button>
       </div>
 
-      <nav aria-label="Portal sections" class="min-h-0 flex-1 overflow-y-auto px-3 pb-4 lg:pb-6">
+      <nav
+        aria-label="Portal sections"
+        class="min-h-0 flex-1 overflow-y-auto px-3 pb-4 lg:pb-6"
+      >
         <!-- Full menu: overlay drawer on mobile, static sidebar on desktop. -->
-        <div
-          id="portal-sections-nav"
-          :class="railCollapsed ? 'lg:hidden' : ''"
-        >
+        <div id="portal-sections-nav" :class="railCollapsed ? 'lg:hidden' : ''">
           <div v-for="section in sections" :key="section.key" class="mt-4 first:mt-1">
             <div class="flex items-center gap-1">
               <NuxtLink
@@ -307,7 +310,10 @@ const menuItems = computed(() => [
               :id="`sidebar-section-${section.key}`"
               class="mt-1 space-y-1"
             >
-              <li v-for="(item, index) in section.items" :key="`${section.key}:${index}:${item.to}`">
+              <li
+                v-for="(item, index) in section.items"
+                :key="`${section.key}:${index}:${item.to}`"
+              >
                 <NuxtLink
                   :to="item.to"
                   class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-200 dark:text-gray-200 dark:hover:bg-gray-800"
@@ -334,11 +340,13 @@ const menuItems = computed(() => [
             v-for="(section, index) in sections"
             :key="section.key"
             class="space-y-1"
-            :class="{ 'mt-2 border-t border-gray-200 pt-2 dark:border-gray-800': index > 0 }"
+            :class="{
+              'mt-2 border-t border-gray-200 pt-2 dark:border-gray-800': index > 0,
+            }"
           >
             <NuxtLink
-              v-for="(item, index) in section.items"
-              :key="`${section.key}:${index}:${item.to}`"
+              v-for="(item, itemIndex) in section.items"
+              :key="`${section.key}:${itemIndex}:${item.to}`"
               :to="item.to"
               :title="item.label"
               :aria-label="item.label"

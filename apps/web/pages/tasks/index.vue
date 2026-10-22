@@ -1,5 +1,11 @@
 <script setup lang="ts">
-import { COLLECTIONS, isTaskOverdue, TASK_TEMPLATES, expandTaskTemplate, getTaskTemplate } from '@afc/shared'
+import {
+  COLLECTIONS,
+  isTaskOverdue,
+  TASK_TEMPLATES,
+  expandTaskTemplate,
+  getTaskTemplate,
+} from '@afc/shared'
 
 definePageMeta({ middleware: 'staff' })
 
@@ -72,7 +78,9 @@ async function applyTemplate() {
             ? null
             : templateForm.value.assignee_user.trim(),
         assignee_person:
-          templateForm.value.assignee_person === '' ? null : templateForm.value.assignee_person,
+          templateForm.value.assignee_person === ''
+            ? null
+            : templateForm.value.assignee_person,
       },
     )
     templateCreated.value = res.data.created
@@ -363,18 +371,26 @@ function isOverdue(row: Record<string, unknown>): boolean {
             />
           </UFormField>
         </div>
-        <ul class="mt-4 space-y-1.5 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm dark:border-gray-800 dark:bg-gray-900/40">
+        <ul
+          class="mt-4 space-y-1.5 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm dark:border-gray-800 dark:bg-gray-900/40"
+        >
           <li
             v-for="(step, index) in templatePreview"
             :key="index"
             class="flex items-center gap-2"
           >
             <span class="text-gray-400 tabular-nums">{{ index + 1 }}.</span>
-            <span class="min-w-0 flex-1 truncate font-medium text-gray-900 dark:text-white">
+            <span
+              class="min-w-0 flex-1 truncate font-medium text-gray-900 dark:text-white"
+            >
               {{ step.title }}
             </span>
-            <UBadge color="neutral" variant="subtle" size="xs">{{ step.priority }}</UBadge>
-            <span class="text-xs text-gray-500 tabular-nums">{{ step.due_date ?? 'no date' }}</span>
+            <UBadge color="neutral" variant="subtle" size="xs">{{
+              step.priority
+            }}</UBadge>
+            <span class="text-xs text-gray-500 tabular-nums">{{
+              step.due_date ?? 'no date'
+            }}</span>
           </li>
         </ul>
         <UAlert
@@ -411,7 +427,7 @@ function isOverdue(row: Record<string, unknown>): boolean {
           placeholder="All branches"
           :loading="branchesPending"
           class="w-full"
-          ariaLabel="Filter by branch"
+          aria-label="Filter by branch"
         />
         <UCheckbox v-model="mine" label="Assigned to me" name="mine" />
       </div>

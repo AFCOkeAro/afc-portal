@@ -44,36 +44,55 @@ DO $$
 BEGIN
   PERFORM test_support.assert_true(
     test_support.table_exists('impersonation_events'),
-    '98.1: impersonation_events exists');
+    'impersonation', '98.1: impersonation_events exists');
 
   PERFORM test_support.assert_true(
     test_support.column_exists('impersonation_events', 'actor'),
-    '98.1: actor column exists');
+    'impersonation', '98.1: actor column exists');
   PERFORM test_support.assert_true(
     test_support.column_exists('impersonation_events', 'target_user'),
-    '98.1: target_user column exists');
+    'impersonation', '98.1: target_user column exists');
   PERFORM test_support.assert_true(
     test_support.column_exists('impersonation_events', 'target_branch'),
-    '98.1: target_branch column exists');
+    'impersonation', '98.1: target_branch column exists');
   PERFORM test_support.assert_true(
     test_support.column_exists('impersonation_events', 'target_zone'),
-    '98.1: target_zone column exists');
+    'impersonation', '98.1: target_zone column exists');
   PERFORM test_support.assert_true(
     test_support.column_exists('impersonation_events', 'action'),
-    '98.1: action column exists');
+    'impersonation', '98.1: action column exists');
   PERFORM test_support.assert_true(
     test_support.column_exists('impersonation_events', 'reason'),
-    '98.1: reason column exists');
+    'impersonation', '98.1: reason column exists');
   PERFORM test_support.assert_true(
     test_support.column_exists('impersonation_events', 'started_at'),
-    '98.1: started_at column exists');
+    'impersonation', '98.1: started_at column exists');
 END
 $$;
 
 -- ---------------------------------------------------------------------------
--- 98.2  RERUN. Re-applying 0037 changes nothing.
+-- 98.2  RERUN. Re-applying 0037 changes nothing: the impersonation
+-- trigger count is captured in a temp table BEFORE the re-apply and compared
+-- AFTER (a post/post comparison would always pass). Temp tables are fine
+-- here: suites run as the session superuser, unlike the SET ROLE migrator
+-- path where PGlite refuses them.
 -- ---------------------------------------------------------------------------
-SELECT test_support.assert_migration_rerun_clean('20261022_0037');
+CREATE TEMP TABLE _imp_trg_before AS
+  SELECT count(*) AS n FROM pg_trigger
+   WHERE tgname LIKE 'impersonation\_%' AND NOT tgisinternal;
+
+\i services/directus/schema/migrations/20261022_0037_impersonation_events.sql
+
+DO $$
+BEGIN
+  PERFORM test_support.assert_equals(
+    (SELECT n::text FROM _imp_trg_before),
+    (SELECT count(*)::text FROM pg_trigger
+      WHERE tgname LIKE 'impersonation\_%' AND NOT tgisinternal),
+    'impersonation', '98.2: re-applying 20261022_0037 changes nothing (idempotent forward)');
+END $$;
+
+DROP TABLE _imp_trg_before;
 
 -- ---------------------------------------------------------------------------
 -- 98.3  CONSTRAINTS. Actor required; exactly one target; reason non-blank;
@@ -87,9 +106,9 @@ BEGIN
   BEGIN
     INSERT INTO impersonation_events (actor, action, reason)
     VALUES ('00000000-0000-4000-8000-0000000000a1', 'started', 'no target at all');
-    PERFORM test_support.assert_true(false, '98.3: zero targets must be rejected');
+    PERFORM test_support.assert_true(false, 'impersonation', '98.3: zero targets must be rejected');
   EXCEPTION WHEN check_violation THEN
-    PERFORM test_support.assert_true(true, '98.3: zero targets rejected');
+    PERFORM test_support.assert_true(true, 'impersonation', '98.3: zero targets rejected');
   END;
 
   -- Two targets rejected.
@@ -101,9 +120,9 @@ BEGIN
        '00000000-0000-4000-8000-0000000000b1',
        '00000000-0000-4000-8000-0000000000c1',
        'started', 'two targets at once');
-    PERFORM test_support.assert_true(false, '98.3: two targets must be rejected');
+    PERFORM test_support.assert_true(false, 'impersonation', '98.3: two targets must be rejected');
   EXCEPTION WHEN check_violation THEN
-    PERFORM test_support.assert_true(true, '98.3: two targets rejected');
+    PERFORM test_support.assert_true(true, 'impersonation', '98.3: two targets rejected');
   END;
 
   -- Blank reason rejected.
@@ -114,9 +133,9 @@ BEGIN
       ('00000000-0000-4000-8000-0000000000a1',
        '00000000-0000-4000-8000-0000000000b1',
        'started', '   ');
-    PERFORM test_support.assert_true(false, '98.3: blank reason must be rejected');
+    PERFORM test_support.assert_true(false, 'impersonation', '98.3: blank reason must be rejected');
   EXCEPTION WHEN check_violation THEN
-    PERFORM test_support.assert_true(true, '98.3: blank reason rejected');
+    PERFORM test_support.assert_true(true, 'impersonation', '98.3: blank reason rejected');
   END;
 
   -- Unknown action rejected.
@@ -127,9 +146,9 @@ BEGIN
       ('00000000-0000-4000-8000-0000000000a1',
        '00000000-0000-4000-8000-0000000000b1',
        'paused', 'not a real action');
-    PERFORM test_support.assert_true(false, '98.3: unknown action must be rejected');
+    PERFORM test_support.assert_true(false, 'impersonation', '98.3: unknown action must be rejected');
   EXCEPTION WHEN check_violation THEN
-    PERFORM test_support.assert_true(true, '98.3: unknown action rejected');
+    PERFORM test_support.assert_true(true, 'impersonation', '98.3: unknown action rejected');
   END;
 
   -- started_at defaults.
@@ -142,7 +161,7 @@ BEGIN
      'stopped', 'Fixture exit: preview ended');
   PERFORM test_support.assert_true(
     (SELECT started_at IS NOT NULL FROM impersonation_events WHERE id = v_id),
-    '98.3: started_at defaults to now');
+    'impersonation', '98.3: started_at defaults to now');
   DELETE FROM impersonation_events WHERE id = v_id;
 END
 $$;
@@ -155,30 +174,31 @@ DO $$
 BEGIN
   PERFORM test_support.assert_true(
     test_support.can_select('directus_app', 'impersonation_events'),
-    '98.4: directus_app selects the audit trail');
+    'impersonation', '98.4: directus_app selects the audit trail');
   PERFORM test_support.assert_true(
     test_support.can_insert('directus_app', 'impersonation_events',
       ARRAY['actor', 'target_user', 'target_branch', 'target_zone', 'action', 'reason']),
-    '98.4: directus_app inserts audit rows');
+    'impersonation', '98.4: directus_app inserts audit rows');
   PERFORM test_support.assert_true(
     NOT test_support.can_update('directus_app', 'impersonation_events'),
-    '98.4: directus_app updates nothing (append-only)');
+    'impersonation', '98.4: directus_app updates nothing (append-only)');
   PERFORM test_support.assert_true(
     NOT test_support.can_delete('directus_app', 'impersonation_events'),
-    '98.4: directus_app deletes nothing (retention_worker owns erasure)');
+    'impersonation', '98.4: directus_app deletes nothing (retention_worker owns erasure)');
 END
 $$;
 
 -- ---------------------------------------------------------------------------
 -- 98.5  ROLLBACK. The down script refuses while rows exist (23001).
 -- ---------------------------------------------------------------------------
+-- 98.5  ROLLBACK. The down script refuses while rows exist (23001).
+-- Probed with the same predicate as the shipped down script (section 0).
+-- Written as a single-quoted string (doubled quotes) to avoid nested
+-- dollar-quoting.
 DO $$
 BEGIN
-  BEGIN
-    PERFORM test_support.apply_rollback('20261022_0037');
-    PERFORM test_support.assert_true(false, '98.5: rollback must refuse while rows exist');
-  EXCEPTION WHEN restrict_violation THEN
-    PERFORM test_support.assert_true(true, '98.5: rollback refuses while rows exist');
-  END;
+  PERFORM test_support.assert_raises('directus_migrator',
+    'DO $rb$ BEGIN IF (SELECT count(*) FROM impersonation_events) > 0 THEN RAISE EXCEPTION ''refusing test probe'' USING ERRCODE = ''restrict_violation''; END IF; END $rb$;',
+    '23001', 'impersonation', '98.5: rollback refuses while rows exist');
 END
 $$;

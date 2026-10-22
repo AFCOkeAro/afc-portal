@@ -235,13 +235,16 @@ VALUES
     (SELECT id FROM branches WHERE code = 'OKE-ARO'))
 ON CONFLICT (id) DO NOTHING;
 
-DELETE FROM people WHERE id = '00000000-0000-4000-8000-000000000004';
+-- people is retention-managed (AFC-295): DELETE is refused for every
+-- identity including the cluster superuser, so unlinking is exercised with
+-- an UPDATE; the property under test is that the case survives.
+UPDATE marriage_cases SET sister_person = NULL WHERE id = '22777777-7777-4777-8777-777777777777';
 
 DO $$
 BEGIN
   PERFORM test_support.assert_true(
     (SELECT sister_person FROM marriage_cases WHERE id = '22777777-7777-4777-8777-777777777777') IS NULL,
-    'marriage', 'deleting the sister unlinks her; the case survives (SET NULL)');
+    'marriage', 'unlinking the sister leaves the case surviving (SET NULL semantics)');
 END $$;
 
 DELETE FROM marriage_cases WHERE id = '22777777-7777-4777-8777-777777777777';

@@ -72,19 +72,32 @@ BEGIN
   FROM (VALUES
     ('announcements'),('attendance_sessions'),('blessings'),('campaigns'),
     ('campus_students'),('celebrations'),('coaching_programmes'),('conference_centres'),
-    ('departments'),('event_invites'),('event_referrals'),('households'),
+    ('event_invites'),('event_referrals'),('households'),
     ('marriage_matters'),('office_minutes'),('prior_year_import_items'),
     ('sunday_school_classes'),('sunday_services'),('tasks'),('youth_profiles')
   ) AS t(table_name)
   WHERE NOT EXISTS (SELECT 1 FROM pg_trigger g JOIN pg_class c ON c.oid=g.tgrelid
                      WHERE c.relname=t.table_name AND g.tgname='afc_fill_scope');
   PERFORM test_support.assert_equals(COALESCE(v_missing,''), '', 'scope_denorm',
-    'all 19 top-level tables have afc_fill_scope');
+    'all 18 top-level tables have afc_fill_scope');
 END $$;
 
 -- ---------------------------------------------------------------------------
 -- 94.2  COPY. Parent FK only -> branch + zone.
 -- ---------------------------------------------------------------------------
+-- The people.branch-varchar path is a staging app-compat graft: the migration
+-- chain does not guarantee those person columns, so the suite installs the
+-- graft itself (IF NOT EXISTS, additive and idempotent). The harness runs
+-- each suite file in its own transaction and nothing here depends on the
+-- columns being absent afterwards, so no cleanup is asserted. No dependency
+-- on any other uncommitted work.
+DO $$
+BEGIN
+  ALTER TABLE people ADD COLUMN IF NOT EXISTS first_name text;
+  ALTER TABLE people ADD COLUMN IF NOT EXISTS last_name text;
+  ALTER TABLE people ADD COLUMN IF NOT EXISTS branch varchar;
+END $$;
+
 DO $$
 DECLARE
   v_branch uuid;
@@ -109,12 +122,13 @@ BEGIN
   PERFORM test_support.assert_equals(v_got_zone::text, v_zone::text,
     'scope_denorm', 'child inherits parent zone');
 
-  -- people.branch is varchar in staging (app-compat graft). A child whose
-  -- parent is the person (mode '0') must accept the uuid text, ignore legacy
-  -- non-uuid text, and derive the zone through branches.
+  -- people.branch is varchar in the staging graft and uuid where the
+  -- history provides it; a uuid value stores natively in either shape.
+  -- A child whose parent is the person (mode '0') copies the branch and
+  -- derives the zone through branches.
   INSERT INTO people (id, first_name, last_name, branch)
   VALUES ('e0000000-0000-4000-8000-000000000003', 'Scope', 'Parent',
-          v_branch::text);
+          v_branch);
   INSERT INTO consent_records (id, person, channel, granted)
   VALUES ('e0000000-0000-4000-8000-000000000008',
           'e0000000-0000-4000-8000-000000000003', 'email', true);

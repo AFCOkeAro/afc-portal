@@ -388,7 +388,10 @@ export default defineEventHandler(async (event): Promise<DashboardData> => {
             headcount_total: number | null
             branch: string | null
           }>(event, scope, 'attendance_sessions', {
-            filter: mergeFilters({ session_type: { _eq: 'sunday_school' } }, branchFilter),
+            filter: mergeFilters(
+              { session_type: { _eq: 'sunday_school' } },
+              branchFilter,
+            ),
             fields: ['id', 'session_date', 'session_name', 'headcount_total', 'branch'],
             sort: '-session_date',
             limit: 5,
@@ -472,21 +475,19 @@ export default defineEventHandler(async (event): Promise<DashboardData> => {
     'registrationsBreakdown',
     (async () => {
       if (upcomingIds.length === 0) return []
-      const registrations = await listItems<{ event: string; registration_status: string }>(
-        event,
-        scope,
-        'event_registrations',
-        {
-          filter: {
-            _and: [
-              { event: { _in: upcomingIds } },
-              { registration_status: { _neq: 'cancelled' } },
-            ],
-          },
-          fields: ['event', 'registration_status'],
-          limit: -1,
+      const registrations = await listItems<{
+        event: string
+        registration_status: string
+      }>(event, scope, 'event_registrations', {
+        filter: {
+          _and: [
+            { event: { _in: upcomingIds } },
+            { registration_status: { _neq: 'cancelled' } },
+          ],
         },
-      )
+        fields: ['event', 'registration_status'],
+        limit: -1,
+      })
       return registrations.data
     })(),
     [],
@@ -572,128 +573,133 @@ export default defineEventHandler(async (event): Promise<DashboardData> => {
     'celebrations',
     (async (): Promise<DashboardCelebrationItem[]> => {
       if (!celebrationsVisible) return []
-      let celebrationItems: DashboardCelebrationItem[] = []
-    // Celebrations half: scoped like the feed (area sees all; zone staff
-    // see their zones; branch staff see their branches). Recurring rows are
-    // read whole and projected in code because Directus cannot express
-    // EXTRACT(month/day) -- the same approach as collectCelebrations.
-    const scopePred = scope.isArea
-      ? undefined
-      : scope.zoneIds.length > 0
-        ? { zone: { _in: scope.zoneIds } }
-        : { branch: { _in: scope.branchIds } }
-    const celebrationRows: Array<Record<string, unknown>> = []
-    let celebrationPage = 1
-    for (;;) {
-      const result = await listItems<Record<string, unknown>>(
-        event,
-        scope,
-        'celebrations',
-        {
-          filter: mergeFilters(
-            scopePred,
-            { status: { _in: ['approved', 'published'] } },
-            { type: { _in: ['birthday', 'wedding_anniversary'] } },
-            {
-              _or: [
-                { is_recurring: { _eq: true } },
-                { event_date: { _gte: windowFrom, _lte: windowTo } },
-              ],
-            },
-          ),
-          fields: CELEBRATION_DASH_FIELDS,
-          limit: 200,
-          page: celebrationPage,
-        },
-      )
-      celebrationRows.push(...result.data)
-      if (result.data.length < 200 || celebrationRows.length >= result.meta.total) break
-      celebrationPage += 1
-    }
-    const feedRows = celebrationRows as unknown as FeedCelebrationRow[]
-    const occurrences = celebrationsToCalendarItems(feedRows, {
-      from: windowFrom,
-      to: windowTo,
-    })
-    const byId = new Map(feedRows.map((row) => [String(row.id), row]))
-    const celebrationPersonIds = [
-      ...new Set(occurrences.map((item) => String(byId.get(item.id)?.person ?? ''))),
-    ].filter(Boolean)
-    const celebrationPeople = new Map<string, Record<string, unknown>>()
-    for (let i = 0; i < celebrationPersonIds.length; i += 100) {
-      const chunk = celebrationPersonIds.slice(i, i + 100)
-      const result = await listItems<Record<string, unknown>>(event, scope, 'people', {
-        filter: { id: { _in: chunk } },
-        fields: ['id', 'first_name', 'last_name', 'preferred_name', 'is_minor'],
-        limit: 100,
-      })
-      for (const row of result.data) celebrationPeople.set(String(row.id), row)
-    }
-    celebrationItems = occurrences.map((item) => {
-      const row = byId.get(item.id)
-      const person = celebrationPeople.get(String(row?.person ?? ''))
-      return {
-        kind: 'celebration' as const,
-        id: item.id,
-        name: person ? personDisplayName(person) : 'Unnamed',
-        label: String(row?.type ?? 'celebration').replace(/_/g, ' '),
-        date: item.date,
-        branch_name: row?.branch ? (names.get(String(row.branch)) ?? null) : null,
-        person_is_minor:
-          typeof person?.is_minor === 'boolean' ? (person.is_minor as boolean) : null,
-        href: `/celebrations/${item.id}`,
-      }
-    })
-
-    // People-DOB half: month/day matches on active people in scope. Runs
-    // only for roles that may read date_of_birth (super/area/branch admin
-    // per FIELD_RESTRICTIONS); anyone else gets the celebrations half only.
-    if (!isHidden(scope, 'people', 'date_of_birth')) {
-      const birthdayItems: DashboardCelebrationItem[] = []
-      let personPage = 1
+      let celebrationItems: DashboardCelebrationItem[]
+      // Celebrations half: scoped like the feed (area sees all; zone staff
+      // see their zones; branch staff see their branches). Recurring rows are
+      // read whole and projected in code because Directus cannot express
+      // EXTRACT(month/day) -- the same approach as collectCelebrations.
+      const scopePred = scope.isArea
+        ? undefined
+        : scope.zoneIds.length > 0
+          ? { zone: { _in: scope.zoneIds } }
+          : { branch: { _in: scope.branchIds } }
+      const celebrationRows: Array<Record<string, unknown>> = []
+      let celebrationPage = 1
       for (;;) {
+        const result = await listItems<Record<string, unknown>>(
+          event,
+          scope,
+          'celebrations',
+          {
+            filter: mergeFilters(
+              scopePred,
+              { status: { _in: ['approved', 'published'] } },
+              { type: { _in: ['birthday', 'wedding_anniversary'] } },
+              {
+                _or: [
+                  { is_recurring: { _eq: true } },
+                  { event_date: { _gte: windowFrom, _lte: windowTo } },
+                ],
+              },
+            ),
+            fields: CELEBRATION_DASH_FIELDS,
+            limit: 200,
+            page: celebrationPage,
+          },
+        )
+        celebrationRows.push(...result.data)
+        if (result.data.length < 200 || celebrationRows.length >= result.meta.total) break
+        celebrationPage += 1
+      }
+      const feedRows = celebrationRows as unknown as FeedCelebrationRow[]
+      const occurrences = celebrationsToCalendarItems(feedRows, {
+        from: windowFrom,
+        to: windowTo,
+      })
+      const byId = new Map(feedRows.map((row) => [String(row.id), row]))
+      const celebrationPersonIds = [
+        ...new Set(occurrences.map((item) => String(byId.get(item.id)?.person ?? ''))),
+      ].filter(Boolean)
+      const celebrationPeople = new Map<string, Record<string, unknown>>()
+      for (let i = 0; i < celebrationPersonIds.length; i += 100) {
+        const chunk = celebrationPersonIds.slice(i, i + 100)
         const result = await listItems<Record<string, unknown>>(event, scope, 'people', {
-          filter: mergeFilters(
-            branchFilter,
-            { status: { _eq: 'active' } },
-            { date_of_birth: { _nnull: true } },
-          ),
-          fields: BIRTHDAY_PERSON_FIELDS,
-          limit: 200,
-          page: personPage,
+          filter: { id: { _in: chunk } },
+          fields: ['id', 'first_name', 'last_name', 'preferred_name', 'is_minor'],
+          limit: 100,
         })
-        for (const row of result.data) {
-          const md = monthDayOf(String(row.date_of_birth ?? ''))
-          if (!md) continue
-          const occurrence = occurrenceInWindow(md.month, md.day, windowFrom, windowTo)
-          if (!occurrence) continue
-          birthdayItems.push({
-            kind: 'birthday',
-            id: String(row.id),
-            name: personDisplayName(row),
-            label: 'birthday',
-            date: occurrence,
-            branch_name: row.branch ? (names.get(String(row.branch)) ?? null) : null,
-            person_is_minor:
-              typeof row.is_minor === 'boolean' ? (row.is_minor as boolean) : null,
-            href: `/people/${String(row.id)}`,
-          })
+        for (const row of result.data) celebrationPeople.set(String(row.id), row)
+      }
+      celebrationItems = occurrences.map((item) => {
+        const row = byId.get(item.id)
+        const person = celebrationPeople.get(String(row?.person ?? ''))
+        return {
+          kind: 'celebration' as const,
+          id: item.id,
+          name: person ? personDisplayName(person) : 'Unnamed',
+          label: String(row?.type ?? 'celebration').replace(/_/g, ' '),
+          date: item.date,
+          branch_name: row?.branch ? (names.get(String(row.branch)) ?? null) : null,
+          person_is_minor:
+            typeof person?.is_minor === 'boolean' ? (person.is_minor as boolean) : null,
+          href: `/celebrations/${item.id}`,
         }
-        if (result.data.length < 200) break
-        personPage += 1
-      }
-      // Merge, de-duplicating people who also have a birthday celebration
-      // row (the named celebration wins over the derived DOB match). The
-      // join is by person id, never by name (names are not unique).
-      const celebratedPersonIds = new Set(
-        celebrationItems
-          .filter((item) => item.label === 'birthday')
-          .map((item) => String(byId.get(item.id)?.person ?? '')),
-      )
-      for (const item of birthdayItems) {
-        if (celebratedPersonIds.has(item.id)) continue
-        celebrationItems.push(item)
-      }
+      })
+
+      // People-DOB half: month/day matches on active people in scope. Runs
+      // only for roles that may read date_of_birth (super/area/branch admin
+      // per FIELD_RESTRICTIONS); anyone else gets the celebrations half only.
+      if (!isHidden(scope, 'people', 'date_of_birth')) {
+        const birthdayItems: DashboardCelebrationItem[] = []
+        let personPage = 1
+        for (;;) {
+          const result = await listItems<Record<string, unknown>>(
+            event,
+            scope,
+            'people',
+            {
+              filter: mergeFilters(
+                branchFilter,
+                { status: { _eq: 'active' } },
+                { date_of_birth: { _nnull: true } },
+              ),
+              fields: BIRTHDAY_PERSON_FIELDS,
+              limit: 200,
+              page: personPage,
+            },
+          )
+          for (const row of result.data) {
+            const md = monthDayOf(String(row.date_of_birth ?? ''))
+            if (!md) continue
+            const occurrence = occurrenceInWindow(md.month, md.day, windowFrom, windowTo)
+            if (!occurrence) continue
+            birthdayItems.push({
+              kind: 'birthday',
+              id: String(row.id),
+              name: personDisplayName(row),
+              label: 'birthday',
+              date: occurrence,
+              branch_name: row.branch ? (names.get(String(row.branch)) ?? null) : null,
+              person_is_minor:
+                typeof row.is_minor === 'boolean' ? (row.is_minor as boolean) : null,
+              href: `/people/${String(row.id)}`,
+            })
+          }
+          if (result.data.length < 200) break
+          personPage += 1
+        }
+        // Merge, de-duplicating people who also have a birthday celebration
+        // row (the named celebration wins over the derived DOB match). The
+        // join is by person id, never by name (names are not unique).
+        const celebratedPersonIds = new Set(
+          celebrationItems
+            .filter((item) => item.label === 'birthday')
+            .map((item) => String(byId.get(item.id)?.person ?? '')),
+        )
+        for (const item of birthdayItems) {
+          if (celebratedPersonIds.has(item.id)) continue
+          celebrationItems.push(item)
+        }
       }
       celebrationItems = celebrationItems
         .sort((a, b) => a.date.localeCompare(b.date) || a.name.localeCompare(b.name))

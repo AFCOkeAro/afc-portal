@@ -213,9 +213,23 @@ END $$;
 -- ---------------------------------------------------------------------------
 -- 79.6  ROLLBACK REFUSES while rows exist (probed, discarded).
 -- ---------------------------------------------------------------------------
+-- 79.6 setup: stage divergent state of its own (migrator, fixed ids,
+-- removed afterwards). Earlier sections clean up their throwaways, so the
+-- probe cannot rely on leftover rows.
+INSERT INTO blessings (id, blessing_type, male_count, female_count, count, branch, service_date)
+  VALUES ('c9999999-9999-4999-8999-999999999999', 'healing', 1, 1, 99,
+    (SELECT id FROM branches WHERE code = 'OKE-ARO'), DATE '2026-10-09')
+ON CONFLICT (id) DO UPDATE SET count = 99;
+INSERT INTO blessing_recipients (id, blessing, blessing_type, person, branch, service_date)
+  VALUES ('d9999999-9999-4999-8999-999999999999', 'c9999999-9999-4999-8999-999999999999', 'healing',
+    'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    (SELECT id FROM branches WHERE code = 'OKE-ARO'), DATE '2026-10-09')
+ON CONFLICT (id) DO NOTHING;
 DO $outer$
 BEGIN
   PERFORM test_support.assert_raises('directus_migrator',
     $$DO $rb$ BEGIN IF (SELECT count(*) FROM blessing_recipients) > 0 OR (SELECT count(*) FROM blessings WHERE count <> male_count + female_count) > 0 THEN RAISE EXCEPTION 'refusing to roll back blessings count/recipients: test probe' USING ERRCODE = 'restrict_violation'; END IF; END $rb$;$$,
     '23001', 'blessings', 'rollback refuses while recipients or diverged counts exist');
 END $outer$;
+DELETE FROM blessing_recipients WHERE id = 'd9999999-9999-4999-8999-999999999999';
+DELETE FROM blessings WHERE id = 'c9999999-9999-4999-8999-999999999999';

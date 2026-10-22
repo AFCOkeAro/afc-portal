@@ -1,11 +1,15 @@
 import type { H3Event } from 'h3'
 import type { AuthSession, Grant, ImpersonatedBy, PortalUser } from '@afc/shared'
-import { IMPERSONATION_AUDIT_COLLECTION, impersonationExpiry } from '@afc/shared'
+import {
+  IMPERSONATION_AUDIT_COLLECTION,
+  impersonationExpiry,
+  isImpersonationExpired as isClaimExpired,
+  targetRoleOutranksActor,
+} from '@afc/shared'
 import { grantsForRole } from '@afc/shared/role-matrix'
 import { DirectusAuthError, directusFetch } from './directus'
 import type { PortalScope } from './portal'
 import { createItem, throwStoreUnavailable } from './portal'
-import { isImpersonationExpired as isClaimExpired, targetRoleOutranksActor } from '@afc/shared'
 
 /**
  * Impersonation enforcement (AFC-684, server-side only).
@@ -79,7 +83,11 @@ export function intersectGrants(actor: Grant[], target: Grant[]): Grant[] {
   for (const a of actor) {
     const t = byKey.get(`${a.collection}:${a.action}`)
     if (!t) continue
-    out.push({ collection: a.collection, action: a.action, scope: intersectScope(a.scope, t.scope) })
+    out.push({
+      collection: a.collection,
+      action: a.action,
+      scope: intersectScope(a.scope, t.scope),
+    })
   }
   return out.sort((x, y) =>
     `${x.collection}:${x.action}`.localeCompare(`${y.collection}:${y.action}`),
@@ -125,10 +133,14 @@ async function readBranchZone(
   branchId: string,
 ): Promise<string | null> {
   try {
-    const row = await directusFetch<{ data: BranchRow }>(event, `/items/branches/${branchId}`, {
-      accessToken: token,
-      query: { fields: 'id,zone' },
-    })
+    const row = await directusFetch<{ data: BranchRow }>(
+      event,
+      `/items/branches/${branchId}`,
+      {
+        accessToken: token,
+        query: { fields: 'id,zone' },
+      },
+    )
     return row.data.zone
   } catch (cause) {
     if (cause instanceof DirectusAuthError) {
@@ -148,24 +160,28 @@ async function readTargetUser(
   targetUserId: string,
 ): Promise<DirectusUserRow> {
   try {
-    const row = await directusFetch<{ data: DirectusUserRow }>(event, `/users/${targetUserId}`, {
-      accessToken: token,
-      query: {
-        fields: [
-          'id',
-          'email',
-          'first_name',
-          'staff_role',
-          'branch',
-          'branch_ids',
-          'department_ids',
-          'person',
-          'area',
-          'zone',
-          'zone_ids',
-        ].join(','),
+    const row = await directusFetch<{ data: DirectusUserRow }>(
+      event,
+      `/users/${targetUserId}`,
+      {
+        accessToken: token,
+        query: {
+          fields: [
+            'id',
+            'email',
+            'first_name',
+            'staff_role',
+            'branch',
+            'branch_ids',
+            'department_ids',
+            'person',
+            'area',
+            'zone',
+            'zone_ids',
+          ].join(','),
+        },
       },
-    })
+    )
     return row.data
   } catch (cause) {
     if (cause instanceof DirectusAuthError) {
@@ -268,9 +284,12 @@ export async function resolveImpersonationTarget(
     // Scope preview: the actor looks through a branch_admin lens narrowed to
     // this branch. The role downgrade is the escalation guard for scope
     // targets — area grants never survive into a branch preview.
-    const previewRole = actor.staffRole === 'super_admin' || actor.staffRole === 'area_admin' || actor.staffRole === 'zone_admin'
-      ? ('branch_admin' as const)
-      : ('none' as const)
+    const previewRole =
+      actor.staffRole === 'super_admin' ||
+      actor.staffRole === 'area_admin' ||
+      actor.staffRole === 'zone_admin'
+        ? ('branch_admin' as const)
+        : ('none' as const)
     const user: PortalUser = {
       id: actor.id,
       email: actor.email,
@@ -284,16 +303,23 @@ export async function resolveImpersonationTarget(
       zoneId: zone,
       zoneIds: zone ? [zone] : [],
     }
-    return { kind: 'branch', id: input.branchId, user, targetZoneId: zone, targetIsAreaWide: false }
+    return {
+      kind: 'branch',
+      id: input.branchId,
+      user,
+      targetZoneId: zone,
+      targetIsAreaWide: false,
+    }
   }
 
   const zoneId = input.zoneId!
   assertInScope(scope, zoneId, false, 'zone_out_of_scope')
-  const previewRole = actor.staffRole === 'super_admin' || actor.staffRole === 'area_admin'
-    ? ('zone_admin' as const)
-    : actor.staffRole === 'zone_admin'
+  const previewRole =
+    actor.staffRole === 'super_admin' || actor.staffRole === 'area_admin'
       ? ('zone_admin' as const)
-      : ('none' as const)
+      : actor.staffRole === 'zone_admin'
+        ? ('zone_admin' as const)
+        : ('none' as const)
   const user: PortalUser = {
     id: actor.id,
     email: actor.email,
@@ -325,7 +351,12 @@ function assertInScope(
     })
   }
   if (targetIsAreaWide || !targetZoneId || !scope.zoneIds.includes(targetZoneId)) {
-    const what = code === 'zone_out_of_scope' ? 'zone' : code === 'branch_out_of_scope' ? 'branch' : 'user'
+    const what =
+      code === 'zone_out_of_scope'
+        ? 'zone'
+        : code === 'branch_out_of_scope'
+          ? 'branch'
+          : 'user'
     throw createError({
       statusCode: 403,
       statusMessage: `That ${what} is outside your zone scope`,

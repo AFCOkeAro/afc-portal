@@ -43,9 +43,16 @@ ALTER TABLE office_minutes DROP CONSTRAINT IF EXISTS office_minutes_time_order;
 ALTER TABLE office_minutes ADD CONSTRAINT office_minutes_time_order
   CHECK (start_time IS NULL OR end_time IS NULL OR end_time > start_time);
 
--- 3. Least-privilege ceiling: extend the 0013 column lists with exactly the
---    three new columns. GRANT is idempotent; repeating it changes nothing.
-GRANT INSERT (start_time, end_time, location) ON office_minutes TO directus_app;
+-- 3. Least-privilege ceiling: 0013 grants SELECT plus INSERT over 8
+--    columns (title, meeting_date, body, file, status, branch, zone,
+--    created_by) and UPDATE over 6 -- but never created_at/updated_at --
+--    while the minutes create route writes all 13 operational columns plus
+--    an explicit id. Postgres grants INSERT per table or per every inserted
+--    column, so the partial lists refuse the full-row INSERT (42501, suite
+--    95 guards this exactly): the grant names every column the route writes.
+--    UPDATE stays scoped to exactly the three new columns. GRANT is
+--    idempotent; repeating it changes nothing.
+GRANT INSERT (id, title, meeting_date, body, file, status, branch, zone, created_by, created_at, updated_at, start_time, end_time, location) ON office_minutes TO directus_app;
 GRANT UPDATE (start_time, end_time, location) ON office_minutes TO directus_app;
 
 REVOKE ALL ON office_minutes FROM PUBLIC;

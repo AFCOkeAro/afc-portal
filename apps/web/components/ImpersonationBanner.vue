@@ -13,6 +13,11 @@ import type { AuthState } from '~/server/api/auth/me.get'
 const api = useApi()
 const { invalidate } = useAuth()
 
+// Exposed before the top-level await below: vue/no-expose-after-await
+// forbids defineExpose after an await expression. The wrapper closes over
+// the binding, so it resolves once setup completes.
+defineExpose({ refresh: () => refresh() })
+
 const { data, refresh } = await useAsyncData<AuthState>('afc:impersonation-banner', () =>
   api.get<AuthState>('/api/auth/me'),
 )
@@ -25,8 +30,6 @@ async function exit(): Promise<void> {
   await refresh()
   await navigateTo('/dashboard', { replace: true })
 }
-
-defineExpose({ refresh })
 </script>
 
 <template>
@@ -39,10 +42,16 @@ defineExpose({ refresh })
     <p class="min-w-0">
       Previewing as
       <strong>{{ claim.targetKind }} {{ claim.targetId }}</strong>
-      — started by {{ claim.actorEmail }} ({{ claim.reason }}).
-      Ends {{ claim.expiresAt }}.
+      — started by {{ claim.actorEmail }} ({{ claim.reason }}). Ends
+      {{ claim.expiresAt }}.
     </p>
-    <UButton size="xs" color="warning" variant="solid" aria-label="Exit preview" @click="exit">
+    <UButton
+      size="xs"
+      color="warning"
+      variant="solid"
+      aria-label="Exit preview"
+      @click="exit"
+    >
       Exit preview
     </UButton>
   </div>

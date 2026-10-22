@@ -222,6 +222,7 @@ END $$;
 \i services/directus/schema/migrations/20261020_0002_hierarchy.sql
 
 \i services/directus/schema/migrations/20261020_0024_remove_abule_egba.sql
+\i services/directus/schema/migrations/20261020_0029_remove_sango_ota_and_satellite.sql
 
 \i services/directus/schema/migrations/20261020_0003_attendance_counts.sql
 
@@ -312,6 +313,10 @@ BEGIN
     'pre-rollback: empty registers (probes above cleaned up; 71 fixtures retired in 71.9)');
 END $$;
 
+-- 0034 links blessing_recipients to attendance_sessions/events; those FKs
+-- would block the register drops below, so they are parked and re-added after.
+ALTER TABLE blessing_recipients DROP CONSTRAINT IF EXISTS blessing_recipients_session_fkey;
+ALTER TABLE blessing_recipients DROP CONSTRAINT IF EXISTS blessing_recipients_event_fkey;
 \i services/directus/schema/migrations/rollback/20261020_0023_attendance_sessions.down.sql
 
 DO $$
@@ -329,6 +334,14 @@ END $$;
 
 -- Leave the registers present, as the forward migration leaves them.
 \i services/directus/schema/migrations/20261020_0023_attendance_sessions.sql
+
+-- The register rollback above drops the 0030/0031 scope triggers; re-apply
+-- them (and the 0034 links parked for the drops) so later suites see the
+-- enforced tree.
+\i services/directus/schema/migrations/20261020_0034_blessings_count_recipients.sql
+\i services/directus/schema/migrations/20261020_0030_child_scope_denorm.sql
+\i services/directus/schema/migrations/20261020_0031_fill_scope_zone.sql
+\i services/directus/schema/migrations/20261022_0039_departments_fill_scope_drop.sql
 
 DO $$
 BEGIN

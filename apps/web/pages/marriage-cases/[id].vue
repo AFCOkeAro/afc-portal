@@ -132,7 +132,13 @@ function flatEntries(payload: unknown): Array<[string, string]> {
         out.push([`${key} ${sub}`.replace(/_/g, ' '), String(subValue ?? '')])
       }
     } else if (Array.isArray(value)) {
-      out.push([key.replace(/_/g, ' '), value.map((item) => String(item ?? '')).filter(Boolean).join('; ') || '—'])
+      out.push([
+        key.replace(/_/g, ' '),
+        value
+          .map((item) => String(item ?? ''))
+          .filter(Boolean)
+          .join('; ') || '—',
+      ])
     } else if (typeof value === 'boolean') {
       out.push([key.replace(/_/g, ' '), value ? 'Yes' : 'No'])
     } else {
@@ -336,38 +342,40 @@ onMounted(async () => {
         </ul>
         <p v-else class="text-sm text-gray-500">No trail rows.</p>
       </UCard>
-      </div>
+    </div>
 
-      <div v-if="printMode" class="print-sheet">
-        <section class="print-page">
-          <h1>The Apostolic Faith Church — Marriage File</h1>
-          <p>
-            Case {{ id }} · Stage {{ data.data.stage }} · Branch
-            {{ data.data.branch }}
-          </p>
-        </section>
-        <section v-for="key in PRINT_KEYS" :key="key" class="print-page">
-          <h2>{{ PRINT_LABELS[key] }}</h2>
-          <dl v-if="printForms[key]">
-            <div v-for="[label, value] in flatEntries((printForms[key] as Record<string, unknown>).payload)" :key="label">
-              <dt>{{ label }}</dt>
-              <dd>{{ value }}</dd>
-            </div>
-          </dl>
-          <p v-else class="print-outstanding">Outstanding — not yet submitted.</p>
-          <p class="print-sign">
-            Signature ______________________ Date __________
-          </p>
-        </section>
-        <section class="print-page">
-          <h2>Wedding vow</h2>
-          <pre v-if="printVow">{{ printVow }}</pre>
-          <p v-else class="print-outstanding">
-            Outstanding — fill the vows or wedding-information form first.
-          </p>
-          <p v-if="!printReady">Preparing…</p>
-        </section>
-      </div>
+    <div v-if="printMode" class="print-sheet">
+      <section class="print-page">
+        <h1>The Apostolic Faith Church — Marriage File</h1>
+        <p>
+          Case {{ id }} · Stage {{ data.data.stage }} · Branch
+          {{ data.data.branch }}
+        </p>
+      </section>
+      <section v-for="key in PRINT_KEYS" :key="key" class="print-page">
+        <h2>{{ PRINT_LABELS[key] }}</h2>
+        <dl v-if="printForms[key]">
+          <div
+            v-for="[label, value] in flatEntries(
+              (printForms[key] as Record<string, unknown>).payload,
+            )"
+            :key="label"
+          >
+            <dt>{{ label }}</dt>
+            <dd>{{ value }}</dd>
+          </div>
+        </dl>
+        <p v-else class="print-outstanding">Outstanding — not yet submitted.</p>
+        <p class="print-sign">Signature ______________________ Date __________</p>
+      </section>
+      <section class="print-page">
+        <h2>Wedding vow</h2>
+        <pre v-if="printVow">{{ printVow }}</pre>
+        <p v-else class="print-outstanding">
+          Outstanding — fill the vows or wedding-information form first.
+        </p>
+        <p v-if="!printReady">Preparing…</p>
+      </section>
     </div>
   </div>
 </template>

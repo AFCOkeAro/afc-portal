@@ -36,7 +36,7 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  let cases: Array<Record<string, unknown>> = []
+  let cases: Array<Record<string, unknown>>
   try {
     const response = await directusFetch<{ data: Array<Record<string, unknown>> }>(
       event,

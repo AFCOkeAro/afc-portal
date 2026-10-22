@@ -221,6 +221,45 @@ BEGIN
   EXECUTE p_stmt;
 END $$;
 
+CREATE OR REPLACE FUNCTION test_support.can_select(p_role text, p_table text)
+RETURNS boolean LANGUAGE sql STABLE AS $$
+  SELECT has_table_privilege(p_role, 'public.' || p_table, 'SELECT')
+$$;
+
+CREATE OR REPLACE FUNCTION test_support.can_insert(p_role text, p_table text, p_cols text[] DEFAULT NULL)
+RETURNS boolean LANGUAGE plpgsql STABLE AS $$
+BEGIN
+  IF p_cols IS NULL THEN
+    RETURN has_table_privilege(p_role, 'public.' || p_table, 'INSERT');
+  END IF;
+  RETURN NOT EXISTS (
+    SELECT 1 FROM unnest(p_cols) AS c
+    WHERE NOT has_column_privilege(p_role, 'public.' || p_table, c, 'INSERT')
+  );
+END $$;
+
+CREATE OR REPLACE FUNCTION test_support.can_update(p_role text, p_table text)
+RETURNS boolean LANGUAGE sql STABLE AS $$
+  SELECT has_table_privilege(p_role, 'public.' || p_table, 'UPDATE')
+$$;
+
+CREATE OR REPLACE FUNCTION test_support.can_delete(p_role text, p_table text)
+RETURNS boolean LANGUAGE sql STABLE AS $$
+  SELECT has_table_privilege(p_role, 'public.' || p_table, 'DELETE')
+$$;
+
+CREATE OR REPLACE FUNCTION test_support.table_exists(p_table text)
+RETURNS boolean LANGUAGE sql STABLE AS $$
+  SELECT to_regclass('public.' || p_table) IS NOT NULL
+$$;
+
+CREATE OR REPLACE FUNCTION test_support.column_exists(p_table text, p_col text)
+RETURNS boolean LANGUAGE sql STABLE AS $$
+  SELECT EXISTS (SELECT 1 FROM information_schema.columns
+                  WHERE table_schema = 'public' AND table_name = p_table
+                    AND column_name = p_col)
+$$;
+
 CREATE OR REPLACE FUNCTION test_support.assert_true(
   p_cond boolean, p_suite text, p_name text, p_detail text DEFAULT NULL
 ) RETURNS void LANGUAGE plpgsql AS $$

@@ -1,6 +1,5 @@
 import { impersonationRequestSchema, isTargetInActorScope } from '@afc/shared'
-import { throwValidation } from '../../utils/portal'
-import { getPortalScope } from '../../utils/portal'
+import { getPortalScope, throwValidation } from '../../utils/portal'
 import { readSession, writeSession } from '../../utils/session'
 import {
   buildImpersonatedSession,
@@ -38,7 +37,10 @@ export default defineEventHandler(async (event) => {
   }
   const body = parsed.data
 
-  if (scope.session.expiresAt && new Date(scope.session.expiresAt).getTime() <= Date.now()) {
+  if (
+    scope.session.expiresAt &&
+    new Date(scope.session.expiresAt).getTime() <= Date.now()
+  ) {
     throw createError({
       statusCode: 401,
       statusMessage: 'Sign in again to continue',
