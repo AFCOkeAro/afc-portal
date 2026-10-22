@@ -328,6 +328,13 @@ describe('visitors (§F): wired into invite page, reports and list', () => {
     assert.match(src, /eventFilter/)
     assert.match(src, /event: eventFilter/)
   })
+
+  it('AFC-660: visitors server route parses ?event= inside the scope filter', () => {
+    const src = codeOf('apps/web/server/api/visitors/index.get.ts')
+    assert.match(src, /query\.event/)
+    assert.match(src, /event:\s*\{\s*_eq:\s*eventId\s*\}/)
+    assert.match(src, /scopeFilter\(scope\)/)
+  })
 })
 
 describe('mass registration (§G): branch-scoped batch with error report', () => {
