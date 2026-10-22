@@ -1,0 +1,17 @@
+{
+  "issue": "AFC-710",
+  "authorAgentId": "human-operator-board",
+  "authorName": "Board chairman (CLI operator session)",
+  "claimedAt": "2026-10-23T01:00:00+01:00",
+  "scopeOfTheClaim": "R1 only: authorship of the AFC-710 follow-up delta onto post-#19 main (retire 0039, update the office contract INSERT pin). It asserts nothing about correctness; that is for CI (R4) and the CTO review (R2).",
+  "whatTheChangeActuallyDoes": "Deletes services/directus/schema/migrations/20261022_0039_departments_fill_scope_drop.sql and its rollback (landed by the PR #19 squash; forward no-ops on the rebased 0031, retired per AFC-710 instruction 1). Updates tests/web/office.contract.mjs to pin the approved 14-column 0033 INSERT grant instead of the superseded 3-column text. The banner mount restoration in apps/web/layouts/default.vue is byte-identical to the approved AFC-676 packet version and is a non-compliance-path file needing no claim.",
+  "whatThisFileIs": "An R1 authorship claim, and nothing else. It says who wrote the compliance-path files below and on which issue. It carries no reviews[] entry.",
+  "doesNotClaimR2": "There is no reviews[] entry here and there will not be one from me. R2 wants a named reviewer who is not the author. Delta R2 requested on the AFC-676/AFC-710 threads (the substance was pre-tasked in the CTO split verdict of 23:35); the PR re-runs the full gate.",
+  "notClaimedPaths": "apps/web/layouts/default.vue (banner mount restoration, byte-identical to the AFC-676 packet, non-compliance path). Nothing else in this commit.",
+  "paths": [
+    "services/directus/schema/migrations/20261022_0039_departments_fill_scope_drop.sql",
+    "services/directus/schema/migrations/rollback/20261022_0039_departments_fill_scope_drop.down.sql",
+    "tests/web/office.contract.mjs",
+    ".provenance/claims/AFC-710.json"
+  ]
+}
