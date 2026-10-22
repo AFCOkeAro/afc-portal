@@ -278,7 +278,11 @@ export const marriageCaseFormSchema = z.object({
   wedding_date: dateSchema.optional(),
   rehearsal_date: dateSchema.optional(),
   engagement_date: dateSchema.optional(),
-  vow_type: z.string().trim().min(1, 'Choose the vow wording').default(MARRIAGE_VOW_DEFAULT),
+  vow_type: z
+    .string()
+    .trim()
+    .min(1, 'Choose the vow wording')
+    .default(MARRIAGE_VOW_DEFAULT),
   notes: optionalNote(),
 })
 export type MarriageCaseForm = z.infer<typeof marriageCaseFormSchema>
@@ -298,7 +302,11 @@ export const marriageCaseTransitionSchema = z
   })
   .superRefine((v, ctx) => {
     if (v.to_stage === 'halted' && !v.halt_reason) {
-      ctx.addIssue({ code: 'custom', path: ['halt_reason'], message: 'Give the reason for halting' })
+      ctx.addIssue({
+        code: 'custom',
+        path: ['halt_reason'],
+        message: 'Give the reason for halting',
+      })
     }
     if (v.to_stage === 'transferred_out' && !v.transfer_to_branch) {
       ctx.addIssue({
@@ -309,6 +317,223 @@ export const marriageCaseTransitionSchema = z
     }
   })
 export type MarriageCaseTransition = z.infer<typeof marriageCaseTransitionSchema>
+
+/**
+ * Marriage workflow engine (AFC-678 phase C). The DB owns the closed stage
+ * vocabulary (migration 0035); forward order lives here and in the routes.
+ * `MARRIAGE_FLOW_STAGES` is the 24 user-flow stages in pipeline order --
+ * `halted` and `transferred_out` are terminal closes reachable from any
+ * stage, never forward steps. `MARRIAGE_FLOW_INDEX` is the order lookup
+ * the transition route enforces (to-index must exceed from-index).
+ */
+export const MARRIAGE_FLOW_STAGES = MARRIAGE_CASE_STAGES.filter(
+  (s): s is Exclude<MarriageCaseStage, 'halted' | 'transferred_out'> =>
+    s !== 'halted' && s !== 'transferred_out',
+)
+export const MARRIAGE_FLOW_INDEX: Record<string, number> = Object.fromEntries(
+  MARRIAGE_FLOW_STAGES.map((s, i) => [s, i]),
+)
+
+/**
+ * Per-couple task template (AFC-678). One task per flow stage, generated at
+ * case creation against the existing `tasks` table (related_type
+ * `marriage_case`, related_id the case id). Titles use brother/sister
+ * language only. `dueOffsetDays` counts from case creation (7 days per
+ * stage step); the route re-anchors to the wedding date where one is set.
+ * `stageGate` is the stage the task unblocks -- completing tasks never
+ * moves the stage by itself; the transition route owns the gate.
+ */
+export interface MarriageStageTask {
+  stageGate: string
+  title: string
+  dueOffsetDays: number
+  priority: (typeof TASK_PRIORITIES)[number]
+}
+
+export const MARRIAGE_CASE_TASK_TEMPLATE: readonly MarriageStageTask[] = [
+  {
+    stageGate: 'introduction',
+    title: 'Record branch introduction for the brother and sister',
+    dueOffsetDays: 0,
+    priority: 'normal',
+  },
+  {
+    stageGate: 'zonal_review',
+    title: 'Zonal pastor review of the couple',
+    dueOffsetDays: 7,
+    priority: 'high',
+  },
+  {
+    stageGate: 'overseer_review',
+    title: 'Area Overseer review of the couple',
+    dueOffsetDays: 14,
+    priority: 'high',
+  },
+  {
+    stageGate: 'proposal_male',
+    title: "Record the brother's proposal record",
+    dueOffsetDays: 21,
+    priority: 'normal',
+  },
+  {
+    stageGate: 'counselling_prayer',
+    title: 'Counselling and prayer session with the brother',
+    dueOffsetDays: 28,
+    priority: 'normal',
+  },
+  {
+    stageGate: 'parental_consent_brother',
+    title: "Collect the brother's parental consent letter",
+    dueOffsetDays: 35,
+    priority: 'normal',
+  },
+  {
+    stageGate: 'propose',
+    title: 'Record the proposal to the sister',
+    dueOffsetDays: 42,
+    priority: 'normal',
+  },
+  {
+    stageGate: 'sister_prayer',
+    title: 'Prayer session with the sister',
+    dueOffsetDays: 49,
+    priority: 'normal',
+  },
+  {
+    stageGate: 'proposal_female',
+    title: "Record the sister's proposal record",
+    dueOffsetDays: 56,
+    priority: 'normal',
+  },
+  {
+    stageGate: 'parental_consent_sister',
+    title: "Collect the sister's parental consent letter",
+    dueOffsetDays: 63,
+    priority: 'normal',
+  },
+  {
+    stageGate: 'terms_signatures',
+    title: 'Collect terms signatures and passports',
+    dueOffsetDays: 70,
+    priority: 'normal',
+  },
+  {
+    stageGate: 'family_introduction',
+    title: 'Family introduction and bridal list',
+    dueOffsetDays: 77,
+    priority: 'normal',
+  },
+  {
+    stageGate: 'date_fixed',
+    title: 'Fix and record the wedding date',
+    dueOffsetDays: 84,
+    priority: 'high',
+  },
+  {
+    stageGate: 'questionnaires_counselling',
+    title: 'Pre-marital questionnaires and counselling series',
+    dueOffsetDays: 91,
+    priority: 'normal',
+  },
+  {
+    stageGate: 'lga_certificate',
+    title: 'Collect the LGA/FG certificate',
+    dueOffsetDays: 98,
+    priority: 'normal',
+  },
+  {
+    stageGate: 'engagement_schedule',
+    title: 'Agree the engagement programme schedule',
+    dueOffsetDays: 105,
+    priority: 'normal',
+  },
+  {
+    stageGate: 'wedding_info',
+    title: 'Verify the wedding information form',
+    dueOffsetDays: 112,
+    priority: 'high',
+  },
+  {
+    stageGate: 'music_selection',
+    title: 'Music selection with the Music Director',
+    dueOffsetDays: 119,
+    priority: 'normal',
+  },
+  {
+    stageGate: 'ministers_mail',
+    title: 'Mail the ministers and announcements',
+    dueOffsetDays: 126,
+    priority: 'normal',
+  },
+  {
+    stageGate: 'attire_check',
+    title: 'Attire check before announcements',
+    dueOffsetDays: 133,
+    priority: 'high',
+  },
+  {
+    stageGate: 'announcements_calendar',
+    title: 'Three-Sunday announcements and calendar entry',
+    dueOffsetDays: 140,
+    priority: 'normal',
+  },
+  {
+    stageGate: 'rehearsal',
+    title: 'Rehearsal at least 3 days before the wedding',
+    dueOffsetDays: 147,
+    priority: 'high',
+  },
+  {
+    stageGate: 'wedding',
+    title: 'Wedding service',
+    dueOffsetDays: 154,
+    priority: 'urgent',
+  },
+  {
+    stageGate: 'reported',
+    title: 'Report the conducted marriage',
+    dueOffsetDays: 161,
+    priority: 'normal',
+  },
+]
+
+/**
+ * Approval gates (AFC-678). `zonal` signs off `zonal_review` (zonal pastor:
+ * zone_admin and above); `overseer` signs off `overseer_review` (Area
+ * Overseer: area_admin and above). Each approval writes a
+ * marriage_case_events `approved` row; it never moves the stage -- the
+ * transition route owns forward movement.
+ */
+export const MARRIAGE_APPROVAL_GATES = ['zonal', 'overseer'] as const
+export type MarriageApprovalGate = (typeof MARRIAGE_APPROVAL_GATES)[number]
+
+export const MARRIAGE_APPROVAL_STAGE: Record<MarriageApprovalGate, string> = {
+  zonal: 'zonal_review',
+  overseer: 'overseer_review',
+}
+
+export const marriageCaseApprovalSchema = z.object({
+  gate: z.enum(MARRIAGE_APPROVAL_GATES),
+  detail: optionalNote(),
+})
+export type MarriageCaseApproval = z.infer<typeof marriageCaseApprovalSchema>
+
+/**
+ * Transfer-out letter flow (AFC-678). The sister out-of-area closes the
+ * file (stage `transferred_out` + receiving branch required by CHECK);
+ * the sister link-in-DB path keeps the case open. The letter itself is a
+ * route artefact recorded as the `transferred_out` event detail.
+ */
+export const marriageCaseTransferSchema = z.object({
+  transfer_to_branch: z.string().uuid('Name the receiving branch'),
+  letter_note: optionalNote(),
+})
+export type MarriageCaseTransfer = z.infer<typeof marriageCaseTransferSchema>
+
+export const marriageCaseLinkSisterSchema = z.object({
+  sister_person: z.string().uuid('Choose the sister'),
+})
+export type MarriageCaseLinkSister = z.infer<typeof marriageCaseLinkSisterSchema>
 
 export const minutesFormSchema = z
   .object({
