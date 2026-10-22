@@ -17,8 +17,7 @@ export default defineEventHandler(async (event) => {
   const adminToken = await directusAdminToken(event)
   const body = await readBody<{ name?: unknown; description?: unknown }>(event)
   const name = typeof body?.name === 'string' ? body.name.trim() : ''
-  const description =
-    typeof body?.description === 'string' ? body.description.trim() : ''
+  const description = typeof body?.description === 'string' ? body.description.trim() : ''
   if (!NAME_PATTERN.test(name)) {
     throw createError({
       statusCode: 400,
@@ -26,14 +25,10 @@ export default defineEventHandler(async (event) => {
       data: { code: 'validation_error', fields: { name } },
     })
   }
-  const existing = await directusFetch<{ data: Array<{ id: string }> }>(
-    event,
-    '/roles',
-    {
-      accessToken: adminToken,
-      query: { filter: { name: { _eq: name } }, fields: 'id', limit: 1 },
-    },
-  )
+  const existing = await directusFetch<{ data: Array<{ id: string }> }>(event, '/roles', {
+    accessToken: adminToken,
+    query: { filter: { name: { _eq: name } }, fields: 'id', limit: 1 },
+  })
   if ((existing.data ?? []).length > 0) {
     throw createError({
       statusCode: 400,
@@ -50,20 +45,16 @@ export default defineEventHandler(async (event) => {
       icon: 'supervised_user_circle',
     },
   })
-  const policy = await directusFetch<{ data: { id: string } }>(
-    event,
-    '/policies',
-    {
-      accessToken: adminToken,
-      method: 'POST',
-      body: {
-        name: `${name} policy`,
-        description: description === '' ? null : description,
-        app_access: true,
-        admin_access: false,
-      },
+  const policy = await directusFetch<{ data: { id: string } }>(event, '/policies', {
+    accessToken: adminToken,
+    method: 'POST',
+    body: {
+      name: `${name} policy`,
+      description: description === '' ? null : description,
+      app_access: true,
+      admin_access: false,
     },
-  )
+  })
   await directusFetch(event, '/access', {
     accessToken: adminToken,
     method: 'POST',

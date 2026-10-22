@@ -71,9 +71,7 @@ export async function directusFetch<T>(
   // retried token and misclassify the retry as a server-token call.
   const session = await readSession(event).catch(() => null)
   const userToken =
-    session?.accessToken && session.accessToken === token
-      ? session.accessToken
-      : null
+    session?.accessToken && session.accessToken === token ? session.accessToken : null
 
   return attemptRequest<T>(event, url, path, options, token, session, userToken, false)
 }

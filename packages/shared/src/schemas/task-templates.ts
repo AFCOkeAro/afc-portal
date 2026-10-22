@@ -41,11 +41,23 @@ export const TASK_TEMPLATES: readonly TaskTemplate[] = [
     relatedType: 'marriage',
     steps: [
       { title: 'Book initial counselling session', priority: 'high', dueOffsetDays: -60 },
-      { title: 'Confirm sponsor and guardian consent', priority: 'high', dueOffsetDays: -45 },
-      { title: 'Verify documentation (IDs, certificates)', priority: 'high', dueOffsetDays: -30 },
+      {
+        title: 'Confirm sponsor and guardian consent',
+        priority: 'high',
+        dueOffsetDays: -45,
+      },
+      {
+        title: 'Verify documentation (IDs, certificates)',
+        priority: 'high',
+        dueOffsetDays: -30,
+      },
       { title: 'Marriage committee review', priority: 'normal', dueOffsetDays: -21 },
       { title: 'Complete pre-marital counselling', priority: 'high', dueOffsetDays: -14 },
-      { title: 'Confirm ceremony logistics (venue, officiant)', priority: 'normal', dueOffsetDays: -7 },
+      {
+        title: 'Confirm ceremony logistics (venue, officiant)',
+        priority: 'normal',
+        dueOffsetDays: -7,
+      },
       { title: 'File post-ceremony registration', priority: 'normal', dueOffsetDays: 3 },
     ],
   },
@@ -74,8 +86,29 @@ export function getTaskTemplate(id: string): TaskTemplate | undefined {
 
 /** Shift a YYYY-MM-DD base date by whole days, returning YYYY-MM-DD. */
 export function shiftDate(baseDate: string, offsetDays: number): string {
-  const [year, month, day] = baseDate.split('-').map(Number)
+  const parts = baseDate.split('-').map(Number)
+  const [year, month, day] = parts
+  if (
+    year === undefined ||
+    month === undefined ||
+    day === undefined ||
+    parts.length !== 3
+  ) {
+    throw new Error(
+      `shiftDate: baseDate must be YYYY-MM-DD, received ${JSON.stringify(baseDate)}`,
+    )
+  }
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) {
+    throw new Error(
+      `shiftDate: baseDate must be YYYY-MM-DD, received ${JSON.stringify(baseDate)}`,
+    )
+  }
   const date = new Date(year, month - 1, day)
+  if (Number.isNaN(date.getTime())) {
+    throw new Error(
+      `shiftDate: baseDate is not a valid calendar date: ${JSON.stringify(baseDate)}`,
+    )
+  }
   date.setDate(date.getDate() + offsetDays)
   const pad = (value: number): string => String(value).padStart(2, '0')
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`

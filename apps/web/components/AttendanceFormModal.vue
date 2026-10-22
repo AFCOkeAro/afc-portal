@@ -220,7 +220,12 @@ async function submit(): Promise<void> {
 
         <div class="grid gap-4 sm:grid-cols-2">
           <UFormField label="Branch" :error="fieldErrors.branch">
-            <EntitySelect v-model="branch" :items="branchOptions" placeholder="Select branch…" class="w-full" />
+            <EntitySelect
+              v-model="branch"
+              :items="branchOptions"
+              placeholder="Select branch…"
+              class="w-full"
+            />
           </UFormField>
           <UFormField label="Date" required :error="fieldErrors.session_date">
             <UInput v-model="sessionDate" type="date" class="w-full" />

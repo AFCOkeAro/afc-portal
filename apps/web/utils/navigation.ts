@@ -47,7 +47,12 @@ export interface NavigationGroupDef {
 }
 
 export const NAVIGATION_GROUPS: readonly NavigationGroupDef[] = [
-  { key: 'dashboard', label: 'Dashboard', icon: 'i-lucide-layout-dashboard', to: '/dashboard' },
+  {
+    key: 'dashboard',
+    label: 'Dashboard',
+    icon: 'i-lucide-layout-dashboard',
+    to: '/dashboard',
+  },
   { key: 'office', label: 'Office Admin', icon: 'i-lucide-briefcase', to: '/minutes' },
   { key: 'outreach', label: 'Outreach', icon: 'i-lucide-radar', to: '/departments' },
   { key: 'welfare', label: 'Welfare', icon: 'i-lucide-heart-handshake', to: '/visitors' },
@@ -55,7 +60,12 @@ export const NAVIGATION_GROUPS: readonly NavigationGroupDef[] = [
   { key: 'people', label: 'People', icon: 'i-lucide-users', to: '/people' },
   { key: 'youth', label: 'Youth', icon: 'i-lucide-sparkles', to: '/campus' },
   { key: 'events', label: 'Events', icon: 'i-lucide-calendar-days', to: '/events' },
-  { key: 'communications', label: 'Communications', icon: 'i-lucide-send', to: '/campaigns' },
+  {
+    key: 'communications',
+    label: 'Communications',
+    icon: 'i-lucide-send',
+    to: '/campaigns',
+  },
   { key: 'admin', label: 'Admin', icon: 'i-lucide-shield-check', to: '/branches' },
 ]
 

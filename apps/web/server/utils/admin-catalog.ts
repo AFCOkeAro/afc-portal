@@ -35,8 +35,7 @@ export function buildModules(): ModuleDef[] {
       (role) =>
         role !== 'none' &&
         grantsForRole(role as never).some(
-          (grant) =>
-            grant.action === 'read' && collections.includes(grant.collection),
+          (grant) => grant.action === 'read' && collections.includes(grant.collection),
         ),
     )
     return {

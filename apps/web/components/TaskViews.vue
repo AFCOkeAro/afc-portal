@@ -45,16 +45,24 @@ const VIEWS: { id: ViewId; label: string; icon: string }[] = [
 ]
 const view = ref<ViewId>('board')
 
-const STATUS_META: Record<string, { label: string; badge: string; dot: string; strip: string }> = {
+const STATUS_META: Record<
+  string,
+  { label: string; badge: string; dot: string; strip: string }
+> = {
   todo: { label: 'To do', badge: 'neutral', dot: 'bg-gray-400', strip: 'bg-gray-300' },
-  in_progress: { label: 'In progress', badge: 'warning', dot: 'bg-amber-500', strip: 'bg-amber-400' },
+  in_progress: {
+    label: 'In progress',
+    badge: 'warning',
+    dot: 'bg-amber-500',
+    strip: 'bg-amber-400',
+  },
   blocked: { label: 'Blocked', badge: 'error', dot: 'bg-red-500', strip: 'bg-red-400' },
   done: { label: 'Done', badge: 'success', dot: 'bg-green-500', strip: 'bg-green-400' },
 }
 const STATUS_IDS = ['todo', 'in_progress', 'blocked', 'done']
 const statusOptions = [
   { label: 'All statuses', value: 'all' },
-  ...STATUS_IDS.map((id) => ({ label: STATUS_META[id].label, value: id })),
+  ...STATUS_IDS.map((id) => ({ label: STATUS_META[id]?.label ?? id, value: id })),
 ]
 const statusFilter = ref('all')
 
@@ -63,15 +71,12 @@ const query = computed<Record<string, string | number>>(() => ({
   ...(props.branchId ? { branch: props.branchId } : {}),
 }))
 
-const {
-  data,
-  pending,
-  error,
-  refresh,
-} = await useAsyncData(`task-views-${props.branchId ?? 'all'}`, () =>
-  api.get<{ data: TaskItem[]; meta: { total: number } }>('/api/tasks', {
-    query: query.value,
-  }),
+const { data, pending, error, refresh } = await useAsyncData(
+  `task-views-${props.branchId ?? 'all'}`,
+  () =>
+    api.get<{ data: TaskItem[]; meta: { total: number } }>('/api/tasks', {
+      query: query.value,
+    }),
   { watch: [query] },
 )
 
@@ -110,7 +115,9 @@ async function applyChecklist() {
 const filtered = computed(() =>
   statusFilter.value === 'all'
     ? rows.value
-    : rows.value.filter((row) => String(row.status ?? '') === statusFilter.value),
+    : rows.value.filter(
+        (row: TaskItem) => String(row.status ?? '') === statusFilter.value,
+      ),
 )
 
 function idOf(row: TaskItem): string {
@@ -135,6 +142,7 @@ function dueKeyOf(row: TaskItem): string | null {
 }
 function displayDate(key: string): string {
   const [year, month, day] = key.split('-').map(Number)
+  if (year === undefined || month === undefined || day === undefined) return key
   return new Date(year, month - 1, day).toLocaleDateString(undefined, {
     day: 'numeric',
     month: 'short',
@@ -151,7 +159,7 @@ const boardColumns = computed(() =>
   STATUS_IDS.map((id) => ({
     id,
     ...STATUS_META[id],
-    items: filtered.value.filter((row) => statusOf(row) === id),
+    items: filtered.value.filter((row: TaskItem) => statusOf(row) === id),
   })),
 )
 
@@ -205,12 +213,13 @@ const calCells = computed<(CalCell | null)[]>(() => {
   return cells
 })
 const unscheduled = computed(() =>
-  filtered.value.filter((row) => dueKeyOf(row) === null),
+  filtered.value.filter((row: TaskItem) => dueKeyOf(row) === null),
 )
 
 /* ---------- Timeline state (groups by due week) ---------- */
 function weekStartKey(dateKey: string): string {
   const [year, month, day] = dateKey.split('-').map(Number)
+  if (year === undefined || month === undefined || day === undefined) return dateKey
   const date = new Date(year, month - 1, day)
   date.setDate(date.getDate() - ((date.getDay() + 6) % 7))
   const pad = (value: number): string => String(value).padStart(2, '0')
@@ -292,10 +301,16 @@ const timelineGroups = computed(() => {
         <UIcon name="i-lucide-arrow-right" class="size-3" />
       </NuxtLink>
     </div>
-    <p v-if="appliedCount !== null" class="mt-2 text-xs font-medium text-green-700 dark:text-green-400">
+    <p
+      v-if="appliedCount !== null"
+      class="mt-2 text-xs font-medium text-green-700 dark:text-green-400"
+    >
       Checklist applied — {{ appliedCount }} tasks created.
     </p>
-    <p v-if="applyError !== ''" class="mt-2 text-xs font-medium text-red-600 dark:text-red-400">
+    <p
+      v-if="applyError !== ''"
+      class="mt-2 text-xs font-medium text-red-600 dark:text-red-400"
+    >
       {{ applyError }}
     </p>
     <p v-if="props.description" class="mt-2 text-xs text-gray-500 dark:text-gray-400">
@@ -320,11 +335,21 @@ const timelineGroups = computed(() => {
       title="No tasks in this view"
       description="Tasks filed for this scope will appear here in every view."
     >
-      <UButton class="mt-4" label="Refresh" size="sm" color="neutral" variant="outline" @click="refresh()" />
+      <UButton
+        class="mt-4"
+        label="Refresh"
+        size="sm"
+        color="neutral"
+        variant="outline"
+        @click="refresh()"
+      />
     </EmptyState>
 
     <!-- Board (kanban, grouped by status — Notion board semantics) -->
-    <div v-else-if="view === 'board'" class="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+    <div
+      v-else-if="view === 'board'"
+      class="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4"
+    >
       <section
         v-for="column in boardColumns"
         :key="column.id"
@@ -333,10 +358,14 @@ const timelineGroups = computed(() => {
       >
         <header class="flex items-center gap-2 px-2 py-1">
           <span :class="`size-2 rounded-full ${column.dot}`" />
-          <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-300">
+          <h3
+            class="text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-300"
+          >
             {{ column.label }}
           </h3>
-          <span class="ml-auto text-xs text-gray-400 tabular-nums">{{ column.items.length }}</span>
+          <span class="ml-auto text-xs text-gray-400 tabular-nums">{{
+            column.items.length
+          }}</span>
         </header>
         <ul class="mt-1 space-y-2">
           <li
@@ -350,25 +379,42 @@ const timelineGroups = computed(() => {
             >
               {{ titleOf(row) }}
             </NuxtLink>
-            <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
-              <span v-if="priorityOf(row)" class="uppercase tracking-wide">{{ priorityOf(row) }}</span>
-              <span v-if="dueKeyOf(row)" :class="isOverdue(row) ? 'font-semibold text-red-600 dark:text-red-400' : ''">
+            <div
+              class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 dark:text-gray-400"
+            >
+              <span v-if="priorityOf(row)" class="uppercase tracking-wide">{{
+                priorityOf(row)
+              }}</span>
+              <span
+                v-if="dueKeyOf(row)"
+                :class="
+                  isOverdue(row) ? 'font-semibold text-red-600 dark:text-red-400' : ''
+                "
+              >
                 {{ displayDate(dueKeyOf(row) as string) }}
               </span>
             </div>
           </li>
         </ul>
-        <p v-if="column.items.length === 0" class="px-2 py-4 text-center text-xs text-gray-400">
+        <p
+          v-if="column.items.length === 0"
+          class="px-2 py-4 text-center text-xs text-gray-400"
+        >
           Empty
         </p>
       </section>
     </div>
 
     <!-- Table -->
-    <div v-else-if="view === 'table'" class="mt-4 overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-800">
+    <div
+      v-else-if="view === 'table'"
+      class="mt-4 overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-800"
+    >
       <table class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
         <thead>
-          <tr class="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500 dark:bg-gray-900 dark:text-gray-400">
+          <tr
+            class="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500 dark:bg-gray-900 dark:text-gray-400"
+          >
             <th class="px-3 py-2 font-medium">Title</th>
             <th class="px-3 py-2 font-medium">Status</th>
             <th class="px-3 py-2 font-medium">Priority</th>
@@ -376,10 +422,19 @@ const timelineGroups = computed(() => {
             <th class="px-3 py-2"><span class="sr-only">Open</span></th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-gray-100 bg-white dark:divide-gray-800 dark:bg-gray-950">
-          <tr v-for="row in filtered" :key="idOf(row)" class="hover:bg-gray-50 dark:hover:bg-gray-900/60">
+        <tbody
+          class="divide-y divide-gray-100 bg-white dark:divide-gray-800 dark:bg-gray-950"
+        >
+          <tr
+            v-for="row in filtered"
+            :key="idOf(row)"
+            class="hover:bg-gray-50 dark:hover:bg-gray-900/60"
+          >
             <td class="px-3 py-2.5">
-              <NuxtLink :to="`/tasks/${idOf(row)}`" class="font-medium text-gray-900 hover:text-primary-600 dark:text-white">
+              <NuxtLink
+                :to="`/tasks/${idOf(row)}`"
+                class="font-medium text-gray-900 hover:text-primary-600 dark:text-white"
+              >
                 {{ titleOf(row) }}
               </NuxtLink>
             </td>
@@ -388,12 +443,26 @@ const timelineGroups = computed(() => {
                 {{ STATUS_META[statusOf(row)].label }}
               </UBadge>
             </td>
-            <td class="px-3 py-2.5 text-gray-600 dark:text-gray-300">{{ priorityOf(row) ?? '—' }}</td>
-            <td class="px-3 py-2.5 text-gray-600 dark:text-gray-300" :class="isOverdue(row) ? 'font-semibold text-red-600 dark:text-red-400' : ''">
+            <td class="px-3 py-2.5 text-gray-600 dark:text-gray-300">
+              {{ priorityOf(row) ?? '—' }}
+            </td>
+            <td
+              class="px-3 py-2.5 text-gray-600 dark:text-gray-300"
+              :class="
+                isOverdue(row) ? 'font-semibold text-red-600 dark:text-red-400' : ''
+              "
+            >
               {{ dueKeyOf(row) ? displayDate(dueKeyOf(row) as string) : '—' }}
             </td>
             <td class="px-3 py-2.5 text-right">
-              <UButton :to="`/tasks/${idOf(row)}`" color="neutral" variant="ghost" size="xs" icon="i-lucide-arrow-right" aria-label="Open task" />
+              <UButton
+                :to="`/tasks/${idOf(row)}`"
+                color="neutral"
+                variant="ghost"
+                size="xs"
+                icon="i-lucide-arrow-right"
+                aria-label="Open task"
+              />
             </td>
           </tr>
         </tbody>
@@ -401,15 +470,33 @@ const timelineGroups = computed(() => {
     </div>
 
     <!-- List -->
-    <ul v-else-if="view === 'list'" class="mt-4 divide-y divide-gray-100 rounded-xl border border-gray-200 bg-white dark:divide-gray-800 dark:border-gray-800 dark:bg-gray-950">
+    <ul
+      v-else-if="view === 'list'"
+      class="mt-4 divide-y divide-gray-100 rounded-xl border border-gray-200 bg-white dark:divide-gray-800 dark:border-gray-800 dark:bg-gray-950"
+    >
       <li v-for="row in filtered" :key="idOf(row)">
-        <NuxtLink :to="`/tasks/${idOf(row)}`" class="flex items-center gap-3 px-3 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-900/60">
-          <span :class="`size-2 shrink-0 rounded-full ${STATUS_META[statusOf(row)].dot}`" />
-          <span class="min-w-0 flex-1 truncate text-sm font-medium text-gray-900 dark:text-white">{{ titleOf(row) }}</span>
-          <span v-if="dueKeyOf(row)" class="shrink-0 text-xs text-gray-500 tabular-nums dark:text-gray-400" :class="isOverdue(row) ? 'font-semibold text-red-600 dark:text-red-400' : ''">
+        <NuxtLink
+          :to="`/tasks/${idOf(row)}`"
+          class="flex items-center gap-3 px-3 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-900/60"
+        >
+          <span
+            :class="`size-2 shrink-0 rounded-full ${STATUS_META[statusOf(row)].dot}`"
+          />
+          <span
+            class="min-w-0 flex-1 truncate text-sm font-medium text-gray-900 dark:text-white"
+            >{{ titleOf(row) }}</span
+          >
+          <span
+            v-if="dueKeyOf(row)"
+            class="shrink-0 text-xs text-gray-500 tabular-nums dark:text-gray-400"
+            :class="isOverdue(row) ? 'font-semibold text-red-600 dark:text-red-400' : ''"
+          >
             {{ displayDate(dueKeyOf(row) as string) }}
           </span>
-          <UIcon name="i-lucide-chevron-right" class="size-4 shrink-0 text-gray-300 dark:text-gray-600" />
+          <UIcon
+            name="i-lucide-chevron-right"
+            class="size-4 shrink-0 text-gray-300 dark:text-gray-600"
+          />
         </NuxtLink>
       </li>
     </ul>
@@ -417,19 +504,58 @@ const timelineGroups = computed(() => {
     <!-- Calendar -->
     <div v-else-if="view === 'calendar'" class="mt-4">
       <div class="mb-2 flex items-center gap-2">
-        <UButton icon="i-lucide-chevron-left" color="neutral" variant="ghost" size="xs" aria-label="Previous month" @click="stepMonth(-1)" />
-        <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ monthLabel }}</h3>
-        <UButton icon="i-lucide-chevron-right" color="neutral" variant="ghost" size="xs" aria-label="Next month" @click="stepMonth(1)" />
-        <UButton label="Today" color="neutral" variant="ghost" size="xs" @click="goThisMonth()" />
+        <UButton
+          icon="i-lucide-chevron-left"
+          color="neutral"
+          variant="ghost"
+          size="xs"
+          aria-label="Previous month"
+          @click="stepMonth(-1)"
+        />
+        <h3 class="text-sm font-semibold text-gray-900 dark:text-white">
+          {{ monthLabel }}
+        </h3>
+        <UButton
+          icon="i-lucide-chevron-right"
+          color="neutral"
+          variant="ghost"
+          size="xs"
+          aria-label="Next month"
+          @click="stepMonth(1)"
+        />
+        <UButton
+          label="Today"
+          color="neutral"
+          variant="ghost"
+          size="xs"
+          @click="goThisMonth()"
+        />
       </div>
-      <div class="grid grid-cols-7 gap-px overflow-hidden rounded-xl border border-gray-200 bg-gray-200 text-xs dark:border-gray-800 dark:bg-gray-800">
-        <div v-for="day in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']" :key="day" class="bg-gray-50 px-2 py-1.5 font-semibold uppercase tracking-wide text-gray-500 dark:bg-gray-900 dark:text-gray-400">
+      <div
+        class="grid grid-cols-7 gap-px overflow-hidden rounded-xl border border-gray-200 bg-gray-200 text-xs dark:border-gray-800 dark:bg-gray-800"
+      >
+        <div
+          v-for="day in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']"
+          :key="day"
+          class="bg-gray-50 px-2 py-1.5 font-semibold uppercase tracking-wide text-gray-500 dark:bg-gray-900 dark:text-gray-400"
+        >
           {{ day }}
         </div>
         <template v-for="(cell, index) in calCells" :key="index">
           <div v-if="cell === null" class="min-h-20 bg-gray-50/60 dark:bg-gray-900/40" />
-          <div v-else class="min-h-20 bg-white p-1 dark:bg-gray-950" :class="cell.isToday ? 'ring-1 ring-inset ring-primary-500' : ''">
-            <p class="px-1 font-semibold tabular-nums" :class="cell.isToday ? 'text-primary-600 dark:text-primary-400' : 'text-gray-500 dark:text-gray-400'">
+          <div
+            v-else
+            class="min-h-20 bg-white p-1 dark:bg-gray-950"
+            :class="cell.isToday ? 'ring-1 ring-inset ring-primary-500' : ''"
+          >
+            <p
+              class="px-1 font-semibold tabular-nums"
+              :class="
+                cell.isToday
+                  ? 'text-primary-600 dark:text-primary-400'
+                  : 'text-gray-500 dark:text-gray-400'
+              "
+            >
               {{ cell.day }}
             </p>
             <NuxtLink
@@ -438,21 +564,35 @@ const timelineGroups = computed(() => {
               :to="`/tasks/${idOf(row)}`"
               :title="titleOf(row)"
               class="mt-0.5 block truncate rounded px-1 py-0.5 text-[11px] font-medium"
-              :class="statusOf(row) === 'done' ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300' : 'bg-primary-100 text-primary-800 dark:bg-primary-900/40 dark:text-primary-300'"
+              :class="
+                statusOf(row) === 'done'
+                  ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300'
+                  : 'bg-primary-100 text-primary-800 dark:bg-primary-900/40 dark:text-primary-300'
+              "
             >
               {{ titleOf(row) }}
             </NuxtLink>
-            <p v-if="cell.items.length > 3" class="px-1 text-[11px] text-gray-400">+{{ cell.items.length - 3 }} more</p>
+            <p v-if="cell.items.length > 3" class="px-1 text-[11px] text-gray-400">
+              +{{ cell.items.length - 3 }} more
+            </p>
           </div>
         </template>
       </div>
-      <div v-if="unscheduled.length > 0" class="mt-3 rounded-xl border border-dashed border-gray-300 p-3 dark:border-gray-700">
-        <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+      <div
+        v-if="unscheduled.length > 0"
+        class="mt-3 rounded-xl border border-dashed border-gray-300 p-3 dark:border-gray-700"
+      >
+        <p
+          class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400"
+        >
           Unscheduled ({{ unscheduled.length }})
         </p>
         <ul class="mt-1 flex flex-wrap gap-1.5">
           <li v-for="row in unscheduled" :key="idOf(row)">
-            <NuxtLink :to="`/tasks/${idOf(row)}`" class="inline-block rounded-full bg-gray-100 px-2.5 py-1 text-xs text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200">
+            <NuxtLink
+              :to="`/tasks/${idOf(row)}`"
+              class="inline-block rounded-full bg-gray-100 px-2.5 py-1 text-xs text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200"
+            >
               {{ titleOf(row) }}
             </NuxtLink>
           </li>
@@ -462,18 +602,42 @@ const timelineGroups = computed(() => {
 
     <!-- Timeline -->
     <div v-else-if="view === 'timeline'" class="mt-4">
-      <ol v-if="timelineGroups.length > 0" class="relative space-y-4 border-l-2 border-gray-200 pl-5 dark:border-gray-800">
+      <ol
+        v-if="timelineGroups.length > 0"
+        class="relative space-y-4 border-l-2 border-gray-200 pl-5 dark:border-gray-800"
+      >
         <li v-for="group in timelineGroups" :key="group.week" class="relative">
-          <span class="absolute -left-[27px] top-1 size-3 rounded-full border-2 border-white bg-primary-500 dark:border-gray-950" />
-          <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ group.label }}</p>
+          <span
+            class="absolute -left-[27px] top-1 size-3 rounded-full border-2 border-white bg-primary-500 dark:border-gray-950"
+          />
+          <p
+            class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400"
+          >
+            {{ group.label }}
+          </p>
           <ul class="mt-1.5 space-y-1.5">
             <li v-for="row in group.items" :key="idOf(row)">
-              <NuxtLink :to="`/tasks/${idOf(row)}`" class="flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm hover:border-primary-300 dark:border-gray-700 dark:bg-gray-950">
-                <span class="font-medium text-gray-900 dark:text-white">{{ titleOf(row) }}</span>
-                <UBadge :color="STATUS_META[statusOf(row)].badge" variant="subtle" size="xs">
+              <NuxtLink
+                :to="`/tasks/${idOf(row)}`"
+                class="flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm hover:border-primary-300 dark:border-gray-700 dark:bg-gray-950"
+              >
+                <span class="font-medium text-gray-900 dark:text-white">{{
+                  titleOf(row)
+                }}</span>
+                <UBadge
+                  :color="STATUS_META[statusOf(row)].badge"
+                  variant="subtle"
+                  size="xs"
+                >
                   {{ STATUS_META[statusOf(row)].label }}
                 </UBadge>
-                <span v-if="dueKeyOf(row)" class="ml-auto text-xs text-gray-500 tabular-nums dark:text-gray-400" :class="isOverdue(row) ? 'font-semibold text-red-600 dark:text-red-400' : ''">
+                <span
+                  v-if="dueKeyOf(row)"
+                  class="ml-auto text-xs text-gray-500 tabular-nums dark:text-gray-400"
+                  :class="
+                    isOverdue(row) ? 'font-semibold text-red-600 dark:text-red-400' : ''
+                  "
+                >
                   due {{ displayDate(dueKeyOf(row) as string) }}
                 </span>
               </NuxtLink>
@@ -481,16 +645,26 @@ const timelineGroups = computed(() => {
           </ul>
         </li>
       </ol>
-      <p v-if="timelineGroups.length === 0" class="text-sm text-gray-500 dark:text-gray-400">
+      <p
+        v-if="timelineGroups.length === 0"
+        class="text-sm text-gray-500 dark:text-gray-400"
+      >
         No dated tasks yet — set a due date and it will plot here.
       </p>
-      <p v-if="unscheduled.length > 0" class="mt-3 text-xs text-gray-500 dark:text-gray-400">
-        {{ unscheduled.length }} unscheduled task{{ unscheduled.length === 1 ? '' : 's' }} not shown.
+      <p
+        v-if="unscheduled.length > 0"
+        class="mt-3 text-xs text-gray-500 dark:text-gray-400"
+      >
+        {{ unscheduled.length }} unscheduled task{{ unscheduled.length === 1 ? '' : 's' }}
+        not shown.
       </p>
     </div>
 
     <!-- Gallery -->
-    <div v-else-if="view === 'gallery'" class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+    <div
+      v-else-if="view === 'gallery'"
+      class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3"
+    >
       <NuxtLink
         v-for="row in filtered"
         :key="idOf(row)"
@@ -504,8 +678,16 @@ const timelineGroups = computed(() => {
             <UBadge :color="STATUS_META[statusOf(row)].badge" variant="subtle">
               {{ STATUS_META[statusOf(row)].label }}
             </UBadge>
-            <span v-if="priorityOf(row)" class="uppercase tracking-wide text-gray-400">{{ priorityOf(row) }}</span>
-            <span v-if="dueKeyOf(row)" class="ml-auto text-gray-500 tabular-nums dark:text-gray-400" :class="isOverdue(row) ? 'font-semibold text-red-600 dark:text-red-400' : ''">
+            <span v-if="priorityOf(row)" class="uppercase tracking-wide text-gray-400">{{
+              priorityOf(row)
+            }}</span>
+            <span
+              v-if="dueKeyOf(row)"
+              class="ml-auto text-gray-500 tabular-nums dark:text-gray-400"
+              :class="
+                isOverdue(row) ? 'font-semibold text-red-600 dark:text-red-400' : ''
+              "
+            >
               {{ displayDate(dueKeyOf(row) as string) }}
             </span>
           </div>

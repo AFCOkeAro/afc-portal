@@ -213,15 +213,20 @@ BEGIN
 END $$;
 
 -- ---------------------------------------------------------------------------
--- 88.4  OVERLAP. Re-applying 0002 + 0003 + 0010 + 0011 changes nothing:
+--   88.4  OVERLAP. Re-applying 0002 + 0003 + 0010 + 0011 changes nothing:
 --        denorms and merge FKs are IF NOT EXISTS no-ops over 0023's tables
 --        (0013's re-apply is proven by suite 79). CTO verdict on AFC-578
 --        review: 0002 alone resurrects ABULE-EGBA, so the landed narrow
---        0024 is re-applied after it.
+--        0024 is re-applied after it. AFC-698: 0029 is re-applied after
+--        0024 for the same reason -- 0002 also resurrects SANGO-OTA and
+--        OKE-ARO-SAT-1, which 0029 removed; without it the branch count
+--        reads 32 and suites 89/93 fail downstream.
 -- ---------------------------------------------------------------------------
 \i services/directus/schema/migrations/20261020_0002_hierarchy.sql
 
 \i services/directus/schema/migrations/20261020_0024_remove_abule_egba.sql
+
+\i services/directus/schema/migrations/20261020_0029_remove_sango_ota_and_satellite.sql
 
 \i services/directus/schema/migrations/20261020_0003_attendance_counts.sql
 
@@ -328,7 +333,14 @@ BEGIN
 END $$;
 
 -- Leave the registers present, as the forward migration leaves them.
+-- 0023 predates the scope layers, so the re-created registers are bare:
+-- re-apply the idempotent 0030 + 0031 forwards in apply order (AFC-698),
+-- or suite 94's shape contract fails on these tables.
 \i services/directus/schema/migrations/20261020_0023_attendance_sessions.sql
+
+\i services/directus/schema/migrations/20261020_0030_child_scope_denorm.sql
+
+\i services/directus/schema/migrations/20261020_0031_fill_scope_zone.sql
 
 DO $$
 BEGIN

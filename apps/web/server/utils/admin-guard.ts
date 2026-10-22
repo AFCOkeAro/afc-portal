@@ -5,7 +5,9 @@ import { getPortalScope, type PortalScope } from './portal'
  * Zone, branch and narrower staff manage their own scope; only area and
  * super admins may reshape who can see what.
  */
-export async function requireArea(event: Parameters<typeof getPortalScope>[0]): Promise<PortalScope> {
+export async function requireArea(
+  event: Parameters<typeof getPortalScope>[0],
+): Promise<PortalScope> {
   const scope = await getPortalScope(event)
   if (!scope.isArea) {
     throw createError({

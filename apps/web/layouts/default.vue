@@ -100,9 +100,9 @@ function sectionForPath(path: string): string | null {
   const exact = NAVIGATION_GROUPS.filter((group) => group.to === path).map(
     (group) => group.key,
   )
-  if (exact.length === 1) return exact[0]
+  if (exact.length === 1) return exact[0] ?? null
   if (exact.length > 1) {
-    return exact.find((key) => isExpanded(key)) ?? exact[0]
+    return exact.find((key) => isExpanded(key)) ?? exact[0] ?? null
   }
   let best: { key: string; length: number } | null = null
   for (const section of sections.value) {
@@ -125,7 +125,7 @@ function sectionForPath(path: string): string | null {
 
 watch(
   () => route.path,
-  (path) => {
+  (path: string) => {
     mobileOpen.value = false
     const current = sectionForPath(path)
     if (current !== null && !isExpanded(current)) {
@@ -141,7 +141,7 @@ function onEscape(event: KeyboardEvent): void {
   if (event.key === 'Escape') mobileOpen.value = false
 }
 
-watch(mobileOpen, (open) => {
+watch(mobileOpen, (open: boolean) => {
   try {
     document.body.style.overflow = open ? 'hidden' : ''
   } catch {
@@ -277,12 +277,12 @@ const menuItems = computed(() => [
         </button>
       </div>
 
-      <nav aria-label="Portal sections" class="min-h-0 flex-1 overflow-y-auto px-3 pb-4 lg:pb-6">
+      <nav
+        aria-label="Portal sections"
+        class="min-h-0 flex-1 overflow-y-auto px-3 pb-4 lg:pb-6"
+      >
         <!-- Full menu: overlay drawer on mobile, static sidebar on desktop. -->
-        <div
-          id="portal-sections-nav"
-          :class="railCollapsed ? 'lg:hidden' : ''"
-        >
+        <div id="portal-sections-nav" :class="railCollapsed ? 'lg:hidden' : ''">
           <div v-for="section in sections" :key="section.key" class="mt-4 first:mt-1">
             <div class="flex items-center gap-1">
               <NuxtLink
@@ -314,7 +314,10 @@ const menuItems = computed(() => [
               :id="`sidebar-section-${section.key}`"
               class="mt-1 space-y-1"
             >
-              <li v-for="(item, index) in section.items" :key="`${section.key}:${index}:${item.to}`">
+              <li
+                v-for="(item, index) in section.items"
+                :key="`${section.key}:${index}:${item.to}`"
+              >
                 <NuxtLink
                   :to="item.to"
                   class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-200 dark:text-gray-200 dark:hover:bg-gray-800"
@@ -341,7 +344,9 @@ const menuItems = computed(() => [
             v-for="(section, index) in sections"
             :key="section.key"
             class="space-y-1"
-            :class="{ 'mt-2 border-t border-gray-200 pt-2 dark:border-gray-800': index > 0 }"
+            :class="{
+              'mt-2 border-t border-gray-200 pt-2 dark:border-gray-800': index > 0,
+            }"
           >
             <NuxtLink
               v-for="(item, index) in section.items"

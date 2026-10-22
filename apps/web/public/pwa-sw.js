@@ -40,7 +40,9 @@ self.addEventListener('activate', (event) => {
         }
       }
       const keys = await caches.keys()
-      await Promise.all(keys.filter((key) => key !== VERSION).map((key) => caches.delete(key)))
+      await Promise.all(
+        keys.filter((key) => key !== VERSION).map((key) => caches.delete(key)),
+      )
       await self.clients.claim()
     })(),
   )
@@ -53,9 +55,13 @@ self.addEventListener('message', (event) => {
 self.addEventListener('periodicsync', (event) => {
   if (event.tag === 'afc-refresh-shell') {
     event.waitUntil(
-      caches.open(VERSION).then((cache) =>
-        Promise.allSettled(CORE.map((path) => fetch(path).then((response) => cache.put(path, response)))),
-      ),
+      caches
+        .open(VERSION)
+        .then((cache) =>
+          Promise.allSettled(
+            CORE.map((path) => fetch(path).then((response) => cache.put(path, response))),
+          ),
+        ),
     )
   }
 })

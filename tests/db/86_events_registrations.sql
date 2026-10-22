@@ -384,6 +384,15 @@ END $$;
 
 \i services/directus/schema/migrations/20261020_0023_attendance_sessions.sql
 
+-- The 0023 re-apply above recreates attendance_sessions/attendance_records
+-- bare: 0023 predates the scope layers, so the re-created tables lack the
+-- 0030 scope columns + triggers and the 0031 fill triggers. Re-apply both
+-- idempotent forwards in apply order (AFC-698); without this, suite 94's
+-- shape contract fails on the re-created registers.
+\i services/directus/schema/migrations/20261020_0030_child_scope_denorm.sql
+
+\i services/directus/schema/migrations/20261020_0031_fill_scope_zone.sql
+
 DO $$
 BEGIN
   PERFORM test_support.assert_true(

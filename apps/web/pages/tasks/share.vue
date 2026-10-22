@@ -23,7 +23,9 @@ function queryParam(name: string): string {
 
 const form = ref({
   title: queryParam('title'),
-  description: [queryParam('text'), queryParam('url')].filter((part) => part !== '').join('\n'),
+  description: [queryParam('text'), queryParam('url')]
+    .filter((part) => part !== '')
+    .join('\n'),
   assignee_user: '',
   assignee_person: '',
   branch: '',
@@ -47,8 +49,12 @@ async function save() {
     await api.post('/api/tasks', {
       title: form.value.title,
       ...(form.value.description === '' ? {} : { description: form.value.description }),
-      ...(form.value.assignee_user === '' ? {} : { assignee_user: form.value.assignee_user }),
-      ...(form.value.assignee_person === '' ? {} : { assignee_person: form.value.assignee_person }),
+      ...(form.value.assignee_user === ''
+        ? {}
+        : { assignee_user: form.value.assignee_user }),
+      ...(form.value.assignee_person === ''
+        ? {}
+        : { assignee_person: form.value.assignee_person }),
       ...(form.value.branch === '' ? {} : { branch: form.value.branch }),
       ...(form.value.due_date === '' ? {} : { due_date: form.value.due_date }),
       priority: form.value.priority,
@@ -71,7 +77,12 @@ async function save() {
       <template #actions>
         <UButton label="Cancel" color="neutral" variant="ghost" to="/tasks" />
         <PermissionGate :collection="COLLECTIONS.tasks" action="create">
-          <UButton label="Save task" icon="i-lucide-check" :loading="saving" @click="save()" />
+          <UButton
+            label="Save task"
+            icon="i-lucide-check"
+            :loading="saving"
+            @click="save()"
+          />
         </PermissionGate>
       </template>
     </PageHeader>
@@ -82,7 +93,12 @@ async function save() {
           <UInput v-model="form.title" class="w-full" placeholder="Task title" />
         </UFormField>
         <UFormField label="Details" class="sm:col-span-2">
-          <UTextarea v-model="form.description" class="w-full" placeholder="Shared text and link land here" :rows="4" />
+          <UTextarea
+            v-model="form.description"
+            class="w-full"
+            placeholder="Shared text and link land here"
+            :rows="4"
+          />
         </UFormField>
         <UFormField label="Assignee user id">
           <UInput

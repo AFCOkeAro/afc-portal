@@ -5,5 +5,12 @@
   "whyOwnershipNotLastTouched": "Ownership is the EARLIEST file that creates an object. 20261006_0002 re-asserts the two guard triggers, so 0002.sql does create them, but 0001 owns them. A rule keyed on last-touched would pass the tree with the AFC-253 defect still in it.",
   "whyThisIsNotABin": "Every entry needs migration, object, a reason of at least 40 characters that says WHY this control may be dropped without being restored, and authorisedBy. An entry with a missing field, a short reason, an unknown field, or no matching drop in the tree makes the gate FAIL. An allowlist that cannot rot is the difference between an exemption and a bin.",
   "whatTheRealTreeShouldNeed": "Nothing. As of 2026-10-06 the real tree needs zero entries, because rollback/20261006_0002_incidents_awareness_at.down.sql re-asserts the evidence seal after the drop. If you are reading this and adding the first entry, read the AFC-264 fix first: the fix is cheaper than the excuse.",
-  "entries": []
+  "entries": [
+    {
+      "migration": "20261020_0030_child_scope_denorm.sql",
+      "object": "afc_set_scope",
+      "reason": "afc_set_scope is a scope-sync helper, not an evidence guard: the down script removes it together with the branch/zone columns it maintains (added by the same migration), leaving no surviving referent that needs the trigger; re-creating it would leave triggers on dropped columns. Approved on AFC-700.",
+      "authorisedBy": "Board-approved on AFC-700 (2026-10-22); CTO review sign-off MediaTech (AFC-698, 2026-10-22)"
+    }
+  ]
 }

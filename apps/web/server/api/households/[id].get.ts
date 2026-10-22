@@ -70,7 +70,11 @@ export default defineEventHandler(async (event): Promise<HouseholdDetail> => {
   // AFC-654: validate the shape at the boundary. A bare `1` reaches
   // Directus as `_eq` against a uuid column and comes back a 500 carrying
   // the raw SQL; answer 400 with a named code before any store read.
-  const id = assertUuidParam(getRouterParam(event, 'id'), 'household', 'invalid_household_id')
+  const id = assertUuidParam(
+    getRouterParam(event, 'id'),
+    'household',
+    'invalid_household_id',
+  )
 
   // Branch scope here; the household-head own-only grant
   // (data-model-expansion §11) has no session field in the portal yet

@@ -83,6 +83,12 @@ interface BranchRow {
 
 const ACTIONS = ['create', 'read', 'update', 'delete'] as const
 
+type PermissionActionOption = (typeof ACTIONS)[number]
+
+const actionOptions = computed(() =>
+  ACTIONS.map((action: PermissionActionOption) => ({ label: action, value: action })),
+)
+
 const loading = ref(true)
 const loadError = ref('')
 const modules = ref<ModuleRow[]>([])
@@ -97,8 +103,13 @@ const collections = computed(() => {
   return [...set].sort()
 })
 
+const collectionOptions = computed(() => [
+  { label: 'users (own profile)', value: 'users' },
+  ...collections.value.map((name: string) => ({ label: name, value: name })),
+])
+
 const roleOptions = computed(() =>
-  roles.value.map((role) => ({
+  roles.value.map((role: AdminRole) => ({
     label: `${role.name}${role.builtIn ? ' (built-in)' : ''}`,
     value: role.name,
   })),
@@ -130,9 +141,17 @@ await useAsyncData('admin-access-overview', () => reloadAll())
 /* ---------------- Roles tab ---------------- */
 const selectedRoleId = ref('')
 const selectedRole = computed(
-  () => roles.value.find((role) => role.id === selectedRoleId.value) ?? null,
+  () => roles.value.find((role: AdminRole) => role.id === selectedRoleId.value) ?? null,
 )
+
+function selectRole(id: string): void {
+  selectedRoleId.value = id
+  void loadRolePermissions()
+}
 const rolePermissions = ref<RolePermission[]>([])
+const filteredRolePermissions = computed(() =>
+  rolePermissions.value.filter((entry: RolePermission) => entry.filter !== null),
+)
 const rolePermsPending = ref(false)
 const newRole = ref({ name: '', description: '' })
 const newRoleError = ref('')
@@ -141,7 +160,7 @@ const permFormError = ref('')
 
 const permKey = (collection: string, action: string): string | null => {
   const found = rolePermissions.value.find(
-    (perm) => perm.collection === collection && perm.action === action,
+    (perm: RolePermission) => perm.collection === collection && perm.action === action,
   )
   return found ? found.id : null
 }
@@ -247,14 +266,16 @@ const branchesFull = ref<BranchRow[]>([])
 
 const branchItems = computed(() => [
   { label: 'None', value: '' },
-  ...branchesFull.value.map((row) => ({ label: row.name, value: row.id })),
+  ...branchesFull.value.map((row: BranchRow) => ({ label: row.name, value: row.id })),
 ])
 const zoneItems = computed(() => [
   { label: 'None', value: '' },
-  ...zones.value.map((row) => ({ label: row.name, value: row.id })),
+  ...zones.value.map((row: ZoneRow) => ({ label: row.name, value: row.id })),
 ])
 const editAreaPreview = computed(() => {
-  const branch = branchesFull.value.find((row) => row.id === editForm.value.branch)
+  const branch = branchesFull.value.find(
+    (row: BranchRow) => row.id === editForm.value.branch,
+  )
   return branch?.area ?? null
 })
 
@@ -298,7 +319,9 @@ async function saveUser(): Promise<void> {
   editError.value = ''
   savingUser.value = true
   try {
-    const branch = branchesFull.value.find((row) => row.id === editForm.value.branch)
+    const branch = branchesFull.value.find(
+      (row: BranchRow) => row.id === editForm.value.branch,
+    )
     await api.patch(`/api/admin/users/${editing.value.id}`, {
       staff_role: editForm.value.staff_role,
       branch: editForm.value.branch === '' ? null : editForm.value.branch,
@@ -308,8 +331,7 @@ async function saveUser(): Promise<void> {
     editing.value = null
     await searchUsers()
   } catch (cause) {
-    editError.value =
-      (cause as { message?: string }).message ?? 'Could not save the user'
+    editError.value = (cause as { message?: string }).message ?? 'Could not save the user'
   } finally {
     savingUser.value = false
   }
@@ -348,7 +370,9 @@ await useAsyncData('admin-zones-branches', async () => {
 
     <template v-else>
       <nav aria-label="Access admin sections" class="mb-4">
-        <div class="inline-flex items-center gap-1 rounded-xl border border-gray-200 bg-white p-1 dark:border-gray-800 dark:bg-gray-900">
+        <div
+          class="inline-flex items-center gap-1 rounded-xl border border-gray-200 bg-white p-1 dark:border-gray-800 dark:bg-gray-900"
+        >
           <UButton
             v-for="entry in TABS"
             :key="entry.id"
@@ -376,9 +400,8 @@ await useAsyncData('admin-zones-branches', async () => {
         <template #header>
           <h2 class="font-semibold">Modules</h2>
           <p class="mt-1 text-sm text-gray-500">
-            Every sidebar section is a module. Visibility follows capability
-            grants — a role that holds no grant on a module's collections
-            never sees it.
+            Every sidebar section is a module. Visibility follows capability grants — a
+            role that holds no grant on a module's collections never sees it.
           </p>
         </template>
         <div class="space-y-4">
@@ -389,7 +412,9 @@ await useAsyncData('admin-zones-branches', async () => {
           >
             <div class="flex flex-wrap items-center gap-2">
               <UIcon :name="module.icon" class="size-4 text-primary-500" />
-              <h3 class="font-semibold text-gray-900 dark:text-white">{{ module.label }}</h3>
+              <h3 class="font-semibold text-gray-900 dark:text-white">
+                {{ module.label }}
+              </h3>
               <span class="font-mono text-xs text-gray-400">{{ module.to }}</span>
             </div>
             <div class="mt-2 flex flex-wrap gap-1.5">
@@ -405,7 +430,9 @@ await useAsyncData('admin-zones-branches', async () => {
             </div>
             <p class="mt-2 text-xs text-gray-500">
               Visible to:
-              <span v-if="module.roles.length === 0" class="italic">no built-in role</span>
+              <span v-if="module.roles.length === 0" class="italic"
+                >no built-in role</span
+              >
               <UBadge
                 v-for="role in module.roles"
                 :key="role"
@@ -427,12 +454,15 @@ await useAsyncData('admin-zones-branches', async () => {
           <template #header>
             <div class="flex items-center gap-2">
               <h2 class="font-semibold">{{ bundle.label }}</h2>
-              <UBadge color="primary" variant="subtle" size="xs">{{ bundle.staffRole }}</UBadge>
+              <UBadge color="primary" variant="subtle" size="xs">{{
+                bundle.staffRole
+              }}</UBadge>
             </div>
             <p class="mt-1 text-sm text-gray-500">{{ bundle.description }}</p>
           </template>
           <p class="text-xs text-gray-500">
-            <span class="font-semibold uppercase tracking-wide">Scope — </span>{{ bundle.scope }}
+            <span class="font-semibold uppercase tracking-wide">Scope — </span
+            >{{ bundle.scope }}
           </p>
           <div class="mt-2 flex flex-wrap gap-1.5">
             <UBadge
@@ -469,8 +499,12 @@ await useAsyncData('admin-zones-branches', async () => {
               <button
                 type="button"
                 class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800"
-                :class="selectedRoleId === role.id ? 'bg-gray-100 font-medium dark:bg-gray-800' : ''"
-                @click="selectedRoleId = role.id; loadRolePermissions()"
+                :class="
+                  selectedRoleId === role.id
+                    ? 'bg-gray-100 font-medium dark:bg-gray-800'
+                    : ''
+                "
+                @click="selectRole(role.id)"
               >
                 <span class="min-w-0 flex-1 truncate">{{ role.name }}</span>
                 <UBadge
@@ -486,12 +520,22 @@ await useAsyncData('admin-zones-branches', async () => {
           <div class="mt-4 border-t border-gray-200 pt-4 dark:border-gray-800">
             <h3 class="text-sm font-semibold">New custom role</h3>
             <UFormField label="Name (lowercase, digits, underscores)" class="mt-2">
-              <UInput v-model="newRole.name" placeholder="e.g. zone_viewer" class="w-full" />
+              <UInput
+                v-model="newRole.name"
+                placeholder="e.g. zone_viewer"
+                class="w-full"
+              />
             </UFormField>
             <UFormField label="Description" class="mt-2">
-              <UInput v-model="newRole.description" placeholder="What is it for?" class="w-full" />
+              <UInput
+                v-model="newRole.description"
+                placeholder="What is it for?"
+                class="w-full"
+              />
             </UFormField>
-            <p v-if="newRoleError !== ''" class="mt-2 text-xs text-red-600">{{ newRoleError }}</p>
+            <p v-if="newRoleError !== ''" class="mt-2 text-xs text-red-600">
+              {{ newRoleError }}
+            </p>
             <UButton
               label="Create role"
               icon="i-lucide-plus"
@@ -519,7 +563,10 @@ await useAsyncData('admin-zones-branches', async () => {
             Select a role on the left.
           </p>
           <div v-else-if="rolePermsPending" class="flex justify-center py-8">
-            <UIcon name="i-lucide-loader-circle" class="size-6 animate-spin text-gray-400" />
+            <UIcon
+              name="i-lucide-loader-circle"
+              class="size-6 animate-spin text-gray-400"
+            />
           </div>
           <div v-else class="overflow-x-auto">
             <table class="min-w-full text-sm">
@@ -538,9 +585,15 @@ await useAsyncData('admin-zones-branches', async () => {
               <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                 <tr v-for="collection in collections" :key="collection">
                   <td class="px-3 py-2 font-mono text-xs">{{ collection }}</td>
-                  <td v-for="action in ACTIONS" :key="action" class="px-3 py-2 text-center">
+                  <td
+                    v-for="action in ACTIONS"
+                    :key="action"
+                    class="px-3 py-2 text-center"
+                  >
                     <UButton
-                      :icon="permKey(collection, action) ? 'i-lucide-check' : 'i-lucide-minus'"
+                      :icon="
+                        permKey(collection, action) ? 'i-lucide-check' : 'i-lucide-minus'
+                      "
                       :color="permKey(collection, action) ? 'success' : 'neutral'"
                       variant="ghost"
                       size="xs"
@@ -558,12 +611,12 @@ await useAsyncData('admin-zones-branches', async () => {
             >
               <h3 class="text-sm font-semibold">Row filters</h3>
               <p class="mt-1 text-xs text-gray-500">
-                Permissions carrying a Directus row filter narrow to matching
-                rows instead of the whole collection.
+                Permissions carrying a Directus row filter narrow to matching rows instead
+                of the whole collection.
               </p>
               <ul class="mt-2 space-y-1 text-xs">
                 <li
-                  v-for="perm in rolePermissions.filter((entry) => entry.filter !== null)"
+                  v-for="perm in filteredRolePermissions"
                   :key="perm.id"
                   class="flex flex-wrap items-center gap-2 rounded-lg bg-gray-50 px-2 py-1.5 font-mono dark:bg-gray-900"
                 >
@@ -579,20 +632,25 @@ await useAsyncData('admin-zones-branches', async () => {
                     @click="togglePermission(perm.collection, perm.action)"
                   />
                 </li>
-                <li
-                  v-if="rolePermissions.filter((entry) => entry.filter !== null).length === 0"
-                  class="text-gray-400"
-                >
+                <li v-if="filteredRolePermissions.length === 0" class="text-gray-400">
                   No row filters — every grant covers its whole collection.
                 </li>
               </ul>
               <h3 class="mt-4 text-sm font-semibold">Add permission</h3>
               <div class="mt-2 grid gap-2 sm:grid-cols-[1fr_140px]">
                 <UFormField label="Collection">
-                  <USelect v-model="permForm.collection" :items="[{ label: 'users (own profile)', value: 'users' }, ...collections.map((name) => ({ label: name, value: name }))]" class="w-full" />
+                  <USelect
+                    v-model="permForm.collection"
+                    :items="collectionOptions"
+                    class="w-full"
+                  />
                 </UFormField>
                 <UFormField label="Action">
-                  <USelect v-model="permForm.action" :items="ACTIONS.map((action) => ({ label: action, value: action }))" class="w-full" />
+                  <USelect
+                    v-model="permForm.action"
+                    :items="actionOptions"
+                    class="w-full"
+                  />
                 </UFormField>
               </div>
               <UFormField label="Row filter JSON (optional)" class="mt-2">
@@ -602,7 +660,9 @@ await useAsyncData('admin-zones-branches', async () => {
                   class="w-full font-mono"
                 />
               </UFormField>
-              <p v-if="permFormError !== ''" class="mt-2 text-xs text-red-600">{{ permFormError }}</p>
+              <p v-if="permFormError !== ''" class="mt-2 text-xs text-red-600">
+                {{ permFormError }}
+              </p>
               <UButton
                 label="Add permission"
                 icon="i-lucide-plus"
@@ -620,8 +680,8 @@ await useAsyncData('admin-zones-branches', async () => {
         <template #header>
           <h2 class="font-semibold">People</h2>
           <p class="mt-1 text-sm text-gray-500">
-            Assign a role bundle to a group of people. Scope links (branch /
-            zone) decide which rows they see.
+            Assign a role bundle to a group of people. Scope links (branch / zone) decide
+            which rows they see.
           </p>
         </template>
         <div
@@ -630,8 +690,9 @@ await useAsyncData('admin-zones-branches', async () => {
         >
           <UIcon name="i-lucide-package" class="size-4 text-primary-500" />
           <span>
-            Assigning bundle <strong>{{ pendingBundle.label }}</strong>
-            (role <span class="font-mono text-xs">{{ pendingBundle.staffRole }}</span>).
+            Assigning bundle <strong>{{ pendingBundle.label }}</strong> (role
+            <span class="font-mono text-xs">{{ pendingBundle.staffRole }}</span
+            >).
           </span>
           <UButton
             label="Clear"
@@ -653,7 +714,10 @@ await useAsyncData('admin-zones-branches', async () => {
           <UButton label="Search" icon="i-lucide-search" @click="searchUsers()" />
         </div>
         <div v-if="usersPending" class="flex justify-center py-8">
-          <UIcon name="i-lucide-loader-circle" class="size-6 animate-spin text-gray-400" />
+          <UIcon
+            name="i-lucide-loader-circle"
+            class="size-6 animate-spin text-gray-400"
+          />
         </div>
         <div v-else-if="users.length > 0" class="mt-4 overflow-x-auto">
           <table class="min-w-full text-sm">
@@ -668,11 +732,15 @@ await useAsyncData('admin-zones-branches', async () => {
             <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
               <tr v-for="user in users" :key="user.id">
                 <td class="px-3 py-2">
-                  <p class="font-medium text-gray-900 dark:text-white">{{ displayName(user) }}</p>
+                  <p class="font-medium text-gray-900 dark:text-white">
+                    {{ displayName(user) }}
+                  </p>
                   <p class="font-mono text-xs text-gray-400">{{ user.email }}</p>
                 </td>
                 <td class="px-3 py-2">
-                  <UBadge color="neutral" variant="subtle">{{ user.staff_role ?? '—' }}</UBadge>
+                  <UBadge color="neutral" variant="subtle">{{
+                    user.staff_role ?? '—'
+                  }}</UBadge>
                 </td>
                 <td class="px-3 py-2 text-gray-500">{{ user.status }}</td>
                 <td class="px-3 py-2 text-right">
@@ -699,7 +767,11 @@ await useAsyncData('admin-zones-branches', async () => {
         <template #body>
           <div class="grid gap-3">
             <UFormField label="Staff role">
-              <USelect v-model="editForm.staff_role" :items="roleOptions" class="w-full" />
+              <USelect
+                v-model="editForm.staff_role"
+                :items="roleOptions"
+                class="w-full"
+              />
             </UFormField>
             <UFormField label="Branch">
               <EntitySelect
@@ -719,8 +791,8 @@ await useAsyncData('admin-zones-branches', async () => {
             </UFormField>
             <p class="text-xs text-gray-500">
               Area link follows the branch automatically
-              <span v-if="editAreaPreview" class="font-mono">({{ editAreaPreview }})</span>.
-              Area and super admins see everything regardless of links.
+              <span v-if="editAreaPreview" class="font-mono">({{ editAreaPreview }})</span
+              >. Area and super admins see everything regardless of links.
             </p>
             <p v-if="editError !== ''" class="text-xs text-red-600">{{ editError }}</p>
             <div class="flex justify-end gap-2">

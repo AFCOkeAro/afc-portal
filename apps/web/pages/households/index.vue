@@ -89,7 +89,12 @@ function formatDate(value: string | null | undefined): string {
           placeholder="Search household name"
           aria-label="Search households"
         />
-        <EntitySelect v-model="branch" :items="branchOptions" placeholder="Select branch…" class="w-full" />
+        <EntitySelect
+          v-model="branch"
+          :items="branchOptions"
+          placeholder="Select branch…"
+          class="w-full"
+        />
       </div>
 
       <UAlert

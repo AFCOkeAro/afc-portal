@@ -30,7 +30,9 @@ self.addEventListener('activate', (event) => {
     caches
       .keys()
       .then((keys) =>
-        Promise.all(keys.filter((key) => key !== VERSION).map((key) => caches.delete(key))),
+        Promise.all(
+          keys.filter((key) => key !== VERSION).map((key) => caches.delete(key)),
+        ),
       )
       .then(() => self.clients.claim()),
   )
@@ -52,9 +54,7 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin) return
 
   if (request.mode === 'navigate') {
-    event.respondWith(
-      fetch(request).catch(() => caches.match('/offline')),
-    )
+    event.respondWith(fetch(request).catch(() => caches.match('/offline')))
     return
   }
 

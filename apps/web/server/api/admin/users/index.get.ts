@@ -28,8 +28,7 @@ export default defineEventHandler(async (event) => {
     accessToken: adminToken,
     query: {
       ...(search === '' ? {} : { search }),
-      fields:
-        'id,email,first_name,last_name,staff_role,status,branch,zone,area',
+      fields: 'id,email,first_name,last_name,staff_role,status,branch,zone,area',
       limit: 25,
     },
   })

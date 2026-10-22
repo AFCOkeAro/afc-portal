@@ -16,7 +16,12 @@ export default defineNuxtPlugin(() => {
         .then((registration) => {
           const periodic = (
             registration as unknown as {
-              periodicSync?: { register: (tag: string, options?: Record<string, unknown>) => Promise<void> }
+              periodicSync?: {
+                register: (
+                  tag: string,
+                  options?: Record<string, unknown>,
+                ) => Promise<void>
+              }
             }
           ).periodicSync
           if (!periodic) return

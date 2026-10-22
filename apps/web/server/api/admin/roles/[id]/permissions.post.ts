@@ -77,15 +77,11 @@ export default defineEventHandler(async (event) => {
   }
   let policies = await policiesForRole(event, adminToken, id)
   if (policies.length === 0) {
-    const policy = await directusFetch<{ data: { id: string } }>(
-      event,
-      '/policies',
-      {
-        accessToken: adminToken,
-        method: 'POST',
-        body: { name: `${role.data.name} policy`, app_access: true, admin_access: false },
-      },
-    )
+    const policy = await directusFetch<{ data: { id: string } }>(event, '/policies', {
+      accessToken: adminToken,
+      method: 'POST',
+      body: { name: `${role.data.name} policy`, app_access: true, admin_access: false },
+    })
     await directusFetch(event, '/access', {
       accessToken: adminToken,
       method: 'POST',
@@ -93,20 +89,16 @@ export default defineEventHandler(async (event) => {
     })
     policies = [policy.data.id]
   }
-  const created = await directusFetch<{ data: { id: string } }>(
-    event,
-    '/permissions',
-    {
-      accessToken: adminToken,
-      method: 'POST',
-      body: {
-        policy: policies[0],
-        collection: storedCollection,
-        action,
-        fields: ['*'],
-        ...(filter === undefined ? {} : { permissions: filter }),
-      },
+  const created = await directusFetch<{ data: { id: string } }>(event, '/permissions', {
+    accessToken: adminToken,
+    method: 'POST',
+    body: {
+      policy: policies[0],
+      collection: storedCollection,
+      action,
+      fields: ['*'],
+      ...(filter === undefined ? {} : { permissions: filter }),
     },
-  )
+  })
   return { data: { id: created.data.id } }
 })

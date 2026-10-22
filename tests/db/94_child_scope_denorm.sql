@@ -68,18 +68,22 @@ BEGIN
   PERFORM test_support.assert_equals(v_triggers::text, '28', 'scope_denorm',
     'afc_set_scope is attached exactly once per child table');
 
+  -- departments is deliberately absent (AFC-698): 0027 pins departments to
+  -- a single scope level (branch XOR zone), so 0031 attaches no afc_fill_scope
+  -- there -- a fill would violate departments_single_scope_check on every
+  -- branch-scoped insert. 18 tables carry the fill trigger.
   SELECT string_agg(t.table_name, ',') INTO v_missing
   FROM (VALUES
     ('announcements'),('attendance_sessions'),('blessings'),('campaigns'),
     ('campus_students'),('celebrations'),('coaching_programmes'),('conference_centres'),
-    ('departments'),('event_invites'),('event_referrals'),('households'),
+    ('event_invites'),('event_referrals'),('households'),
     ('marriage_matters'),('office_minutes'),('prior_year_import_items'),
     ('sunday_school_classes'),('sunday_services'),('tasks'),('youth_profiles')
   ) AS t(table_name)
   WHERE NOT EXISTS (SELECT 1 FROM pg_trigger g JOIN pg_class c ON c.oid=g.tgrelid
                      WHERE c.relname=t.table_name AND g.tgname='afc_fill_scope');
   PERFORM test_support.assert_equals(COALESCE(v_missing,''), '', 'scope_denorm',
-    'all 19 top-level tables have afc_fill_scope');
+    'all 18 top-level tables have afc_fill_scope');
 END $$;
 
 -- ---------------------------------------------------------------------------
@@ -109,12 +113,14 @@ BEGIN
   PERFORM test_support.assert_equals(v_got_zone::text, v_zone::text,
     'scope_denorm', 'child inherits parent zone');
 
-  -- people.branch is varchar in staging (app-compat graft). A child whose
-  -- parent is the person (mode '0') must accept the uuid text, ignore legacy
-  -- non-uuid text, and derive the zone through branches.
+  -- people.branch is uuid in migration history (0038) and varchar in
+  -- staging (app-compat graft). The trigger reads parent.branch through
+  -- ::text plus a uuid-shape check, so both shapes copy; legacy non-uuid
+  -- text is ignored, never an error. A child whose parent is the person
+  -- (mode '0') derives the zone through branches.
   INSERT INTO people (id, first_name, last_name, branch)
   VALUES ('e0000000-0000-4000-8000-000000000003', 'Scope', 'Parent',
-          v_branch::text);
+          v_branch);
   INSERT INTO consent_records (id, person, channel, granted)
   VALUES ('e0000000-0000-4000-8000-000000000008',
           'e0000000-0000-4000-8000-000000000003', 'email', true);

@@ -224,7 +224,12 @@ const priorityColor: Record<string, 'success' | 'warning' | 'neutral' | 'error'>
         <USelect v-model="status" :items="statusOptions" class="w-full" />
         <USelect v-model="category" :items="categoryOptions" class="w-full" />
         <USelect v-model="priority" :items="priorityOptions" class="w-full" />
-        <EntitySelect v-model="branch" :items="branchOptions" placeholder="Select branch…" class="w-full" />
+        <EntitySelect
+          v-model="branch"
+          :items="branchOptions"
+          placeholder="Select branch…"
+          class="w-full"
+        />
         <USelect
           v-model="confidentiality"
           :items="confidentialityOptions"
