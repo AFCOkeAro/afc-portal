@@ -109,6 +109,33 @@ watch(
   },
 )
 
+/** Escape closes the mobile drawer; the open drawer locks body scroll so
+ *  the page underneath stays put. */
+function onEscape(event: KeyboardEvent): void {
+  if (event.key === 'Escape') mobileOpen.value = false
+}
+
+watch(mobileOpen, (open) => {
+  try {
+    document.body.style.overflow = open ? 'hidden' : ''
+  } catch {
+    // Non-DOM environment: nothing to lock.
+  }
+})
+
+onMounted(() => {
+  window.addEventListener('keydown', onEscape)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', onEscape)
+  try {
+    document.body.style.overflow = ''
+  } catch {
+    // Non-DOM environment: nothing to unlock.
+  }
+})
+
 onMounted(() => {
   try {
     const raw = window.localStorage.getItem(SIDEBAR_EXPANDED_KEY)
@@ -172,11 +199,21 @@ const menuItems = computed(() => [
 
 <template>
   <div class="min-h-screen lg:flex">
+    <!-- Mobile drawer backdrop. -->
+    <div
+      v-if="mobileOpen"
+      class="fixed inset-0 z-40 bg-gray-950/50 lg:hidden"
+      aria-hidden="true"
+      @click="mobileOpen = false"
+    />
     <aside
-      class="border-b border-gray-200 bg-white transition-[width] lg:fixed lg:inset-y-0 lg:border-b-0 lg:border-r dark:border-gray-800 dark:bg-gray-900"
-      :class="railCollapsed ? 'lg:w-16' : 'lg:w-64'"
+      class="fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col border-r border-gray-200 bg-white transition-transform duration-200 ease-out lg:inset-y-0 lg:z-auto dark:border-gray-800 dark:bg-gray-900"
+      :class="[
+        mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
+        railCollapsed ? 'lg:w-16' : 'lg:w-64',
+      ]"
     >
-      <div class="flex h-16 items-center justify-between gap-1 px-3">
+      <div class="flex h-16 shrink-0 items-center justify-between gap-1 px-3">
         <NuxtLink
           to="/dashboard"
           class="flex min-w-0 items-center gap-2 rounded-lg px-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500"
@@ -214,11 +251,11 @@ const menuItems = computed(() => [
         </button>
       </div>
 
-      <nav aria-label="Portal sections" class="px-3 pb-4 lg:pb-6">
-        <!-- Full menu: mobile behind the hamburger, desktop while expanded. -->
+      <nav aria-label="Portal sections" class="min-h-0 flex-1 overflow-y-auto px-3 pb-4 lg:pb-6">
+        <!-- Full menu: overlay drawer on mobile, static sidebar on desktop. -->
         <div
           id="portal-sections-nav"
-          :class="[railCollapsed ? 'lg:hidden' : '', mobileOpen ? 'block' : 'hidden lg:block']"
+          :class="railCollapsed ? 'lg:hidden' : ''"
         >
           <div v-for="section in sections" :key="section.key" class="mt-4 first:mt-1">
             <div class="flex items-center gap-1">

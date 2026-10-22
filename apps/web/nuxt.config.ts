@@ -31,6 +31,26 @@ export default defineNuxtConfig({
 
   devtools: { enabled: false },
 
+  // PWA installability (AFC-686): manifest + icons + theme wiring. The
+  // service worker itself ships verbatim from public/sw.js and registers
+  // in plugins/pwa.client.ts — no module, no build step.
+  app: {
+    head: {
+      link: [
+        { rel: 'manifest', href: '/manifest.webmanifest' },
+        { rel: 'icon', type: 'image/png', href: '/icons/icon-192.png' },
+        { rel: 'apple-touch-icon', href: '/icons/apple-touch-icon.png' },
+      ],
+      meta: [
+        { name: 'theme-color', content: '#052e16' },
+        { name: 'mobile-web-app-capable', content: 'yes' },
+        { name: 'apple-mobile-web-app-capable', content: 'yes' },
+        { name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' },
+        { name: 'apple-mobile-web-app-title', content: 'AFC Portal' },
+      ],
+    },
+  },
+
   css: ['~/assets/css/main.css'],
 
   runtimeConfig: {
