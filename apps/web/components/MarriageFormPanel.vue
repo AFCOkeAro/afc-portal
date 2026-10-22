@@ -257,6 +257,20 @@ function setPath(name: string, value: unknown) {
   target[parts[parts.length - 1]] = value
 }
 
+// Single-expression template handlers: the repo prettier strips `;`
+// separators when it splits multi-statement event attributes across lines,
+// which breaks the production build. Routing inputs through these methods
+// keeps one statement per attribute with identical behaviour.
+function onFieldInput(name: string, value: unknown): void {
+  setPath(name, value)
+  values.value = { ...values.value }
+}
+
+function onAnswerInput(name: string, index: number, value: unknown): void {
+  ;(getPath(name) as string[])[index - 1] = String(value)
+  values.value = { ...values.value }
+}
+
 function selectForm(key: string) {
   formKey.value = key
   saveError.value = ''
@@ -435,27 +449,18 @@ await loadForms()
             :model-value="String(getPath(def.name) ?? '')"
             :type="def.type === 'date' ? 'date' : 'text'"
             class="w-full"
-            @update:model-value="
-              setPath(def.name, $event)
-              values = { ...values }
-            "
+            @update:model-value="onFieldInput(def.name, $event)"
           />
           <UTextarea
             v-else-if="def.type === 'textarea'"
             :model-value="String(getPath(def.name) ?? '')"
             class="w-full"
-            @update:model-value="
-              setPath(def.name, $event)
-              values = { ...values }
-            "
+            @update:model-value="onFieldInput(def.name, $event)"
           />
           <USwitch
             v-else-if="def.type === 'switch'"
             :model-value="Boolean(getPath(def.name))"
-            @update:model-value="
-              setPath(def.name, $event)
-              values = { ...values }
-            "
+            @update:model-value="onFieldInput(def.name, $event)"
           />
           <USelect
             v-else-if="def.type === 'select'"
@@ -467,10 +472,7 @@ await loadForms()
               }))
             "
             class="w-full"
-            @update:model-value="
-              setPath(def.name, $event)
-              values = { ...values }
-            "
+            @update:model-value="onFieldInput(def.name, $event)"
           />
           <div v-else-if="def.type === 'answers'" class="grid gap-2">
             <UTextarea
@@ -481,10 +483,7 @@ await loadForms()
               "
               :placeholder="`Answer ${index}`"
               class="w-full"
-              @update:model-value="
-                ;(getPath(def.name) as string[])[index - 1] = String($event)
-                values = { ...values }
-              "
+              @update:model-value="onAnswerInput(def.name, index, $event)"
             />
           </div>
           <UTextarea
@@ -492,10 +491,7 @@ await loadForms()
             :model-value="fromStored(getPath(def.name))"
             placeholder="One item per line"
             class="w-full"
-            @update:model-value="
-              setPath(def.name, $event)
-              values = { ...values }
-            "
+            @update:model-value="onFieldInput(def.name, $event)"
           />
           <div v-else-if="def.type === 'numbers'" class="flex flex-wrap gap-2">
             <UButton
