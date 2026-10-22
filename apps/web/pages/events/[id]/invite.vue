@@ -215,6 +215,40 @@ async function confirmInvite(): Promise<void> {
         <span v-if="event.location"> · {{ event.location }}</span>
       </p>
 
+      <!-- Visitor invitation + management (AFC-649 §F): scoped by the
+        visitor/invite list routes' own area/zone/branch filters. -->
+      <UCard class="mb-8">
+        <div class="flex flex-wrap items-center gap-2">
+          <p class="mr-auto text-sm text-gray-600 dark:text-gray-300">
+            Invitations and visitor follow-ups for this event live in the scoped lists.
+          </p>
+          <UButton
+            size="sm"
+            color="neutral"
+            variant="outline"
+            icon="i-lucide-users"
+            label="Manage visitors"
+            :to="`/visitors?event=${id}`"
+          />
+          <UButton
+            size="sm"
+            color="neutral"
+            variant="ghost"
+            icon="i-lucide-send"
+            label="Sent invitations"
+            :to="`/invites?event=${id}`"
+          />
+          <UButton
+            size="sm"
+            color="neutral"
+            variant="ghost"
+            icon="i-lucide-chart-column"
+            label="Event reports"
+            :to="`/events/${id}?tab=reports`"
+          />
+        </div>
+      </UCard>
+
       <UAlert
         v-if="created"
         class="mb-4"

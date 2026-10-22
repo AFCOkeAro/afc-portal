@@ -16,6 +16,8 @@ function queryParam(name: string): string | null {
 }
 const status = ref(queryParam('status') ?? 'open')
 const branch = ref(queryParam('branch') ?? 'all')
+/** Event wiring (AFC-649 §F): event pages link here with ?event=. */
+const eventFilter = ref(queryParam('event'))
 const page = ref(1)
 const limit = 25
 
@@ -27,7 +29,7 @@ watch(searchInput, (value: string) => {
   }, 300)
 })
 
-watch([status, branch, search], () => {
+watch([status, branch, search, eventFilter], () => {
   page.value = 1
 })
 
@@ -46,6 +48,7 @@ const query = computed(() => ({
   status: status.value,
   ...(search.value ? { search: search.value } : {}),
   ...(branch.value !== 'all' ? { branch: branch.value } : {}),
+  ...(eventFilter.value ? { event: eventFilter.value } : {}),
 }))
 
 const { data, pending, error, refresh } = await useAsyncData(
@@ -175,7 +178,25 @@ const statusColor: Record<string, 'success' | 'warning' | 'neutral' | 'error'> =
           aria-label="Search visitors"
         />
         <USelect v-model="status" :items="statusOptions" class="w-full" />
-        <EntitySelect v-model="branch" :items="branchOptions" placeholder="Select branch…" class="w-full" />
+        <EntitySelect
+          v-model="branch"
+          :items="branchOptions"
+          placeholder="Select branch…"
+          class="w-full"
+        />
+      </div>
+      <div v-if="eventFilter" class="mt-3">
+        <UBadge color="neutral" variant="subtle">
+          Event: {{ eventFilter }}
+          <UButton
+            size="xs"
+            color="neutral"
+            variant="ghost"
+            icon="i-lucide-x"
+            aria-label="Clear event filter"
+            @click="eventFilter = null"
+          />
+        </UBadge>
       </div>
 
       <UAlert

@@ -3,9 +3,19 @@ import { COLLECTIONS } from '@afc/shared'
 import { ApiRequestError } from '~/composables/useApi'
 import type { BranchSummary, EventDetail, RegistrationRow } from '~/types/portal'
 
+/**
+ * Programme detail (AFC-649 §A–D, F): hero with public link + 6 tabs
+ * (Overview, Registrations, Check-in, Reports, Schedule, Materials)
+ * matching the reference screenshots.
+ *
+ * Data paths unchanged (GET /api/events/[id], rollups, check-in,
+ * registrations, invites, visitors — all scope-filtered server-side).
+ * Overview analytics are folded client-side from the already-loaded
+ * scoped rows (rollups precedent: no summary tables, no new endpoint).
+ * Tab is `?tab=` so each tab deep-links.
+ */
 definePageMeta({ middleware: 'staff' })
 
-/** Header aggregates from GET /api/events/[id]/rollups (AFC-470 §5). */
 interface RegistrationRollups {
   registered: number
   confirmed: number
@@ -16,7 +26,20 @@ interface RegistrationRollups {
   byStatus: Record<string, number>
 }
 
+const TABS = [
+  { id: 'overview', label: 'Overview', icon: 'i-lucide-layout-grid' },
+  { id: 'registrations', label: 'Registrations', icon: 'i-lucide-users' },
+  { id: 'checkin', label: 'Check-in', icon: 'i-lucide-scan-line' },
+  { id: 'reports', label: 'Reports', icon: 'i-lucide-chart-column' },
+  { id: 'schedule', label: 'Schedule', icon: 'i-lucide-calendar-days' },
+  { id: 'materials', label: 'Materials', icon: 'i-lucide-folder-open' },
+] as const
+
+type TabId = (typeof TABS)[number]['id']
+const REPORT_SUBTABS = ['Unit reports', 'Feedback', 'Blessings', 'Testimonies'] as const
+
 const route = useRoute()
+const router = useRouter()
 const api = useApi()
 const permissions = usePermissions()
 const id = String(route.params.id)
@@ -24,6 +47,7 @@ const showEdit = ref(false)
 const showBlessingForm = ref(false)
 const showWalkinForm = ref(false)
 const showGroupForm = ref(false)
+const showComms = ref(false)
 const managingRegistration = ref<RegistrationRow | null>(null)
 const showManageOpen = computed({
   get: () => managingRegistration.value !== null,
@@ -35,10 +59,32 @@ const savingStatus = ref(false)
 const actionError = ref('')
 const checkinTicket = ref('')
 const checkinName = ref('')
+const checkinMode = ref<'scan' | 'type'>('scan')
+const checkinSession = ref('arrival')
 const checkingIn = ref(false)
 const checkinMessage = ref('')
 const checkinIsError = ref(false)
+/** People checked in on this device, this session (client-side only). */
+const deviceCheckins = ref<Array<{ name: string; at: string }>>([])
 const rollups = ref<RegistrationRollups | null>(null)
+const reportSubtab = ref<(typeof REPORT_SUBTABS)[number]>('Unit reports')
+
+/* Registrations tab state (AFC-649 §C): filter bar + bulk select. */
+const regSearch = ref('')
+const regStatus = ref('all')
+const selectedRegs = ref<Set<string>>(new Set())
+
+const tab = computed<TabId>(() => {
+  const raw = route.query.tab
+  const value = Array.isArray(raw) ? raw[0] : raw
+  return (TABS as readonly { id: string }[]).some((entry) => entry.id === value)
+    ? (value as TabId)
+    : 'overview'
+})
+
+function goTab(next: TabId): void {
+  void router.replace({ query: { ...route.query, tab: next } })
+}
 
 const {
   data: event,
@@ -50,6 +96,16 @@ const {
 const branches = await useAsyncData('events-branches', () =>
   api.get<BranchSummary[]>('/api/branches'),
 )
+
+const branchNameOf = computed(() => {
+  const map = new Map(
+    (branches.data.value ?? []).map((row) => [String(row.id), row.name]),
+  )
+  return (branch: unknown): string | null => {
+    if (branch === null || branch === undefined || branch === '') return null
+    return map.get(String(branch)) ?? null
+  }
+})
 
 const canEdit = computed(() => permissions.can(COLLECTIONS.events, 'update'))
 const canBlessings = computed(() => permissions.can(COLLECTIONS.blessings, 'read'))
@@ -81,18 +137,23 @@ const restrictedMessage = computed(() => {
   return `Registration fields not shown on this account: ${hidden.join(', ')}.`
 })
 
-function formatDateTime(value: string | null | undefined): string {
+const isUpcoming = computed(() => {
+  if (!event.value) return true
+  const start = new Date(event.value.start_at).getTime()
+  return Number.isNaN(start) || start >= Date.now()
+})
+
+const publicLink = computed(() => `/register`)
+
+function formatDay(value: string | null | undefined): string {
   if (!value) return '—'
   const date = new Date(value)
   return Number.isNaN(date.getTime())
     ? value
-    : date.toLocaleString(undefined, {
-        weekday: 'short',
+    : date.toLocaleDateString(undefined, {
         day: 'numeric',
         month: 'short',
         year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
       })
 }
 
@@ -104,6 +165,140 @@ const registrationColor: Record<string, 'success' | 'warning' | 'neutral' | 'err
   cancelled: 'error',
   no_show: 'error',
 }
+
+/* ---------- Overview analytics: scoped rows only (AFC-649 §B) ---------- */
+
+const activeRegs = computed(() =>
+  (event.value?.registrations ?? []).filter(
+    (row) => row.registration_status !== 'cancelled',
+  ),
+)
+
+const overTime = computed<Array<[string, number]>>(() => {
+  const buckets = new Map<string, number>()
+  for (const row of activeRegs.value) {
+    const created = (row as { created_at?: string }).created_at
+    if (!created) continue
+    const day = created.slice(0, 10)
+    buckets.set(day, (buckets.get(day) ?? 0) + 1)
+  }
+  return [...buckets.entries()]
+    .sort(([a]: [string, number], [b]: [string, number]) => (a < b ? -1 : 1))
+    .slice(-14)
+})
+const overTimePeak = computed(() =>
+  overTime.value.reduce(
+    (peak: number, [, count]: [string, number]) => Math.max(peak, count),
+    0,
+  ),
+)
+/** Busiest registration day (script-side so the template stays typeless). */
+const busiestDay = computed(() => {
+  if (overTime.value.length === 0) return null
+  return overTime.value.reduce<[string, number]>(
+    (a: [string, number], b: [string, number]) => (b[1] > a[1] ? b : a),
+  )
+})
+const overTimeLast7 = computed(() =>
+  overTime.value.slice(-7).reduce((sum: number, [, c]: [string, number]) => sum + c, 0),
+)
+
+function breakdown(get: (row: RegistrationRow) => string): Array<[string, number]> {
+  const buckets = new Map<string, number>()
+  for (const row of activeRegs.value) {
+    const key = get(row) || 'Not given'
+    buckets.set(key, (buckets.get(key) ?? 0) + 1)
+  }
+  return [...buckets.entries()].sort(([, a], [, b]) => b - a)
+}
+
+const byStatus = computed(() =>
+  breakdown((row) => row.registration_status.replace(/_/g, ' ')),
+)
+const byAgeGroup = computed(() =>
+  breakdown((row) => String(row.age_group || 'Not given')),
+)
+const byPayment = computed(() =>
+  breakdown((row) => String(row.payment_status || 'Not given')),
+)
+const bySource = computed(() => breakdown((row) => String(row.source || 'Not given')))
+const byBranch = computed(() =>
+  breakdown((row) => branchNameOf.value(row.branch) ?? 'Area-wide'),
+)
+
+const byBranchCheckin = computed(() => {
+  const checked = new Map<string, number>()
+  for (const row of activeRegs.value) {
+    if (row.registration_status !== 'attended') continue
+    const key = branchNameOf.value(row.branch) ?? 'Area-wide'
+    checked.set(key, (checked.get(key) ?? 0) + 1)
+  }
+  return checked
+})
+
+const totalActive = computed(() => activeRegs.value.length)
+function share(count: number): string {
+  if (totalActive.value === 0) return '0%'
+  return `${Math.round((count / totalActive.value) * 100)}%`
+}
+
+/* ---------- Registrations tab rows ---------- */
+
+const filteredRegs = computed<RegistrationRow[]>(() => {
+  const needle = regSearch.value.trim().toLowerCase()
+  return (event.value?.registrations ?? []).filter((row: RegistrationRow) => {
+    if (regStatus.value !== 'all' && row.registration_status !== regStatus.value)
+      return false
+    if (!needle) return true
+    const haystack = [
+      row.ticket_code,
+      row.person_name,
+      row.email,
+      row.phone,
+      branchNameOf.value(row.branch),
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase()
+    return haystack.includes(needle)
+  })
+})
+
+const allSelected = computed(
+  () =>
+    filteredRegs.value.length > 0 &&
+    filteredRegs.value.every((row: RegistrationRow) => selectedRegs.value.has(row.id)),
+)
+function toggleAll(): void {
+  if (allSelected.value) selectedRegs.value = new Set()
+  else
+    selectedRegs.value = new Set(filteredRegs.value.map((row: RegistrationRow) => row.id))
+}
+function toggleOne(rowId: string): void {
+  const next = new Set(selectedRegs.value)
+  if (next.has(rowId)) next.delete(rowId)
+  else next.add(rowId)
+  selectedRegs.value = next
+}
+
+/** Rows currently selected for comms (script-side so the template stays typeless). */
+const selectedRegistrations = computed<RegistrationRow[]>(() =>
+  (event.value?.registrations ?? []).filter((row: RegistrationRow) =>
+    selectedRegs.value.has(row.id),
+  ),
+)
+
+const regStatusOptions = [
+  { label: 'Status: all', value: 'all' },
+  { label: 'Pending', value: 'pending' },
+  { label: 'Confirmed', value: 'confirmed' },
+  { label: 'Attended', value: 'attended' },
+  { label: 'Waitlisted', value: 'waitlisted' },
+  { label: 'Cancelled', value: 'cancelled' },
+  { label: 'No show', value: 'no_show' },
+]
+
+/* ---------- Actions (unchanged paths) ---------- */
 
 async function setStatus(status: 'published' | 'closed' | 'cancelled'): Promise<void> {
   savingStatus.value = true
@@ -119,12 +314,16 @@ async function setStatus(status: 'published' | 'closed' | 'cancelled'): Promise<
   }
 }
 
-/**
- * Revenue rollups (AFC-470 §5). Loaded client-side on mount so the read
- * grant is evaluated after the capability list arrives; reloaded with the
- * page after every check-in. A failure hides the cards rather than the
- * page — the list underneath is the system of record.
- */
+async function copyPublicLink(): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(
+      new URL(publicLink.value, window.location.origin).toString(),
+    )
+  } catch {
+    /* Clipboard unavailable — the visible link text is still copyable. */
+  }
+}
+
 async function loadRollups(): Promise<void> {
   if (!canReadRegistrations.value) {
     rollups.value = null
@@ -140,7 +339,6 @@ async function loadRollups(): Promise<void> {
   }
 }
 
-/** Staff check-in by ticket code or name (AFC-470 §2). Exactly one query. */
 async function checkIn(): Promise<void> {
   const ticket = checkinTicket.value.trim()
   const name = checkinName.value.trim()
@@ -157,6 +355,17 @@ async function checkIn(): Promise<void> {
       meta: { already: boolean }
     }>(`/api/events/${id}/check-in`, ticket !== '' ? { ticket_code: ticket } : { name })
     checkinIsError.value = false
+    const display =
+      ((result.data.person_name as string | undefined) ??
+        (result.data.registrant_first_name as string | undefined) ??
+        ticket) ||
+      name
+    if (!result.meta.already) {
+      deviceCheckins.value = [
+        { name: String(display), at: new Date().toLocaleTimeString() },
+        ...deviceCheckins.value,
+      ].slice(0, 50)
+    }
     checkinMessage.value = result.meta.already
       ? 'Already checked in — no change made.'
       : 'Checked in and marked attended.'
@@ -176,25 +385,14 @@ onMounted(() => {
   void loadRollups()
 })
 
-/** Re-run after any registration write: list counts and revenue move together. */
 async function afterRegistrationSaved(): Promise<void> {
+  selectedRegs.value = new Set()
   await Promise.all([refresh(), loadRollups()])
 }
 </script>
 
 <template>
   <div>
-    <div class="mb-4">
-      <UButton
-        to="/events"
-        color="neutral"
-        variant="ghost"
-        size="sm"
-        icon="i-lucide-arrow-left"
-        label="Back to events"
-      />
-    </div>
-
     <div v-if="pending" class="flex justify-center py-16">
       <UIcon name="i-lucide-loader-circle" class="size-6 animate-spin text-gray-400" />
     </div>
@@ -203,41 +401,115 @@ async function afterRegistrationSaved(): Promise<void> {
       v-else-if="error"
       color="error"
       variant="subtle"
-      title="Could not load this event"
+      title="Could not load this programme"
       :description="error.message"
     />
 
     <template v-else-if="event">
-      <PageHeader
-        :title="event.title"
-        :description="`${event.event_type} · ${event.branch_name || 'Area-wide'}`"
+      <!-- Hero (reference: back link, status pill, title, dates, public link) -->
+      <div
+        class="rounded-2xl bg-gradient-to-br from-primary-950 via-primary-900 to-primary-950 p-6 text-white"
       >
-        <template #actions>
+        <NuxtLink to="/events" class="text-xs text-primary-200 hover:text-white">
+          ← All programmes
+        </NuxtLink>
+        <div class="mt-2">
+          <UBadge color="neutral" variant="solid" size="xs">
+            {{ isUpcoming ? 'Upcoming' : 'Past' }}
+          </UBadge>
+        </div>
+        <h1 class="mt-2 text-2xl font-bold">{{ event.title }}</h1>
+        <p class="mt-1 text-sm text-primary-200">
+          {{
+            event.event_type
+              ? event.event_type.charAt(0).toUpperCase() + event.event_type.slice(1)
+              : 'Event'
+          }}{{ event.summary ? ` · ${event.summary}` : '' }}
+        </p>
+        <div
+          class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-primary-100"
+        >
+          <span>
+            <UIcon name="i-lucide-calendar" class="mr-1 inline size-3" />
+            {{ formatDay(event.start_at)
+            }}{{ event.end_at ? ` – ${formatDay(event.end_at)}` : '' }}
+          </span>
+          <span>
+            <UIcon name="i-lucide-map-pin" class="mr-1 inline size-3" />
+            {{ event.branch_name || 'Area-wide' }}
+          </span>
+          <span
+            class="ml-auto inline-flex items-center gap-1 rounded-lg bg-white px-2 py-1 font-mono text-[11px] text-gray-700"
+          >
+            <UIcon name="i-lucide-globe" class="size-3" />{{ publicLink }}
+            <UButton
+              size="xs"
+              color="neutral"
+              variant="ghost"
+              icon="i-lucide-copy"
+              aria-label="Copy public registration link"
+              @click="copyPublicLink()"
+            />
+            <UButton
+              size="xs"
+              color="neutral"
+              variant="ghost"
+              icon="i-lucide-external-link"
+              aria-label="Open public registration form"
+              :to="publicLink"
+            />
+          </span>
+        </div>
+        <div
+          v-if="canEdit"
+          class="mt-4 flex flex-wrap gap-2 border-t border-white/15 pt-3"
+        >
           <UButton
-            v-if="canExport"
-            :to="`/api/events/${event.id}/registrations.csv`"
-            external
+            v-if="event.status !== 'published'"
+            size="xs"
+            label="Publish"
+            :loading="savingStatus"
+            @click="setStatus('published')"
+          />
+          <UButton
+            v-if="event.status === 'published'"
+            size="xs"
             color="neutral"
             variant="outline"
-            icon="i-lucide-download"
-            label="Export CSV"
+            label="Close registration"
+            :loading="savingStatus"
+            @click="setStatus('closed')"
           />
-          <PermissionGate :collection="COLLECTIONS.events" action="update">
-            <UButton label="Edit event" icon="i-lucide-pencil" @click="showEdit = true" />
-          </PermissionGate>
-        </template>
-      </PageHeader>
+          <UButton
+            v-if="event.status !== 'cancelled'"
+            size="xs"
+            color="error"
+            variant="outline"
+            label="Cancel event"
+            :loading="savingStatus"
+            @click="setStatus('cancelled')"
+          />
+          <UButton
+            size="xs"
+            color="neutral"
+            variant="ghost"
+            label="Edit programme"
+            icon="i-lucide-pencil"
+            @click="showEdit = true"
+          />
+        </div>
+      </div>
 
       <UAlert
         v-if="actionError"
-        class="mb-4"
+        class="mt-4"
         color="error"
         variant="subtle"
         :description="actionError"
       />
       <UAlert
         v-if="restrictedMessage"
-        class="mb-4"
+        class="mt-4"
         color="warning"
         variant="subtle"
         icon="i-lucide-shield-alert"
@@ -245,316 +517,620 @@ async function afterRegistrationSaved(): Promise<void> {
         :description="restrictedMessage"
       />
 
-      <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          label="Registered"
-          :value="event.registered_count"
-          :hint="event.capacity ? `Capacity ${event.capacity}` : 'Unlimited capacity'"
-        />
-        <StatCard
-          label="Confirmed"
-          :value="event.confirmed_count"
-          hint="Confirmed registrations"
-        />
-        <StatCard label="Attended" :value="event.attended_count" hint="Marked attended" />
-        <StatCard label="Status" :value="event.status" :hint="event.visibility" />
-      </div>
-
-      <div v-if="canReadRegistrations && rollups" class="mt-4 grid gap-4 sm:grid-cols-3">
-        <StatCard
-          label="Expected revenue"
-          :value="`${rollups.expected} ${event.currency ?? ''}`.trim()"
-          hint="Sum of amounts expected, excluding cancelled"
-        />
-        <StatCard
-          label="Collected"
-          :value="`${rollups.collected} ${event.currency ?? ''}`.trim()"
-          hint="Sum of amounts paid, excluding cancelled"
-        />
-        <StatCard
-          label="Outstanding"
-          :value="`${rollups.outstanding} ${event.currency ?? ''}`.trim()"
-          hint="Expected minus collected"
-        />
-      </div>
-
-      <div class="mt-6 grid gap-6 xl:grid-cols-3">
-        <UCard>
-          <template #header><h2 class="text-base font-semibold">Schedule</h2></template>
-          <dl class="space-y-3 text-sm">
-            <div>
-              <dt class="text-gray-500 dark:text-gray-400">Starts</dt>
-              <dd>{{ formatDateTime(event.start_at) }}</dd>
-            </div>
-            <div>
-              <dt class="text-gray-500 dark:text-gray-400">Ends</dt>
-              <dd>{{ formatDateTime(event.end_at) }}</dd>
-            </div>
-            <div>
-              <dt class="text-gray-500 dark:text-gray-400">Location</dt>
-              <dd>{{ event.location || '—' }}</dd>
-            </div>
-            <div v-if="event.address">
-              <dt class="text-gray-500 dark:text-gray-400">Address</dt>
-              <dd class="whitespace-pre-line">{{ event.address }}</dd>
-            </div>
-          </dl>
-        </UCard>
-
-        <UCard>
-          <template #header
-            ><h2 class="text-base font-semibold">Registration</h2></template
+      <!-- 6 tabs -->
+      <nav aria-label="Programme sections" class="mt-4">
+        <div
+          class="flex gap-1 overflow-x-auto rounded-xl border border-gray-200 bg-white p-1 dark:border-gray-800 dark:bg-gray-900"
+        >
+          <button
+            v-for="entry in TABS"
+            :key="entry.id"
+            type="button"
+            :aria-current="tab === entry.id ? 'page' : undefined"
+            :class="[
+              'flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm',
+              tab === entry.id
+                ? 'bg-primary-950 font-medium text-white'
+                : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800',
+            ]"
+            @click="goTab(entry.id)"
           >
-          <dl class="space-y-3 text-sm">
-            <div class="flex justify-between gap-3">
-              <dt class="text-gray-500 dark:text-gray-400">Registration open</dt>
-              <dd>{{ event.registration_open ? 'Yes' : 'No' }}</dd>
-            </div>
-            <div class="flex justify-between gap-3">
-              <dt class="text-gray-500 dark:text-gray-400">Opens</dt>
-              <dd class="text-right">
-                {{ formatDateTime(event.registration_opens_at) }}
-              </dd>
-            </div>
-            <div class="flex justify-between gap-3">
-              <dt class="text-gray-500 dark:text-gray-400">Closes</dt>
-              <dd class="text-right">
-                {{ formatDateTime(event.registration_closes_at) }}
-              </dd>
-            </div>
-            <div class="flex justify-between gap-3">
-              <dt class="text-gray-500 dark:text-gray-400">Fee</dt>
-              <dd>
-                {{
-                  event.fee_amount
-                    ? `${event.fee_amount} ${event.currency ?? ''}`
-                    : 'Free'
-                }}
-              </dd>
-            </div>
-            <div class="flex justify-between gap-3">
-              <dt class="text-gray-500 dark:text-gray-400">Waitlist</dt>
-              <dd>{{ event.waitlist_enabled ? 'Enabled' : 'Off' }}</dd>
-            </div>
-          </dl>
-        </UCard>
+            <UIcon :name="entry.icon" class="size-4" />{{ entry.label }}
+          </button>
+        </div>
+      </nav>
 
-        <UCard>
-          <template #header
-            ><h2 class="text-base font-semibold">Eligibility</h2></template
-          >
-          <dl class="space-y-3 text-sm">
-            <div class="flex justify-between gap-3">
-              <dt class="text-gray-500 dark:text-gray-400">Age range</dt>
-              <dd>{{ event.age_min ?? 'Any' }} – {{ event.age_max ?? 'Any' }}</dd>
-            </div>
-            <div class="flex justify-between gap-3">
-              <dt class="text-gray-500 dark:text-gray-400">Guardian consent</dt>
-              <dd>{{ event.requires_guardian_consent ? 'Required' : 'Not required' }}</dd>
-            </div>
-            <div class="flex justify-between gap-3">
-              <dt class="text-gray-500 dark:text-gray-400">Medical data</dt>
-              <dd>{{ event.collect_medical ? 'Collected' : 'Not collected' }}</dd>
-            </div>
-            <div class="flex justify-between gap-3">
-              <dt class="text-gray-500 dark:text-gray-400">Visibility</dt>
-              <dd class="capitalize">{{ event.visibility }}</dd>
-            </div>
-          </dl>
-          <div
-            v-if="canEdit"
-            class="mt-4 flex flex-wrap gap-2 border-t border-gray-100 pt-4 dark:border-gray-800"
-          >
-            <UButton
-              v-if="event.status !== 'published'"
-              size="xs"
-              label="Publish"
-              :loading="savingStatus"
-              @click="setStatus('published')"
+      <!-- OVERVIEW -->
+      <section v-if="tab === 'overview'" aria-label="Programme overview" class="mt-4">
+        <p class="mb-3 text-xs text-gray-500 dark:text-gray-400">
+          At a glance
+          <span class="float-right">
+            <UIcon name="i-lucide-map-pin" class="mr-1 inline size-3" />{{
+              event.branch_name || 'Whole scope in view'
+            }}
+          </span>
+        </p>
+        <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <StatCard label="Registered" :value="event.registered_count" hint="All time" />
+          <StatCard
+            label="Checked in"
+            :value="event.attended_count"
+            :hint="`${share(event.attended_count)} of registered`"
+          />
+          <StatCard
+            label="Confirmed"
+            :value="event.confirmed_count"
+            hint="Confirmed registrations"
+          />
+          <StatCard
+            label="Unit reports"
+            :value="`${event.blessings.length}`"
+            hint="Linked blessing records"
+          />
+          <template v-if="canReadRegistrations && rollups">
+            <StatCard
+              label="Expected revenue"
+              :value="`${rollups.expected} ${event.currency ?? ''}`.trim()"
+              hint="Excluding cancelled"
             />
-            <UButton
-              v-if="event.status === 'published'"
-              size="xs"
-              color="neutral"
-              variant="outline"
-              label="Close registration"
-              :loading="savingStatus"
-              @click="setStatus('closed')"
+            <StatCard
+              label="Collected"
+              :value="`${rollups.collected} ${event.currency ?? ''}`.trim()"
+              hint="Excluding cancelled"
             />
-            <UButton
-              v-if="event.status !== 'cancelled'"
-              size="xs"
-              color="error"
-              variant="outline"
-              label="Cancel event"
-              :loading="savingStatus"
-              @click="setStatus('cancelled')"
+            <StatCard
+              label="Outstanding"
+              :value="`${rollups.outstanding} ${event.currency ?? ''}`.trim()"
+              hint="Expected minus collected"
             />
+          </template>
+        </div>
+
+        <div class="mt-4 grid gap-4 xl:grid-cols-2">
+          <UCard>
+            <template #header
+              ><h2 class="text-sm font-semibold">Registrations over time</h2>
+              <p class="text-xs text-gray-500">New registrations per day</p></template
+            >
+            <EmptyState
+              v-if="overTime.length === 0"
+              title="No registrations yet"
+              description="Share the public registration link to start collecting sign-ups."
+            />
+            <template v-else>
+              <div
+                class="flex h-28 items-end gap-1"
+                role="img"
+                aria-label="Registrations per day"
+              >
+                <div
+                  v-for="[day, count] in overTime"
+                  :key="day"
+                  class="flex-1 rounded-t bg-primary-900"
+                  :style="{
+                    height: `${Math.max(4, (count / Math.max(1, overTimePeak)) * 100)}%`,
+                  }"
+                  :title="`${day}: ${count}`"
+                />
+              </div>
+              <div class="mt-2 flex justify-between text-xs text-gray-500">
+                <span
+                  >Last 7 days:
+                  <strong class="tabular-nums">{{ overTimeLast7 }}</strong></span
+                >
+                <span v-if="busiestDay"
+                  >Busiest day:
+                  <strong>{{ busiestDay[0] }}</strong>
+                  ·
+                  <strong class="tabular-nums">{{ overTimePeak }}</strong></span
+                >
+              </div>
+            </template>
+          </UCard>
+
+          <UCard>
+            <template #header
+              ><h2 class="text-sm font-semibold">Who's coming</h2></template
+            >
+            <EmptyState
+              v-if="totalActive === 0"
+              title="Nobody registered yet"
+              description="Age-group and status breakdowns appear here."
+            />
+            <div v-else class="space-y-4">
+              <div>
+                <p class="mb-1 text-xs uppercase tracking-wide text-gray-500">
+                  Age group
+                </p>
+                <div v-for="[label, count] in byAgeGroup" :key="label" class="mb-1.5">
+                  <div class="flex justify-between text-xs">
+                    <span>{{ label }}</span>
+                    <span class="tabular-nums">{{ count }} · {{ share(count) }}</span>
+                  </div>
+                  <div class="h-1.5 rounded bg-gray-100 dark:bg-gray-800">
+                    <div
+                      class="h-1.5 rounded bg-primary-900"
+                      :style="{ width: share(count) }"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div>
+                <p class="mb-1 text-xs uppercase tracking-wide text-gray-500">Status</p>
+                <div v-for="[label, count] in byStatus" :key="label" class="mb-1.5">
+                  <div class="flex justify-between text-xs">
+                    <span class="capitalize">{{ label }}</span>
+                    <span class="tabular-nums">{{ count }} · {{ share(count) }}</span>
+                  </div>
+                  <div class="h-1.5 rounded bg-gray-100 dark:bg-gray-800">
+                    <div
+                      class="h-1.5 rounded bg-primary-900"
+                      :style="{ width: share(count) }"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </UCard>
+        </div>
+
+        <UCard class="mt-4">
+          <template #header>
+            <div class="flex items-center justify-between">
+              <div>
+                <h2 class="text-sm font-semibold">By branch</h2>
+                <p class="text-xs text-gray-500">
+                  Select scope on the list to narrow this table
+                </p>
+              </div>
+              <UButton
+                size="xs"
+                color="neutral"
+                variant="ghost"
+                label="All"
+                to="/events"
+              />
+            </div>
+          </template>
+          <EmptyState
+            v-if="byBranch.length === 0"
+            title="No data yet"
+            description="Branch breakdowns appear once registrations arrive."
+          />
+          <div v-else class="overflow-x-auto">
+            <table class="min-w-full text-sm">
+              <thead>
+                <tr class="text-left text-xs uppercase tracking-wide text-gray-500">
+                  <th class="px-3 py-2 font-medium">Branch</th>
+                  <th class="px-3 py-2 font-medium">Registered</th>
+                  <th class="px-3 py-2 font-medium">Checked in</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                <tr v-for="[label, count] in byBranch" :key="label">
+                  <td class="px-3 py-2 font-medium">{{ label }}</td>
+                  <td class="px-3 py-2 tabular-nums">{{ count }}</td>
+                  <td class="px-3 py-2 tabular-nums">
+                    {{ byBranchCheckin.get(label) ?? 0 }}
+                  </td>
+                </tr>
+                <tr class="font-medium">
+                  <td class="px-3 py-2">Total</td>
+                  <td class="px-3 py-2 tabular-nums">{{ totalActive }}</td>
+                  <td class="px-3 py-2 tabular-nums">{{ event.attended_count }}</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </UCard>
-      </div>
 
-      <UCard class="mt-6">
-        <template #header>
-          <div class="flex flex-wrap items-center justify-between gap-2">
-            <h2 class="text-base font-semibold">Registrations</h2>
-            <div class="flex items-center gap-2">
-              <span class="text-xs text-gray-500 dark:text-gray-400">
-                {{ event.registrations.length }} records
-              </span>
+        <div class="mt-4 grid gap-4 xl:grid-cols-2">
+          <UCard>
+            <template #header
+              ><h2 class="text-sm font-semibold">Payment status</h2></template
+            >
+            <EmptyState
+              v-if="byPayment.length === 0"
+              title="No data yet"
+              description="Payment breakdowns appear once registrations arrive."
+            />
+            <ul v-else class="space-y-1.5 text-sm">
+              <li
+                v-for="[label, count] in byPayment"
+                :key="label"
+                class="flex justify-between"
+              >
+                <span class="capitalize">{{ label }}</span>
+                <span class="tabular-nums">{{ count }} · {{ share(count) }}</span>
+              </li>
+            </ul>
+          </UCard>
+          <UCard>
+            <template #header
+              ><h2 class="text-sm font-semibold">Registration source</h2></template
+            >
+            <EmptyState
+              v-if="bySource.length === 0"
+              title="No data yet"
+              description="Source breakdowns appear once registrations arrive."
+            />
+            <ul v-else class="space-y-1.5 text-sm">
+              <li
+                v-for="[label, count] in bySource"
+                :key="label"
+                class="flex justify-between"
+              >
+                <span class="capitalize">{{ label }}</span>
+                <span class="tabular-nums">{{ count }} · {{ share(count) }}</span>
+              </li>
+            </ul>
+          </UCard>
+        </div>
+      </section>
+
+      <!-- REGISTRATIONS -->
+      <section v-if="tab === 'registrations'" aria-label="Registrations" class="mt-4">
+        <div class="mb-3 flex flex-wrap items-center gap-2 text-sm">
+          <p>
+            <strong class="tabular-nums">{{ filteredRegs.length }}</strong> registrations
+          </p>
+          <span class="text-xs text-gray-500">
+            <UIcon name="i-lucide-map-pin" class="mr-1 inline size-3" />{{
+              event.branch_name || 'Whole scope in view'
+            }}
+          </span>
+          <span class="ml-auto flex gap-2">
+            <UButton
+              v-if="canExport"
+              :to="`/api/events/${event.id}/registrations.csv`"
+              external
+              color="neutral"
+              variant="outline"
+              size="sm"
+              icon="i-lucide-download"
+              label="Export CSV"
+            />
+            <UButton
+              v-if="canCreateRegistrations"
+              size="sm"
+              icon="i-lucide-user-plus"
+              label="Add registrant"
+              @click="showWalkinForm = true"
+            />
+          </span>
+        </div>
+
+        <UCard>
+          <div class="flex flex-col gap-2 lg:flex-row">
+            <UInput
+              v-model="regSearch"
+              icon="i-lucide-search"
+              placeholder="Search name, reg no, phone or email"
+              aria-label="Search registrations"
+              class="flex-1"
+            />
+            <USelect
+              v-model="regStatus"
+              :items="regStatusOptions"
+              aria-label="Filter by status"
+            />
+          </div>
+
+          <UAlert
+            v-if="!canReadRegistrations"
+            class="mt-3"
+            color="warning"
+            variant="subtle"
+            title="Registration list not available"
+            description="Your role can see the event but does not hold a read grant on registrations."
+          />
+          <EmptyState
+            v-else-if="filteredRegs.length === 0"
+            class="mt-3"
+            title="No registrations match"
+            description="Try a different search or add the first registrant."
+          />
+          <div v-else class="mt-3 overflow-x-auto">
+            <table
+              class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800"
+            >
+              <thead>
+                <tr class="text-left text-xs uppercase tracking-wide text-gray-500">
+                  <th class="px-2 py-2">
+                    <UCheckbox
+                      :model-value="allSelected"
+                      aria-label="Select all registrations"
+                      @update:model-value="toggleAll()"
+                    />
+                  </th>
+                  <th class="px-3 py-2 font-medium">Reg no</th>
+                  <th class="px-3 py-2 font-medium">Name</th>
+                  <th class="px-3 py-2 font-medium">Phone</th>
+                  <th class="px-3 py-2 font-medium">Home church</th>
+                  <th class="px-3 py-2 font-medium">Registered</th>
+                  <th class="px-3 py-2 font-medium">Check-in</th>
+                  <th v-if="canUpdateRegistrations" class="px-3 py-2">
+                    <span class="sr-only">Actions</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                <tr v-for="registration in filteredRegs" :key="registration.id">
+                  <td class="px-2 py-3">
+                    <UCheckbox
+                      :model-value="selectedRegs.has(registration.id)"
+                      :aria-label="`Select ${registration.person_name}`"
+                      @update:model-value="toggleOne(registration.id)"
+                    />
+                  </td>
+                  <td class="px-3 py-3 font-mono text-xs">
+                    {{ registration.ticket_code || '—' }}
+                  </td>
+                  <td class="px-3 py-3">
+                    <p class="font-medium">{{ registration.person_name }}</p>
+                    <p class="text-xs text-gray-500">{{ registration.email || '' }}</p>
+                  </td>
+                  <td class="px-3 py-3 text-gray-600 dark:text-gray-300">
+                    {{ registration.phone || '—' }}
+                  </td>
+                  <td class="px-3 py-3 text-gray-600 dark:text-gray-300">
+                    {{ branchNameOf(registration.branch) ?? '—' }}
+                  </td>
+                  <td class="px-3 py-3 text-gray-600 dark:text-gray-300">
+                    {{ formatDay(registration.created_at) }}
+                  </td>
+                  <td class="px-3 py-3">
+                    <UBadge
+                      :color="
+                        registrationColor[registration.registration_status] ?? 'neutral'
+                      "
+                      variant="subtle"
+                    >
+                      {{
+                        registration.registration_status === 'attended'
+                          ? 'Checked in'
+                          : 'Not yet'
+                      }}
+                    </UBadge>
+                  </td>
+                  <td v-if="canUpdateRegistrations" class="px-3 py-3 text-right">
+                    <UButton
+                      size="xs"
+                      color="neutral"
+                      variant="ghost"
+                      label="Manage"
+                      @click="managingRegistration = registration"
+                    />
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div
+            class="mt-3 flex flex-wrap items-center gap-2 border-t border-gray-100 pt-3 text-sm dark:border-gray-800"
+          >
+            <p class="text-xs text-gray-500">
+              {{ selectedRegs.size }} of {{ filteredRegs.length }} selected
+            </p>
+            <span class="ml-auto flex gap-2">
               <UButton
                 v-if="canCreateRegistrations"
-                size="xs"
-                variant="outline"
-                label="Register walk-in"
-                icon="i-lucide-plus"
-                @click="showWalkinForm = true"
-              />
-              <UButton
-                v-if="canCreateRegistrations"
-                size="xs"
+                size="sm"
+                color="neutral"
                 variant="outline"
                 label="Register group"
                 icon="i-lucide-users"
                 @click="showGroupForm = true"
               />
-            </div>
+              <UButton
+                size="sm"
+                color="neutral"
+                variant="outline"
+                label="Message selected"
+                icon="i-lucide-mail"
+                :disabled="selectedRegs.size === 0"
+                @click="showComms = true"
+              />
+            </span>
           </div>
-        </template>
+        </UCard>
+      </section>
 
-        <UAlert
-          v-if="!canReadRegistrations"
-          color="warning"
-          variant="subtle"
-          title="Registration list not available"
-          description="Your role can see the event but does not hold a read grant on registrations."
-        />
-
-        <EmptyState
-          v-else-if="event.registrations.length === 0"
-          title="No registrations yet"
-          description="Share the public registration link to start collecting sign-ups."
-        />
-
-        <div v-else class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
-            <thead>
-              <tr
-                class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400"
-              >
-                <th class="px-3 py-2 font-medium">Ticket</th>
-                <th class="px-3 py-2 font-medium">Name</th>
-                <th class="px-3 py-2 font-medium">Contact</th>
-                <th class="px-3 py-2 font-medium">Age group</th>
-                <th v-if="medicalVisible" class="px-3 py-2 font-medium">Medical</th>
-                <th class="px-3 py-2 font-medium">Payment</th>
-                <th class="px-3 py-2 font-medium">Status</th>
-                <th v-if="canUpdateRegistrations" class="px-3 py-2 font-medium">
-                  <span class="sr-only">Actions</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-              <tr v-for="registration in event.registrations" :key="registration.id">
-                <td class="px-3 py-3 font-mono text-xs">
-                  {{ registration.ticket_code || '—' }}
-                </td>
-                <td class="px-3 py-3">
-                  <p class="font-medium">{{ registration.person_name }}</p>
-                  <p class="text-xs text-gray-500 dark:text-gray-400">
-                    {{ registration.email || registration.phone || '' }}
-                  </p>
-                </td>
-                <td class="px-3 py-3 text-gray-600 dark:text-gray-300">
-                  {{ registration.guardian_name || '—' }}
-                </td>
-                <td class="px-3 py-3 capitalize text-gray-600 dark:text-gray-300">
-                  {{ registration.age_group }}
-                </td>
-                <td
-                  v-if="medicalVisible"
-                  class="px-3 py-3 text-gray-600 dark:text-gray-300"
-                >
-                  <p>{{ registration.allergies || 'No allergies' }}</p>
-                  <p class="text-xs text-gray-500 dark:text-gray-400">
-                    {{ registration.medical_notes || '' }}
-                  </p>
-                </td>
-                <td class="px-3 py-3 text-gray-600 dark:text-gray-300">
-                  {{ registration.payment_status || '—' }}
-                  <span v-if="registration.amount_paid">
-                    · {{ registration.amount_paid }}</span
-                  >
-                </td>
-                <td class="px-3 py-3">
-                  <UBadge
-                    :color="
-                      registrationColor[registration.registration_status] ?? 'neutral'
-                    "
-                    variant="subtle"
-                  >
-                    {{ registration.registration_status.replace(/_/g, ' ') }}
-                  </UBadge>
-                </td>
-                <td v-if="canUpdateRegistrations" class="px-3 py-3 text-right">
-                  <UButton
-                    size="xs"
-                    color="neutral"
-                    variant="ghost"
-                    label="Manage"
-                    @click="managingRegistration = registration"
+      <!-- CHECK-IN -->
+      <section v-if="tab === 'checkin'" aria-label="Check-in" class="mt-4">
+        <div class="grid gap-4 xl:grid-cols-2">
+          <div class="space-y-4">
+            <UCard>
+              <div class="flex items-end justify-between gap-3">
+                <UFormField label="Checking in to" class="flex-1">
+                  <USelect
+                    v-model="checkinSession"
+                    :items="[
+                      { label: 'Arrival (accreditation)', value: 'arrival' },
+                      { label: 'General session', value: 'general' },
+                    ]"
+                    class="w-full"
                   />
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </UCard>
+                </UFormField>
+                <div class="pb-0.5 text-right">
+                  <p class="text-2xl font-bold tabular-nums">
+                    {{ deviceCheckins.length }}
+                  </p>
+                  <p class="text-xs text-gray-500">
+                    checked in · you: {{ deviceCheckins.length }}
+                  </p>
+                </div>
+              </div>
+            </UCard>
 
-      <UCard v-if="canUpdateRegistrations" class="mt-6">
-        <template #header><h2 class="text-base font-semibold">Check-in</h2></template>
-        <p class="mb-3 text-sm text-gray-500 dark:text-gray-400">
-          Find one registration by ticket code or by name and mark it attended. A name
-          must match exactly one registration — otherwise you are asked to refine it.
-        </p>
-        <div class="flex flex-col gap-2 sm:flex-row">
-          <UInput
-            v-model="checkinTicket"
-            placeholder="Ticket code"
-            class="font-mono"
-            :disabled="checkingIn"
-            @keyup.enter="checkIn()"
-          />
-          <UInput
-            v-model="checkinName"
-            placeholder="Registrant name"
-            :disabled="checkingIn"
-            @keyup.enter="checkIn()"
-          />
-          <UButton
-            label="Check in"
-            icon="i-lucide-check"
-            :loading="checkingIn"
-            @click="checkIn()"
-          />
-        </div>
-        <UAlert
-          v-if="checkinMessage"
-          class="mt-3"
-          :color="checkinIsError ? 'error' : 'success'"
-          variant="subtle"
-          :description="checkinMessage"
-        />
-      </UCard>
+            <div
+              v-if="canUpdateRegistrations"
+              class="grid grid-cols-2 gap-1 rounded-xl border border-gray-200 bg-white p-1 dark:border-gray-800 dark:bg-gray-900"
+              role="tablist"
+              aria-label="Check-in mode"
+            >
+              <button
+                type="button"
+                role="tab"
+                :aria-selected="checkinMode === 'scan'"
+                :class="[
+                  'rounded-lg px-3 py-1.5 text-sm',
+                  checkinMode === 'scan'
+                    ? 'bg-gray-100 font-medium dark:bg-gray-800'
+                    : 'text-gray-500',
+                ]"
+                @click="checkinMode = 'scan'"
+              >
+                <UIcon name="i-lucide-scan-line" class="mr-1 inline size-4" />Scan QR
+              </button>
+              <button
+                type="button"
+                role="tab"
+                :aria-selected="checkinMode === 'type'"
+                :class="[
+                  'rounded-lg px-3 py-1.5 text-sm',
+                  checkinMode === 'type'
+                    ? 'bg-gray-100 font-medium dark:bg-gray-800'
+                    : 'text-gray-500',
+                ]"
+                @click="checkinMode = 'type'"
+              >
+                <UIcon name="i-lucide-keyboard" class="mr-1 inline size-4" />Type or
+                search
+              </button>
+            </div>
 
-      <UCard v-if="canBlessings" class="mt-6">
-        <template #header>
-          <div class="flex flex-wrap items-center justify-between gap-2">
-            <h2 class="text-base font-semibold">Blessings</h2>
-            <div class="flex items-center gap-2">
-              <span class="text-xs text-gray-500 dark:text-gray-400">
+            <UCard v-if="canUpdateRegistrations">
+              <div v-if="checkinMode === 'scan'">
+                <div
+                  class="flex aspect-square items-center justify-center rounded-xl bg-black text-white"
+                  aria-label="QR scanner placeholder"
+                >
+                  <div class="text-center">
+                    <UIcon name="i-lucide-scan-line" class="size-16 opacity-80" />
+                    <p class="mt-2 text-xs opacity-70">
+                      Camera scanning is not on this device — type the ticket code below.
+                    </p>
+                  </div>
+                </div>
+                <UInput
+                  v-model="checkinTicket"
+                  placeholder="Ticket code from the QR"
+                  class="mt-3 font-mono"
+                  :disabled="checkingIn"
+                  @keyup.enter="checkIn()"
+                />
+              </div>
+              <div v-else>
+                <p class="mb-3 text-sm text-gray-500">
+                  Find one registration by ticket code or by name and mark it attended. A
+                  name must match exactly one registration — otherwise you are asked to
+                  refine it.
+                </p>
+                <div class="flex flex-col gap-2 sm:flex-row">
+                  <UInput
+                    v-model="checkinTicket"
+                    placeholder="Ticket code"
+                    class="font-mono"
+                    :disabled="checkingIn"
+                    @keyup.enter="checkIn()"
+                  />
+                  <UInput
+                    v-model="checkinName"
+                    placeholder="Registrant name"
+                    :disabled="checkingIn"
+                    @keyup.enter="checkIn()"
+                  />
+                </div>
+              </div>
+              <UButton
+                class="mt-3 w-full"
+                label="Check in"
+                icon="i-lucide-check"
+                :loading="checkingIn"
+                @click="checkIn()"
+              />
+              <UAlert
+                v-if="checkinMessage"
+                class="mt-3"
+                :color="checkinIsError ? 'error' : 'success'"
+                variant="subtle"
+                :description="checkinMessage"
+              />
+            </UCard>
+            <UAlert
+              v-else
+              color="warning"
+              variant="subtle"
+              title="Check-in not available"
+              description="Your role does not hold the registration update grant."
+            />
+          </div>
+
+          <UCard>
+            <template #header
+              ><h2 class="text-sm font-semibold">Checked in on this device</h2>
+              <p class="text-xs text-gray-500">
+                People you check in appear here.
+              </p></template
+            >
+            <EmptyState
+              v-if="deviceCheckins.length === 0"
+              title="Nobody checked in yet"
+              description="Successful check-ins on this device are listed here for the session."
+            />
+            <ul v-else class="divide-y divide-gray-100 text-sm dark:divide-gray-800">
+              <li
+                v-for="(entry, index) in deviceCheckins"
+                :key="`${entry.name}-${index}`"
+                class="flex justify-between py-2"
+              >
+                <span class="font-medium">{{ entry.name }}</span>
+                <span class="text-xs text-gray-500">{{ entry.at }}</span>
+              </li>
+            </ul>
+          </UCard>
+        </div>
+      </section>
+
+      <!-- REPORTS -->
+      <section v-if="tab === 'reports'" aria-label="Reports" class="mt-4">
+        <div class="flex flex-wrap items-center gap-1">
+          <div
+            class="flex gap-1 overflow-x-auto rounded-xl border border-gray-200 bg-white p-1 dark:border-gray-800 dark:bg-gray-900"
+            role="tablist"
+            aria-label="Report types"
+          >
+            <button
+              v-for="sub in REPORT_SUBTABS"
+              :key="sub"
+              type="button"
+              role="tab"
+              :aria-selected="reportSubtab === sub"
+              :class="[
+                'shrink-0 rounded-lg px-3 py-1.5 text-sm',
+                reportSubtab === sub
+                  ? 'bg-primary-950 font-medium text-white'
+                  : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800',
+              ]"
+              @click="reportSubtab = sub"
+            >
+              {{ sub }}
+            </button>
+          </div>
+          <span class="ml-auto text-xs text-gray-500">
+            <UIcon name="i-lucide-map-pin" class="mr-1 inline size-3" />{{
+              event.branch_name || 'Whole scope in view'
+            }}
+          </span>
+        </div>
+
+        <UCard class="mt-3">
+          <template v-if="reportSubtab === 'Blessings'">
+            <div class="mb-3 flex items-center justify-between">
+              <p class="text-sm text-gray-500">
                 {{ event.blessings_total }} total · {{ event.blessings.length }} records
-              </span>
+              </p>
               <UButton
                 v-if="canRecordBlessings"
                 size="xs"
@@ -565,60 +1141,173 @@ async function afterRegistrationSaved(): Promise<void> {
                 @click="showBlessingForm = true"
               />
             </div>
-          </div>
-        </template>
-
-        <EmptyState
-          v-if="event.blessings.length === 0"
-          title="No blessings recorded"
-          description="Blessings recorded against this event will appear here."
-        />
-
-        <div v-else class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
-            <thead>
-              <tr
-                class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400"
+            <EmptyState
+              v-if="!canBlessings"
+              title="Blessings not available"
+              description="Your role does not hold the blessings read grant."
+            />
+            <EmptyState
+              v-else-if="event.blessings.length === 0"
+              title="No blessings recorded"
+              description="Blessings recorded against this event will appear here."
+            />
+            <div v-else class="overflow-x-auto">
+              <table
+                class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800"
               >
-                <th class="px-3 py-2 font-medium">Blessing</th>
-                <th class="px-3 py-2 font-medium">Date</th>
-                <th class="px-3 py-2 font-medium">Male</th>
-                <th class="px-3 py-2 font-medium">Female</th>
-                <th class="px-3 py-2 font-medium">Total</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-              <tr v-for="blessing in event.blessings" :key="blessing.id">
-                <td class="px-3 py-3">
-                  <NuxtLink
-                    :to="`/blessings/${blessing.id}`"
-                    class="font-medium capitalize hover:text-primary-600"
-                  >
-                    {{
-                      blessing.blessing_type === 'other' && blessing.other_label
-                        ? blessing.other_label
-                        : blessing.blessing_type.replace(/_/g, ' ')
-                    }}
-                  </NuxtLink>
-                </td>
-                <td class="px-3 py-3 text-gray-600 dark:text-gray-300">
-                  {{ blessing.service_date }}
-                </td>
-                <td class="px-3 py-3 tabular-nums text-gray-600 dark:text-gray-300">
-                  {{ blessing.male_count }}
-                </td>
-                <td class="px-3 py-3 tabular-nums text-gray-600 dark:text-gray-300">
-                  {{ blessing.female_count }}
-                </td>
-                <td class="px-3 py-3 font-medium tabular-nums">
-                  {{ blessing.total_count }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </UCard>
+                <thead>
+                  <tr class="text-left text-xs uppercase tracking-wide text-gray-500">
+                    <th class="px-3 py-2 font-medium">Blessing</th>
+                    <th class="px-3 py-2 font-medium">Date</th>
+                    <th class="px-3 py-2 font-medium">Male</th>
+                    <th class="px-3 py-2 font-medium">Female</th>
+                    <th class="px-3 py-2 font-medium">Total</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                  <tr v-for="blessing in event.blessings" :key="blessing.id">
+                    <td class="px-3 py-3">
+                      <NuxtLink
+                        :to="`/blessings/${blessing.id}`"
+                        class="font-medium capitalize hover:text-primary-600"
+                      >
+                        {{
+                          blessing.blessing_type === 'other' && blessing.other_label
+                            ? blessing.other_label
+                            : blessing.blessing_type.replace(/_/g, ' ')
+                        }}
+                      </NuxtLink>
+                    </td>
+                    <td class="px-3 py-3 text-gray-600">{{ blessing.service_date }}</td>
+                    <td class="px-3 py-3 tabular-nums text-gray-600">
+                      {{ blessing.male_count }}
+                    </td>
+                    <td class="px-3 py-3 tabular-nums text-gray-600">
+                      {{ blessing.female_count }}
+                    </td>
+                    <td class="px-3 py-3 font-medium tabular-nums">
+                      {{ blessing.total_count }}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </template>
 
+          <template v-else-if="reportSubtab === 'Unit reports'">
+            <EmptyState
+              title="No unit report form yet"
+              description="Your coordinator needs to set up the unit report form before units can report."
+            >
+              <UButton
+                v-if="canEdit"
+                class="mt-4"
+                size="sm"
+                color="neutral"
+                variant="outline"
+                label="Open programme settings"
+                icon="i-lucide-settings"
+                @click="showEdit = true"
+              />
+            </EmptyState>
+          </template>
+
+          <template v-else>
+            <EmptyState
+              :title="
+                reportSubtab === 'Feedback' ? 'No feedback yet' : 'No testimonies yet'
+              "
+              :description="
+                reportSubtab === 'Feedback'
+                  ? 'Participant feedback collected for this programme will appear here.'
+                  : 'Testimonies shared from this programme will appear here.'
+              "
+            />
+          </template>
+        </UCard>
+
+        <!-- Visitor invitation + management (AFC-649 §F) -->
+        <UCard class="mt-4">
+          <template #header
+            ><h2 class="text-sm font-semibold">Visitors and invitations</h2>
+            <p class="text-xs text-gray-500">
+              Scoped by your area, zone and branch.
+            </p></template
+          >
+          <div class="flex flex-wrap gap-2">
+            <UButton
+              size="sm"
+              color="neutral"
+              variant="outline"
+              icon="i-lucide-mail-plus"
+              label="Invite someone"
+              :to="`/events/${event.id}/invite`"
+            />
+            <UButton
+              size="sm"
+              color="neutral"
+              variant="outline"
+              icon="i-lucide-users"
+              label="Manage visitors"
+              :to="`/visitors?event=${event.id}`"
+            />
+            <UButton
+              size="sm"
+              color="neutral"
+              variant="ghost"
+              icon="i-lucide-send"
+              label="Sent invitations"
+              :to="`/invites?event=${event.id}`"
+            />
+          </div>
+        </UCard>
+      </section>
+
+      <!-- SCHEDULE -->
+      <section v-if="tab === 'schedule'" aria-label="Schedule" class="mt-4">
+        <p class="mb-3 text-sm text-gray-500">0 events</p>
+        <UCard>
+          <EmptyState
+            title="No schedule yet"
+            description="Add days, services and sessions. Turn on check-in for any event where ushers take attendance."
+          >
+            <UButton
+              v-if="canEdit"
+              class="mt-4"
+              size="sm"
+              color="neutral"
+              variant="outline"
+              label="Open programme settings"
+              icon="i-lucide-settings"
+              @click="showEdit = true"
+            />
+          </EmptyState>
+        </UCard>
+      </section>
+
+      <!-- MATERIALS -->
+      <section v-if="tab === 'materials'" aria-label="Materials" class="mt-4">
+        <p class="mb-3 text-sm text-gray-500">0 items</p>
+        <UCard>
+          <EmptyState
+            title="No materials yet"
+            description="Guidelines, handbooks and the order of programme will appear here once they're shared."
+          >
+            <UButton
+              v-if="canEdit"
+              class="mt-4"
+              size="sm"
+              color="neutral"
+              variant="outline"
+              label="Open programme settings"
+              icon="i-lucide-settings"
+              @click="showEdit = true"
+            />
+          </EmptyState>
+        </UCard>
+      </section>
+
+      <!-- Modals (unchanged) -->
       <RegistrationManageModal
         v-model:open="showManageOpen"
         :registration="managingRegistration"
@@ -636,7 +1325,16 @@ async function afterRegistrationSaved(): Promise<void> {
       <RegistrationGroupModal
         v-model:open="showGroupForm"
         :event-id="event.id"
+        :branches="branches.data.value ?? []"
+        :event-branch="event.branch"
         @saved="afterRegistrationSaved()"
+      />
+      <EventCommsModal
+        v-model:open="showComms"
+        :event-id="event.id"
+        :event-title="event.title"
+        :registrations="selectedRegistrations"
+        @sent="afterRegistrationSaved()"
       />
       <EventFormModal
         v-model:open="showEdit"
