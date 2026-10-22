@@ -33,6 +33,13 @@ export interface BranchSummary {
   type_label?: string | null
   zone?: string | null
   area?: string | null
+  /** AFC-672: geo + contact for the merged Churches map/tooltips. */
+  geo_lat?: number | null
+  geo_lng?: number | null
+  address?: string | null
+  phone?: string | null
+  email?: string | null
+  pastor?: string | null
 }
 
 export interface ZoneSummary {
@@ -41,6 +48,26 @@ export interface ZoneSummary {
   code: string
   area: string | null
   status: string
+  /** AFC-672: geo + contact for the merged Churches map/tooltips. */
+  geo_lat?: number | null
+  geo_lng?: number | null
+  address?: string | null
+  leader?: string | null
+}
+
+export interface BscSummary {
+  id: string
+  name: string
+  code: string
+  parent_branch: string
+  zone: string | null
+  status: string
+  /** AFC-672: geo + contact for the merged Churches map/tooltips. */
+  geo_lat?: number | null
+  geo_lng?: number | null
+  address?: string | null
+  location?: string | null
+  leader?: string | null
 }
 
 export interface BranchSectionWarning {

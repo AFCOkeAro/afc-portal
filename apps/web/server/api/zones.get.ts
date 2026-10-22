@@ -13,6 +13,10 @@ export interface ZoneSummary {
   code: string
   area: string | null
   status: string
+  geo_lat: number | null
+  geo_lng: number | null
+  address: string | null
+  leader: string | null
 }
 
 /**
@@ -45,7 +49,19 @@ export default defineEventHandler(async (event): Promise<ZoneSummary[]> => {
         area ? { area: { _eq: area } } : undefined,
         visibleZones ? { id: { _in: visibleZones } } : undefined,
       ),
-      fields: ['id', 'name', 'code', 'area', 'status'],
+      // AFC-672: geo + contact for the merged Churches map/tooltips.
+      // Operational fields only (§2.2); caller already holds zones read.
+      fields: [
+        'id',
+        'name',
+        'code',
+        'area',
+        'status',
+        'geo_lat',
+        'geo_lng',
+        'address',
+        'leader',
+      ],
       sort: 'sort,name',
       limit: -1,
     })
