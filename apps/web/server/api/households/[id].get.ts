@@ -1,6 +1,7 @@
 import type { Household } from '@afc/shared'
 import {
   ageFromDob,
+  assertUuidParam,
   branchNames,
   findScopedItem,
   fullName,
@@ -66,10 +67,10 @@ export default defineEventHandler(async (event): Promise<HouseholdDetail> => {
   const scope = await getPortalScope(event)
   requireCan(scope, 'households', 'read')
 
-  const id = getRouterParam(event, 'id')
-  if (!id) {
-    throw createError({ statusCode: 400, statusMessage: 'A household id is required' })
-  }
+  // AFC-654: validate the shape at the boundary. A bare `1` reaches
+  // Directus as `_eq` against a uuid column and comes back a 500 carrying
+  // the raw SQL; answer 400 with a named code before any store read.
+  const id = assertUuidParam(getRouterParam(event, 'id'), 'household', 'invalid_household_id')
 
   // Branch scope here; the household-head own-only grant
   // (data-model-expansion §11) has no session field in the portal yet
@@ -96,7 +97,12 @@ export default defineEventHandler(async (event): Promise<HouseholdDetail> => {
       limit: -1,
     })
   } catch (error) {
-    if ((error as { statusCode?: number })?.statusCode) throw error
+    // AFC-654: deliberate 4xx (scope 404s, validation) pass through; any
+    // 5xx — including an upstream SQL-syntax failure the boundary guard
+    // missed — maps to the named store error, never a bare 500. The
+    // Directus layer already strips upstream detail from 5xx messages.
+    const status = (error as { statusCode?: number })?.statusCode
+    if (typeof status === 'number' && status >= 400 && status < 500) throw error
     throwStoreUnavailable(error, 'household_store', '0020')
   }
 

@@ -506,6 +506,30 @@ export function csvResponse(event: H3Event, filename: string, rows: string[][]):
   return rows.map((row) => row.map(csvEscape).join(',')).join('\n')
 }
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+export function isUuid(value: string): boolean {
+  return UUID_RE.test(value)
+}
+
+/**
+ * Reject a malformed `:id` path param at the boundary (AFC-654). Directus
+ * answers a non-UUID `_eq` against a uuid column with a 500 whose message
+ * embeds the raw SQL, which must never reach the client. Every uuid-keyed
+ * detail route should call this before its first store read.
+ */
+export function assertUuidParam(id: string | undefined, resource: string, code: string): string {
+  if (!id || !isUuid(id)) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: `That ${resource} id is not valid`,
+      data: { code },
+    })
+  }
+  return id
+}
+
 export function throwValidation(
   error: { issues: Array<{ path: (string | number | symbol)[]; message: string }> },
   message = 'Some fields need attention',

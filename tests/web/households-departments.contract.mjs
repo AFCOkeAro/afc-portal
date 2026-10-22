@@ -334,7 +334,6 @@ describe('household/department routes: unreadable store fails named, never bare 
   it('deliberate 4xx pass through instead of being renamed into the store', () => {
     for (const src of [
       householdList,
-      householdDetail,
       householdPost,
       householdPatch,
       householdLink,
@@ -345,6 +344,51 @@ describe('household/department routes: unreadable store fails named, never bare 
       deptUnlink,
     ]) {
       assert.match(src, /statusCode\?\: number \}\)\?\.statusCode\) throw error/)
+    }
+  })
+
+  it('household detail passes through only 4xx; 5xx maps to the named store error (AFC-654)', () => {
+    assert.match(
+      householdDetail,
+      /status >= 400 && status < 500\) throw error/,
+    )
+    assert.match(
+      householdDetail,
+      /throwStoreUnavailable\(error, 'household_store', '0020'\)/,
+    )
+  })
+
+  it('household detail validates the id shape at the boundary (AFC-654)', () => {
+    assert.match(
+      householdDetail,
+      /assertUuidParam\(getRouterParam\(event, 'id'\), 'household', 'invalid_household_id'\)/,
+    )
+    assert.doesNotMatch(householdDetail, /A household id is required/)
+  })
+
+  it('the uuid boundary guard answers 400 with a named code (AFC-654)', () => {
+    const src = codeOf('apps/web/server/utils/portal.ts')
+    assert.match(src, /export function assertUuidParam/)
+    assert.match(src, /statusCode: 400/)
+    assert.match(src, /is not valid/)
+    assert.match(src, /data: \{ code \}/)
+  })
+
+  it('the Directus layer strips upstream detail from 5xx messages (AFC-654)', () => {
+    const src = codeOf('apps/web/server/utils/directus.ts')
+    assert.match(src, /if \(status >= 500 \|\| status < 400\)/)
+    assert.match(src, /statusMessage: `Directus request to \$\{path\} failed`,/)
+  })
+
+  it('no route embeds raw SQL in an error body (AFC-654)', () => {
+    for (const rel of [
+      'apps/web/server/api/households/[id].get.ts',
+      'apps/web/server/utils/directus.ts',
+      'apps/web/server/utils/portal.ts',
+    ]) {
+      const src = read(rel)
+      assert.doesNotMatch(src, /select\s+.*\s+from\s+/i)
+      assert.doesNotMatch(src, /invalid input syntax/i)
     }
   })
 
