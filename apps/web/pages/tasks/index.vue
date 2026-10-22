@@ -15,6 +15,8 @@ function queryParam(name: string): string | null {
 }
 const status = ref(queryParam('status') ?? 'all')
 const mine = ref(queryParam('mine') === '1')
+/** Branch drill-down (AFC-666): event Tasks tab links here with ?branch=. */
+const branch = ref(queryParam('branch') ?? '')
 const showForm = ref(false)
 const form = ref({
   title: '',
@@ -29,6 +31,7 @@ const error = ref('')
 const query = computed(() => ({
   ...(status.value !== 'all' ? { status: status.value } : {}),
   ...(mine.value ? { mine: '1' } : {}),
+  ...(branch.value !== '' ? { branch: branch.value } : {}),
 }))
 
 /** Same-page strip navigation (AFC-588): query-only link, sync the filter. */
@@ -38,6 +41,7 @@ watch(
     const statusNext = typeof next.status === 'string' ? next.status : null
     status.value = statusNext ?? 'all'
     mine.value = next.mine === '1'
+    branch.value = typeof next.branch === 'string' ? next.branch : ''
   },
 )
 const { data, pending, refresh } = await useAsyncData(
@@ -233,12 +237,20 @@ function isOverdue(row: Record<string, unknown>): boolean {
     </UCard>
 
     <UCard>
-      <div class="grid gap-3 sm:grid-cols-[220px_1fr]">
+      <div class="grid gap-3 sm:grid-cols-[220px_220px_1fr]">
         <USelect
           v-model="status"
           :items="statusOptions"
           class="w-full"
           aria-label="Filter by status"
+        />
+        <EntitySelect
+          v-model="branch"
+          :items="[{ label: 'All branches', value: '' }, ...branchOptions]"
+          placeholder="All branches"
+          :loading="branchesPending"
+          class="w-full"
+          ariaLabel="Filter by branch"
         />
         <UCheckbox v-model="mine" label="Assigned to me" name="mine" />
       </div>
