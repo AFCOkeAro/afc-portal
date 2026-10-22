@@ -31,8 +31,8 @@
 -- promised ("must ALTER these tables to add the FK; it must not fork them").
 -- Orphan branch uuids no longer insert, so the fixture resolves the SEEDED
 -- Lagos North branches by code instead of minting random ids. Same code =
--- same branch across features. PRE-FORMULA reuses seeded SANGO-OTA (its
--- December row is pre-formula by date, not by branch; SANGO-OTA holds no
+-- same branch across features. PRE-FORMULA reuses seeded SANGO (its
+-- December row is pre-formula by date, not by branch; SANGO holds no
 -- finance row for 2026-07, keeping 68.7's free-key assertion intact).
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS fixture_weca_branches (
@@ -50,7 +50,7 @@ BEGIN
          ('LEGUN', (SELECT id FROM branches WHERE code = 'LEGUN')),
          ('MATOGUN', (SELECT id FROM branches WHERE code = 'MATOGUN')),
          ('OLOMOWEWE', (SELECT id FROM branches WHERE code = 'OLOMOWEWE')),
-         ('PRE-FORMULA', (SELECT id FROM branches WHERE code = 'SANGO-OTA'));
+         ('PRE-FORMULA', (SELECT id FROM branches WHERE code = 'SANGO'));
 
   -- OKE-ARO: E=1952150, Faith City 38000 (board row).
   SELECT branch_id INTO v_oke FROM fixture_weca_branches WHERE label = 'OKE-ARO';
@@ -404,11 +404,11 @@ BEGIN
     '42501', 'weca', 'the app cannot hand-edit a computed line');
 
   -- §10 floor: the app CAN capture inputs and read the schedule.
-  -- AFC-466 MERGE: branch must be a real branches row (FK). SANGO-OTA holds
+  -- AFC-466 MERGE: branch must be a real branches row (FK). SANGO holds
   -- no finance row for 2026-07, so the (branch, month) unique key is free.
   PERFORM test_support.assert_not_raises('directus_app',
     $q$INSERT INTO branch_financial_records (branch, month, income, currency)
-      VALUES ((SELECT id FROM branches WHERE code = 'SANGO-OTA'), DATE '2026-07-01', 50000.00, 'NGN')$q$,
+      VALUES ((SELECT id FROM branches WHERE code = 'SANGO'), DATE '2026-07-01', 50000.00, 'NGN')$q$,
     'weca', 'the app can capture a financial input record');
   PERFORM test_support.assert_not_raises('directus_app',
     $q$SELECT 1 FROM weca_return_formulas WHERE version = 'weca-2026-01'$q$,

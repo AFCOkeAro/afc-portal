@@ -13,29 +13,53 @@ export interface NavigationItem {
   to: string
   icon: string
   requires: readonly [CollectionName, PermissionAction]
-  /** Sidebar section this entry renders under (AFC-549). */
+  /** Sidebar section this entry renders under. */
   group: NavigationGroup
   /** Shown in the sidebar only; the dashboard lists everything. */
   inSidebar?: boolean
 }
 
 /**
- * Sidebar sections in render order (AFC-549). The sidebar renders one
- * headed section per group and drops groups with no permitted items, so a
- * volunteer sees only the sections their capabilities allow.
+ * Sidebar sections in render order. The header of each section is a link to
+ * its own landing page (`/sections/<key>`, rendered by pages/sections/[group].vue)
+ * and the chevron beside it only collapses the section. A section with no
+ * permitted items is dropped, so capability-gating stays per item.
  */
 export type NavigationGroup =
-  'overview' | 'people' | 'gatherings' | 'communications' | 'office'
+  | 'dashboard'
+  | 'office'
+  | 'outreach'
+  | 'welfare'
+  | 'worship'
+  | 'people'
+  | 'youth'
+  | 'events'
+  | 'communications'
+  | 'admin'
 
-export const NAVIGATION_GROUPS: readonly { key: NavigationGroup; label: string }[] = [
-  { key: 'overview', label: 'Overview' },
-  { key: 'people', label: 'People and Care' },
-  { key: 'gatherings', label: 'Gatherings' },
-  { key: 'communications', label: 'Communications' },
-  { key: 'office', label: 'Office' },
+export interface NavigationGroupDef {
+  key: NavigationGroup
+  label: string
+  icon: string
+  /** Landing page for the section header. */
+  to: string
+}
+
+export const NAVIGATION_GROUPS: readonly NavigationGroupDef[] = [
+  { key: 'dashboard', label: 'Dashboard', icon: 'i-lucide-layout-dashboard', to: '/sections/dashboard' },
+  { key: 'office', label: 'Office Admin', icon: 'i-lucide-briefcase', to: '/sections/office' },
+  { key: 'outreach', label: 'Outreach', icon: 'i-lucide-radar', to: '/sections/outreach' },
+  { key: 'welfare', label: 'Welfare', icon: 'i-lucide-heart-handshake', to: '/sections/welfare' },
+  { key: 'worship', label: 'Worship', icon: 'i-lucide-church', to: '/sections/worship' },
+  { key: 'people', label: 'People', icon: 'i-lucide-users', to: '/sections/people' },
+  { key: 'youth', label: 'Youth', icon: 'i-lucide-sparkles', to: '/sections/youth' },
+  { key: 'events', label: 'Events', icon: 'i-lucide-calendar-days', to: '/sections/events' },
+  { key: 'communications', label: 'Communications', icon: 'i-lucide-send', to: '/sections/communications' },
+  { key: 'admin', label: 'Admin', icon: 'i-lucide-shield-check', to: '/sections/admin' },
 ]
 
 export const NAVIGATION: readonly NavigationItem[] = [
+  // Dashboard
   {
     label: 'Dashboard',
     to: '/dashboard',
@@ -43,154 +67,32 @@ export const NAVIGATION: readonly NavigationItem[] = [
     // Every staff role holds a read grant on `branches`, so this resolves for all
     // of them and disappears for a session with no grants at all.
     requires: ['branches', 'read'],
-    group: 'overview',
+    group: 'dashboard',
     inSidebar: true,
   },
   {
-    label: 'Branches',
-    to: '/branches',
-    icon: 'i-lucide-building-2',
-    requires: ['branches', 'read'],
-    group: 'office',
-    inSidebar: true,
-  },
-  {
-    label: 'People',
-    to: '/people',
-    icon: 'i-lucide-users',
-    requires: ['people', 'read'],
-    group: 'people',
-    inSidebar: true,
-  },
-  {
-    label: 'Households',
-    to: '/households',
-    icon: 'i-lucide-house',
-    requires: ['households', 'read'],
-    group: 'people',
-    inSidebar: true,
-  },
-  {
-    label: 'Departments',
-    to: '/departments',
-    icon: 'i-lucide-network',
-    requires: ['departments', 'read'],
-    group: 'people',
-    inSidebar: true,
-  },
-  {
-    label: 'Events',
-    to: '/events',
-    icon: 'i-lucide-calendar-days',
-    requires: ['events', 'read'],
-    group: 'gatherings',
-    inSidebar: true,
-  },
-  // Slice 4 UI (AFC-527, wireframes v3 screens 8-12). Capability-gated, no
-  // role names (data-model §13 rule 7). The member entry resolves for staff
-  // today; the member role holds no matrix grant yet (track d, OTP-gated),
-  // so it resolves for members once the matrix gains the member row.
-  {
-    label: 'Invitations',
-    to: '/invites',
-    icon: 'i-lucide-mail-plus',
-    requires: ['events', 'read'],
-    group: 'gatherings',
-    inSidebar: true,
-  },
-  {
-    label: 'My invitations',
-    to: '/me/invitations',
-    icon: 'i-lucide-mail-open',
-    requires: ['events', 'read'],
-    group: 'gatherings',
-    inSidebar: true,
-  },
-  {
-    label: 'Campaigns',
-    to: '/campaigns',
-    icon: 'i-lucide-workflow',
-    requires: ['communications', 'read'],
-    group: 'communications',
-    inSidebar: true,
-  },
-  {
-    label: 'Delivery log',
-    to: '/communications',
-    icon: 'i-lucide-scroll-text',
-    requires: ['communications', 'read'],
-    group: 'communications',
-    inSidebar: true,
-  },
-  {
-    label: 'Attendance',
-    to: '/attendance',
-    icon: 'i-lucide-clipboard-check',
-    requires: ['attendance_sessions', 'read'],
-    group: 'gatherings',
-    inSidebar: true,
-  },
-  {
-    label: 'Services',
-    to: '/services',
-    icon: 'i-lucide-church',
+    label: 'Calendar',
+    to: '/calendar',
+    icon: 'i-lucide-calendar-range',
     requires: ['sunday_services', 'read'],
-    group: 'gatherings',
+    group: 'dashboard',
     inSidebar: true,
   },
   {
-    label: 'Visitors',
-    to: '/visitors',
-    icon: 'i-lucide-user-plus',
-    requires: ['visitors', 'read'],
-    group: 'people',
+    label: 'Search',
+    to: '/search',
+    icon: 'i-lucide-search',
+    requires: ['people', 'read'],
+    group: 'dashboard',
     inSidebar: true,
   },
+
+  // Office Admin
   {
-    label: 'Welfare',
-    to: '/welfare',
-    icon: 'i-lucide-heart-handshake',
-    requires: ['welfare_cases', 'read'],
-    group: 'people',
-    inSidebar: true,
-  },
-  {
-    label: 'Finance',
-    to: '/finance/records',
-    icon: 'i-lucide-landmark',
-    requires: ['branch_financial_records', 'read'],
-    group: 'office',
-    inSidebar: true,
-  },
-  {
-    label: 'Youth',
-    to: '/youth',
-    icon: 'i-lucide-sparkles',
-    requires: ['youth_profiles', 'read'],
-    group: 'people',
-    inSidebar: true,
-  },
-  {
-    label: 'Celebrations',
-    to: '/celebrations',
-    icon: 'i-lucide-party-popper',
-    requires: ['celebrations', 'read'],
-    group: 'people',
-    inSidebar: true,
-  },
-  {
-    label: 'Campus',
-    to: '/campus',
-    icon: 'i-lucide-graduation-cap',
-    requires: ['coaching_programmes', 'read'],
-    group: 'people',
-    inSidebar: true,
-  },
-  {
-    label: 'Transfers',
-    to: '/transfers',
-    icon: 'i-lucide-arrow-right-left',
-    requires: ['transfers', 'read'],
+    label: 'Minutes',
+    to: '/minutes',
+    icon: 'i-lucide-notebook-text',
+    requires: ['office_minutes', 'read'],
     group: 'office',
     inSidebar: true,
   },
@@ -203,10 +105,20 @@ export const NAVIGATION: readonly NavigationItem[] = [
     inSidebar: true,
   },
   {
-    label: 'Minutes',
-    to: '/minutes',
-    icon: 'i-lucide-notebook-text',
-    requires: ['office_minutes', 'read'],
+    // Weekly remittance, monthly report and deductions all live on the
+    // finance records surface; summary/formulas are reached from there.
+    label: 'Finance',
+    to: '/finance/records',
+    icon: 'i-lucide-landmark',
+    requires: ['branch_financial_records', 'read'],
+    group: 'office',
+    inSidebar: true,
+  },
+  {
+    label: 'Transfers',
+    to: '/transfers',
+    icon: 'i-lucide-arrow-right-left',
+    requires: ['transfers', 'read'],
     group: 'office',
     inSidebar: true,
   },
@@ -219,6 +131,171 @@ export const NAVIGATION: readonly NavigationItem[] = [
     inSidebar: true,
   },
   {
+    // No dedicated automation surface yet; tasks is the closest working page.
+    label: 'Workflow and Automation',
+    to: '/tasks',
+    icon: 'i-lucide-workflow',
+    requires: ['tasks', 'read'],
+    group: 'office',
+    inSidebar: true,
+  },
+
+  // Outreach
+  {
+    // AVS centres are served by the centres register today.
+    label: 'AVS',
+    to: '/bscs',
+    icon: 'i-lucide-school',
+    requires: ['bible_study_centres', 'read'],
+    group: 'outreach',
+    inSidebar: true,
+  },
+  {
+    // Secretaries sit inside the departments register.
+    label: 'Secretaries',
+    to: '/departments',
+    icon: 'i-lucide-clipboard-list',
+    requires: ['departments', 'read'],
+    group: 'outreach',
+    inSidebar: true,
+  },
+  {
+    // Outreach prospects are tracked as visitors.
+    label: 'Outreach List',
+    to: '/visitors',
+    icon: 'i-lucide-list-plus',
+    requires: ['visitors', 'read'],
+    group: 'outreach',
+    inSidebar: true,
+  },
+
+  // Welfare
+  {
+    label: 'Visitors',
+    to: '/visitors',
+    icon: 'i-lucide-user-plus',
+    requires: ['visitors', 'read'],
+    group: 'welfare',
+    inSidebar: true,
+  },
+  {
+    label: 'Celebrations',
+    to: '/celebrations',
+    icon: 'i-lucide-party-popper',
+    requires: ['celebrations', 'read'],
+    group: 'welfare',
+    inSidebar: true,
+  },
+
+  // Worship
+  {
+    // Sunday School classes are modelled as departments today.
+    label: 'Sunday School',
+    to: '/departments',
+    icon: 'i-lucide-book-open',
+    requires: ['departments', 'read'],
+    group: 'worship',
+    inSidebar: true,
+  },
+  {
+    label: 'Branches',
+    to: '/branches',
+    icon: 'i-lucide-building-2',
+    requires: ['branches', 'read'],
+    group: 'worship',
+    inSidebar: true,
+  },
+  {
+    // Groups / management teams are modelled as departments today.
+    label: 'Groups',
+    to: '/departments',
+    icon: 'i-lucide-network',
+    requires: ['departments', 'read'],
+    group: 'worship',
+    inSidebar: true,
+  },
+  {
+    label: 'Attendance',
+    to: '/attendance',
+    icon: 'i-lucide-clipboard-check',
+    requires: ['attendance_sessions', 'read'],
+    group: 'worship',
+    inSidebar: true,
+  },
+  {
+    // Overview, attendance and blessings reporting.
+    label: 'Reporting',
+    to: '/attendance/report',
+    icon: 'i-lucide-chart-column',
+    requires: ['attendance_sessions', 'read'],
+    group: 'worship',
+    inSidebar: true,
+  },
+
+  // People
+  {
+    label: 'Persons',
+    to: '/people',
+    icon: 'i-lucide-users',
+    requires: ['people', 'read'],
+    group: 'people',
+    inSidebar: true,
+  },
+  {
+    label: 'Household (Family)',
+    to: '/households',
+    icon: 'i-lucide-house',
+    requires: ['households', 'read'],
+    group: 'people',
+    inSidebar: true,
+  },
+
+  // Youth
+  {
+    label: 'Teenagers',
+    to: '/campus',
+    icon: 'i-lucide-graduation-cap',
+    requires: ['coaching_programmes', 'read'],
+    group: 'youth',
+    inSidebar: true,
+  },
+
+  // Events
+  {
+    label: 'Invitations',
+    to: '/invites',
+    icon: 'i-lucide-mail-plus',
+    requires: ['events', 'read'],
+    group: 'events',
+    inSidebar: true,
+  },
+  {
+    label: 'My invitations',
+    to: '/me/invitations',
+    icon: 'i-lucide-mail-open',
+    requires: ['events', 'read'],
+    group: 'events',
+    inSidebar: true,
+  },
+  {
+    label: 'Services',
+    to: '/services',
+    icon: 'i-lucide-church',
+    requires: ['sunday_services', 'read'],
+    group: 'events',
+    inSidebar: true,
+  },
+
+  // Communications
+  {
+    label: 'Campaigns',
+    to: '/campaigns',
+    icon: 'i-lucide-workflow',
+    requires: ['communications', 'read'],
+    group: 'communications',
+    inSidebar: true,
+  },
+  {
     label: 'Announcements',
     to: '/announcements',
     icon: 'i-lucide-megaphone',
@@ -227,19 +304,54 @@ export const NAVIGATION: readonly NavigationItem[] = [
     inSidebar: true,
   },
   {
-    label: 'Calendar',
-    to: '/calendar',
-    icon: 'i-lucide-calendar-range',
-    requires: ['sunday_services', 'read'],
-    group: 'overview',
+    label: 'Delivery log',
+    to: '/communications',
+    icon: 'i-lucide-scroll-text',
+    requires: ['communications', 'read'],
+    group: 'communications',
+    inSidebar: true,
+  },
+
+  // Admin
+  {
+    label: 'Branches',
+    to: '/branches',
+    icon: 'i-lucide-building-2',
+    requires: ['branches', 'read'],
+    group: 'admin',
     inSidebar: true,
   },
   {
-    label: 'Search',
-    to: '/search',
-    icon: 'i-lucide-search',
-    requires: ['people', 'read'],
-    group: 'overview',
+    label: 'Zones',
+    to: '/zones',
+    icon: 'i-lucide-map',
+    requires: ['zones', 'read'],
+    group: 'admin',
+    inSidebar: true,
+  },
+  {
+    label: 'Bible Study Centres',
+    to: '/bscs',
+    icon: 'i-lucide-book-marked',
+    requires: ['bible_study_centres', 'read'],
+    group: 'admin',
+    inSidebar: true,
+  },
+  {
+    label: 'AVS',
+    to: '/bscs',
+    icon: 'i-lucide-school',
+    requires: ['bible_study_centres', 'read'],
+    group: 'admin',
+    inSidebar: true,
+  },
+  {
+    // Directus owns roles/policies; the portal redirects to its admin view.
+    label: 'Roles and Permission',
+    to: '/admin/roles',
+    icon: 'i-lucide-shield-check',
+    requires: ['directus_users', 'read'],
+    group: 'admin',
     inSidebar: true,
   },
 ]

@@ -35,6 +35,14 @@ export interface BranchSummary {
   area?: string | null
 }
 
+export interface ZoneSummary {
+  id: string
+  name: string
+  code: string
+  area: string | null
+  status: string
+}
+
 export interface BranchSectionWarning {
   section: string
   code: string

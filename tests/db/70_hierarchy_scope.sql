@@ -61,7 +61,7 @@ BEGIN
     'hierarchy', 'all six zones carry the LAG-NORTH-Z prefix');
 
   SELECT count(*) INTO v_branches FROM branches;
-  PERFORM test_support.assert_true(v_branches = 32, 'hierarchy', 'thirty-two branches (30 mapped + satellite + kept Sango-Ota)');
+  PERFORM test_support.assert_true(v_branches = 30, 'hierarchy', 'thirty branches (the 30 user-mapped rows)');
 
   SELECT count(*) INTO v_bsc FROM bible_study_centres;
   PERFORM test_support.assert_true(v_bsc = 9, 'hierarchy', 'nine seeded BSCs');
@@ -82,17 +82,6 @@ BEGIN
    WHERE c.zone IS DISTINCT FROM b.zone;
   PERFORM test_support.assert_true(v_bsc_mismatch = 0, 'hierarchy', 'bsc.zone agrees with parent branch zone on every row');
 
-  -- parent_branch and zone are distinct relations: the satellite hangs under
-  -- Oke-Aro (parent_branch) while its own zone row is still Z1.
-  PERFORM test_support.assert_true(
-    (SELECT parent_branch FROM branches WHERE code = 'OKE-ARO-SAT-1')
-      = (SELECT id FROM branches WHERE code = 'OKE-ARO'),
-    'hierarchy', 'the satellite hangs under Oke-Aro via parent_branch');
-  PERFORM test_support.assert_true(
-    (SELECT zone FROM branches WHERE code = 'OKE-ARO-SAT-1')
-      = (SELECT id FROM zones WHERE code = 'LAG-NORTH-Z1'),
-    'hierarchy', 'the satellite keeps its own zone (Z1), distinct from parent_branch');
-
   -- The four WECA workbook branches resolve by the same codes the finance
   -- suite uses: one branch identity across features, not one per feature.
   PERFORM test_support.assert_true(
@@ -106,15 +95,11 @@ BEGIN
   PERFORM test_support.assert_true(
     (SELECT count(*) FROM branches WHERE code = 'MATOGUN' AND branch_type = 'afwc' AND type_label = 'AFWC') = 1,
     'hierarchy', 'Matogun is the AFWC branch');
-  -- AFC-578 user table + CTO sequencing: LEGUN and OLOMOWEWE were sampled
-  -- as full_fledged but are Semi Formed Church; SANGO-OTA is kept per
-  -- explicit CTO ruling (absence from the 30-list is not a removal order).
+  -- AFC-578 user table: LEGUN and OLOMOWEWE were sampled as full_fledged
+  -- but are Semi Formed Church.
   PERFORM test_support.assert_true(
     (SELECT count(*) FROM branches WHERE code IN ('LEGUN', 'OLOMOWEWE') AND branch_type = 'semi_formed' AND type_label IS NULL) = 2,
     'hierarchy', 'Legun and Olomowewe are semi_formed without a label');
-  PERFORM test_support.assert_true(
-    (SELECT count(*) FROM branches WHERE code = 'SANGO-OTA') = 1,
-    'hierarchy', 'Sango-Ota is kept');
 END $$;
 
 -- ---------------------------------------------------------------------------
@@ -125,12 +110,13 @@ END $$;
 \i services/directus/schema/migrations/20261020_0002_hierarchy.sql
 \i services/directus/schema/migrations/20261020_0024_remove_abule_egba.sql
 \i services/directus/schema/migrations/20261020_0028_lagos_north_branches.sql
+\i services/directus/schema/migrations/20261020_0029_remove_sango_ota_and_satellite.sql
 
 DO $$
 BEGIN
   PERFORM test_support.assert_true((SELECT count(*) FROM areas) = 1, 'hierarchy', 'rerun: still one area');
   PERFORM test_support.assert_true((SELECT count(*) FROM zones) = 6, 'hierarchy', 'rerun: still six zones');
-  PERFORM test_support.assert_true((SELECT count(*) FROM branches) = 32, 'hierarchy', 'rerun: still thirty-two branches');
+  PERFORM test_support.assert_true((SELECT count(*) FROM branches) = 30, 'hierarchy', 'rerun: still thirty branches');
   PERFORM test_support.assert_true((SELECT count(*) FROM bible_study_centres) = 9, 'hierarchy', 'rerun: still nine BSCs');
 END $$;
 

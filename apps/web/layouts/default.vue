@@ -38,6 +38,24 @@ const sections = computed(() =>
 const SIDEBAR_EXPANDED_KEY = 'afc:sidebar-expanded-v1'
 const expandedKeys = ref<string[]>([])
 
+/**
+ * Icon-rail state. On large screens the sidebar collapses to a narrow rail
+ * that shows only item icons (labels remain available as tooltips). Persisted
+ * beside the section set; the narrow layout is desktop-only, so mobile keeps
+ * the full menu.
+ */
+const SIDEBAR_RAIL_KEY = 'afc:sidebar-rail-v1'
+const railCollapsed = ref(false)
+
+function toggleRail(): void {
+  railCollapsed.value = !railCollapsed.value
+  try {
+    window.localStorage.setItem(SIDEBAR_RAIL_KEY, JSON.stringify(railCollapsed.value))
+  } catch {
+    // Storage unavailable: the rail still toggles for this page view.
+  }
+}
+
 function isExpanded(key: string): boolean {
   return expandedKeys.value.includes(key)
 }
@@ -61,12 +79,19 @@ function toggleSection(key: string): void {
 onMounted(() => {
   try {
     const raw = window.localStorage.getItem(SIDEBAR_EXPANDED_KEY)
-    if (!raw) return
-    const parsed: unknown = JSON.parse(raw)
-    if (Array.isArray(parsed))
-      expandedKeys.value = parsed.filter((k): k is string => typeof k === 'string')
+    if (raw) {
+      const parsed: unknown = JSON.parse(raw)
+      if (Array.isArray(parsed))
+        expandedKeys.value = parsed.filter((k): k is string => typeof k === 'string')
+    }
   } catch {
     expandedKeys.value = []
+  }
+
+  try {
+    railCollapsed.value = window.localStorage.getItem(SIDEBAR_RAIL_KEY) === 'true'
+  } catch {
+    railCollapsed.value = false
   }
 })
 
@@ -109,60 +134,119 @@ const menuItems = computed(() => [
 <template>
   <div class="min-h-screen lg:flex">
     <aside
-      class="border-b border-gray-200 bg-white lg:fixed lg:inset-y-0 lg:w-64 lg:border-b-0 lg:border-r dark:border-gray-800 dark:bg-gray-900"
+      class="border-b border-gray-200 bg-white transition-[width] lg:fixed lg:inset-y-0 lg:border-b-0 lg:border-r dark:border-gray-800 dark:bg-gray-900"
+      :class="railCollapsed ? 'lg:w-16' : 'lg:w-64'"
     >
-      <NuxtLink
-        to="/dashboard"
-        class="flex h-16 items-center gap-2 px-5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500"
-      >
-        <UIcon name="i-lucide-church" class="size-6 text-primary-500" />
-        <span class="font-semibold">AFC Portal</span>
-      </NuxtLink>
+      <div class="flex h-16 items-center justify-between gap-1 px-3">
+        <NuxtLink
+          to="/dashboard"
+          class="flex min-w-0 items-center gap-2 rounded-lg px-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500"
+          :class="railCollapsed ? 'lg:mx-auto' : ''"
+        >
+          <UIcon name="i-lucide-church" class="size-6 shrink-0 text-primary-500" />
+          <span v-if="!railCollapsed" class="truncate font-semibold">AFC Portal</span>
+        </NuxtLink>
+      </div>
 
-      <nav aria-label="Portal sections" class="px-3 pb-4 lg:pb-0">
-        <div v-for="section in sections" :key="section.key" class="mt-4 first:mt-1">
-          <button
-            type="button"
-            :aria-expanded="isExpanded(section.key) ? 'true' : 'false'"
-            :aria-controls="`sidebar-section-${section.key}`"
-            class="flex w-full items-center justify-between rounded-lg px-3 py-1 text-xs font-semibold uppercase tracking-wide text-gray-500 hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:text-gray-400 dark:hover:bg-gray-800"
-            @click="toggleSection(section.key)"
-          >
-            <span>{{ section.label }}</span>
-            <UIcon
-              name="i-lucide-chevron-down"
-              class="size-4 shrink-0 transition-transform"
-              :class="{ 'rotate-180': isExpanded(section.key) }"
-            />
-          </button>
-          <ul
-            v-if="isExpanded(section.key)"
-            :id="`sidebar-section-${section.key}`"
-            class="mt-1 space-y-1"
-          >
-            <li v-for="item in section.items" :key="item.to">
+      <div class="hidden px-3 lg:block">
+        <button
+          type="button"
+          class="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left text-xs text-gray-500 hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:text-gray-400 dark:hover:bg-gray-800"
+          :class="railCollapsed ? 'justify-center px-0' : ''"
+          :aria-label="railCollapsed ? 'Expand menu' : 'Collapse menu'"
+          :aria-pressed="railCollapsed ? 'true' : 'false'"
+          @click="toggleRail"
+        >
+          <UIcon
+            :name="railCollapsed ? 'i-lucide-chevrons-right' : 'i-lucide-chevrons-left'"
+            class="size-4 shrink-0"
+          />
+          <span v-if="!railCollapsed">Collapse menu</span>
+        </button>
+      </div>
+
+      <nav aria-label="Portal sections" class="px-3 pb-4 lg:pb-6">
+        <!-- Full menu: mobile always, desktop while expanded. -->
+        <div :class="railCollapsed ? 'lg:hidden' : ''">
+          <div v-for="section in sections" :key="section.key" class="mt-4 first:mt-1">
+            <div class="flex items-center gap-1">
               <NuxtLink
-                :to="item.to"
-                class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-200 dark:text-gray-200 dark:hover:bg-gray-800"
-                active-class="bg-gray-200 font-medium text-gray-900 dark:bg-gray-800 dark:text-white"
+                :to="section.to"
+                class="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-3 py-1 text-xs font-semibold uppercase tracking-wide text-gray-500 hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:text-gray-400 dark:hover:bg-gray-800"
+                :title="`${section.label} overview`"
               >
-                <UIcon :name="item.icon" class="size-5 shrink-0" />
-                <span>{{ item.label }}</span>
+                <UIcon :name="section.icon" class="size-4 shrink-0" />
+                <span class="truncate">{{ section.label }}</span>
               </NuxtLink>
-            </li>
-          </ul>
+              <button
+                type="button"
+                :aria-expanded="isExpanded(section.key) ? 'true' : 'false'"
+                :aria-controls="`sidebar-section-${section.key}`"
+                :aria-label="`${isExpanded(section.key) ? 'Collapse' : 'Expand'} ${section.label}`"
+                class="rounded-md p-1 text-gray-500 hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:text-gray-400 dark:hover:bg-gray-800"
+                @click="toggleSection(section.key)"
+              >
+                <UIcon
+                  name="i-lucide-chevron-down"
+                  class="size-4 shrink-0 transition-transform"
+                  :class="{ 'rotate-180': isExpanded(section.key) }"
+                />
+              </button>
+            </div>
+            <ul
+              v-if="isExpanded(section.key)"
+              :id="`sidebar-section-${section.key}`"
+              class="mt-1 space-y-1"
+            >
+              <li v-for="(item, index) in section.items" :key="`${section.key}:${index}:${item.to}`">
+                <NuxtLink
+                  :to="item.to"
+                  class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-200 dark:text-gray-200 dark:hover:bg-gray-800"
+                  active-class="bg-gray-200 font-medium text-gray-900 dark:bg-gray-800 dark:text-white"
+                >
+                  <UIcon :name="item.icon" class="size-5 shrink-0" />
+                  <span>{{ item.label }}</span>
+                </NuxtLink>
+              </li>
+            </ul>
+          </div>
+
+          <p
+            v-if="items.length === 0"
+            class="px-3 py-4 text-sm text-gray-500 dark:text-gray-400"
+          >
+            No sections are available to this account yet.
+          </p>
         </div>
 
-        <p
-          v-if="items.length === 0"
-          class="px-3 py-4 text-sm text-gray-500 dark:text-gray-400"
-        >
-          No sections are available to this account yet.
-        </p>
+        <!-- Icon rail: desktop only, flattened items with a divider per section. -->
+        <div v-if="railCollapsed" class="hidden lg:block">
+          <div
+            v-for="(section, index) in sections"
+            :key="section.key"
+            class="space-y-1"
+            :class="{ 'mt-2 border-t border-gray-200 pt-2 dark:border-gray-800': index > 0 }"
+          >
+            <NuxtLink
+              v-for="(item, index) in section.items"
+              :key="`${section.key}:${index}:${item.to}`"
+              :to="item.to"
+              :title="item.label"
+              :aria-label="item.label"
+              class="flex items-center justify-center rounded-lg p-2 text-gray-700 hover:bg-gray-200 dark:text-gray-200 dark:hover:bg-gray-800"
+              active-class="bg-gray-200 text-gray-900 dark:bg-gray-800 dark:text-white"
+            >
+              <UIcon :name="item.icon" class="size-5 shrink-0" />
+            </NuxtLink>
+          </div>
+        </div>
       </nav>
     </aside>
 
-    <div class="flex min-w-0 flex-1 flex-col lg:pl-64">
+    <div
+      class="flex min-w-0 flex-1 flex-col"
+      :class="railCollapsed ? 'lg:pl-16' : 'lg:pl-64'"
+    >
       <header
         class="sticky top-0 z-10 flex h-16 items-center justify-between gap-2 border-b border-gray-200 bg-white/80 px-3 backdrop-blur sm:px-5 dark:border-gray-800 dark:bg-gray-950/80"
       >

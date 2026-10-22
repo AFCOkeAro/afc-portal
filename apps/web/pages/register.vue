@@ -49,6 +49,11 @@ const form = reactive<RegistrationFormInput>(blankForm())
 // registrant lands on the right event instead of re-finding it. An unknown
 // id (or a non-public event, which the public feed never lists) falls back
 // to the picker — never a stuck invalid selection.
+const route = useRoute()
+const preselectedEvent =
+  typeof route.query.event === 'string' && route.query.event.length > 0
+    ? route.query.event
+    : ''
 
 // Public event picker (AFC-631): same session-free /api/calendar/public feed
 // the public calendar page renders. Options are the public rows only.
@@ -83,12 +88,6 @@ watch(
   },
   { immediate: true },
 )
-
-const route = useRoute()
-const preselectedEvent =
-  typeof route.query.event === 'string' && route.query.event.length > 0
-    ? route.query.event
-    : ''
 
 const submitting = ref(false)
 const submitted = ref<{ ticket_code: string | null; registration_status: string } | null>(

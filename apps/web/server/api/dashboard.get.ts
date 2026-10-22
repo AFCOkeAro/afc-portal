@@ -10,6 +10,7 @@ import type {
   WelfareCaseRow,
 } from '../../types/portal'
 import {
+  branchCollectionScope,
   branchNames,
   can,
   countItems,
@@ -203,6 +204,11 @@ export default defineEventHandler(async (event): Promise<DashboardData> => {
   )
   const names = namesResult.value
   const branchFilter = scopeFilter(scope)
+  // `branches` has no `branch` field (its rows *are* the branches), so it uses
+  // the collection-specific predicate: area = all, zone grant = the zone's
+  // rows, branch grant = the branch's own row. Using `scopeFilter` here sent a
+  // `branch` predicate Directus rejects with 403 for non-area sessions.
+  const branchesFilter = branchCollectionScope(scope)
   const eventFilter = eventScopeFilter(scope)
 
   // AFC-577 capability gates. The family side reuses the AFC-576 collector
@@ -253,7 +259,7 @@ export default defineEventHandler(async (event): Promise<DashboardData> => {
     settleSection(
       'branches',
       listItems<Record<string, unknown>>(event, scope, 'branches', {
-        filter: mergeFilters({ status: { _eq: 'active' } }, branchFilter),
+        filter: mergeFilters({ status: { _eq: 'active' } }, branchesFilter),
         fields: ['id', 'name', 'code', 'branch_type', 'status'],
         sort: 'sort,name',
         limit: -1,

@@ -7,23 +7,20 @@
 -- (server-verified answers on AFC-578); the CTO sequencing ruling landed
 -- the narrow ABULE-EGBA removal first (0024_remove_abule_egba, commit
 -- 5da6740) and ordered this broader seed under a new number (0028), with
--- SANGO-OTA explicitly KEPT (absence from the 30-list is not a removal
--- order). Migration 0028 re-homes LEGUN/MATOGUN/OLOMOWEWE + BSC denorms to
--- Z1, fixes LEGUN/OLOMOWEWE to semi_formed/NULL, and seeds the 26 missing
+-- the 30 user-mapped rows only. Migration 0028 re-homes
+-- LEGUN/MATOGUN/OLOMOWEWE + BSC denorms to Z1, fixes LEGUN/OLOMOWEWE to
+-- semi_formed/NULL, and seeds the 26 missing
 -- rows. This suite asserts the database half of that promise:
 --
 --   93.1  map         -- all 30 user names resolve with the mapped zone and
---                         type; SANGO-OTA present-but-untouched (Z6,
---                         worship_centre — existence only, no correctness
---                         claim); ABULE-EGBA absent (narrow 0024's pin);
---                         32 rows; per-zone partition 8/4/6/5/4/5.
+--                         type; ABULE-EGBA absent (narrow 0024's pin);
+--                         30 rows; per-zone partition 7/4/6/5/4/4.
 --   93.2  resurrect   -- re-applying 0002 ALONE brings ABULE-EGBA back (ON
 --                         CONFLICT DO NOTHING skips present codes only);
 --                         0024_remove deletes it again; 0028 re-applied is a
---                         no-op. The triple is idempotent; no single file is.
+--                         no-op. The sequence is idempotent; no single file is.
 --   93.3  types       -- the vocabulary holds: 18 full_fledged (all FFC),
---                         8 semi_formed (no label), 4 afwc (all AFWC),
---                         1 satellite sample, 1 worship centre (SANGO-OTA).
+--                         8 semi_formed (no label), 4 afwc (all AFWC).
 --   93.4  guards      -- a duplicate code is still rejected; a populated
 --                         zone still cannot be deleted (RESTRICT).
 --
@@ -92,29 +89,19 @@ BEGIN
   PERFORM test_support.assert_true(v_mismatch = 0,
     'branchmap', 'all 30 user-mapped branches resolve with the mapped zone and type');
 
-  -- SANGO-OTA stays: present under Z6 as seeded, per explicit CTO ruling.
-  PERFORM test_support.assert_true(
-    (SELECT count(*) FROM branches WHERE code = 'SANGO-OTA') = 1,
-    'branchmap', 'Sango-Ota is kept, not removed');
-  PERFORM test_support.assert_true(
-    (SELECT count(*) FROM branches b JOIN zones z ON z.id = b.zone
-      WHERE b.code = 'SANGO-OTA' AND z.code = 'LAG-NORTH-Z6'
-        AND b.branch_type = 'worship_centre') = 1,
-    'branchmap', 'Sango-Ota keeps its seeded zone and type');
-
   -- ABULE-EGBA stays gone (narrow 0024's pin, restated here so this suite
   -- fails if any re-apply resurrects it without the narrow re-apply).
   PERFORM test_support.assert_true(
     (SELECT count(*) FROM branches WHERE code IN ('ABULE-EGBA')) = 0,
     'branchmap', 'Abule-Egba stays removed');
   PERFORM test_support.assert_true(
-    (SELECT count(*) FROM branches) = 32,
-    'branchmap', 'thirty-two branch rows (30 mapped + satellite + Sango-Ota)');
+    (SELECT count(*) FROM branches) = 30,
+    'branchmap', 'thirty branch rows (the 30 user-mapped rows)');
 
-  -- Per-zone partition after the seed: Z1:8 Z2:4 Z3:6 Z4:5 Z5:4 Z6:5.
+  -- Per-zone partition after the seed: Z1:7 Z2:4 Z3:6 Z4:5 Z5:4 Z6:4.
   PERFORM test_support.assert_true(
-    (SELECT count(*) FROM branches b JOIN zones z ON z.id = b.zone WHERE z.code = 'LAG-NORTH-Z1') = 8,
-    'branchmap', 'Z1 (Oke Aro) scopes eight branches');
+    (SELECT count(*) FROM branches b JOIN zones z ON z.id = b.zone WHERE z.code = 'LAG-NORTH-Z1') = 7,
+    'branchmap', 'Z1 (Oke Aro) scopes seven branches');
   PERFORM test_support.assert_true(
     (SELECT count(*) FROM branches b JOIN zones z ON z.id = b.zone WHERE z.code = 'LAG-NORTH-Z2') = 4,
     'branchmap', 'Z2 (Sango) scopes four branches');
@@ -128,19 +115,14 @@ BEGIN
     (SELECT count(*) FROM branches b JOIN zones z ON z.id = b.zone WHERE z.code = 'LAG-NORTH-Z5') = 4,
     'branchmap', 'Z5 (Ijoko) scopes four branches');
   PERFORM test_support.assert_true(
-    (SELECT count(*) FROM branches b JOIN zones z ON z.id = b.zone WHERE z.code = 'LAG-NORTH-Z6') = 5,
-    'branchmap', 'Z6 (Agege) scopes five branches including kept Sango-Ota');
-
-  -- The satellite survives untouched.
-  PERFORM test_support.assert_true(
-    (SELECT parent_branch FROM branches WHERE code = 'OKE-ARO-SAT-1')
-      = (SELECT id FROM branches WHERE code = 'OKE-ARO'),
-    'branchmap', 'the satellite still hangs under Oke-Aro');
+    (SELECT count(*) FROM branches b JOIN zones z ON z.id = b.zone WHERE z.code = 'LAG-NORTH-Z6') = 4,
+    'branchmap', 'Z6 (Agege) scopes four branches');
 END $$;
 
 -- ---------------------------------------------------------------------------
 -- 93.2  RESURRECT. 0002 alone brings ABULE-EGBA back; the narrow 0024
---         removes it; 0028 re-applied is a no-op.
+--         removes it; 0028 is a no-op; 0029 removes the two non-branch
+--         rows that 0002 also resurrects.
 -- ---------------------------------------------------------------------------
 \i services/directus/schema/migrations/20261020_0002_hierarchy.sql
 
@@ -161,19 +143,20 @@ BEGIN
 END $$;
 
 \i services/directus/schema/migrations/20261020_0028_lagos_north_branches.sql
+\i services/directus/schema/migrations/20261020_0029_remove_sango_ota_and_satellite.sql
 
 DO $$
 BEGIN
   PERFORM test_support.assert_true(
-    (SELECT count(*) FROM branches) = 32,
-    'branchmap', '0028 re-applied is a no-op at thirty-two rows');
+    (SELECT count(*) FROM branches) = 30,
+    'branchmap', '0029 re-applied leaves thirty rows');
   PERFORM test_support.assert_true(
     (SELECT count(*) FROM branches WHERE code IN ('ABULE-EGBA')) = 0,
     'branchmap', 'round-trip keeps Abule-Egba removed');
 END $$;
 
 -- ---------------------------------------------------------------------------
--- 93.3  TYPES. The vocabulary holds across the 32 rows.
+-- 93.3  TYPES. The vocabulary holds across the 30 rows.
 -- ---------------------------------------------------------------------------
 DO $$
 BEGIN

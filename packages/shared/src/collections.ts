@@ -18,6 +18,8 @@ export const COLLECTIONS = {
   events: 'events',
   eventDepartments: 'events_departments',
   eventRegistrations: 'event_registrations',
+  /** Invites (Slice 4). One row per invitation; quota + delivery read it. */
+  eventInvites: 'event_invites',
   attendanceSessions: 'attendance_sessions',
   attendanceRecords: 'attendance_records',
   /**
@@ -57,6 +59,10 @@ export const COLLECTIONS = {
    * stored consent basis. No send path is enabled in this slice.
    */
   communications: 'communications',
+  /** Campaign catalogue is read-only in the portal; steps/runs are its children. */
+  campaigns: 'campaigns',
+  campaignSteps: 'campaign_steps',
+  campaignRuns: 'campaign_runs',
   communicationRecipients: 'communication_recipients',
   messageTemplates: 'message_templates',
   consentRecords: 'consent_records',

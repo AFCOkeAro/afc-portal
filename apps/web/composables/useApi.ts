@@ -57,6 +57,7 @@ export function useApi() {
     method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
     path: string,
     options: ApiRequestOptions = {},
+    retried = false,
   ): Promise<T> {
     try {
       // The cast is confined to this call. `useRequestFetch` is typed against the
@@ -73,6 +74,20 @@ export function useApi() {
         ignoreResponseError: options.tolerateError === true,
       })) as T
     } catch (cause) {
+      if (!retried && readStatus(cause) === 401) {
+        // A 401 can be transient: the portal session cookie is sealed and
+        // stateless, so a request dispatched with a just-rotated cookie fails
+        // even though a parallel request already refreshed the session
+        // server-side and resealed the cookie (see
+        // server/utils/directus.ts requestWithRefresh). Retry once — the
+        // browser sends the latest cookie, which carries the fresh tokens —
+        // and only treat a second 401 as a real sign-out.
+        // Safe for every method: server routes authenticate (requireSession /
+        // getPortalScope) before any side effect, so a 401 means nothing
+        // executed and the retry cannot double-apply.
+        await new Promise((resolve) => setTimeout(resolve, 300))
+        return call<T>(method, path, options, true)
+      }
       throw toApiRequestError(cause, method, path)
     }
   }
@@ -94,6 +109,12 @@ export function useApi() {
     remove: <T>(path: string, options?: ApiRequestOptions) =>
       call<T>('DELETE', path, options),
   }
+}
+
+function readStatus(cause: unknown): number {
+  return (
+    (cause as { response?: { status?: number } })?.response?.status ?? 0
+  )
 }
 
 function toApiRequestError(cause: unknown, method: string, path: string): Error {

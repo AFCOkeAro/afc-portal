@@ -142,6 +142,7 @@ export function inviteCapabilities(role: string): InviteCapabilities {
         retry: true,
         exportCsv: true,
       }
+    case 'zone_admin':
     case 'branch_admin':
       return {
         create: true,
