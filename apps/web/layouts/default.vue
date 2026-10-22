@@ -403,6 +403,10 @@ const menuItems = computed(() => [
         </div>
       </header>
 
+      <!-- Impersonation preview marker (AFC-684): visible on every staff page
+        while a preview is active, with a one-click exit. -->
+      <ImpersonationBanner />
+
       <main class="min-w-0 flex-1 p-5 lg:p-8">
         <slot />
       </main>

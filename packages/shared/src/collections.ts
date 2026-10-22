@@ -106,6 +106,12 @@ export const COLLECTIONS = {
    */
   marriageCases: 'marriage_cases',
   marriageCaseEvents: 'marriage_case_events',
+  /**
+   * Scoped impersonation audit (AFC-684). One row per start/stop with actor,
+   * target (user XOR branch XOR zone), action, reason, and timestamp.
+   * Created by migration 0037; read by area admins, written by the portal.
+   */
+  impersonationEvents: 'impersonation_events',
   officeMinutes: 'office_minutes',
   minutesAttendees: 'minutes_attendees',
   officeMinuteEvents: 'office_minute_events',

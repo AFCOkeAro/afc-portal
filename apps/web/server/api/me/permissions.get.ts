@@ -1,7 +1,8 @@
 import type { CapabilitiesPayload, Grant } from '@afc/shared'
 import { readableCollections, sortGrants, writableCollections } from '@afc/shared'
-import { capabilitiesForRole } from '@afc/shared/role-matrix'
+import { capabilitiesForRole, grantsForRole, hiddenFieldsForRole } from '@afc/shared/role-matrix'
 import { requireSession } from '../../utils/session'
+import { intersectGrants } from '../../utils/impersonation'
 import { customGrantsForRole, isBuiltInRole } from '../../utils/custom-grants'
 
 /**
@@ -22,7 +23,7 @@ import { customGrantsForRole, isBuiltInRole } from '../../utils/custom-grants'
  * treat the two as agreeing, not as the second being derived from the first.
  */
 export default defineEventHandler(async (event): Promise<CapabilitiesPayload> => {
-  const { session } = await requireSession(event)
+  const { session, impersonatedBy } = await requireSession(event)
 
   const payload = capabilitiesForRole({
     staffRole: session.user.staffRole,
@@ -41,6 +42,21 @@ export default defineEventHandler(async (event): Promise<CapabilitiesPayload> =>
     ).catch(() => [] as Grant[])
     if (custom.length > 0) {
       const grants = sortGrants(custom)
+      // Impersonation (AFC-684): a preview through a custom-role target still
+      // intersects with the actor's grants — never a union.
+      if (impersonatedBy) {
+        const actorGrants = grantsForRole(
+          impersonatedBy.actorRole as Parameters<typeof grantsForRole>[0],
+        )
+        const effective = intersectGrants(actorGrants, grants)
+        return {
+          grants: sortGrants(effective),
+          readable: readableCollections(effective),
+          writable: writableCollections(effective),
+          hiddenFields: {},
+          scoped: payload.scoped,
+        }
+      }
       return {
         grants,
         readable: readableCollections(grants),
@@ -57,5 +73,27 @@ export default defineEventHandler(async (event): Promise<CapabilitiesPayload> =>
   // A session with no branch and no area grant sees nothing (data-model §9
   // rule 5, fail closed). `capabilitiesForRole` already returns an empty grant
   // list for that case; the flag is carried so the shell can say why.
+
+  // Impersonation: effective grants = intersection(actor, target), never
+  // union (AFC-684 §A). Scope targets already run with a downgraded preview
+  // role; user targets keep the target's role (capped below the actor by the
+  // target_role_outranks_actor gate), so intersect here against the actor's
+  // grants — a preview that could write where the actor cannot would be an
+  // escalation. Scoped views render read-only where the actor lacks write
+  // by construction: the writable list below drops those collections.
+  if (impersonatedBy) {
+    const actorGrants = grantsForRole(
+      impersonatedBy.actorRole as Parameters<typeof grantsForRole>[0],
+    )
+    const effective = intersectGrants(actorGrants, payload.grants)
+    return {
+      grants: sortGrants(effective),
+      readable: readableCollections(effective),
+      writable: writableCollections(effective),
+      hiddenFields: hiddenFieldsForRole(session.user.staffRole),
+      scoped: payload.scoped,
+    }
+  }
+
   return payload
 })

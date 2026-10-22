@@ -50,6 +50,7 @@ const USER_ID_EXCEPTIONS = [
   'apps/web/pages/tasks/index.vue', // form.assignee_user
   'apps/web/pages/invites/index.vue', // inviterFilter
   'apps/web/pages/visitors/[id].vue', // officerInput (Welfare position holder)
+  'apps/web/pages/admin/impersonate.vue', // user-UUID paste (AFC-684: no user list endpoint; branch/zone targets stay EntitySelect)
 ]
 
 function vueFiles() {
@@ -156,7 +157,7 @@ describe('AFC-631 migration gates', () => {
       const text = read(rel)
       assert.match(
         text,
-        /assignee_user|inviterFilter|officerInput/,
+        /assignee_user|inviterFilter|officerInput|user UUID|targetId/,
         `${rel} still holds its documented user-id input`,
       )
     }

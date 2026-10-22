@@ -676,6 +676,19 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     none: [NONE, 'none'],
     zone_admin: [R, 'own_zone'],
   },
+  // Scoped impersonation audit (AFC-684). Area-only read (the log list view);
+  // the portal writes start/stop rows with the server token, not with a role
+  // grant, so no role holds a write here. Zone/branch staff start previews
+  // but never read the area-wide log.
+  [COLLECTIONS.impersonationEvents]: {
+    super_admin: [R, 'all'],
+    area_admin: [R, 'all'],
+    branch_admin: [NONE, 'none'],
+    department_leader: [NONE, 'none'],
+    volunteer: [NONE, 'none'],
+    none: [NONE, 'none'],
+    zone_admin: [NONE, 'none'],
+  },
   [COLLECTIONS.officeMinutes]: {
     super_admin: [ALL, 'all'],
     area_admin: [ALL, 'all'],

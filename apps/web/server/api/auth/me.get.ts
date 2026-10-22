@@ -1,9 +1,11 @@
-import type { AuthSession } from '@afc/shared'
+import type { AuthSession, ImpersonatedBy } from '@afc/shared'
 import { readSession } from '../../utils/session'
 
 export interface AuthState {
   authenticated: boolean
   session: AuthSession | null
+  /** Present only while a preview is active — drives the banner + exit. */
+  impersonatedBy?: ImpersonatedBy | null
 }
 
 /**
@@ -24,5 +26,6 @@ export default defineEventHandler(async (event): Promise<AuthState> => {
   return {
     authenticated: found !== null,
     session: found?.session ?? null,
+    impersonatedBy: found?.impersonatedBy ?? null,
   }
 })

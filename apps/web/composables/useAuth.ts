@@ -1,4 +1,4 @@
-import type { AuthSession, LoginCredentials, PortalUser } from '@afc/shared'
+import type { AuthSession, ImpersonatedBy, LoginCredentials, PortalUser } from '@afc/shared'
 import type { AuthState } from '~/server/api/auth/me.get'
 import { ApiRequestError } from './useApi'
 
@@ -17,10 +17,12 @@ import { ApiRequestError } from './useApi'
 export function useAuth() {
   const api = useApi()
   const session = useState<AuthSession | null>('afc:session', () => null)
+  const impersonatedBy = useState<ImpersonatedBy | null>('afc:impersonated-by', () => null)
   const loading = useState<boolean>('afc:session:loading', () => false)
 
   const user = computed<PortalUser | null>(() => session.value?.user ?? null)
   const isAuthenticated = computed(() => session.value !== null)
+  const isImpersonating = computed(() => impersonatedBy.value !== null)
 
   /**
    * Fetch the session once per request. Safe to call from middleware, a layout
@@ -32,12 +34,14 @@ export function useAuth() {
     try {
       const state = await api.get<AuthState>('/api/auth/me')
       session.value = state.session
+      impersonatedBy.value = state.impersonatedBy ?? null
       return state.session
     } catch (cause) {
       // A transport failure here is a real fault and is re-thrown, so a broken
       // auth service is not presented to users as a logout.
       if (cause instanceof ApiRequestError && cause.status === 401) {
         session.value = null
+        impersonatedBy.value = null
         return null
       }
       throw cause
@@ -49,6 +53,7 @@ export function useAuth() {
   async function login(credentials: LoginCredentials): Promise<AuthSession> {
     const next = await api.post<AuthSession>('/api/auth/login', credentials)
     session.value = next
+    impersonatedBy.value = null
     return next
   }
 
@@ -60,6 +65,7 @@ export function useAuth() {
       // logged-in shell on screen after a failed logout is worse than the
       // opposite.
       session.value = null
+      impersonatedBy.value = null
       await navigateTo('/login')
     }
   }
@@ -67,10 +73,13 @@ export function useAuth() {
   /** Force the next `ensureSession` to re-read the cookie. Used after a 401. */
   function invalidate(): void {
     session.value = null
+    impersonatedBy.value = null
   }
 
   return {
     session: readonly(session),
+    impersonatedBy: readonly(impersonatedBy),
+    isImpersonating: readonly(isImpersonating),
     user,
     isAuthenticated,
     loading: readonly(loading),
