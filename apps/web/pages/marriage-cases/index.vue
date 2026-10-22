@@ -54,6 +54,13 @@ const rows = computed(() => data.value?.data ?? [])
       description="Brother/sister couples through the pipeline stages."
     >
       <template #actions>
+        <UButton
+          label="Conducted marriages"
+          icon="i-lucide-book-heart"
+          color="neutral"
+          variant="outline"
+          to="/marriage-cases/report"
+        />
         <PermissionGate :collection="COLLECTIONS.marriageCases" action="create">
           <UButton label="Open case" icon="i-lucide-plus" @click="showForm = !showForm" />
         </PermissionGate>
