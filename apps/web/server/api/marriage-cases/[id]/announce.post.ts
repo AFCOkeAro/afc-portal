@@ -1,7 +1,4 @@
-import {
-  MARRIAGE_FLOW_INDEX,
-  marriageCaseAnnounceSchema,
-} from '@afc/shared'
+import { MARRIAGE_FLOW_INDEX, marriageCaseAnnounceSchema } from '@afc/shared'
 import {
   assertUuidParam,
   createItem,

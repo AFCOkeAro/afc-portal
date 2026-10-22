@@ -51,7 +51,8 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const weddingDate = form.wedding_date ?? (row.wedding_date ? String(row.wedding_date) : null)
+  const weddingDate =
+    form.wedding_date ?? (row.wedding_date ? String(row.wedding_date) : null)
   const rehearsalDate =
     form.rehearsal_date ?? (row.rehearsal_date ? String(row.rehearsal_date) : null)
 

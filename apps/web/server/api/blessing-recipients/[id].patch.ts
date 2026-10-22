@@ -21,7 +21,10 @@ export default defineEventHandler(async (event) => {
 
   const id = getRouterParam(event, 'id')
   if (!id)
-    throw createError({ statusCode: 400, statusMessage: 'A blessing recipient id is required' })
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'A blessing recipient id is required',
+    })
 
   const parsed = blessingRecipientUpdateSchema.safeParse(await readBody(event))
   if (!parsed.success) throwValidation(parsed.error)

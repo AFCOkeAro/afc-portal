@@ -112,9 +112,7 @@ export function useApi() {
 }
 
 function readStatus(cause: unknown): number {
-  return (
-    (cause as { response?: { status?: number } })?.response?.status ?? 0
-  )
+  return (cause as { response?: { status?: number } })?.response?.status ?? 0
 }
 
 function toApiRequestError(cause: unknown, method: string, path: string): Error {

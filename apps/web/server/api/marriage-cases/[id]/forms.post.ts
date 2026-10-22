@@ -40,13 +40,20 @@ export default defineEventHandler(async (event) => {
   }
   const shape = marriageFormPayloadSchemas[formKey]
   const shaped = shape.safeParse(payload ?? {})
-  if (!shaped.success) throwValidation(shaped.error, `The ${formKey} form needs attention`)
+  if (!shaped.success)
+    throwValidation(shaped.error, `The ${formKey} form needs attention`)
 
-  if (stage !== undefined && !(MARRIAGE_CASE_STAGES as readonly string[]).includes(stage)) {
+  if (
+    stage !== undefined &&
+    !(MARRIAGE_CASE_STAGES as readonly string[]).includes(stage)
+  ) {
     throw createError({
       statusCode: 400,
       statusMessage: 'Unknown pipeline stage',
-      data: { code: 'validation_error', fields: { stage: 'Record the stage at submission time' } },
+      data: {
+        code: 'validation_error',
+        fields: { stage: 'Record the stage at submission time' },
+      },
     })
   }
 
@@ -73,20 +80,26 @@ export default defineEventHandler(async (event) => {
   const now = new Date().toISOString()
   let saved: Record<string, unknown>
   try {
-    saved = await createItem<Record<string, unknown>>(event, scope, 'marriage_case_forms', {
-      marriage_case: id,
-      form_key: formKey,
-      stage: stage ?? String(row.stage),
-      payload: shaped.data,
-      submitted_by: scope.session.user.id,
-      created_at: now,
-      updated_at: now,
-    })
+    saved = await createItem<Record<string, unknown>>(
+      event,
+      scope,
+      'marriage_case_forms',
+      {
+        marriage_case: id,
+        form_key: formKey,
+        stage: stage ?? String(row.stage),
+        payload: shaped.data,
+        submitted_by: scope.session.user.id,
+        created_at: now,
+        updated_at: now,
+      },
+    )
   } catch (error) {
     if (error && typeof error === 'object' && 'statusCode' in error) throw error
     throw createError({
       statusCode: 503,
-      statusMessage: 'The marriage forms store is unavailable (migration 0036 not applied?)',
+      statusMessage:
+        'The marriage forms store is unavailable (migration 0036 not applied?)',
       data: { code: 'pending_migration_0036', cause: String(error) },
     })
   }

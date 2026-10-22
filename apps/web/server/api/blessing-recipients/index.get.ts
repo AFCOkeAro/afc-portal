@@ -1,9 +1,4 @@
-import {
-  getPortalScope,
-  listItems,
-  mergeFilters,
-  requireCan,
-} from '../../utils/portal'
+import { getPortalScope, listItems, mergeFilters, requireCan } from '../../utils/portal'
 import { blessingScopeFilter } from '../../utils/blessing-report'
 
 /**
@@ -56,31 +51,36 @@ export default defineEventHandler(async (event) => {
       : undefined,
   )
 
-  const result = await listItems<Record<string, unknown>>(event, scope, 'blessing_recipients', {
-    filter,
-    fields: [
-      'id',
-      'blessing',
-      'blessing_type',
-      'other_label',
-      'person',
-      'attendee_user',
-      'branch',
-      'zone',
-      'bsc',
-      'session',
-      'event',
-      'sunday_service',
-      'service_date',
-      'recorded_by',
-      'notes',
-      'created_at',
-      'updated_at',
-    ],
-    sort,
-    page,
-    limit,
-  })
+  const result = await listItems<Record<string, unknown>>(
+    event,
+    scope,
+    'blessing_recipients',
+    {
+      filter,
+      fields: [
+        'id',
+        'blessing',
+        'blessing_type',
+        'other_label',
+        'person',
+        'attendee_user',
+        'branch',
+        'zone',
+        'bsc',
+        'session',
+        'event',
+        'sunday_service',
+        'service_date',
+        'recorded_by',
+        'notes',
+        'created_at',
+        'updated_at',
+      ],
+      sort,
+      page,
+      limit,
+    },
+  )
 
   return {
     data: result.data.map((row) => ({ ...row, id: String(row.id) })),

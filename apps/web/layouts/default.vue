@@ -83,15 +83,40 @@ function toggleSection(key: string): void {
   persistExpanded()
 }
 
-/** The section holding a path: exact item match, else longest prefix (so
- *  detail pages like /tasks/:id keep their section open). */
+/** A header tap is an explicit selection: open that section at once, even
+ *  when the route watcher cannot tell it apart (shared canonical routes,
+ *  or a page whose path matches no single item). */
+function selectSection(key: string): void {
+  expandedKeys.value = [key]
+  persistExpanded()
+}
+
+/** The section holding a path. Group canonical routes win first (the headers
+ *  navigate to those, and two groups share /departments): on an exact group
+ *  match the already-open group is kept so a tap never jumps sections.
+ *  Otherwise the longest item-prefix match wins, so detail pages like
+ *  /tasks/:id keep their section open. */
 function sectionForPath(path: string): string | null {
+  const exact = NAVIGATION_GROUPS.filter((group) => group.to === path).map(
+    (group) => group.key,
+  )
+  if (exact.length === 1) return exact[0] ?? null
+  if (exact.length > 1) {
+    return exact.find((key) => isExpanded(key)) ?? exact[0] ?? null
+  }
   let best: { key: string; length: number } | null = null
   for (const section of sections.value) {
     for (const item of section.items) {
       if (path === item.to || path.startsWith(`${item.to}/`)) {
-        if (!best || item.to.length > best.length)
+        if (!best || item.to.length > best.length) {
           best = { key: section.key, length: item.to.length }
+        } else if (
+          item.to.length === best.length &&
+          section.key !== best.key &&
+          isExpanded(section.key)
+        ) {
+          best = { key: section.key, length: item.to.length }
+        }
       }
     }
   }
@@ -200,28 +225,6 @@ const menuItems = computed(() => [
 
 <template>
   <div class="min-h-screen lg:flex">
-    <!-- Mobile app bar: persistent brand + menu button. The drawer slides
-      away when closed, so the control that opens it must live outside it. -->
-    <div
-      class="sticky top-0 z-30 flex h-16 items-center justify-between gap-1 border-b border-gray-200 bg-white/95 px-3 backdrop-blur lg:hidden dark:border-gray-800 dark:bg-gray-900/95"
-    >
-      <NuxtLink
-        to="/dashboard"
-        class="flex min-w-0 items-center gap-2 rounded-lg px-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500"
-      >
-        <UIcon name="i-lucide-church" class="size-6 shrink-0 text-primary-500" />
-        <span class="truncate font-semibold">AFC Portal</span>
-      </NuxtLink>
-      <button
-        type="button"
-        class="rounded-lg p-2 text-gray-500 hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:text-gray-400 dark:hover:bg-gray-800"
-        aria-label="Open menu"
-        aria-controls="portal-sections-nav"
-        @click="mobileOpen = true"
-      >
-        <UIcon name="i-lucide-menu" class="size-5" />
-      </button>
-    </div>
     <!-- Mobile drawer backdrop. -->
     <div
       v-if="mobileOpen"
@@ -286,6 +289,7 @@ const menuItems = computed(() => [
                 :to="section.to"
                 class="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-3 py-1 text-xs font-semibold uppercase tracking-wide text-gray-500 hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:text-gray-400 dark:hover:bg-gray-800"
                 :title="`Open ${section.label}`"
+                @click="selectSection(section.key)"
               >
                 <UIcon :name="section.icon" class="size-4 shrink-0" />
                 <span class="truncate">{{ section.label }}</span>
@@ -345,8 +349,8 @@ const menuItems = computed(() => [
             }"
           >
             <NuxtLink
-              v-for="(item, itemIndex) in section.items"
-              :key="`${section.key}:${itemIndex}:${item.to}`"
+              v-for="(item, index) in section.items"
+              :key="`${section.key}:${index}:${item.to}`"
               :to="item.to"
               :title="item.label"
               :aria-label="item.label"
@@ -367,13 +371,30 @@ const menuItems = computed(() => [
       <header
         class="sticky top-0 z-10 flex h-16 items-center justify-between gap-2 border-b border-gray-200 bg-white/80 px-3 backdrop-blur sm:px-5 dark:border-gray-800 dark:bg-gray-950/80"
       >
-        <div class="min-w-0 shrink-0">
-          <p class="truncate text-sm font-medium text-gray-900 dark:text-white">
-            {{ user?.email ?? 'Not signed in' }}
-          </p>
-          <p class="truncate text-xs text-gray-500 dark:text-gray-400">
-            {{ user?.staffRole?.replace(/_/g, ' ') ?? '' }}
-          </p>
+        <div class="flex min-w-0 flex-1 items-center gap-1">
+          <button
+            type="button"
+            class="shrink-0 rounded-lg p-2 text-gray-500 hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 lg:hidden dark:text-gray-400 dark:hover:bg-gray-800"
+            aria-label="Open menu"
+            aria-controls="portal-sections-nav"
+            @click="mobileOpen = true"
+          >
+            <UIcon name="i-lucide-menu" class="size-5" />
+          </button>
+          <NuxtLink
+            to="/dashboard"
+            class="flex min-w-0 shrink-0 items-center gap-2 rounded-lg px-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 lg:hidden"
+          >
+            <UIcon name="i-lucide-church" class="size-6 shrink-0 text-primary-500" />
+          </NuxtLink>
+          <div class="hidden min-w-0 shrink-0 lg:block">
+            <p class="truncate text-sm font-medium text-gray-900 dark:text-white">
+              {{ user?.email ?? 'Not signed in' }}
+            </p>
+            <p class="truncate text-xs text-gray-500 dark:text-gray-400">
+              {{ user?.staffRole?.replace(/_/g, ' ') ?? '' }}
+            </p>
+          </div>
         </div>
 
         <!-- Header search (AFC-585): desktop field, mobile icon-expands. -->
@@ -410,10 +431,6 @@ const menuItems = computed(() => [
           </UDropdownMenu>
         </div>
       </header>
-
-      <!-- Impersonation preview marker (AFC-684): visible on every staff page
-        while a preview is active, with a one-click exit. -->
-      <ImpersonationBanner />
 
       <main class="min-w-0 flex-1 p-5 lg:p-8">
         <slot />

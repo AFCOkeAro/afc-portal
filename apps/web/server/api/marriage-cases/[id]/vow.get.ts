@@ -1,8 +1,4 @@
-import {
-  MARRIAGE_VOW_TYPES,
-  buildVowText,
-  type MarriageVowType,
-} from '@afc/shared'
+import { MARRIAGE_VOW_TYPES, buildVowText, type MarriageVowType } from '@afc/shared'
 import {
   assertUuidParam,
   findScopedItem,
@@ -75,7 +71,8 @@ export default defineEventHandler(async (event) => {
     if (error && typeof error === 'object' && 'statusCode' in error) throw error
     throw createError({
       statusCode: 503,
-      statusMessage: 'The marriage forms store is unavailable (migration 0036 not applied?)',
+      statusMessage:
+        'The marriage forms store is unavailable (migration 0036 not applied?)',
       data: { code: 'pending_migration_0036', cause: String(error) },
     })
   })
@@ -92,21 +89,32 @@ export default defineEventHandler(async (event) => {
 
   const brotherName =
     String(vows.brother_full_name ?? '').trim() ||
-    [infoBrother.surname, infoBrother.other_names].map((part) => String(part ?? '').trim()).filter(Boolean).join(' ')
+    [infoBrother.surname, infoBrother.other_names]
+      .map((part) => String(part ?? '').trim())
+      .filter(Boolean)
+      .join(' ')
   const sisterName =
     String(vows.sister_full_name ?? '').trim() ||
-    [infoSister.surname, infoSister.other_names].map((part) => String(part ?? '').trim()).filter(Boolean).join(' ')
+    [infoSister.surname, infoSister.other_names]
+      .map((part) => String(part ?? '').trim())
+      .filter(Boolean)
+      .join(' ')
   const giverName = String(vows.giver_name ?? '').trim() || undefined
 
   if (!brotherName || !sisterName) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Fill the vows form (or the wedding information form) before printing the vow',
+      statusMessage:
+        'Fill the vows form (or the wedding information form) before printing the vow',
       data: {
         code: 'names_missing',
         fields: {
-          brother_full_name: brotherName ? 'Set' : 'Enter the brother full name on the vows form',
-          sister_full_name: sisterName ? 'Set' : 'Enter the sister full name on the vows form',
+          brother_full_name: brotherName
+            ? 'Set'
+            : 'Enter the brother full name on the vows form',
+          sister_full_name: sisterName
+            ? 'Set'
+            : 'Enter the sister full name on the vows form',
         },
       },
     })

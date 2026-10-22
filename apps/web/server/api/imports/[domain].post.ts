@@ -384,8 +384,7 @@ async function upsertBlessing(
     await createItem(event, scope, 'blessings', body)
     return 'imported'
   }
-  const same =
-    Number(match.count ?? match.male_count) === body.count
+  const same = Number(match.count ?? match.male_count) === body.count
   if (same) return 'skipped'
   await updateItem(event, scope, 'blessings', String(match.id), {
     count: body.count,

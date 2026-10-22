@@ -94,20 +94,27 @@ export default defineEventHandler(async (event) => {
       // label + program links resolve to one row.
       const eqOrNull = (value: string | null) =>
         value ? { _eq: value } : { _null: true }
-      const existing = await listItems<Record<string, unknown>>(event, scope, 'blessings', {
-        filter: {
-          branch: { _eq: branch },
-          service_date: { _eq: form.service_date },
-          blessing_type: { _eq: row.blessing_type },
-          ...(label ? { other_label: { _eq: label } } : { other_label: { _null: true } }),
-          session: eqOrNull(program.session),
-          event: eqOrNull(program.event),
-          sunday_service: eqOrNull(program.sunday_service),
+      const existing = await listItems<Record<string, unknown>>(
+        event,
+        scope,
+        'blessings',
+        {
+          filter: {
+            branch: { _eq: branch },
+            service_date: { _eq: form.service_date },
+            blessing_type: { _eq: row.blessing_type },
+            ...(label
+              ? { other_label: { _eq: label } }
+              : { other_label: { _null: true } }),
+            session: eqOrNull(program.session),
+            event: eqOrNull(program.event),
+            sunday_service: eqOrNull(program.sunday_service),
+          },
+          fields: ['id'],
+          limit: 1,
+          page: 1,
         },
-        fields: ['id'],
-        limit: 1,
-        page: 1,
-      })
+      )
       const body = {
         blessing_type: row.blessing_type,
         other_label: label,
@@ -149,10 +156,15 @@ export default defineEventHandler(async (event) => {
           id: String(updated.id ?? found.id),
         })
       } else {
-        const created = await createItem<Record<string, unknown>>(event, scope, 'blessings', {
-          ...body,
-          created_at: now,
-        })
+        const created = await createItem<Record<string, unknown>>(
+          event,
+          scope,
+          'blessings',
+          {
+            ...body,
+            created_at: now,
+          },
+        )
         await createItem(event, scope, 'blessing_events', {
           blessing: String(created.id),
           event_type: 'created',

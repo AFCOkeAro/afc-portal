@@ -60,7 +60,10 @@ export default defineEventHandler(async (event) => {
       zoneIds: live.zoneIds ?? [],
     }
   } catch (error) {
-    console.error('impersonation exit actor re-read failed, restoring minimal identity', error)
+    console.error(
+      'impersonation exit actor re-read failed, restoring minimal identity',
+      error,
+    )
   }
   const restoredUser = actorUser ?? {
     id: claim.actorId,

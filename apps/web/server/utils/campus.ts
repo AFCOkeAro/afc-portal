@@ -312,7 +312,8 @@ export async function programmeChildFilter(
   // Fail-closed: a session with no visible programmes sees no child rows.
   // Empty `_in` is the fail-closed predicate; a text sentinel breaks on a
   // uuid column (Directus 500s trying to cast '__none__').
-  if (ids.length === 0) return { programme: { _eq: '00000000-0000-0000-0000-000000000000' } }
+  if (ids.length === 0)
+    return { programme: { _eq: '00000000-0000-0000-0000-000000000000' } }
   return { programme: { _in: ids } }
 }
 
@@ -360,7 +361,9 @@ export async function campusAttendanceScopeFilter(
   // Fail-closed: no visible programmes means no attendance rows, even when
   // the student side would match.
   const sessionPart: Record<string, unknown> =
-    ids.length > 0 ? { programme: { _in: ids } } : { programme: { _eq: '00000000-0000-0000-0000-000000000000' } }
+    ids.length > 0
+      ? { programme: { _in: ids } }
+      : { programme: { _eq: '00000000-0000-0000-0000-000000000000' } }
   const studentPart = studentRelationScope(scope, 'campus_student') ?? {}
   return mergeFilters(sessionPart, studentPart)
 }

@@ -1,0 +1,27 @@
+{
+  "authorAgentId": "7b4aae3b-0da5-4de2-a1d8-4737943ef561",
+  "authorName": "Coder",
+  "claimedAt": "2026-10-22T23:30:00+01:00",
+  "doesNotClaimR2": "There is no `reviews[]` entry here and there will not be one from the author: R1 wants a named author who is not the reviewer, and the author is the Coder run on AFC-699/AFC-700. Reviewer designation for a compliance-path commit is the CTO (MediaTech); R2 is carried by the commit's `Reviewed-by: MediaTech (CTO)` trailer (AFC-194 section 8.4 form (a)). No independent security reviewer exists on this team (board-declined seat), so the CTO review below is a recorded degradation, not independent review. Migration 0038 stores personal data (people first_name/last_name/branch) and Directus grant changes, so per team instructions it goes to the CTO regardless.",
+  "issue": "AFC-698",
+  "notClaimedPaths": "Compliance-path files in this commit are exactly the listed paths: the 0030 rewrite, the 0031 departments exclusion (+ down-script mirror), new 0038 up/down, the F3 grandfather entry, and suites 63/70/86/88/94. Non-compliance files in the same commit (prettier formatting of the 53 main-flagged files; type annotations in task-templates.ts, TaskViews.vue, default.vue, roles.vue, custom-grants.ts) are outside GUARDED_PATHS/REVIEW_REQUIRED_PATHS and need no claim.",
+  "paths": [
+    ".provenance/claims/AFC-698.json",
+    "scripts/rollback-control-grandfathered.json",
+    "services/directus/schema/migrations/20261020_0030_child_scope_denorm.sql",
+    "services/directus/schema/migrations/20261020_0031_fill_scope_zone.sql",
+    "services/directus/schema/migrations/20261022_0038_people_identity.sql",
+    "services/directus/schema/migrations/rollback/20261020_0031_fill_scope_zone.down.sql",
+    "services/directus/schema/migrations/rollback/20261022_0038_people_identity.down.sql",
+    "tests/db/63_retention_privileges.sql",
+    "tests/db/70_hierarchy_scope.sql",
+    "tests/db/86_events_registrations.sql",
+    "tests/db/88_attendance_sessions.sql",
+    "tests/db/94_child_scope_denorm.sql",
+    "tests/db/85_households_departments.sql"
+  ],
+  "scopeOfTheClaim": "R1 only: authorship of the listed compliance paths on AFC-698 (green-main sprint). It asserts nothing about whether they are correct. Correctness is the CTO review recorded in the commit trailer and the AFC-698 issue thread, plus green CI itself.",
+  "verificationRecorded": "CTO re-verification in a pristine origin/main worktree (7ba76be + this commit's files): pnpm format:check clean (53 files); pnpm --filter @afc/shared typecheck clean; pnpm --filter web typecheck 0 errors (was 24); scripts/retention-literal-gate.sh, awareness-write-context-gate.sh, migration-privilege-gate.sh, adr-uniqueness-gate.sh exit 0; node scripts/migration-rollback-gate.mjs OK (61 control drops examined, 0 FAIL); pnpm test:db PGlite full run green (see commit message). postgres:16 re-verification is CI's db-tests-postgres job (no container runtime in this sandbox).",
+  "whatTheChangeActuallyDoes": "Green-main minimal fix. (1) 0030 rewrite: static per-child DDL (no CREATE TEMP TABLE: PGlite 42501), people-parent guards via information_schema (postgres 42703), triggers statically visible to the rollback gate (26 F3-grandfathered drops). (2) 0031: departments removed from the afc_fill_scope fill list -- filling zone on a branch-scoped department violates 0027 departments_single_scope_check on every such insert (real product contradiction, caught by suites 85/92); down script mirrors the list. (3) New 0038: people first_name/last_name/branch(uuid FK) + grants (board-approved datamodel option on AFC-700); data-guarded down script. (4) Suites: 63 tripwire moved to the reviewed 0038 slice; 70 Z1 8->7 and others 20->19 (0029 removed the satellite, expectation never updated); 85.4/88.4 re-apply 0029 after the 0002 re-apply (resurrected SANGO-OTA/SAT-1 broke 87/89 counts); 86/88 re-apply idempotent 0030+0031 after their 0023 rollback re-apply (bare re-created registers broke 94 shape); 94 fill list drops departments (no fill trigger there by design, 19->18). Non-compliance in the same commit: prettier formatting of the 53 main-flagged files; type annotations in task-templates.ts, TaskViews.vue, default.vue, roles.vue (incl. selectRole/actionOptions/collectionOptions/filteredRolePermissions hoists so template expressions stay build-parseable JS), custom-grants.ts scope label fix.",
+  "whatThisFileIs": "An R1 authorship claim, and nothing else."
+}

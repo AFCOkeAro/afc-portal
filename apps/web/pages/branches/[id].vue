@@ -500,11 +500,11 @@ function formatDateTime(value: string | null | undefined): string {
                   <p class="text-sm font-medium capitalize">
                     {{ group.blessing_type.replace(/_/g, ' ') }}
                   </p>
-              <p class="text-xs text-gray-500 dark:text-gray-400">
-                {{ group.count }} recorded
-              </p>
-            </div>
-            <span class="text-sm font-semibold tabular-nums">{{ group.count }}</span>
+                  <p class="text-xs text-gray-500 dark:text-gray-400">
+                    {{ group.count }} recorded
+                  </p>
+                </div>
+                <span class="text-sm font-semibold tabular-nums">{{ group.count }}</span>
               </NuxtLink>
             </li>
           </ul>

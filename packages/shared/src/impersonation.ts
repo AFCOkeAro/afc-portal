@@ -48,7 +48,10 @@ export const impersonationRequestSchema = z
   .refine(
     (value) =>
       [value.targetUserId, value.branchId, value.zoneId].filter(Boolean).length === 1,
-    { message: 'Name exactly one target: targetUserId, branchId, or zoneId', path: ['targetUserId'] },
+    {
+      message: 'Name exactly one target: targetUserId, branchId, or zoneId',
+      path: ['targetUserId'],
+    },
   )
 
 export type ImpersonationRequest = z.infer<typeof impersonationRequestSchema>
@@ -161,7 +164,9 @@ const IMPERSONATION_ROLE_RANK: Readonly<Record<string, number>> = {
 }
 
 export function targetRoleOutranksActor(actorRole: string, targetRole: string): boolean {
-  return (IMPERSONATION_ROLE_RANK[targetRole] ?? 0) > (IMPERSONATION_ROLE_RANK[actorRole] ?? 0)
+  return (
+    (IMPERSONATION_ROLE_RANK[targetRole] ?? 0) > (IMPERSONATION_ROLE_RANK[actorRole] ?? 0)
+  )
 }
 
 /** Impersonated expiry: 30 minutes from now, capped by the outer session. */
@@ -172,7 +177,10 @@ export function impersonationExpiry(nowMs: number, originalExpiresAt: string): s
   return new Date(expires).toISOString()
 }
 
-export function isImpersonationExpired(claim: { expiresAt: string }, nowMs = Date.now()): boolean {
+export function isImpersonationExpired(
+  claim: { expiresAt: string },
+  nowMs = Date.now(),
+): boolean {
   return new Date(claim.expiresAt).getTime() <= nowMs
 }
 

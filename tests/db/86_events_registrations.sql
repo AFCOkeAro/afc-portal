@@ -387,10 +387,16 @@ END $$;
 \i services/directus/schema/migrations/20261020_0021_events_registrations.sql
 
 \i services/directus/schema/migrations/20261020_0023_attendance_sessions.sql
+
+-- The 0023 re-apply above recreates attendance_sessions/attendance_records
+-- bare: 0023 predates the scope layers, so the re-created tables lack the
+-- 0030 scope columns + triggers and the 0031 fill triggers. Re-apply the
+-- rebased idempotent forwards in apply order (AFC-698) plus the 0034 links,
+-- so later suites see the enforced tree. 0039 is retired: the rebased 0031
+-- no longer fills departments, so there is nothing to drop.
 \i services/directus/schema/migrations/20261020_0034_blessings_count_recipients.sql
 \i services/directus/schema/migrations/20261020_0030_child_scope_denorm.sql
 \i services/directus/schema/migrations/20261020_0031_fill_scope_zone.sql
-\i services/directus/schema/migrations/20261022_0039_departments_fill_scope_drop.sql
 
 DO $$
 BEGIN

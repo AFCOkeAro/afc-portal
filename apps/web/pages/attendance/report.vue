@@ -160,10 +160,20 @@ function groupLabel(row: AttendanceReport['rows'][number]): string {
           <USelect v-model="sessionType" :items="typeOptions" class="w-full" />
         </UFormField>
         <UFormField label="Branch">
-          <EntitySelect v-model="branch" :items="branchOptions" placeholder="Select branch…" class="w-full" />
+          <EntitySelect
+            v-model="branch"
+            :items="branchOptions"
+            placeholder="Select branch…"
+            class="w-full"
+          />
         </UFormField>
         <UFormField label="Zone">
-          <EntitySelect v-model="zone" :items="zoneOptions" placeholder="Select zone…" class="w-full" />
+          <EntitySelect
+            v-model="zone"
+            :items="zoneOptions"
+            placeholder="Select zone…"
+            class="w-full"
+          />
         </UFormField>
         <UFormField v-if="period === 'custom'" label="From">
           <UInput v-model="dateFrom" type="date" class="w-full" />

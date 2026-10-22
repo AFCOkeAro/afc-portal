@@ -1,7 +1,4 @@
-import {
-  MARRIAGE_FORM_KEYS,
-  type MarriageFormKey,
-} from '@afc/shared'
+import { MARRIAGE_FORM_KEYS, type MarriageFormKey } from '@afc/shared'
 import {
   assertUuidParam,
   findScopedItem,
@@ -27,13 +24,9 @@ export default defineEventHandler(async (event) => {
     'case',
     'invalid_case_id',
   )
-  await findScopedItem<Record<string, unknown>>(
-    event,
-    scope,
-    'marriage_cases',
-    id,
-    { scope: { ...scopeFilter(scope), ...officeZoneScope(scope) } },
-  ).catch((error: unknown) => {
+  await findScopedItem<Record<string, unknown>>(event, scope, 'marriage_cases', id, {
+    scope: { ...scopeFilter(scope), ...officeZoneScope(scope) },
+  }).catch((error: unknown) => {
     if (error && typeof error === 'object' && 'statusCode' in error) throw error
     throw createError({
       statusCode: 503,
@@ -55,7 +48,8 @@ export default defineEventHandler(async (event) => {
     if (error && typeof error === 'object' && 'statusCode' in error) throw error
     throw createError({
       statusCode: 503,
-      statusMessage: 'The marriage forms store is unavailable (migration 0036 not applied?)',
+      statusMessage:
+        'The marriage forms store is unavailable (migration 0036 not applied?)',
       data: { code: 'pending_migration_0036', cause: String(error) },
     })
   })

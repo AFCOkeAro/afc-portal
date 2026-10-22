@@ -193,7 +193,7 @@ function needsRecipientPerson(row: {
 }): boolean {
   return Boolean(
     (typeof row.person === 'string' && row.person.length > 0) ||
-      (typeof row.attendee_user === 'string' && row.attendee_user.length > 0),
+    (typeof row.attendee_user === 'string' && row.attendee_user.length > 0),
   )
 }
 

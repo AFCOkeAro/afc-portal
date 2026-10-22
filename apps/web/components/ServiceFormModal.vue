@@ -111,7 +111,12 @@ async function submit(): Promise<void> {
 
         <div class="grid gap-4 sm:grid-cols-2">
           <UFormField label="Branch" :error="fieldErrors.branch">
-            <EntitySelect v-model="form.branch" :items="branchOptions" placeholder="Select branch…" class="w-full" />
+            <EntitySelect
+              v-model="form.branch"
+              :items="branchOptions"
+              placeholder="Select branch…"
+              class="w-full"
+            />
           </UFormField>
           <UFormField label="Date" required :error="fieldErrors.service_date">
             <UInput v-model="form.service_date" type="date" class="w-full" />

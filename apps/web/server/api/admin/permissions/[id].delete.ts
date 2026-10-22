@@ -48,7 +48,8 @@ export default defineEventHandler(async (event) => {
       if (role?.data && isProtectedRole(role.data.name)) {
         throw createError({
           statusCode: 400,
-          statusMessage: 'Built-in role permissions are governed by role-matrix.ts in code',
+          statusMessage:
+            'Built-in role permissions are governed by role-matrix.ts in code',
           data: { code: 'validation_error' },
         })
       }

@@ -60,7 +60,7 @@ function toGrant(collection: unknown, action: unknown): Grant | null {
   return {
     collection: collection as CollectionName,
     action: action as PermissionAction,
-    scope: 'branch',
+    scope: 'own_branch',
     note: 'custom role grant (Directus policy)',
   }
 }
@@ -80,9 +80,15 @@ export async function policiesForRole(
       query: { filter: { role: { _eq: roleId } }, fields: 'policy', limit: -1 },
     },
   )
-  return [...new Set((access.data ?? []).map((row) => row.policy).filter(
-    (policy): policy is string => typeof policy === 'string' && policy.length > 0,
-  ))]
+  return [
+    ...new Set(
+      (access.data ?? [])
+        .map((row) => row.policy)
+        .filter(
+          (policy): policy is string => typeof policy === 'string' && policy.length > 0,
+        ),
+    ),
+  ]
 }
 
 async function loadCustomGrants(
@@ -90,14 +96,10 @@ async function loadCustomGrants(
   token: string,
   staffRole: string,
 ): Promise<Grant[]> {
-  const roles = await directusFetch<{ data: Array<{ id: string }> }>(
-    event,
-    '/roles',
-    {
-      accessToken: token,
-      query: { filter: { name: { _eq: staffRole } }, fields: 'id', limit: 1 },
-    },
-  )
+  const roles = await directusFetch<{ data: Array<{ id: string }> }>(event, '/roles', {
+    accessToken: token,
+    query: { filter: { name: { _eq: staffRole } }, fields: 'id', limit: 1 },
+  })
   const role = (roles.data ?? [])[0]
   if (!role) return []
   const policies = await policiesForRole(event, token, role.id)
@@ -133,7 +135,7 @@ export async function customGrantsForRole(
   if (isBuiltInRole(staffRole)) return []
   const hit = cache.get(staffRole)
   if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.grants
-  let grants: Grant[] = []
+  let grants: Grant[]
   try {
     const token = await directusAdminToken(event)
     try {

@@ -94,11 +94,18 @@ export default defineEventHandler(async (event) => {
     const error = cause as { statusCode?: number; statusMessage?: string; data?: unknown }
     // The idempotent entry key (0034 UNIQUE): a second identical mapping
     // names the conflict instead of leaking a Postgres code.
-    if (error.statusCode === 409 || String(error.statusMessage ?? '').includes('unique')) {
+    if (
+      error.statusCode === 409 ||
+      String(error.statusMessage ?? '').includes('unique')
+    ) {
       throw createError({
         statusCode: 409,
-        statusMessage: 'That person already has this blessing recorded for the program date',
-        data: { code: 'conflict', fields: { person: 'Link the existing record instead' } },
+        statusMessage:
+          'That person already has this blessing recorded for the program date',
+        data: {
+          code: 'conflict',
+          fields: { person: 'Link the existing record instead' },
+        },
       })
     }
     throw createError({

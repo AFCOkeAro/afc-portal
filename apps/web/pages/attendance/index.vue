@@ -166,7 +166,12 @@ function typeLabel(value: string): string {
           aria-label="Search attendance sessions"
         />
         <USelect v-model="type" :items="typeOptions" class="w-full" />
-        <EntitySelect v-model="branch" :items="branchOptions" placeholder="Select branch…" class="w-full" />
+        <EntitySelect
+          v-model="branch"
+          :items="branchOptions"
+          placeholder="Select branch…"
+          class="w-full"
+        />
       </div>
 
       <UAlert

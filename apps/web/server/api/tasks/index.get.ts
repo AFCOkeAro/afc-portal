@@ -30,9 +30,7 @@ export default defineEventHandler(async (event) => {
   const status = typeof query.status === 'string' ? query.status : undefined
   const mine = query.mine === '1'
   const branch =
-    typeof query.branch === 'string' && query.branch.length > 0
-      ? query.branch
-      : undefined
+    typeof query.branch === 'string' && query.branch.length > 0 ? query.branch : undefined
   logScopedQuery(scope, 'tasks.list', {
     status: status ?? 'all',
     mine,

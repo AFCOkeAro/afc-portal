@@ -86,10 +86,7 @@ export default defineEventHandler(async (event) => {
     }
   }
 
-  if (
-    toStage === 'announcements_calendar' &&
-    fromStage !== 'attire_check'
-  ) {
+  if (toStage === 'announcements_calendar' && fromStage !== 'attire_check') {
     throw createError({
       statusCode: 400,
       statusMessage: 'The attire check must pass before announcements run',

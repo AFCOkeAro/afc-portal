@@ -36,7 +36,10 @@ export default defineEventHandler(async (event) => {
     throw createError({
       statusCode: 400,
       statusMessage: 'That file is larger than 10 MB',
-      data: { code: 'validation_error', fields: { file: 'Keep scans and photos under 10 MB' } },
+      data: {
+        code: 'validation_error',
+        fields: { file: 'Keep scans and photos under 10 MB' },
+      },
     })
   }
   const mime = String(file.type ?? 'application/octet-stream')
@@ -44,7 +47,10 @@ export default defineEventHandler(async (event) => {
     throw createError({
       statusCode: 400,
       statusMessage: 'PDF, JPEG, PNG or WebP only',
-      data: { code: 'validation_error', fields: { file: 'Send a PDF, JPEG, PNG or WebP file' } },
+      data: {
+        code: 'validation_error',
+        fields: { file: 'Send a PDF, JPEG, PNG or WebP file' },
+      },
     })
   }
 
@@ -56,14 +62,11 @@ export default defineEventHandler(async (event) => {
   )
   let stored: { data: { id: string } }
   try {
-    stored = await $fetch<{ data: { id: string } }>(
-      `${directusBaseUrl(event)}/files`,
-      {
-        method: 'POST',
-        body: form,
-        headers: scope.token ? { Authorization: `Bearer ${scope.token}` } : undefined,
-      },
-    )
+    stored = await $fetch<{ data: { id: string } }>(`${directusBaseUrl(event)}/files`, {
+      method: 'POST',
+      body: form,
+      headers: scope.token ? { Authorization: `Bearer ${scope.token}` } : undefined,
+    })
   } catch (error) {
     throwStoreUnavailable(error, 'marriage file store', '0036')
   }

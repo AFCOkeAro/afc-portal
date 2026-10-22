@@ -1,8 +1,4 @@
-import {
-  expandTaskTemplate,
-  getTaskTemplate,
-  taskFromTemplateSchema,
-} from '@afc/shared'
+import { expandTaskTemplate, getTaskTemplate, taskFromTemplateSchema } from '@afc/shared'
 import {
   createItem,
   getPortalScope,

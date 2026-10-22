@@ -41,16 +41,11 @@ export const MARRIAGE_FORM_KEYS = [
 ] as const
 export type MarriageFormKey = (typeof MARRIAGE_FORM_KEYS)[number]
 
-const requiredName = (label: string) =>
-  z.string().trim().min(1, label).max(200)
+const requiredName = (label: string) => z.string().trim().min(1, label).max(200)
 
 const yesNo = z.enum(['yes', 'no'])
 
-const thirteenAnswers = () =>
-  z
-    .array(z.string().trim().max(4000))
-    .max(13)
-    .default([])
+const thirteenAnswers = () => z.array(z.string().trim().max(4000)).max(13).default([])
 
 /** F1. Proposal Record (brother). */
 export const proposalMaleSchema = z.object({
@@ -376,8 +371,7 @@ export function buildVowText(
     ].join('\n\n')
   }
   const giving =
-    giverName?.trim() ||
-    'On behalf of her family, the giver answers: "I do."'
+    giverName?.trim() || 'On behalf of her family, the giver answers: "I do."'
   return [
     'MARRIAGE CEREMONY TWO (the sister is given away).',
     intro,

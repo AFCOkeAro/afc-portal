@@ -71,11 +71,20 @@ const zones = await useAsyncData('blessings-zones', () =>
 )
 
 const servicesList = await useAsyncData('blessings-services', () =>
-  api.get<{ data: Array<{ id: string; service_date: string; theme: string | null; service_type: string }> }>('/api/services', { query: { limit: 50 } }),
+  api.get<{
+    data: Array<{
+      id: string
+      service_date: string
+      theme: string | null
+      service_type: string
+    }>
+  }>('/api/services', { query: { limit: 50 } }),
 )
 
 const eventsList = await useAsyncData('blessings-events', () =>
-  api.get<{ data: Array<{ id: string; title: string }> }>('/api/events', { query: { limit: 50 } }),
+  api.get<{ data: Array<{ id: string; title: string }> }>('/api/events', {
+    query: { limit: 50 },
+  }),
 )
 
 const serviceOptions = computed(() =>
@@ -316,7 +325,9 @@ function formatDate(value: string): string {
               <td class="px-3 py-3 text-gray-600 dark:text-gray-300">
                 {{ row.branch_name || '—' }}
               </td>
-              <td class="px-3 py-3 font-medium tabular-nums">{{ row.count ?? row.total_count }}</td>
+              <td class="px-3 py-3 font-medium tabular-nums">
+                {{ row.count ?? row.total_count }}
+              </td>
               <td class="px-3 py-3 text-right">
                 <UButton
                   :to="`/blessings/${row.id}`"

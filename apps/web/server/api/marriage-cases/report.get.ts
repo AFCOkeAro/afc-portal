@@ -80,7 +80,9 @@ export default defineEventHandler(async (event) => {
           row.sister_person,
           row.officiating_minister,
         ])
-        .filter((value): value is string => typeof value === 'string' && value.length > 0),
+        .filter(
+          (value): value is string => typeof value === 'string' && value.length > 0,
+        ),
     ),
   ]
   const people = new Map<string, string>()
@@ -117,7 +119,9 @@ export default defineEventHandler(async (event) => {
     brother_name: row.brother_person
       ? (people.get(String(row.brother_person)) ?? null)
       : null,
-    sister_name: row.sister_person ? (people.get(String(row.sister_person)) ?? null) : null,
+    sister_name: row.sister_person
+      ? (people.get(String(row.sister_person)) ?? null)
+      : null,
     branch_name: row.branch ? (names.get(String(row.branch)) ?? null) : null,
     officiating_minister_name: row.officiating_minister
       ? (people.get(String(row.officiating_minister)) ?? null)

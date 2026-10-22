@@ -15,8 +15,14 @@ definePageMeta({ middleware: 'staff' })
 const api = useApi()
 const toast = useToast()
 
-interface BranchRow { id: string; name: string }
-interface ZoneRow { id: string; name: string }
+interface BranchRow {
+  id: string
+  name: string
+}
+interface ZoneRow {
+  id: string
+  name: string
+}
 
 const kind = ref<'user' | 'branch' | 'zone'>('branch')
 const targetId = ref('')
@@ -79,7 +85,10 @@ async function start(): Promise<void> {
           ? { zoneId: targetId.value, reason: reason.value.trim() }
           : { branchId: targetId.value, reason: reason.value.trim() }
     await api.post('/api/admin/impersonate', body)
-    toast.add({ title: 'Preview started', description: 'The banner marks the preview scope.' })
+    toast.add({
+      title: 'Preview started',
+      description: 'The banner marks the preview scope.',
+    })
     await navigateTo('/dashboard', { replace: true })
   } catch (cause) {
     fieldError.value =
@@ -95,8 +104,8 @@ async function start(): Promise<void> {
     <div>
       <h1 class="text-xl font-semibold">Preview a scope</h1>
       <p class="mt-1 text-sm text-gray-500">
-        Start a 30-minute audited preview. Zone admins see only their own zones'
-        branches; anything outside your scope is refused.
+        Start a 30-minute audited preview. Zone admins see only their own zones' branches;
+        anything outside your scope is refused.
       </p>
     </div>
 
@@ -127,13 +136,15 @@ async function start(): Promise<void> {
             class="w-full"
           />
           <p v-if="kind === 'user'" class="mt-1 text-xs text-gray-500">
-            No user directory endpoint exists yet: paste the full user id from
-            the Directus admin. Branch and zone targets stay searchable picks.
+            No user directory endpoint exists yet: paste the full user id from the
+            Directus admin. Branch and zone targets stay searchable picks.
           </p>
         </div>
 
         <div>
-          <label class="mb-1 block text-sm font-medium" for="impersonate-reason">Reason (kept in the audit log)</label>
+          <label class="mb-1 block text-sm font-medium" for="impersonate-reason"
+            >Reason (kept in the audit log)</label
+          >
           <UTextarea
             id="impersonate-reason"
             v-model="reason"
@@ -143,7 +154,9 @@ async function start(): Promise<void> {
           />
         </div>
 
-        <p v-if="fieldError" role="alert" class="text-sm text-red-600">{{ fieldError }}</p>
+        <p v-if="fieldError" role="alert" class="text-sm text-red-600">
+          {{ fieldError }}
+        </p>
 
         <div class="flex justify-end gap-2">
           <UButton variant="ghost" to="/dashboard">Cancel</UButton>

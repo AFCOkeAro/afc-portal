@@ -18,9 +18,7 @@ let cached: CachedToken | null = null
 let inflight: Promise<string> | null = null
 const CACHE_TTL_MS = 9 * 60 * 1000
 
-export async function directusAdminToken(
-  event: import('h3').H3Event,
-): Promise<string> {
+export async function directusAdminToken(event: import('h3').H3Event): Promise<string> {
   if (cached && Date.now() - cached.at < CACHE_TTL_MS) return cached.token
   if (!inflight) {
     inflight = (async () => {

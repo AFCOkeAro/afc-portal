@@ -17,8 +17,7 @@ async function preview() {
     vowText.value = response.data.text
     selectedType.value = response.data.vow_type
   } catch (cause) {
-    vowError.value =
-      (cause as { message?: string }).message ?? 'The vow did not render'
+    vowError.value = (cause as { message?: string }).message ?? 'The vow did not render'
   }
 }
 
@@ -68,10 +67,10 @@ watch(
       <pre
         v-if="vowText"
         class="whitespace-pre-wrap text-sm leading-relaxed text-gray-700 dark:text-gray-200"
-      >{{ vowText }}</pre>
+        >{{ vowText }}</pre>
       <p v-else class="text-sm text-gray-500">
-        Names come from the saved vows or wedding-information form. Fill one of
-        those first, then preview.
+        Names come from the saved vows or wedding-information form. Fill one of those
+        first, then preview.
       </p>
     </div>
   </UCard>

@@ -28,18 +28,33 @@ export default defineEventHandler(async (event) => {
   const limit = Math.min(100, Math.max(1, Number(query.limit ?? 25) || 25))
 
   try {
-    const result = await listItems<Record<string, unknown>>(event, scope, IMPERSONATION_AUDIT_COLLECTION, {
-      page,
-      limit,
-      sort: '-started_at',
-      fields: ['id', 'actor', 'target_user', 'target_branch', 'target_zone', 'action', 'reason', 'started_at'],
-    })
+    const result = await listItems<Record<string, unknown>>(
+      event,
+      scope,
+      IMPERSONATION_AUDIT_COLLECTION,
+      {
+        page,
+        limit,
+        sort: '-started_at',
+        fields: [
+          'id',
+          'actor',
+          'target_user',
+          'target_branch',
+          'target_zone',
+          'action',
+          'reason',
+          'started_at',
+        ],
+      },
+    )
     return result
   } catch (error) {
     if (error instanceof DirectusAuthError) {
       throw createError({
         statusCode: 403,
-        statusMessage: 'The impersonation log refused this read — sign in again or ask for read access',
+        statusMessage:
+          'The impersonation log refused this read — sign in again or ask for read access',
         data: { code: 'impersonation_log_forbidden' },
       })
     }

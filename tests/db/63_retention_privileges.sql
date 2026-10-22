@@ -654,13 +654,23 @@ BEGIN
     'id' = ANY(v_cols) AND 'date_of_birth' = ANY(v_cols) AND 'status' = ANY(v_cols),
     'priv', 'people carries the retention anchor columns the engine resolves against');
 
-  -- The contract: this table is NOT the v4 people record. If a later migration
-  -- adds the full field set here, this assertion starts failing and someone has
-  -- to decide whether that was intended -- which is the point.
+  -- The contract, as decided on AFC-700 (board-approved 2026-10-22; CTO
+  -- review AFC-698): migration 0038
+  -- adds the identity slice (first_name, last_name, branch) to the anchor
+  -- table via ALTER TABLE ADD COLUMN -- never a second CREATE TABLE, which
+  -- would fork the identity the engine resolves holds and age anchors
+  -- against. The remainder of the operational record (phone, email,
+  -- membership_status, guardian) is still absent: the next migration that
+  -- adds any of those re-trips this assertion and forces the same decision
+  -- again. That is the point of the tripwire -- it moves forward one
+  -- reviewed slice at a time, never silently.
   PERFORM test_support.assert_true(
-    NOT ('first_name' = ANY(v_cols) OR 'phone' = ANY(v_cols) OR 'email' = ANY(v_cols)
+    'first_name' = ANY(v_cols) AND 'last_name' = ANY(v_cols) AND 'branch' = ANY(v_cols),
+    'priv', 'merge contract: people carries the reviewed 0038 identity slice');
+  PERFORM test_support.assert_true(
+    NOT ('phone' = ANY(v_cols) OR 'email' = ANY(v_cols)
          OR 'membership_status' = ANY(v_cols) OR 'guardian' = ANY(v_cols)),
-    'priv', 'merge contract: people is still the retention anchor only, not the v4 people record');
+    'priv', 'merge contract: people is not the full v4 people record yet');
 
   PERFORM test_support.assert_true(
     (SELECT count(*) >= 0 FROM people),

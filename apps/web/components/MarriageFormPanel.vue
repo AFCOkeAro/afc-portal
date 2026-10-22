@@ -7,7 +7,8 @@ const emit = defineEmits<{ refreshed: [] }>()
 
 const api = useApi()
 
-type FieldType = 'text' | 'date' | 'textarea' | 'switch' | 'select' | 'answers' | 'lines' | 'numbers'
+type FieldType =
+  'text' | 'date' | 'textarea' | 'switch' | 'select' | 'answers' | 'lines' | 'numbers'
 interface FieldDef {
   name: string
   label: string
@@ -70,7 +71,12 @@ const FIELD_DEFS: Record<string, FieldDef[]> = {
     { name: 'other_name', label: 'Other name', type: 'text' },
     { name: 'sex', label: 'Sex', type: 'select', options: ['male', 'female'] },
     { name: 'phone', label: 'Phone', type: 'text' },
-    { name: 'status', label: 'Status', type: 'select', options: ['single', 'married', 'widow', 'widower', 'divorcee', 'single_parent'] },
+    {
+      name: 'status',
+      label: 'Status',
+      type: 'select',
+      options: ['single', 'married', 'widow', 'widower', 'divorcee', 'single_parent'],
+    },
     { name: 'profession', label: 'Profession', type: 'text' },
     { name: 'workplace', label: 'Place of work', type: 'text' },
     { name: 'church_work', label: 'Work in the church', type: 'textarea' },
@@ -126,7 +132,11 @@ const FIELD_DEFS: Record<string, FieldDef[]> = {
     { name: 'sister.surname', label: 'Sister surname', type: 'text' },
     { name: 'sister.other_names', label: 'Sister other names', type: 'text' },
     { name: 'sister.date_of_birth', label: 'Sister date of birth', type: 'date' },
-    { name: 'verified', label: 'Verified — names match the people records', type: 'switch' },
+    {
+      name: 'verified',
+      label: 'Verified — names match the people records',
+      type: 'switch',
+    },
   ],
   music_selection: [
     { name: 'congregational_song_1', label: 'Congregational song 1', type: 'text' },
@@ -142,22 +152,49 @@ const FIELD_DEFS: Record<string, FieldDef[]> = {
     { name: 'brother_signature', label: 'Brother signature (name)', type: 'text' },
     { name: 'sister_signature', label: 'Sister signature (name)', type: 'text' },
     { name: 'pledge_date', label: 'Pledge date', type: 'date' },
-    { name: 'approved_by', label: 'Approved by (FDD / counsellor / overseer)', type: 'text' },
+    {
+      name: 'approved_by',
+      label: 'Approved by (FDD / counsellor / overseer)',
+      type: 'text',
+    },
   ],
   engagement_procedures: [
-    { name: 'completed_steps', label: 'Completed steps (1–10)', type: 'numbers', count: 10 },
-    { name: 'master_of_ceremonies', label: 'Master of ceremonies (one M.C.)', type: 'text' },
+    {
+      name: 'completed_steps',
+      label: 'Completed steps (1–10)',
+      type: 'numbers',
+      count: 10,
+    },
+    {
+      name: 'master_of_ceremonies',
+      label: 'Master of ceremonies (one M.C.)',
+      type: 'text',
+    },
     { name: 'conducted_date', label: 'Conducted date', type: 'date' },
     { name: 'notes', label: 'Notes', type: 'textarea' },
   ],
   counselling_curriculum: [
-    { name: 'completed_weeks', label: 'Completed weeks (1–12)', type: 'numbers', count: 12 },
+    {
+      name: 'completed_weeks',
+      label: 'Completed weeks (1–12)',
+      type: 'numbers',
+      count: 12,
+    },
     { name: 'exercise_books_verified', label: 'Exercise books verified', type: 'switch' },
-    { name: 'recommendation', label: 'Counsellor recommendation', type: 'select', options: ['ready', 'continue', 'delay'] },
+    {
+      name: 'recommendation',
+      label: 'Counsellor recommendation',
+      type: 'select',
+      options: ['ready', 'continue', 'delay'],
+    },
     { name: 'counsellor', label: 'Counsellor', type: 'text' },
   ],
   documentation_checklist: [
-    { name: 'pre_counselling', label: 'Pre-counselling rows (one per line)', type: 'lines' },
+    {
+      name: 'pre_counselling',
+      label: 'Pre-counselling rows (one per line)',
+      type: 'lines',
+    },
     { name: 'pre_wedding', label: 'Pre-wedding rows (one per line)', type: 'lines' },
     { name: 'back_office', label: 'Back-office rows (one per line)', type: 'lines' },
     { name: 'verified_by', label: 'Verified by', type: 'text' },
@@ -186,18 +223,25 @@ function blankFor(defs: FieldDef[]): Record<string, unknown> {
   const out: Record<string, unknown> = {}
   for (const def of defs) {
     if (def.type === 'switch') setInto(out, def.name, false)
-    else if (def.type === 'answers') setInto(out, def.name, Array.from({ length: def.count ?? 0 }, () => ''))
+    else if (def.type === 'answers')
+      setInto(
+        out,
+        def.name,
+        Array.from({ length: def.count ?? 0 }, () => ''),
+      )
     else if (def.type === 'numbers') setInto(out, def.name, [])
     else setInto(out, def.name, '')
   }
-  if (formKey.value === 'engagement_list') out.spiritual_items = '1 White Holy Bible (KJV)'
+  if (formKey.value === 'engagement_list')
+    out.spiritual_items = '1 White Holy Bible (KJV)'
   if (formKey.value === 'vows') out.vow_type = 'B'
   return out
 }
 
 function getPath(name: string): unknown {
   return name.split('.').reduce<unknown>((acc, part) => {
-    if (acc !== null && typeof acc === 'object') return (acc as Record<string, unknown>)[part]
+    if (acc !== null && typeof acc === 'object')
+      return (acc as Record<string, unknown>)[part]
     return undefined
   }, values.value)
 }
@@ -222,9 +266,7 @@ function selectForm(key: string) {
   const next = blankFor(FIELD_DEFS[key] ?? [])
   if (latest) {
     for (const def of FIELD_DEFS[key] ?? []) {
-      const hit = def.name.includes('.')
-        ? getNested(latest, def.name)
-        : latest[def.name]
+      const hit = def.name.includes('.') ? getNested(latest, def.name) : latest[def.name]
       if (hit !== undefined) setInto(next, def.name, hit)
     }
   }
@@ -233,7 +275,8 @@ function selectForm(key: string) {
 
 function getNested(source: Record<string, unknown>, name: string): unknown {
   return name.split('.').reduce<unknown>((acc, part) => {
-    if (acc !== null && typeof acc === 'object') return (acc as Record<string, unknown>)[part]
+    if (acc !== null && typeof acc === 'object')
+      return (acc as Record<string, unknown>)[part]
     return undefined
   }, source)
 }
@@ -254,7 +297,14 @@ function toPayload(): Record<string, unknown> {
   for (const def of FIELD_DEFS[formKey.value] ?? []) {
     const raw = getPath(def.name)
     if (def.type === 'lines' && typeof raw === 'string') {
-      setInto(payload, def.name, raw.split('\n').map((line) => line.trim()).filter(Boolean))
+      setInto(
+        payload,
+        def.name,
+        raw
+          .split('\n')
+          .map((line) => line.trim())
+          .filter(Boolean),
+      )
     } else {
       setInto(payload, def.name, raw)
     }
@@ -270,13 +320,14 @@ function fromStored(value: unknown): string {
 async function loadForms() {
   formsError.value = ''
   try {
-    const response = await api.get<{ data: Record<string, Record<string, unknown> | null> }>(
-      `/api/marriage-cases/${props.caseId}/forms`,
-    )
+    const response = await api.get<{
+      data: Record<string, Record<string, unknown> | null>
+    }>(`/api/marriage-cases/${props.caseId}/forms`)
     forms.value = response.data
     selectForm(formKey.value)
   } catch (cause) {
-    formsError.value = (cause as { message?: string }).message ?? 'Could not load the forms'
+    formsError.value =
+      (cause as { message?: string }).message ?? 'Could not load the forms'
   }
 }
 
@@ -293,7 +344,8 @@ async function save() {
     await loadForms()
     emit('refreshed')
   } catch (cause) {
-    saveError.value = (cause as { message?: string }).message ?? 'Could not save this form'
+    saveError.value =
+      (cause as { message?: string }).message ?? 'Could not save this form'
   }
 }
 
@@ -315,17 +367,22 @@ async function prefillWeddingInfo() {
       setPath(`${side}.date_of_birth`, person.date_of_birth ?? '')
     }
     values.value = { ...next }
-    prefillNote.value = 'Filled from the people records. Check every field, then tick verified.'
+    prefillNote.value =
+      'Filled from the people records. Check every field, then tick verified.'
   } catch (cause) {
-    prefillNote.value = (cause as { message?: string }).message ?? 'Prefill did not go through'
+    prefillNote.value =
+      (cause as { message?: string }).message ?? 'Prefill did not go through'
   }
 }
 
 function toggleNumber(name: string, step: number) {
-  const current = new Set(getPath(name) as number[] ?? [])
+  const current = new Set((getPath(name) as number[]) ?? [])
   if (current.has(step)) current.delete(step)
   else current.add(step)
-  setPath(name, [...current].sort((a, b) => a - b))
+  setPath(
+    name,
+    [...current].sort((a, b) => a - b),
+  )
   values.value = { ...values.value }
 }
 
@@ -348,7 +405,12 @@ await loadForms()
       <UFormField label="Form">
         <USelect
           :model-value="formKey"
-          :items="MARRIAGE_FORM_KEYS.map((key: string) => ({ label: `${KEY_LABELS[key]}${forms[key] ? ' ✓' : ''}`, value: key }))"
+          :items="
+            MARRIAGE_FORM_KEYS.map((key: string) => ({
+              label: `${KEY_LABELS[key]}${forms[key] ? ' ✓' : ''}`,
+              value: key,
+            }))
+          "
           class="w-full"
           @update:model-value="selectForm(String($event))"
         />
@@ -373,34 +435,56 @@ await loadForms()
             :model-value="String(getPath(def.name) ?? '')"
             :type="def.type === 'date' ? 'date' : 'text'"
             class="w-full"
-            @update:model-value="setPath(def.name, $event); values = { ...values }"
+            @update:model-value="
+              setPath(def.name, $event)
+              values = { ...values }
+            "
           />
           <UTextarea
             v-else-if="def.type === 'textarea'"
             :model-value="String(getPath(def.name) ?? '')"
             class="w-full"
-            @update:model-value="setPath(def.name, $event); values = { ...values }"
+            @update:model-value="
+              setPath(def.name, $event)
+              values = { ...values }
+            "
           />
           <USwitch
             v-else-if="def.type === 'switch'"
             :model-value="Boolean(getPath(def.name))"
-            @update:model-value="setPath(def.name, $event); values = { ...values }"
+            @update:model-value="
+              setPath(def.name, $event)
+              values = { ...values }
+            "
           />
           <USelect
             v-else-if="def.type === 'select'"
             :model-value="String(getPath(def.name) ?? '')"
-            :items="(def.options ?? []).map((option: string) => ({ label: option, value: option }))"
+            :items="
+              (def.options ?? []).map((option: string) => ({
+                label: option,
+                value: option,
+              }))
+            "
             class="w-full"
-            @update:model-value="setPath(def.name, $event); values = { ...values }"
+            @update:model-value="
+              setPath(def.name, $event)
+              values = { ...values }
+            "
           />
           <div v-else-if="def.type === 'answers'" class="grid gap-2">
             <UTextarea
-              v-for="index in (def.count ?? 0)"
+              v-for="index in def.count ?? 0"
               :key="index"
-              :model-value="String((getPath(def.name) as string[] ?? [])[index - 1] ?? '')"
+              :model-value="
+                String(((getPath(def.name) as string[]) ?? [])[index - 1] ?? '')
+              "
               :placeholder="`Answer ${index}`"
               class="w-full"
-              @update:model-value="(getPath(def.name) as string[])[index - 1] = String($event); values = { ...values }"
+              @update:model-value="
+                ;(getPath(def.name) as string[])[index - 1] = String($event)
+                values = { ...values }
+              "
             />
           </div>
           <UTextarea
@@ -408,15 +492,26 @@ await loadForms()
             :model-value="fromStored(getPath(def.name))"
             placeholder="One item per line"
             class="w-full"
-            @update:model-value="setPath(def.name, $event); values = { ...values }"
+            @update:model-value="
+              setPath(def.name, $event)
+              values = { ...values }
+            "
           />
           <div v-else-if="def.type === 'numbers'" class="flex flex-wrap gap-2">
             <UButton
-              v-for="step in (def.count ?? 0)"
+              v-for="step in def.count ?? 0"
               :key="step"
               size="xs"
-              :color="(getPath(def.name) as number[] ?? []).includes(step) ? 'primary' : 'neutral'"
-              :variant="(getPath(def.name) as number[] ?? []).includes(step) ? 'solid' : 'outline'"
+              :color="
+                ((getPath(def.name) as number[]) ?? []).includes(step)
+                  ? 'primary'
+                  : 'neutral'
+              "
+              :variant="
+                ((getPath(def.name) as number[]) ?? []).includes(step)
+                  ? 'solid'
+                  : 'outline'
+              "
               :label="String(step)"
               @click="toggleNumber(def.name, step)"
             />

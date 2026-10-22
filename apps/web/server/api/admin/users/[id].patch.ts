@@ -14,8 +14,7 @@ import { directusAdminToken } from '../../../utils/directus-admin'
  * Custom staff-role values are accepted only when a Directus role of that
  * exact name exists; built-ins map to the seeded display-name roles.
  */
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 const BUILT_IN_ROLE_NAMES: Record<string, string> = {
   super_admin: 'Administrator',
@@ -42,14 +41,10 @@ async function roleIdByName(
   token: string,
   name: string,
 ): Promise<string | null> {
-  const match = await directusFetch<{ data: Array<{ id: string }> }>(
-    event,
-    '/roles',
-    {
-      accessToken: token,
-      query: { filter: { name: { _eq: name } }, fields: 'id', limit: 1 },
-    },
-  )
+  const match = await directusFetch<{ data: Array<{ id: string }> }>(event, '/roles', {
+    accessToken: token,
+    query: { filter: { name: { _eq: name } }, fields: 'id', limit: 1 },
+  })
   return (match.data ?? [])[0]?.id ?? null
 }
 

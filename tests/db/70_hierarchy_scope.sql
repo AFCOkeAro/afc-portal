@@ -132,8 +132,9 @@ BEGIN
   SELECT id INTO v_z1 FROM zones WHERE code = 'LAG-NORTH-Z1';
   SELECT id INTO v_z2 FROM zones WHERE code = 'LAG-NORTH-Z2';
 
-  -- A Z1 filter returns exactly Z1's rows: Oke-Aro, its satellite, Akute,
-  -- Koyemidun, Olambe, Legun, Olomowewe, Matogun (eight after the 0028 seed).
+  -- A Z1 filter returns exactly Z1's rows: Oke-Aro, Akute, Koyemidun,
+  -- Olambe, Legun, Olomowewe, Matogun (seven: the Oke-Aro satellite was
+  -- removed by 0029, AFC-698).
   SELECT count(*) INTO v_z1_branches FROM branches WHERE zone = v_z1;
   PERFORM test_support.assert_true(v_z1_branches = 7, 'hierarchy', 'Z1 filter returns exactly seven branches');
   SELECT count(*) INTO v_z2_branches FROM branches WHERE zone = v_z2;

@@ -1,6 +1,10 @@
 import type { CapabilitiesPayload, Grant } from '@afc/shared'
 import { readableCollections, sortGrants, writableCollections } from '@afc/shared'
-import { capabilitiesForRole, grantsForRole, hiddenFieldsForRole } from '@afc/shared/role-matrix'
+import {
+  capabilitiesForRole,
+  grantsForRole,
+  hiddenFieldsForRole,
+} from '@afc/shared/role-matrix'
 import { requireSession } from '../../utils/session'
 import { intersectGrants } from '../../utils/impersonation'
 import { customGrantsForRole, isBuiltInRole } from '../../utils/custom-grants'

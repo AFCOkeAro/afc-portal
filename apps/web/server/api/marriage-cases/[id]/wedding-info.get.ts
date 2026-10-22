@@ -59,15 +59,17 @@ export default defineEventHandler(async (event) => {
   const [brother, sister] = await Promise.all([
     brotherId
       ? findScopedItem<Record<string, unknown>>(event, scope, 'people', brotherId)
-        .then((person) => prefillPerson(stripHidden(scope, 'people', person)))
-        .catch(() => null)
+          .then((person) => prefillPerson(stripHidden(scope, 'people', person)))
+          .catch(() => null)
       : Promise.resolve(null),
     sisterId
       ? findScopedItem<Record<string, unknown>>(event, scope, 'people', sisterId)
-        .then((person) => prefillPerson(stripHidden(scope, 'people', person)))
-        .catch(() => null)
+          .then((person) => prefillPerson(stripHidden(scope, 'people', person)))
+          .catch(() => null)
       : Promise.resolve(null),
   ])
 
-  return { data: { brother, sister, wedding_info_verified: row.wedding_info_verified ?? false } }
+  return {
+    data: { brother, sister, wedding_info_verified: row.wedding_info_verified ?? false },
+  }
 })

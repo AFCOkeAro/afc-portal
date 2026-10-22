@@ -551,8 +551,7 @@ export function csvResponse(event: H3Event, filename: string, rows: string[][]):
   return rows.map((row) => row.map(csvEscape).join(',')).join('\n')
 }
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export function isUuid(value: string): boolean {
   return UUID_RE.test(value)
@@ -564,7 +563,11 @@ export function isUuid(value: string): boolean {
  * embeds the raw SQL, which must never reach the client. Every uuid-keyed
  * detail route should call this before its first store read.
  */
-export function assertUuidParam(id: string | undefined, resource: string, code: string): string {
+export function assertUuidParam(
+  id: string | undefined,
+  resource: string,
+  code: string,
+): string {
   if (!id || !isUuid(id)) {
     throw createError({
       statusCode: 400,

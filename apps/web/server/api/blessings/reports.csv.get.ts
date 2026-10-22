@@ -51,18 +51,8 @@ export default defineEventHandler(async (event): Promise<string> => {
     body.push(
       [],
       ['section', 'from', 'to', 'count'],
-      [
-        'current',
-        filters.date_from ?? '',
-        filters.date_to ?? '',
-        String(currentCount),
-      ],
-      [
-        'prior',
-        compare.from,
-        compare.to,
-        String(compare.total),
-      ],
+      ['current', filters.date_from ?? '', filters.date_to ?? '', String(currentCount)],
+      ['prior', compare.from, compare.to, String(compare.total)],
       ['delta', '', '', String(compare.delta_total)],
     )
   }

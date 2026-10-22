@@ -106,7 +106,9 @@ export default defineEventHandler(async (event) => {
   }
 
   const branch = String(row.branch)
-  const zone = row.zone ? String(row.zone) : ((await scopeZoneIds(event, scope))[0] ?? null)
+  const zone = row.zone
+    ? String(row.zone)
+    : ((await scopeZoneIds(event, scope))[0] ?? null)
   const now = new Date().toISOString()
   const weddingDate = row.wedding_date ? String(row.wedding_date) : null
 

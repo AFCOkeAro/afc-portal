@@ -25,7 +25,10 @@ export default defineEventHandler(async (event): Promise<BlessingRecipientDetail
 
   const id = getRouterParam(event, 'id')
   if (!id)
-    throw createError({ statusCode: 400, statusMessage: 'A blessing recipient id is required' })
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'A blessing recipient id is required',
+    })
 
   const row = await findScopedItem<Record<string, unknown>>(
     event,
@@ -64,13 +67,12 @@ export default defineEventHandler(async (event): Promise<BlessingRecipientDetail
   let personName: string | null = null
   if (row.person) {
     try {
-      const person = await findScopedItem<{ preferred_name?: string; full_name?: string }>(
-        event,
-        scope,
-        'people',
-        String(row.person),
-        { fields: ['id', 'preferred_name', 'full_name'] },
-      )
+      const person = await findScopedItem<{
+        preferred_name?: string
+        full_name?: string
+      }>(event, scope, 'people', String(row.person), {
+        fields: ['id', 'preferred_name', 'full_name'],
+      })
       personName = person.preferred_name || person.full_name || null
     } catch {
       personName = null

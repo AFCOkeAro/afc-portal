@@ -1,4 +1,9 @@
-import type { AuthSession, ImpersonatedBy, LoginCredentials, PortalUser } from '@afc/shared'
+import type {
+  AuthSession,
+  ImpersonatedBy,
+  LoginCredentials,
+  PortalUser,
+} from '@afc/shared'
 import type { AuthState } from '~/server/api/auth/me.get'
 import { ApiRequestError } from './useApi'
 
@@ -17,7 +22,10 @@ import { ApiRequestError } from './useApi'
 export function useAuth() {
   const api = useApi()
   const session = useState<AuthSession | null>('afc:session', () => null)
-  const impersonatedBy = useState<ImpersonatedBy | null>('afc:impersonated-by', () => null)
+  const impersonatedBy = useState<ImpersonatedBy | null>(
+    'afc:impersonated-by',
+    () => null,
+  )
   const loading = useState<boolean>('afc:session:loading', () => false)
 
   const user = computed<PortalUser | null>(() => session.value?.user ?? null)

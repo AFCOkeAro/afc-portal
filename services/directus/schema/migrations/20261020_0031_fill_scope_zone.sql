@@ -6,6 +6,13 @@
 -- only a branch kept zone NULL. Zone-scoped policies filter on zone, which made
 -- those rows invisible to zone admins. This trigger only fills a missing zone
 -- from the branch and never overwrites an explicitly supplied value.
+--
+-- departments is NOT in the fill list (AFC-698): migration 0027 pins
+-- departments to a single scope level (branch XOR zone, area-wide when both
+-- null, departments_single_scope_check). Filling zone from branch on a
+-- branch-scoped department insert would violate that CHECK on every write,
+-- so a branch-scoped department keeps zone NULL by design here; zone-level
+-- visibility for departments resolves through the branch at read time.
 
 CREATE OR REPLACE FUNCTION afc_fill_scope_zone() RETURNS trigger
 LANGUAGE plpgsql AS $$
@@ -26,7 +33,7 @@ DECLARE
   tables text[] := ARRAY[
     'announcements','attendance_sessions','blessings','campaigns',
     'campus_students','celebrations','coaching_programmes','conference_centres',
-    'departments','event_invites','event_referrals','households',
+    'event_invites','event_referrals','households',
     'marriage_matters','office_minutes','prior_year_import_items',
     'sunday_school_classes','sunday_services','tasks','youth_profiles'
   ];
