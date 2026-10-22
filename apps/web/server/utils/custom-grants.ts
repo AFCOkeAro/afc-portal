@@ -135,7 +135,7 @@ export async function customGrantsForRole(
   if (isBuiltInRole(staffRole)) return []
   const hit = cache.get(staffRole)
   if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.grants
-  let grants: Grant[] = []
+  let grants: Grant[]
   try {
     const token = await directusAdminToken(event)
     try {

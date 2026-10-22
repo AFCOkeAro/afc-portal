@@ -573,7 +573,7 @@ export default defineEventHandler(async (event): Promise<DashboardData> => {
     'celebrations',
     (async (): Promise<DashboardCelebrationItem[]> => {
       if (!celebrationsVisible) return []
-      let celebrationItems: DashboardCelebrationItem[] = []
+      let celebrationItems: DashboardCelebrationItem[]
       // Celebrations half: scoped like the feed (area sees all; zone staff
       // see their zones; branch staff see their branches). Recurring rows are
       // read whole and projected in code because Directus cannot express
