@@ -5,13 +5,24 @@
   "claimedAt": "2026-10-23T12:30:00+01:00",
   "scopeOfTheClaim": "R1 only: authorship of the AFC-758 group-write migration, its rollback, and the db suite. It asserts nothing about correctness; that is for CI (R4) and the CTO review (R2).",
   "whatTheChangeActuallyDoes": "New migration 0040 (+rollback that revokes exactly the added grants) grants directus_app scoped INSERT (all route-written columns incl. explicit id) and UPDATE (name/code/description/status/leader_person, no scope placement) on departments, plus INSERT (people/departments/role/joined_at/status) and UPDATE (role/status) on people_departments; no DELETE anywhere; REVOKE ALL FROM PUBLIC re-asserted. Suite 99 pins idempotent re-apply, app write/no-delete guards, PUBLIC-empty, and shipped down-script revoke with forward restore (fixture people row removed by owner role per retention guard).",
-  "whatThisFileIs": "An R1 authorship claim, and nothing else. It says who wrote the compliance-path files below and on which issue. It carries no reviews[] entry.",
-  "doesNotClaimR2": "There is no reviews[] entry here and there will not be one from me. R2 wants a named reviewer who is not the author. CTO R2 requested on the AFC-758 thread before this branch merges to main.",
+  "whatThisFileIs": "R1 authorship claim plus the machine-readable R2 record (reviews[] by CTO, added post-merge without rewriting history).",
+  "doesNotClaimR2": "R1 author asserted no reviews[] entry; CTO added the reviews[] entry below post-merge as the R2 record (no history rewrite).",
   "notClaimedPaths": "apps/web routes (departments POST/PATCH, areas GET), UI (nav entry, New-group modal), shared zod schemas, web contract suite \u2014 non-compliance files needing no claim.",
   "paths": [
     "services/directus/schema/migrations/20261023_0040_departments_group_write.sql",
     "services/directus/schema/migrations/rollback/20261023_0040_departments_group_write.down.sql",
     "tests/db/99_departments_group_write.sql",
     ".provenance/claims/AFC-758.json"
+  ],
+  "reviews": [
+    {
+      "commit": "b3336c36c01addf5cdbfaf10722af1539d64ab34",
+      "reviewIssue": "AFC-758",
+      "reviewerAgentId": "8f6e42d7-fb6e-4e6c-904b-dfdda50000ed",
+      "reviewerName": "MediaTech (CTO)",
+      "verdict": "approve",
+      "findings": "R2 comment 430f4699: scoped INSERT/UPDATE, no DELETE, PUBLIC revoked; exact-revoke down script; suite 99; group-only POST/PATCH with area scope + leader junction + named 409/403; areas picker gated; nav + modal; contract 10/10; CI build/typecheck/lint/tab-role green. Accepted variances: INSERT id/zone/area required by route, UPDATE(code) ceiling headroom.",
+      "trailerPresentOnCommit": false
+    }
   ]
 }
