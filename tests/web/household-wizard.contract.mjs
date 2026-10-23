@@ -497,3 +497,46 @@ describe('migration: 0041 adds address + BSC without widening the boundary', () 
     assert.match(suite, /households_lat_check/)
   })
 })
+
+/**
+ * AFC-772 courier pins — detail [id].get.ts applied (AFC-771 R2).
+ *
+ * The hybrid new.vue replacement is BLOCKED: issue document
+ * afc-771-hybrid-new-vue (rev 0645b84f) carries a truncated template
+ * ("...[truncated 9113 chars]") instead of the full file, so no verbatim
+ * replacement is possible. Hybrid-row / M-D-Y / select / structured-address
+ * UI pins stay with the parent owner until a complete source lands. The
+ * detail-route pins below are the verifiable half of the courier brief.
+ */
+describe('AFC-772 detail route: structured address + member BSC', () => {
+  const route = codeOf('apps/web/server/api/households/[id].get.ts')
+
+  it('selects the eight structured household fields', () => {
+    for (const field of [
+      'address_1',
+      'address_2',
+      'city',
+      'state',
+      'zip',
+      'country',
+      'latitude',
+      'longitude',
+    ]) {
+      assert.ok(route.includes(`'${field}'`), `detail selects ${field}`)
+    }
+  })
+
+  it('selects the member BSC link', () => {
+    assert.match(route, /'branch',\s*'bsc',/)
+  })
+
+  it('carries branch + BSC on the member row type', () => {
+    assert.match(route, /branch: string \| null/)
+    assert.match(route, /bsc: string \| null/)
+  })
+
+  it('maps branch + BSC from the store row', () => {
+    assert.match(route, /branch: \(row\.branch as string \| null\)/)
+    assert.match(route, /bsc: \(row\.bsc as string \| null\)/)
+  })
+})
