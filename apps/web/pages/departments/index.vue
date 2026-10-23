@@ -38,7 +38,12 @@ const query = computed(() => ({
   ...(branch.value !== 'all' ? { branch: branch.value } : {}),
 }))
 
-const { data, pending, error } = await useAsyncData(
+const {
+  data,
+  pending,
+  error,
+  refresh: refreshDepartments,
+} = await useAsyncData(
   'departments-list',
   () => api.get<{ data: DepartmentRow[] }>('/api/departments', { query: query.value }),
   { watch: [query] },
@@ -122,7 +127,7 @@ async function submitGroup(): Promise<void> {
     groupArea.value = ''
     groupLeader.value = ''
     showCreate.value = false
-    await refresh()
+    await refreshDepartments()
   } catch (cause) {
     groupIsError.value = true
     groupMessage.value =

@@ -3,7 +3,7 @@ import {
   listItems,
   requireCan,
   throwStoreUnavailable,
-} from '../utils/portal'
+} from '../../utils/portal'
 
 export interface AreaSummary {
   id: string
@@ -30,7 +30,7 @@ export default defineEventHandler(async (event): Promise<AreaSummary[]> => {
       sort: 'sort,name',
       limit: -1,
     })
-    return result.data.map((area) => ({ ...area, id: String(area.id) }))
+    return result.data.map((area: AreaSummary) => ({ ...area, id: String(area.id) }))
   } catch (cause) {
     const error = cause as { statusCode?: number }
     if (error.statusCode) throw cause
