@@ -206,6 +206,8 @@ export interface Person {
    *  written before the wizard. */
   household_role: 'head_of_household' | 'spouse' | 'child' | 'relative' | null
   branch: string | null
+  /** Home Bible Study Centre (AFC-771, migration 0041). Null when unset. */
+  bsc: string | null
   membership_status: MembershipStatus
   member_since: string | null
   guardian: string | null
@@ -223,6 +225,16 @@ export interface Household {
   zone: string | null
   household_head: string | null
   address: string | null
+  /** Structured address (AFC-771); legacy `address` stays the readable copy. */
+  address_1: string | null
+  address_2: string | null
+  city: string | null
+  state: string | null
+  zip: string | null
+  country: string | null
+  /** Decimal degrees; staff-only read via the household read grant. */
+  latitude: number | null
+  longitude: number | null
   phone: string | null
   primary_contact: string | null
   notes: string | null

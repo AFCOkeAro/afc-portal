@@ -17,7 +17,8 @@
  * same pair the staff person form validates against.
  */
 import { z } from 'zod'
-import { dateSchema, emailSchema, optionalNote, phoneSchema, uuidSchema } from './common'
+import { dateSchema, emailSchema, optionalNote, optionalText, phoneSchema, uuidSchema } from './common'
+import { MEMBERSHIP_STATUSES } from './person'
 
 /** Household member roles for the wizard. `households.household_head`
  *  still carries the head link; this names every row's place. */
@@ -58,13 +59,33 @@ const wizardEmailSchema = z
 export const householdWizardMemberSchema = z.object({
   role: householdRoleSchema,
   first_name: z.string().trim().min(1, 'First name is required').max(120),
+  /** Optional; stored on people.other_names (no middle-name column exists). */
+  middle_name: z.string().trim().max(120).optional(),
   last_name: z.string().trim().min(1, 'Last name is required').max(120),
+  /** Optional; appended to last_name (no suffix column exists). */
+  suffix: z.string().trim().max(20).optional(),
   gender: householdWizardGenderSchema,
   date_of_birth: dateSchema
     .optional()
     .transform((value) => (value === '' ? undefined : value)),
   phone: wizardPhoneSchema,
   email: wizardEmailSchema,
+  /**
+   * Per-member branch (AFC-771). Optional; defaults to the household
+   * branch. Scoped by resolveBranch — out-of-scope is a 403.
+   */
+  branch: uuidSchema.optional(),
+  /**
+   * Per-member status (AFC-771). Reuses MEMBERSHIP_STATUSES from
+   * ./person — no new values without CTO sign-off. Optional; the
+   * server keeps the age-band default when absent.
+   */
+  membership_status: z.enum(MEMBERSHIP_STATUSES).optional(),
+  /**
+   * Per-member Bible Study Centre (AFC-771). Optional; scope-checked
+   * against the caller's branches/zones — out-of-scope is a 403.
+   */
+  bsc: uuidSchema.optional(),
   /** Checked = write one sms consent record; unchecked = no record. */
   consent_sms: z.boolean().default(false),
   /** Checked = write one whatsapp consent record; unchecked = no record. */
@@ -87,7 +108,25 @@ export const householdWizardSchema = z
     branch: uuidSchema.optional(),
     /** Optional; the server defaults to "<head last name> family". */
     name: z.string().trim().max(255).optional(),
+    /** Legacy single-line address; kept readable, backfilled into address_1. */
     address: optionalNote(),
+    /**
+     * Structured address (AFC-771). Replaces the textarea on the form;
+     * the server composes the legacy `address` from these parts so old
+     * reads keep working. latitude/longitude are decimal degrees.
+     */
+    address_1: optionalText(255),
+    address_2: optionalText(255),
+    city: optionalText(120),
+    state: optionalText(120),
+    zip: optionalText(20),
+    country: optionalText(120),
+    latitude: z.number().min(-90).max(90).optional(),
+    longitude: z.number().min(-180).max(180).optional(),
+    /** Optional wedding date; stored on households.wedding_date (AFC-771). */
+    wedding_date: dateSchema
+      .optional()
+      .transform((value) => (value === '' ? undefined : value)),
     members: z
       .array(householdWizardMemberSchema)
       .min(1, 'Add at least one person')

@@ -209,3 +209,103 @@ describe('AFC-684 UI: picker, banner, exit', () => {
     assert.match(src, /ImpersonationBanner/)
   })
 })
+
+/**
+ * AFC-760 contract tests — the preview claim must not survive exit/re-login.
+ *
+ * Root cause: h3's `session.update` shallow-merges onto the data unsealed
+ * from the request cookie, so a write that omits `impersonatedBy` left the
+ * stale claim in place and the next start always 409'd. `writeSession` is
+ * therefore replace-semantics (delete live keys, then update), and every
+ * caller passes the claim explicitly or not at all.
+ *
+ * Run: node --test tests/web/impersonation.contract.mjs
+ */
+describe('AFC-760 session replace semantics: claim dropped on exit/login, kept on refresh', () => {
+  /** Source window starting at the first occurrence of a marker. */
+  const callWindow = (src, marker, len = 800) => {
+    const i = src.indexOf(marker)
+    assert.ok(i >= 0, `${marker} not found`)
+    return src.slice(i, i + len)
+  }
+
+  /** Body of writeSession only (up to the next export, so clearPortalSession is excluded). */
+  const writeSessionBody = (src) => {
+    const start = src.indexOf('export async function writeSession')
+    assert.ok(start >= 0, 'writeSession not found')
+    const end = src.indexOf('export async function clearPortalSession')
+    return src.slice(start, end >= 0 ? end : start + 1600)
+  }
+
+  it('writeSession deletes live keys before updating (replace, not merge)', () => {
+    const body = writeSessionBody(codeOf('apps/web/server/utils/session.ts'))
+    assert.match(body, /Object\.keys\(current\)/)
+    assert.match(body, /delete current\[key\]/)
+    assert.match(body, /session\.update\(data\)/)
+  })
+
+  it('writeSession does not rely on clear-then-update (clear rehydrates the stale cookie)', () => {
+    const body = writeSessionBody(codeOf('apps/web/server/utils/session.ts'))
+    assert.doesNotMatch(body, /clear\(\)/)
+  })
+
+  it('writeSession documents the replace semantics in its function comment', () => {
+    const src = read('apps/web/server/utils/session.ts')
+    assert.match(src, /Replace the sealed session with exactly/)
+    assert.match(src, /alone is NOT a\n \* substitute/)
+  })
+
+  it('exit path writes the restored session without the impersonatedBy key', () => {
+    const src = codeOf('apps/web/server/api/admin/impersonate-exit.post.ts')
+    const written = callWindow(src, 'writeSession(event', 600)
+    assert.doesNotMatch(written, /impersonatedBy/)
+  })
+
+  it('login path clears then writes without the claim', () => {
+    const src = codeOf('apps/web/server/api/auth/login.post.ts')
+    assert.match(src, /clearPortalSession/)
+    const written = callWindow(src, 'writeSession(event', 400)
+    assert.doesNotMatch(written, /impersonatedBy/)
+  })
+
+  it('member OTP verify writes without the claim (a member sign-in never inherits a staff preview)', () => {
+    const src = codeOf('apps/web/server/api/auth/member-otp/verify.post.ts')
+    const written = callWindow(src, 'writeSession(event', 1500)
+    assert.doesNotMatch(written, /impersonatedBy/)
+  })
+
+  it('refresh path carries impersonatedBy through (refresh must NOT drop an active preview)', () => {
+    const src = codeOf('apps/web/server/utils/directus.ts')
+    const body = callWindow(src, 'doRefreshSessionToken', 1600)
+    assert.match(body, /writeSession/)
+    assert.match(body, /impersonatedBy/)
+  })
+
+  it('impersonate start passes the claim explicitly', () => {
+    const src = codeOf('apps/web/server/api/admin/impersonate.post.ts')
+    const written = callWindow(src, 'writeSession(event', 600)
+    assert.match(written, /impersonatedBy/)
+  })
+
+  it('second impersonate after exit is allowed: the 409 guard reads the fresh session first', () => {
+    const src = codeOf('apps/web/server/api/admin/impersonate.post.ts')
+    assert.match(src, /readSession/)
+    assert.match(src, /already_impersonating/)
+    assert.match(src, /statusCode:\s*409/)
+    assert.ok(
+      src.indexOf('readSession') < src.indexOf('already_impersonating'),
+      'the 409 guard must read the current session before refusing a double start',
+    )
+  })
+
+  it('me reflects the stored session, so a dropped claim reads as no preview', () => {
+    const src = codeOf('apps/web/server/api/auth/me.get.ts')
+    assert.match(src, /readSession/)
+    assert.match(src, /found\?\.impersonatedBy \?\? null/)
+  })
+
+  it('logout still clears the session', () => {
+    const src = codeOf('apps/web/server/api/auth/logout.post.ts')
+    assert.match(src, /clearPortalSession/)
+  })
+})

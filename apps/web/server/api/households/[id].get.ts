@@ -21,6 +21,14 @@ const HOUSEHOLD_FIELDS = [
   'name',
   'branch',
   'address',
+  'address_1',
+  'address_2',
+  'city',
+  'state',
+  'zip',
+  'country',
+  'latitude',
+  'longitude',
   'phone',
   'wedding_date',
   'household_head',
@@ -38,6 +46,7 @@ const MEMBER_FIELDS = [
   'is_minor',
   'phone',
   'branch',
+  'bsc',
   'household_role',
   'membership_status',
   'status',
@@ -50,6 +59,8 @@ export interface HouseholdMemberRow {
   gender: string
   is_minor: boolean | null
   phone: string | null
+  branch: string | null
+  bsc: string | null
   membership_status: string
   status: string
   age: number | null
@@ -150,6 +161,8 @@ export default defineEventHandler(async (event): Promise<HouseholdDetail> => {
     household_role: (row.household_role as string | null) ?? null,
     is_minor: (row.is_minor as boolean | null) ?? null,
     phone: (row.phone as string | null) ?? null,
+    branch: (row.branch as string | null) ?? null,
+    bsc: (row.bsc as string | null) ?? null,
     membership_status: String(row.membership_status ?? ''),
     status: String(row.status ?? ''),
     age: isHidden(scope, 'people', 'date_of_birth')

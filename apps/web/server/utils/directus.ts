@@ -234,6 +234,11 @@ async function doRefreshSessionToken(
       accessToken,
       refreshToken: refreshed.data.refresh_token ?? session.refreshToken,
       session: session.session,
+      // A refresh must NOT drop an active preview (AFC-760): with replace
+      // semantics in writeSession, an omitted key stays absent, so the claim
+      // is carried through explicitly. Exit / login / member OTP paths pass
+      // it absent on purpose.
+      ...(session.impersonatedBy ? { impersonatedBy: session.impersonatedBy } : {}),
     })
     return accessToken
   } catch {

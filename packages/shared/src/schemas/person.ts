@@ -15,7 +15,8 @@ import { personExtensionSchema } from './youth'
 
 const GENDERS = ['male', 'female', 'unspecified'] as const
 
-const MEMBERSHIP_STATUSES = [
+/** Single authority for member statuses (AFC-771 reuses it in the wizard). */
+export const MEMBERSHIP_STATUSES = [
   'member',
   'regular_attendee',
   'visitor',
