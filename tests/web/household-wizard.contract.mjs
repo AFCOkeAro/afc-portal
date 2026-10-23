@@ -240,8 +240,7 @@ describe('wizard page: staff-only guided submit with kit styling', () => {
   })
 })
 
-describe('migration: 0026 extends people without widening the boundary', () => {
-  const path26 = 'services/directus/schema/migrations/20261020_0026_household_roles.sql'
+describe('migration: 0026 extends people without widening the boundary', () => {  const path26 = 'services/directus/schema/migrations/20261020_0026_household_roles.sql'
   const down26 =
     'services/directus/schema/migrations/rollback/20261020_0026_household_roles.down.sql'
 
@@ -293,5 +292,208 @@ describe('migration: 0026 extends people without widening the boundary', () => {
     assert.match(suite, /91\.6/)
     assert.match(suite, /household_head/)
     assert.match(suite, /people_household_role_check/)
+  })
+})
+
+/**
+ * AFC-771 contract tests — hybrid-row upgrade (Option C, user-picked).
+ *
+ * Covers what lands in-tree this commit: the wizard schema (wedding
+ * date, structured address, per-member branch/status/BSC), the submit
+ * route (persist + scope 403s + composed legacy address), the shared
+ * readback types, and migration 0041 (+ rollback, pinned by suite 99).
+ *
+ * UI assertions (hybrid new.vue, detail [id].get.ts fields) are NOT
+ * pinned here: those two paths are not writable from this workspace
+ * (owned by another uid) and travel as AFC-771 issue documents for the
+ * CTO courier to apply. The courier extends this file when it lands
+ * them. A red pin on an unapplied file would be a bought green, not a
+ * earned one.
+ *
+ * Run: node --test tests/web/household-wizard.contract.mjs
+ */
+describe('AFC-771 schema: wedding date, structured address, per-member links', () => {
+  const schema = read('packages/shared/src/schemas/household-wizard.ts')
+
+  it('carries wedding_date as an optional date', () => {
+    assert.match(schema, /wedding_date/)
+  })
+
+  it('carries the structured address: parts plus decimal-degree pins', () => {
+    for (const field of [
+      'address_1',
+      'address_2',
+      'city',
+      'state',
+      'zip',
+      'country',
+      'latitude',
+      'longitude',
+    ]) {
+      assert.ok(schema.includes(field), `wizard names address field ${field}`)
+    }
+    assert.match(schema, /latitude.*-90.*90/s)
+    assert.match(schema, /longitude.*-180.*180/s)
+  })
+
+  it('keeps the legacy address readable', () => {
+    assert.match(schema, /address: optionalNote\(\)/)
+  })
+
+  it('carries optional middle/suffix names on the member', () => {
+    assert.match(schema, /middle_name/)
+    assert.match(schema, /suffix/)
+  })
+
+  it('carries per-member branch, status, and BSC links', () => {
+    assert.match(schema, /branch: uuidSchema\.optional\(\)/)
+    assert.match(schema, /membership_status/)
+    assert.match(schema, /bsc: uuidSchema\.optional\(\)/)
+  })
+
+  it('reuses MEMBERSHIP_STATUSES with no new enum values', () => {
+    assert.match(schema, /MEMBERSHIP_STATUSES/)
+    assert.match(schema, /from '\.\/person'/)
+    const person = read('packages/shared/src/schemas/person.ts')
+    assert.match(person, /export const MEMBERSHIP_STATUSES/)
+    for (const status of [
+      'member',
+      'regular_attendee',
+      'visitor',
+      'youth',
+      'child',
+      'staff',
+      'inactive',
+    ]) {
+      assert.ok(person.includes(`'${status}'`), `person names status ${status}`)
+    }
+  })
+})
+
+describe('AFC-771 route: persist everything, scope every link', () => {
+  const src = codeOf('apps/web/server/api/households/wizard.post.ts')
+
+  it('persists wedding_date instead of a hardcoded null', () => {
+    assert.match(src, /wedding_date: form\.wedding_date \?\? null/)
+    assert.doesNotMatch(src, /wedding_date: null/)
+  })
+
+  it('persists the structured address and composes the legacy line', () => {
+    assert.match(src, /address_1: structured/)
+    assert.match(src, /latitude: structured/)
+    assert.match(src, /composeAddress\(form\)/)
+    assert.match(src, /hasStructuredAddress\(form\)/)
+  })
+
+  it('defaults per-member branch to the household branch, 403 outside', () => {
+    assert.match(src, /member\.branch \? resolveBranch\(scope, member\.branch\) : branch/)
+  })
+
+  it('keeps the age-band status default and honors an explicit status', () => {
+    assert.match(src, /member\.membership_status \?\? statusForAge\(age\)/)
+  })
+
+  it('scope-checks the BSC with a fail-closed 403', () => {
+    assert.match(src, /resolveBscInScope\(event, scope, member\.bsc\)/)
+    assert.match(src, /bsc_out_of_scope/)
+    assert.match(src, /bible_study_centres/)
+  })
+
+  it('requires the BSC read grant only when a centre is named', () => {
+    assert.match(src, /bible_study_centres', 'read'/)
+    assert.match(src, /form\.members\.some\(\(member\) => member\.bsc\)/)
+  })
+
+  it('maps middle to other_names and suffix onto last_name', () => {
+    assert.match(src, /other_names: member\.middle_name/)
+    assert.match(src, /member\.suffix/)
+  })
+
+  it('keeps the partial-write shape and consent semantics', () => {
+    assert.match(src, /wizard_partial_write/)
+    assert.match(src, /basis: isMinor \? 'guardian' : 'explicit_opt_in'/)
+  })
+})
+
+describe('AFC-771 readback types: address parts and member links', () => {
+  it('extends the shared Household with the structured address', () => {
+    const types = read('packages/shared/src/types.ts')
+    for (const field of ['address_1', 'city', 'latitude', 'longitude']) {
+      assert.ok(types.includes(field), `Household names ${field}`)
+    }
+  })
+
+  it('adds bsc to the shared Person', () => {
+    const types = read('packages/shared/src/types.ts')
+    assert.match(types, /bsc: string \| null/)
+  })
+
+  it('adds branch and bsc to the portal member row', () => {
+    const portal = read('apps/web/types/portal.ts')
+    assert.match(portal, /branch: string \| null/)
+    assert.match(portal, /bsc: string \| null/)
+  })
+})
+
+describe('migration: 0041 adds address + BSC without widening the boundary', () => {
+  const path41 = 'services/directus/schema/migrations/20261023_0041_household_address_bsc.sql'
+  const down41 =
+    'services/directus/schema/migrations/rollback/20261023_0041_household_address_bsc.down.sql'
+
+  it('exists with the next free number and a rollback', () => {
+    assert.ok(existsSync(path.join(root, path41)), '0041 exists')
+    assert.ok(existsSync(path.join(root, down41)), '0041 rollback exists')
+  })
+
+  it('keeps the bootstrap-role boundary', () => {
+    const statements = read(path41)
+      .split('\n')
+      .map((line) => line.split('--')[0])
+      .join('\n')
+    assert.match(statements, /directus_migrator.*directus_app/)
+    assert.doesNotMatch(statements, /CREATE ROLE/i)
+    assert.doesNotMatch(statements, /SUPERUSER/i)
+  })
+
+  it('adds address columns and the BSC link conditionally', () => {
+    const src = codeOf(path41)
+    assert.match(src, /ADD COLUMN IF NOT EXISTS address_1/)
+    assert.match(src, /ADD COLUMN IF NOT EXISTS latitude/)
+    assert.match(src, /households_lat_check/)
+    assert.match(src, /households_lng_check/)
+    assert.match(src, /ADD COLUMN IF NOT EXISTS bsc/)
+    assert.match(src, /people_bsc_fkey/)
+  })
+
+  it('backfills address_1 from the legacy line', () => {
+    const src = codeOf(path41)
+    assert.match(src, /SET address_1 = address/)
+  })
+
+  it('grants the app the new writes and nothing destructive', () => {
+    const src = codeOf(path41)
+    assert.match(src, /GRANT UPDATE \(address_1.*ON households TO directus_app/s)
+    assert.match(src, /GRANT UPDATE \(bsc\) ON people TO directus_app/)
+    assert.doesNotMatch(src, /DELETE FROM people/)
+    assert.doesNotMatch(src, /DROP TABLE/)
+  })
+
+  it('refuses to roll back pins and links with no legacy copy', () => {
+    const down = read(down41)
+    assert.match(down, /refusing to roll back member BSC links/)
+    assert.match(down, /refusing to roll back household geo pins/)
+    assert.match(down, /restrict_violation/)
+  })
+
+  it('is pinned by DB suite 99', () => {
+    assert.ok(
+      existsSync(path.join(root, 'tests/db/99_household_address_bsc.sql')),
+      'suite 99 exists',
+    )
+    const suite = read('tests/db/99_household_address_bsc.sql')
+    assert.match(suite, /99\.1/)
+    assert.match(suite, /99\.6/)
+    assert.match(suite, /people_bsc_fkey/)
+    assert.match(suite, /households_lat_check/)
   })
 })

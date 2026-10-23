@@ -1,14 +1,20 @@
 import { createHash } from 'node:crypto'
 import type { HouseholdWizardMember } from '@afc/shared'
 import { householdWizardSchema, toPersonPayload } from '@afc/shared'
+import type { H3Event } from 'h3'
 import {
   ageFromDob,
   createItem,
   getPortalScope,
+  listItems,
+  mergeFilters,
   requireCan,
   resolveBranch,
+  scopeZoneIds,
   throwValidation,
   updateItem,
+  zoneScopeFilter,
+  type PortalScope,
 } from '../../utils/portal'
 
 /**
@@ -41,6 +47,14 @@ import {
  *    `sha256:` over the trimmed number with cosmetic separators removed
  *    (no country-code rewriting — the route stores what the member
  *    typed, same as `normalizeInvitePhone`).
+ *
+ * AFC-771 EXTENSIONS (hybrid-row build, same transaction shape):
+ *  a. wedding_date + structured address persist on the household; the
+ *     legacy `address` is composed from the parts so old reads survive.
+ *  b. Per-member branch (defaults to the household branch), status
+ *     (explicit or the age band), and BSC (scope-checked, 403 outside).
+ *  c. middle_name → people.other_names; suffix appends to last_name.
+ *     Both columns already exist — no new person name columns invented.
  */
 export default defineEventHandler(async (event) => {
   const scope = await getPortalScope(event)
@@ -51,6 +65,11 @@ export default defineEventHandler(async (event) => {
   const parsed = householdWizardSchema.safeParse(await readBody(event))
   if (!parsed.success) throwValidation(parsed.error)
   const form = parsed.data
+
+  // The BSC read grant is only needed when a member names a centre.
+  if (form.members.some((member) => member.bsc)) {
+    requireCan(scope, 'bible_study_centres', 'read')
+  }
 
   // Scoped branches only: a requested branch outside the caller's scope is
   // a 403; branch staff without a request default to their own branch.
@@ -103,6 +122,8 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
+    const structured = hasStructuredAddress(form)
+    const legacyAddress = structured ? composeAddress(form) : (form.address ?? null)
     const household = await createItem<{ id: string | number }>(
       event,
       scope,
@@ -110,7 +131,15 @@ export default defineEventHandler(async (event) => {
       {
         name: householdName,
         branch: branch ?? null,
-        address: form.address ?? null,
+        address: legacyAddress,
+        address_1: structured ? (form.address_1 ?? null) : null,
+        address_2: structured ? (form.address_2 ?? null) : null,
+        city: structured ? (form.city ?? null) : null,
+        state: structured ? (form.state ?? null) : null,
+        zip: structured ? (form.zip ?? null) : null,
+        country: structured ? (form.country ?? null) : null,
+        latitude: structured ? (form.latitude ?? null) : null,
+        longitude: structured ? (form.longitude ?? null) : null,
         phone: firstPhone(form.members) ?? null,
         wedding_date: form.wedding_date ?? null,
         household_head: null,
@@ -130,6 +159,17 @@ export default defineEventHandler(async (event) => {
       const email = member.email?.trim() ? member.email.trim() : undefined
       const age = ageFromDob(member.date_of_birth)
       const isMinor = age !== null && age < 18
+      // Per-member branch defaults to the household branch; an explicit
+      // out-of-scope branch is a 403 (fail-closed, same as the household).
+      const memberBranch = member.branch ? resolveBranch(scope, member.branch) : branch
+      // Per-member BSC is scope-checked like the /api/bscs list: outside
+      // the caller's branches/zones it is a 403, never an existence oracle.
+      const memberBsc = member.bsc
+        ? await resolveBscInScope(event, scope, member.bsc)
+        : null
+      const lastName = member.suffix?.trim()
+        ? `${member.last_name.trim()} ${member.suffix.trim()}`
+        : member.last_name.trim()
       const created: { id: string | number } = await createItem<{ id: string | number }>(
         event,
         scope,
@@ -137,16 +177,16 @@ export default defineEventHandler(async (event) => {
         {
           ...toPersonPayload({
             first_name: member.first_name.trim(),
-            last_name: member.last_name.trim(),
+            last_name: lastName,
             preferred_name: undefined,
-            other_names: undefined,
+            other_names: member.middle_name?.trim() || undefined,
             gender: member.gender,
             date_of_birth: member.date_of_birth,
             phone,
             email,
             address: undefined,
-            branch: branch ?? undefined,
-            membership_status: statusForAge(age),
+            branch: memberBranch ?? undefined,
+            membership_status: member.membership_status ?? statusForAge(age),
             member_since: new Date().toISOString().slice(0, 10),
             guardian: undefined,
             consent_data: false,
@@ -155,7 +195,8 @@ export default defineEventHandler(async (event) => {
           }),
           household: householdId,
           household_role: member.role,
-          branch: branch ?? null,
+          branch: memberBranch ?? null,
+          bsc: memberBsc,
           // Minors point at the head as guardian (the head is created
           // first, so its id is known for every later member).
           guardian: isMinor ? headId : null,
@@ -232,6 +273,86 @@ function statusForAge(age: number | null): 'member' | 'youth' | 'child' {
   if (age !== null && age < 13) return 'child'
   if (age !== null && age < 18) return 'youth'
   return 'member'
+}
+
+/** True when the submit carries any structured address part. */
+function hasStructuredAddress(form: {
+  address_1?: string | null
+  address_2?: string | null
+  city?: string | null
+  state?: string | null
+  zip?: string | null
+  country?: string | null
+  latitude?: number | null
+  longitude?: number | null
+}): boolean {
+  return Boolean(
+    form.address_1 ??
+      form.address_2 ??
+      form.city ??
+      form.state ??
+      form.zip ??
+      form.country ??
+      form.latitude ??
+      form.longitude,
+  )
+}
+
+/**
+ * Compose the legacy single-line address from the structured parts so
+ * reads that only know `households.address` keep working. The structured
+ * columns stay authoritative; this is the readable copy.
+ */
+function composeAddress(form: {
+  address_1?: string | null
+  address_2?: string | null
+  city?: string | null
+  state?: string | null
+  zip?: string | null
+  country?: string | null
+}): string | null {
+  const parts = [form.address_1, form.address_2, form.city, form.state, form.zip, form.country]
+    .map((part) => part?.trim())
+    .filter((part): part is string => Boolean(part))
+  return parts.length > 0 ? parts.join(', ') : null
+}
+
+/**
+ * Scope-check one BSC id against the caller (same predicate as
+ * GET /api/bscs). Area staff may name any active centre; zone staff are
+ * limited to their zones; branch staff to their branches. Anything else
+ * — unknown id or outside scope — is a 403 (fail-closed, no oracle).
+ */
+async function resolveBscInScope(
+  event: H3Event,
+  scope: PortalScope,
+  bscId: string,
+): Promise<string> {
+  const visibleZones = await scopeZoneIds(event, scope)
+  const scoped = await listItems<{ id: string | number }>(event, scope, 'bible_study_centres', {
+    filter: mergeFilters(
+      { id: { _eq: bscId } },
+      { status: { _eq: 'active' } },
+      scope.isArea
+        ? undefined
+        : scope.zoneIds.length > 0
+          ? zoneScopeFilter('zone')
+          : { parent_branch: { _in: scope.branchIds } },
+      !scope.isArea && visibleZones.length > 0 && scope.zoneIds.length === 0
+        ? { zone: { _in: visibleZones } }
+        : undefined,
+    ),
+    fields: ['id'],
+    limit: 1,
+  })
+  if (scoped.data.length === 0) {
+    throw createError({
+      statusCode: 403,
+      statusMessage: 'That Bible Study Centre is outside your scope',
+      data: { code: 'bsc_out_of_scope' },
+    })
+  }
+  return String(scoped.data[0].id)
 }
 
 function firstPhone(members: HouseholdWizardMember[]): string | undefined {

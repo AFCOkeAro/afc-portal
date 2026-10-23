@@ -268,13 +268,29 @@ const sections = computed(() => [
             </div>
           </dl>
           <div
-            v-if="household.address"
+            v-if="household.address_1 || household.address"
             class="mt-4 border-t border-gray-100 pt-4 text-sm dark:border-gray-800"
           >
             <p class="text-gray-500 dark:text-gray-400">Address</p>
-            <p class="mt-1 whitespace-pre-line">{{ household.address }}</p>
+            <p class="mt-1 whitespace-pre-line">
+              {{
+                [
+                  household.address_1,
+                  household.address_2,
+                  household.city,
+                  household.state,
+                  household.zip,
+                  household.country,
+                ]
+                  .filter(Boolean)
+                  .join(', ') || household.address
+              }}
+            </p>
+            <p v-if="household.latitude != null && household.longitude != null" class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Map pin: {{ household.latitude }}, {{ household.longitude }}
+            </p>
           </div>
-          <p class="mt-4 text-xs text-gray-500 dark:text-gray-400">
+          <p v-else class="mt-4 text-xs text-gray-500 dark:text-gray-400">
             Address text only — the map pin is deferred.
           </p>
         </UCard>

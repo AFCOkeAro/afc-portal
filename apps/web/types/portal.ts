@@ -168,6 +168,8 @@ export interface HouseholdMemberRow {
   gender: string
   is_minor: boolean | null
   phone: string | null
+  branch: string | null
+  bsc: string | null
   membership_status: string
   status: string
   age: number | null
