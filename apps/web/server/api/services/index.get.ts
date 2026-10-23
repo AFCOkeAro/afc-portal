@@ -58,6 +58,11 @@ export default defineEventHandler(async (event) => {
     typeof query.service_type === 'string' && query.service_type.length > 0
       ? query.service_type
       : undefined
+  // Command palette fan-out (AFC-717): every other list endpoint forwards
+  // `?search=` to Directus; services was the one that did not. Same bounded
+  // trim, same fail-closed scope predicate below — no new surface.
+  const search =
+    typeof query.search === 'string' ? query.search.trim().slice(0, 120) : undefined
 
   const visibleZones = scope.isArea ? [] : await scopeZoneIds(event, scope)
   requireZoneInScope(scope, zone, visibleZones)
@@ -85,6 +90,7 @@ export default defineEventHandler(async (event) => {
       sort: '-service_date,-service_time',
       page,
       limit,
+      search: search || undefined,
     },
   )
 

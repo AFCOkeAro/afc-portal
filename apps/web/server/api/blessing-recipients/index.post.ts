@@ -1,4 +1,5 @@
 import { blessingRecipientFormSchema } from '@afc/shared'
+import { DirectusAuthError } from '../../utils/directus'
 import {
   createItem,
   findScopedItem,
@@ -105,6 +106,29 @@ export default defineEventHandler(async (event) => {
         data: {
           code: 'conflict',
           fields: { person: 'Link the existing record instead' },
+        },
+      })
+    }
+    // AFC-714 wart fix: a missing Directus role grant on blessing_recipients
+    // arrives here as DirectusAuthError (server-token path) or 403
+    // directus_forbidden (user-token path). Either is a permission refusal,
+    // never a form error — name it 403 with { code, fields } per the
+    // failure-shape rule instead of 400 with empty fields. No bare 500.
+    if (
+      cause instanceof DirectusAuthError ||
+      error.statusCode === 403 ||
+      (error.data as { code?: string } | undefined)?.code === 'directus_forbidden'
+    ) {
+      throw createError({
+        statusCode: 403,
+        statusMessage:
+          'The blessings store refused this write — sign in again or ask for write access to individual blessings',
+        data: {
+          code: 'blessing_recipients_forbidden',
+          fields: {
+            blessing_recipients:
+              'The blessings store refused this write — sign in again or ask for write access to individual blessings',
+          },
         },
       })
     }

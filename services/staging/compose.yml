@@ -23,6 +23,11 @@ services:
     build:
       context: ../..
       dockerfile: apps/web/Dockerfile
+      # Staging SHA-proof (AFC-718): the commit SHA is baked into the image
+      # at build time. Set NUXT_PUBLIC_BUILD_SHA in the host .env (or leave
+      # it empty for local builds, where the probe reports 'unknown').
+      args:
+        NUXT_PUBLIC_BUILD_SHA: ${NUXT_PUBLIC_BUILD_SHA:-}
     image: ${WEB_IMAGE:-afc-web:staging}
     restart: unless-stopped
     environment:
@@ -37,6 +42,10 @@ services:
       NUXT_PUBLIC_DIRECTUS_URL: ${NUXT_PUBLIC_DIRECTUS_URL:-}
       NUXT_DIRECTUS_SERVER_TOKEN: ${NUXT_DIRECTUS_SERVER_TOKEN:-}
       NUXT_DIRECTUS_PUBLIC_TOKEN: ${NUXT_DIRECTUS_PUBLIC_TOKEN:-}
+      # Staging SHA-proof (AFC-718): runtime fallback for the build SHA the
+      # image baked in above. Resolves from the host .env, same as every
+      # other entry in this block; empty means the probe reports 'unknown'.
+      NUXT_PUBLIC_BUILD_SHA: ${NUXT_PUBLIC_BUILD_SHA:-}
       # Admin-surface only (AFC-669 roles/permissions management): the portal
       # server logs in as the Directus administrator for role/policy reads
       # and writes. Names only here; values resolve from services/staging/.env
@@ -46,9 +55,13 @@ services:
       NITRO_HOST: 0.0.0.0
       NITRO_PORT: 3000
     expose:
-      - "3000"
+      - '3000'
     healthcheck:
-      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      test:
+        [
+          'CMD-SHELL',
+          'node -e "fetch(''http://127.0.0.1:3000/api/health'').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"',
+        ]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -61,8 +74,8 @@ services:
       web:
         condition: service_started
     ports:
-      - "80:80"
-      - "443:443"
+      - '80:80'
+      - '443:443'
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
