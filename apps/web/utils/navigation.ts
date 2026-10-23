@@ -116,6 +116,16 @@ export const NAVIGATION: readonly NavigationItem[] = [
     inSidebar: true,
   },
   {
+    // Pipeline surface (AFC-674 scopes B-F + report): the index links to
+    // the conducted-marriages report, so one entry covers both.
+    label: 'Marriage pipeline',
+    to: '/marriage-cases',
+    icon: 'i-lucide-heart-handshake',
+    requires: ['marriage_cases', 'read'],
+    group: 'office',
+    inSidebar: true,
+  },
+  {
     // Weekly remittance, monthly report and deductions all live on the
     // finance records surface; summary/formulas are reached from there.
     label: 'Finance',
