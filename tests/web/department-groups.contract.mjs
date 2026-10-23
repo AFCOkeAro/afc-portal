@@ -103,6 +103,11 @@ describe('department groups — routes (AFC-758)', () => {
     assert.match(src, /branch: null/, 'groups carry no branch')
     assert.match(src, /area_out_of_scope/, 'out-of-scope area is a named 403')
     assert.match(src, /code: 'conflict'/, 'duplicate code maps to a named 409')
+    assert.match(
+      src,
+      /RECORD_NOT_UNIQUE/,
+      'Directus 400 unique shape also maps to the 409',
+    )
   })
 
   it('create links the leader as a junction leader row', () => {

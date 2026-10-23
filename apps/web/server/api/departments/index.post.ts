@@ -57,10 +57,21 @@ export default defineEventHandler(async (event) => {
       status: 'active',
     })
   } catch (cause) {
-    const error = cause as { statusCode?: number; statusMessage?: string }
+    const error = cause as {
+      statusCode?: number
+      statusMessage?: string
+      data?: unknown
+    }
+    // Directus answers unique violations as 400 RECORD_NOT_UNIQUE
+    // ('Value ... has to be unique'), not 409 — map both shapes to the
+    // named conflict (live finding on staging, synthetic verify).
+    const denialCode = (error.data as { code?: unknown } | undefined)?.code
+    const messageText = String(error.statusMessage ?? '')
     if (
       error.statusCode === 409 ||
-      String(error.statusMessage ?? '').includes('departments_code_key')
+      messageText.includes('departments_code_key') ||
+      denialCode === 'RECORD_NOT_UNIQUE' ||
+      /has to be unique/i.test(messageText)
     ) {
       throw createError({
         statusCode: 409,
