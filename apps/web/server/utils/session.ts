@@ -110,11 +110,31 @@ export async function requireSession(event: H3Event): Promise<PortalSessionData>
   return found
 }
 
+/**
+ * Replace the sealed session with exactly `data`.
+ *
+ * Replace semantics (AFC-760): h3's `session.update` shallow-merges the patch
+ * onto the data unsealed from the request cookie (`Object.assign` in h3's
+ * `updateSession`), so a key the caller omits (notably `impersonatedBy` on
+ * exit / re-login) would survive from the stale cookie and the next preview
+ * start would 409 on the ghost claim. Deleting the live keys before the
+ * update guarantees absent keys stay absent. Note `clear()` alone is NOT a
+ * substitute: the next `update()` re-runs h3's `getSession`, which re-unseals
+ * the stale request cookie and resurrects the deleted keys — the delete must
+ * happen on the live `session.data` object in the same step as the update.
+ * Callers that must keep the preview claim (impersonate start, token
+ * refresh) pass `impersonatedBy` explicitly; callers that must drop it
+ * (impersonate exit, login, member OTP verify) pass it absent.
+ */
 export async function writeSession(
   event: H3Event,
   data: PortalSessionData,
 ): Promise<void> {
   const session = await portalSession(event)
+  const current = session.data as unknown as Record<string, unknown>
+  for (const key of Object.keys(current)) {
+    delete current[key]
+  }
   await session.update(data)
 }
 
