@@ -204,7 +204,12 @@ describe('wizard page: staff-only guided submit with kit styling', () => {
   })
 
   it('names contact inputs and per-channel consent boxes', () => {
-    assert.match(page, /Birth date/)
+    // Option C hybrid (user-picked, AFC-771 §4): month/day/year inputs
+    // map to one date_of_birth — the single Birth date input is gone.
+    assert.match(page, /Birth month/)
+    assert.match(page, /Birth day/)
+    assert.match(page, /Birth year/)
+    assert.match(page, /birthIso\(member\)/)
     assert.match(page, /Phone/)
     assert.match(page, /Email/)
     assert.match(page, /consent_sms/)
@@ -538,5 +543,62 @@ describe('AFC-772 detail route: structured address + member BSC', () => {
   it('maps branch + BSC from the store row', () => {
     assert.match(route, /branch: \(row\.branch as string \| null\)/)
     assert.match(route, /bsc: \(row\.bsc as string \| null\)/)
+  })
+})
+
+/**
+ * AFC-771 hybrid UI pins — complete new.vue landed in-tree (AFC-772
+ * unblocked the ownership; the truncated document is superseded by the
+ * file below). Option C: collapsed row per member, expand to edit.
+ */
+describe('AFC-771 hybrid UI: collapsed rows, M/D/Y birth, scoped selects', () => {
+  const page = codeOf('apps/web/pages/households/new.vue')
+
+  it('renders one collapsible row per member with a summary line', () => {
+    assert.match(page, /toggleMember\(index\)/)
+    assert.match(page, /displayName\(member\)/)
+    assert.match(page, /displayBirth\(member\)/)
+    assert.match(page, /roleLabels\[member\.role\]/)
+    assert.match(page, /aria-expanded/)
+  })
+
+  it('maps month/day/year inputs to one date_of_birth', () => {
+    assert.match(page, /birthY/)
+    assert.match(page, /birthM/)
+    assert.match(page, /birthD/)
+    assert.match(page, /date_of_birth: birthIso\(member\)/)
+  })
+
+  it('offers per-member branch, status, and BSC selects', () => {
+    assert.match(page, /memberBranchOptions/)
+    assert.match(page, /statusOptions/)
+    assert.match(page, /bscOptions/)
+    assert.match(page, /\/api\/bscs/)
+    assert.match(page, /Same as household/)
+    assert.match(page, /Auto by age/)
+    assert.match(page, /No centre/)
+  })
+
+  it('keeps middle/suffix optional and consent semantics', () => {
+    assert.match(page, /Middle name \(optional\)/)
+    assert.match(page, /Suffix \(optional\)/)
+    assert.match(page, /member\.middle_name/)
+    assert.match(page, /member\.suffix/)
+    assert.match(page, /consent_sms/)
+    assert.match(page, /consent_whatsapp/)
+  })
+
+  it('carries wedding date and structured address on the household block', () => {
+    assert.match(page, /weddingDate/)
+    assert.match(page, /address1/)
+    assert.match(page, /latitude/)
+    assert.match(page, /longitude/)
+  })
+
+  it('opens rows that carry errors and keeps the 20-member bound', () => {
+    assert.match(page, /member\.expanded = true/)
+    assert.match(page, /members\.length >= 20/)
+    assert.match(page, /Add person/)
+    assert.match(page, /Remove person/)
   })
 })

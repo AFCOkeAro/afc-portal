@@ -336,7 +336,7 @@ async function resolveBscInScope(
       scope.isArea
         ? undefined
         : scope.zoneIds.length > 0
-          ? zoneScopeFilter('zone')
+          ? zoneScopeFilter(scope)
           : { parent_branch: { _in: scope.branchIds } },
       !scope.isArea && visibleZones.length > 0 && scope.zoneIds.length === 0
         ? { zone: { _in: visibleZones } }
@@ -352,7 +352,15 @@ async function resolveBscInScope(
       data: { code: 'bsc_out_of_scope' },
     })
   }
-  return String(scoped.data[0].id)
+  const found = scoped.data[0]
+  if (found === undefined) {
+    throw createError({
+      statusCode: 403,
+      statusMessage: 'That Bible Study Centre is outside your scope',
+      data: { code: 'bsc_out_of_scope' },
+    })
+  }
+  return String(found.id)
 }
 
 function firstPhone(members: HouseholdWizardMember[]): string | undefined {
