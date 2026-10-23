@@ -4,9 +4,9 @@ import {
   getPortalScope,
   listItems,
   scopeFilter,
-} from '../../utils/portal'
-import { inviteCapabilities, requireInviteCap } from '../../utils/event-invites'
-import type { InviteRow } from '../../utils/event-invites'
+} from '../../../utils/portal'
+import { inviteCapabilities, requireInviteCap } from '../../../utils/event-invites'
+import type { InviteRow } from '../../../utils/event-invites'
 
 /**
  * Retry a failed send once, idempotently (AFC-480, US-E3 AC2). Only rows in
