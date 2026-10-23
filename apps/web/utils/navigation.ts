@@ -216,6 +216,14 @@ export const NAVIGATION: readonly NavigationItem[] = [
     group: 'welfare',
     inSidebar: true,
   },
+  {
+    label: 'Welfare',
+    to: '/welfare',
+    icon: 'i-lucide-heart-handshake',
+    requires: ['welfare_cases', 'read'],
+    group: 'welfare',
+    inSidebar: true,
+  },
 
   // Worship
   {
@@ -265,6 +273,15 @@ export const NAVIGATION: readonly NavigationItem[] = [
     group: 'worship',
     inSidebar: true,
   },
+  {
+    // Bulk entry + individual mapping (AFC-671); reports live on the page.
+    label: 'Blessings',
+    to: '/blessings',
+    icon: 'i-lucide-sparkles',
+    requires: ['blessings', 'read'],
+    group: 'worship',
+    inSidebar: true,
+  },
 
   // People
   {
@@ -290,6 +307,14 @@ export const NAVIGATION: readonly NavigationItem[] = [
     to: '/campus',
     icon: 'i-lucide-graduation-cap',
     requires: ['coaching_programmes', 'read'],
+    group: 'youth',
+    inSidebar: true,
+  },
+  {
+    label: 'Youth profiles',
+    to: '/youth',
+    icon: 'i-lucide-users',
+    requires: ['youth_profiles', 'read'],
     group: 'youth',
     inSidebar: true,
   },
@@ -341,6 +366,14 @@ export const NAVIGATION: readonly NavigationItem[] = [
     label: 'Delivery log',
     to: '/communications',
     icon: 'i-lucide-scroll-text',
+    requires: ['communications', 'read'],
+    group: 'communications',
+    inSidebar: true,
+  },
+  {
+    label: 'Hardening status',
+    to: '/hardening/status',
+    icon: 'i-lucide-shield-check',
     requires: ['communications', 'read'],
     group: 'communications',
     inSidebar: true,
