@@ -488,6 +488,10 @@ jobs:
         run: pnpm --filter web build
         env:
           NODE_OPTIONS: --max-old-space-size=4096
+          # Staging SHA-proof (AFC-718): bake the built commit into
+          # runtimeConfig.public.buildSha so GET /api/health reports it as
+          # `sha`. A commit SHA is public repository metadata, not a secret.
+          NUXT_PUBLIC_BUILD_SHA: ${{ github.sha }}
 
       # A build that emits nothing is not a build. Nitro's server entry is the
       # artefact the Dockerfile copies, so asserting its existence here is what
