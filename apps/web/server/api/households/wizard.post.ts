@@ -112,7 +112,7 @@ export default defineEventHandler(async (event) => {
         branch: branch ?? null,
         address: form.address ?? null,
         phone: firstPhone(form.members) ?? null,
-        wedding_date: null,
+        wedding_date: form.wedding_date ?? null,
         household_head: null,
         primary_contact: null,
         notes: null,

@@ -88,6 +88,10 @@ export const householdWizardSchema = z
     /** Optional; the server defaults to "<head last name> family". */
     name: z.string().trim().max(255).optional(),
     address: optionalNote(),
+    /** Optional wedding date; stored on households.wedding_date (AFC-771). */
+    wedding_date: dateSchema
+      .optional()
+      .transform((value) => (value === '' ? undefined : value)),
     members: z
       .array(householdWizardMemberSchema)
       .min(1, 'Add at least one person')
