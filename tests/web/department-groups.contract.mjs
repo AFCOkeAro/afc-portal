@@ -105,6 +105,32 @@ describe('department groups — routes (AFC-758)', () => {
     assert.match(src, /code: 'conflict'/, 'duplicate code maps to a named 409')
   })
 
+  it('duplicate code maps the Directus 400 unique shape to the named 409 (AFC-766)', () => {
+    const src = codeOf(CREATE)
+    assert.match(
+      src,
+      /isUniqueViolation\(cause\)/,
+      'staging 400-unique shape reuses the canonical unique detector (one abstraction, no divergent regex)',
+    )
+    assert.match(
+      src,
+      /departments_code_key/,
+      'the named constraint path still maps to 409',
+    )
+    assert.match(src, /statusCode: 409/, 'duplicate code answers 409')
+    assert.match(
+      src,
+      /That group code is already in use/,
+      'conflict carries the resubmit message',
+    )
+    assert.match(
+      src,
+      /fields: \{ code: 'Pick a unique group code' \}/,
+      'conflict names the code field with the resubmit hint',
+    )
+    assert.match(src, /throw cause/, 'anything else rethrows (fail closed)')
+  })
+
   it('create links the leader as a junction leader row', () => {
     const src = codeOf(CREATE)
     assert.match(src, /role: 'leader'/, 'leader row carries the leader role')
