@@ -260,7 +260,7 @@ describe('check-in / reports / schedule / materials (§D)', () => {
     assert.match(src, /Feedback/)
     assert.match(src, /Blessings/)
     assert.match(src, /Testimonies/)
-    assert.match(src, /No unit report form yet/)
+    assert.match(src, /No sessions recorded for this programme yet/)
   })
 
   it('schedule and materials are empty states with coordinator affordance', () => {

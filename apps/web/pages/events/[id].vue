@@ -416,6 +416,135 @@ async function checkIn(): Promise<void> {
   }
 }
 
+/* Unit reports headcount capture (AFC-757): aggregate session headcounts
+   recorded through the existing capture endpoint — no new backend. Totals
+   below are the stored per-session headcount_total values. */
+interface UnitSessionRow {
+  id: string
+  session_date: string
+  session_type: string
+  session_name: string
+  headcount_total: number | null
+}
+interface UnitServiceType {
+  key: string
+  label: string
+  categories: string[] | string
+  supports_sex_split?: boolean
+}
+const unitSessions = ref<UnitSessionRow[]>([])
+const unitTypes = ref<UnitServiceType[]>([])
+const unitLoading = ref(false)
+const unitLoaded = ref(false)
+const unitDate = ref('')
+const unitType = ref('')
+const unitName = ref('')
+const unitCats = ref<string[]>([])
+const unitSplit = ref(true)
+const unitCounts = ref<Record<string, { male: number | null; female: number | null }>>({})
+const unitSaving = ref(false)
+const unitMessage = ref('')
+const unitIsError = ref(false)
+const unitTotal = computed(() =>
+  unitSessions.value.reduce(
+    (sum, row) =>
+      sum + (typeof row.headcount_total === 'number' ? row.headcount_total : 0),
+    0,
+  ),
+)
+function unitCategoriesOf(entry: UnitServiceType): string[] {
+  if (Array.isArray(entry.categories)) return entry.categories.map(String)
+  try {
+    const parsed: unknown = JSON.parse(entry.categories)
+    return Array.isArray(parsed) ? parsed.map(String) : []
+  } catch {
+    return []
+  }
+}
+async function loadUnitData(): Promise<void> {
+  if (unitLoading.value) return
+  unitLoading.value = true
+  try {
+    const [sessions, types] = await Promise.all([
+      api.get<{ data: UnitSessionRow[] }>('/api/attendance', {
+        query: { event: id, limit: -1 },
+      }),
+      api.get<{ data: UnitServiceType[] }>('/api/attendance/service-types'),
+    ])
+    unitSessions.value = sessions.data ?? []
+    unitTypes.value = types.data ?? []
+    unitLoaded.value = true
+  } catch (cause) {
+    unitMessage.value =
+      cause instanceof ApiRequestError ? cause.message : 'Could not load sessions.'
+    unitIsError.value = true
+  } finally {
+    unitLoading.value = false
+  }
+}
+function unitPickType(key: string): void {
+  unitType.value = key
+  const entry = unitTypes.value.find((row) => row.key === key)
+  unitCats.value = entry ? unitCategoriesOf(entry) : []
+  unitSplit.value = entry?.supports_sex_split !== false
+  unitCounts.value = {}
+}
+async function submitUnitCapture(): Promise<void> {
+  unitMessage.value = ''
+  if (unitDate.value === '' || unitType.value === '' || unitName.value.trim() === '') {
+    unitIsError.value = true
+    unitMessage.value = 'Fill in the session date, service type and session name.'
+    return
+  }
+  const rows: Array<{ category: string; sex: string; count: number }> = []
+  for (const category of unitCats.value) {
+    const entry = unitCounts.value[category] ?? { male: null, female: null }
+    if (unitSplit.value) {
+      if (typeof entry.male === 'number' && entry.male > 0)
+        rows.push({ category, sex: 'male', count: entry.male })
+      if (typeof entry.female === 'number' && entry.female > 0)
+        rows.push({ category, sex: 'female', count: entry.female })
+    } else if (typeof entry.male === 'number' && entry.male > 0) {
+      rows.push({ category, sex: 'unspecified', count: entry.male })
+    }
+  }
+  if (rows.length === 0) {
+    unitIsError.value = true
+    unitMessage.value = 'Enter at least one headcount above zero.'
+    return
+  }
+  unitSaving.value = true
+  try {
+    await api.post('/api/attendance/capture', {
+      event: id,
+      branch: event.value?.branch ?? null,
+      session_date: unitDate.value,
+      session_type: unitType.value,
+      session_name: unitName.value.trim(),
+      idempotency_key: crypto.randomUUID(),
+      rows,
+    })
+    unitIsError.value = false
+    unitMessage.value = 'Headcount recorded.'
+    unitCounts.value = {}
+    await loadUnitData()
+  } catch (cause) {
+    unitIsError.value = true
+    unitMessage.value =
+      cause instanceof ApiRequestError && cause.status === 409
+        ? 'Already recorded — no change made.'
+        : cause instanceof ApiRequestError
+          ? cause.message
+          : 'Could not record the headcount.'
+  } finally {
+    unitSaving.value = false
+  }
+}
+watch([tab, reportSubtab], ([nextTab, nextSub]) => {
+  if (nextTab === 'reports' && nextSub === 'Unit reports' && !unitLoaded.value)
+    void loadUnitData()
+})
+
 onMounted(() => {
   void loadRollups()
 })
@@ -1259,21 +1388,129 @@ async function afterRegistrationSaved(): Promise<void> {
           </template>
 
           <template v-else-if="reportSubtab === 'Unit reports'">
-            <EmptyState
-              title="No unit report form yet"
-              description="Your coordinator needs to set up the unit report form before units can report."
-            >
-              <UButton
+            <div v-if="unitLoading" class="py-6 text-center text-sm text-gray-500">
+              Loading sessions…
+            </div>
+            <div v-else>
+              <table v-if="unitSessions.length > 0" class="w-full text-left text-sm">
+                <thead>
+                  <tr class="border-b border-gray-200 dark:border-gray-800">
+                    <th class="py-2 pr-2 font-medium">Date</th>
+                    <th class="py-2 pr-2 font-medium">Session</th>
+                    <th class="py-2 text-right font-medium">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    v-for="session in unitSessions"
+                    :key="session.id"
+                    class="border-b border-gray-100 dark:border-gray-800"
+                  >
+                    <td class="py-2 pr-2">{{ session.session_date }}</td>
+                    <td class="py-2 pr-2">{{ session.session_name }}</td>
+                    <td class="py-2 text-right tabular-nums">
+                      {{ session.headcount_total ?? '—' }}
+                    </td>
+                  </tr>
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td class="py-2 pr-2 font-semibold" colspan="2">Total</td>
+                    <td class="py-2 text-right font-semibold tabular-nums">
+                      {{ unitTotal }}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+              <div v-else>
+                <p class="text-sm text-gray-500">
+                  No sessions recorded for this programme yet.
+                </p>
+                <UButton
+                  v-if="canEdit"
+                  class="mt-2"
+                  size="sm"
+                  color="neutral"
+                  variant="outline"
+                  label="Open programme settings"
+                  icon="i-lucide-settings"
+                  @click="showEdit = true"
+                />
+              </div>
+              <div
                 v-if="canEdit"
-                class="mt-4"
-                size="sm"
-                color="neutral"
-                variant="outline"
-                label="Open programme settings"
-                icon="i-lucide-settings"
-                @click="showEdit = true"
-              />
-            </EmptyState>
+                class="mt-4 border-t border-gray-200 pt-4 dark:border-gray-800"
+              >
+                <h3 class="text-sm font-semibold">Record headcount</h3>
+                <div class="mt-2 grid gap-2 sm:grid-cols-3">
+                  <UFormField label="Session date">
+                    <UInput v-model="unitDate" type="date" class="w-full" />
+                  </UFormField>
+                  <UFormField label="Service type">
+                    <USelect
+                      :model-value="unitType"
+                      :items="
+                        unitTypes.map((row) => ({ label: row.label, value: row.key }))
+                      "
+                      class="w-full"
+                      @update:model-value="unitPickType(String($event))"
+                    />
+                  </UFormField>
+                  <UFormField label="Session name">
+                    <UInput v-model="unitName" type="text" class="w-full" />
+                  </UFormField>
+                </div>
+                <div v-if="unitCats.length > 0" class="mt-2 grid gap-2 sm:grid-cols-2">
+                  <div v-for="category in unitCats" :key="category">
+                    <UFormField :label="category">
+                      <div class="flex gap-2">
+                        <UInput
+                          :model-value="unitCounts[category]?.male ?? null"
+                          type="number"
+                          min="0"
+                          :placeholder="unitSplit ? 'Male' : 'Count'"
+                          class="w-full"
+                          @update:model-value="
+                            unitCounts[category] = {
+                              male: $event === null ? null : Number($event),
+                              female: unitCounts[category]?.female ?? null,
+                            }
+                          "
+                        />
+                        <UInput
+                          v-if="unitSplit"
+                          :model-value="unitCounts[category]?.female ?? null"
+                          type="number"
+                          min="0"
+                          placeholder="Female"
+                          class="w-full"
+                          @update:model-value="
+                            unitCounts[category] = {
+                              male: unitCounts[category]?.male ?? null,
+                              female: $event === null ? null : Number($event),
+                            }
+                          "
+                        />
+                      </div>
+                    </UFormField>
+                  </div>
+                </div>
+                <p
+                  v-if="unitMessage !== ''"
+                  class="mt-2 text-sm"
+                  :class="unitIsError ? 'text-red-600' : 'text-green-700'"
+                >
+                  {{ unitMessage }}
+                </p>
+                <UButton
+                  class="mt-2"
+                  label="Save headcount"
+                  icon="i-lucide-save"
+                  :loading="unitSaving"
+                  @click="submitUnitCapture"
+                />
+              </div>
+            </div>
           </template>
 
           <template v-else>
