@@ -6,7 +6,7 @@ import {
   requireCan,
   scopeFilter,
   throwValidation,
-} from '../../utils/portal'
+} from '../../../utils/portal'
 
 /** POST /api/minutes/:id/attendees — attach a person/user attendee (US-E3 AC2). */
 export default defineEventHandler(async (event) => {
