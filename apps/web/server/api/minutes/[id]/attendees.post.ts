@@ -25,7 +25,13 @@ import { writeOfficeAudit } from '../../../utils/office'
  * F1 residual: the portal gate is the only control in policy-less staging
  * (portal.ts). Do not enable this exception where a Directus row policy is
  * installed unless that policy mirrors the same three conditions
- * (branch scope + created_by + draft). Owner: CTO.
+ * (branch scope + created_by + draft). The mirror exists: migration 0033
+ * denormalises the two parent facts onto minutes_attendees
+ * (minute_status/minute_created_by, trigger-maintained) so the flat
+ * Directus filter in apps/web/server/utils/minutes-policy.ts
+ * (MINUTES_ATTENDEE_CREATE_FILTER) can express them without relation
+ * metadata, and the admin grant endpoint defaults that filter for
+ * minutes_attendees:create. Owner: CTO.
  *
  * F3 deviation recorded: AFC-702 suggested `event_type: 'attendee_added'`, but
  * migration 0013 CHECK-constrains `office_minute_events.event_type` to
