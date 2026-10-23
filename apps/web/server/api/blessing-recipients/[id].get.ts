@@ -68,12 +68,21 @@ export default defineEventHandler(async (event): Promise<BlessingRecipientDetail
   if (row.person) {
     try {
       const person = await findScopedItem<{
-        preferred_name?: string
-        full_name?: string
+        first_name?: string | null
+        last_name?: string | null
+        preferred_name?: string | null
       }>(event, scope, 'people', String(row.person), {
-        fields: ['id', 'preferred_name', 'full_name'],
+        fields: ['id', 'first_name', 'last_name', 'preferred_name'],
       })
-      personName = person.preferred_name || person.full_name || null
+      const preferred =
+        typeof person.preferred_name === 'string' ? person.preferred_name.trim() : ''
+      const base = [person.first_name, person.last_name]
+        .filter(
+          (part): part is string => typeof part === 'string' && part.trim().length > 0,
+        )
+        .map((part) => part.trim())
+        .join(' ')
+      personName = preferred || base || null
     } catch {
       personName = null
     }

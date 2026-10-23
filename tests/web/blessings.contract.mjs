@@ -42,7 +42,8 @@ const sqlOf = (rel) =>
     .join('\n')
 
 const MIGRATION = 'services/directus/schema/migrations/20261020_0011_blessings.sql'
-const MIGRATION_COUNT = 'services/directus/schema/migrations/20261020_0034_blessings_count_recipients.sql'
+const MIGRATION_COUNT =
+  'services/directus/schema/migrations/20261020_0034_blessings_count_recipients.sql'
 const DOWN =
   'services/directus/schema/migrations/rollback/20261020_0011_blessings.down.sql'
 const DOWN_COUNT =
@@ -198,7 +199,11 @@ describe('blessings — schema (§3.4)', () => {
     const src = sqlOf(MIGRATION_COUNT)
     // sqlOf strips `--` comments, so anchor on the GRANT itself.
     const grants = src.slice(src.indexOf('GRANT SELECT ON blessing_recipients'))
-    assert.match(grants, /GRANT SELECT ON blessing_recipients TO directus_app/, 'read grant')
+    assert.match(
+      grants,
+      /GRANT SELECT ON blessing_recipients TO directus_app/,
+      'read grant',
+    )
     assert.match(
       grants,
       /GRANT INSERT \(blessing, blessing_type/,
@@ -214,8 +219,16 @@ describe('blessings — schema (§3.4)', () => {
 
   it('the 0034 rollback refuses while rows exist and drops recipients before count', () => {
     const src = sqlOf(DOWN_COUNT)
-    assert.match(src, /refusing to roll back blessings count\/recipients/, 'rollback must refuse with rows')
-    assert.match(src, /ERRCODE = 'restrict_violation'/, 'refusal must be restrict_violation')
+    assert.match(
+      src,
+      /refusing to roll back blessings count\/recipients/,
+      'rollback must refuse with rows',
+    )
+    assert.match(
+      src,
+      /ERRCODE = 'restrict_violation'/,
+      'refusal must be restrict_violation',
+    )
     const dropTable = src.indexOf('DROP TABLE IF EXISTS blessing_recipients')
     const dropColumn = src.indexOf('DROP COLUMN IF EXISTS count')
     assert.ok(
@@ -271,7 +284,11 @@ describe('blessings — shared contracts', () => {
     const src = codeOf(SHARED.schema)
     assert.match(src, /blessing_type !== 'other'/, 'other_label refine must exist')
     assert.match(src, /Name the other blessing/, 'the refine must point at the label')
-    assert.match(src, /count: z\.coerce\.number\(\)\.int\(\)\.min\(0\)/, 'single count must exist')
+    assert.match(
+      src,
+      /count: z\.coerce\.number\(\)\.int\(\)\.min\(0\)/,
+      'single count must exist',
+    )
     assert.doesNotMatch(
       src,
       /total_count:\s*z\./,
@@ -292,9 +309,17 @@ describe('blessings — shared contracts', () => {
   it('the bulk schema writes all types at once with row-level other-label errors', () => {
     const src = codeOf(SHARED.schema)
     assert.match(src, /blessingBulkFormSchema/, 'bulk form schema must exist')
-    assert.match(src, /rows: z\.array\(blessingBulkRowSchema\)/, 'bulk rows must be typed')
+    assert.match(
+      src,
+      /rows: z\.array\(blessingBulkRowSchema\)/,
+      'bulk rows must be typed',
+    )
     assert.match(src, /Enter at least one blessing count/, 'empty bulk must be rejected')
-    assert.match(src, /\['rows', index, 'other_label'\]/, 'other-label errors must point at the row')
+    assert.match(
+      src,
+      /\['rows', index, 'other_label'\]/,
+      'other-label errors must point at the row',
+    )
   })
 
   it('the recipient schema maps one person to blessing types with both lenses', () => {
@@ -389,7 +414,11 @@ describe('blessings — scoping (scoped list/detail/create + audit)', () => {
 
   it('batch writes all types at once with per-row idempotent results', () => {
     const src = codeOf(ROUTES.batch)
-    assert.match(src, /blessingBulkFormSchema\.safeParse/, 'batch must validate the bulk form')
+    assert.match(
+      src,
+      /blessingBulkFormSchema\.safeParse/,
+      'batch must validate the bulk form',
+    )
     assert.match(
       src,
       /resolveBranch\(scope, form\.branch\)/,
@@ -463,6 +492,30 @@ describe('blessings — scoping (scoped list/detail/create + audit)', () => {
       codeOf(ROUTES.recipientsPatch),
       /findScopedItem[\s\S]*?\(\s*event,\s*scope,\s*'blessing_recipients'/,
       'patch must resolve inside the caller scope',
+    )
+  })
+
+  it('recipients detail falls back to first + last name (AFC-747)', () => {
+    const src = codeOf(ROUTES.recipientsDetail)
+    assert.match(
+      src,
+      /first_name/,
+      'recipients detail must read first_name for the person fallback',
+    )
+    assert.match(
+      src,
+      /last_name/,
+      'recipients detail must read last_name for the person fallback',
+    )
+    assert.doesNotMatch(
+      src,
+      /full_name/,
+      'recipients detail must not rely on full_name (people carry first/last)',
+    )
+    assert.match(
+      src,
+      /preferred \|\| base \|\| null/,
+      'recipients detail must resolve preferred, then first+last, then null',
     )
   })
 
