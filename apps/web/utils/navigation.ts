@@ -116,14 +116,22 @@ export const NAVIGATION: readonly NavigationItem[] = [
     inSidebar: true,
   },
   {
-    // AFC-745: marriage pipeline register (capability-gated by
-    // marriage_cases:read, matching the /marriage-cases index; the
-    // /marriage-cases/report page is linked from the index, not nav).
-    // The existing Marriage entry above is a different surface and is kept.
+    // Pipeline surface (AFC-674 scopes B-F + report): the index links to
+    // the conducted-marriages report, so one entry covers both.
     label: 'Marriage pipeline',
     to: '/marriage-cases',
     icon: 'i-lucide-heart-handshake',
     requires: ['marriage_cases', 'read'],
+    group: 'office',
+    inSidebar: true,
+  },
+  {
+    // Departments as their own section (AFC-758): ministries plus HQ
+    // groups. Group creation lives on the section page itself.
+    label: 'Departments',
+    to: '/departments',
+    icon: 'i-lucide-network',
+    requires: ['departments', 'read'],
     group: 'office',
     inSidebar: true,
   },
@@ -219,9 +227,6 @@ export const NAVIGATION: readonly NavigationItem[] = [
     inSidebar: true,
   },
   {
-    // AFC-744: welfare register (capability-gated by welfare_cases:read,
-    // matching GET /api/welfare + middleware/welfare; /welfare/reports is
-    // linked from the welfare page, not a separate nav entry).
     label: 'Welfare',
     to: '/welfare',
     icon: 'i-lucide-heart-handshake',
@@ -279,11 +284,10 @@ export const NAVIGATION: readonly NavigationItem[] = [
     inSidebar: true,
   },
   {
-    // AFC-744: blessings register (capability-gated by blessings:read,
-    // matching GET /api/blessings).
+    // Bulk entry + individual mapping (AFC-671); reports live on the page.
     label: 'Blessings',
     to: '/blessings',
-    icon: 'i-lucide-gift',
+    icon: 'i-lucide-sparkles',
     requires: ['blessings', 'read'],
     group: 'worship',
     inSidebar: true,
@@ -317,12 +321,9 @@ export const NAVIGATION: readonly NavigationItem[] = [
     inSidebar: true,
   },
   {
-    // AFC-744: youth profiles register (capability-gated by
-    // youth_profiles:read, matching GET /api/youth). The Teenagers entry
-    // above is a different surface (/campus) and is kept.
     label: 'Youth profiles',
     to: '/youth',
-    icon: 'i-lucide-contact',
+    icon: 'i-lucide-users',
     requires: ['youth_profiles', 'read'],
     group: 'youth',
     inSidebar: true,
@@ -380,11 +381,9 @@ export const NAVIGATION: readonly NavigationItem[] = [
     inSidebar: true,
   },
   {
-    // AFC-744: hardening status (capability-gated by communications:read,
-    // matching GET /api/hardening/status).
     label: 'Hardening status',
     to: '/hardening/status',
-    icon: 'i-lucide-activity',
+    icon: 'i-lucide-shield-check',
     requires: ['communications', 'read'],
     group: 'communications',
     inSidebar: true,

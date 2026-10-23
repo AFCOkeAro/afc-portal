@@ -10,6 +10,11 @@
  * Unlink sets the junction row to `inactive` rather than deleting it, so the
  * assignment history survives. Re-linking the same person reactivates the row
  * instead of violating the unique pair index.
+ *
+ * Group creation (AFC-758) is the one staff-writable department path: only
+ * department_type 'group' may be created through the API, and only
+ * area-scoped (branch null + area set, the Groups 1-4 precedent). All other
+ * department types stay board-managed and are refused with a named code.
  */
 import { z } from 'zod'
 import { uuidSchema } from './common'
@@ -31,3 +36,36 @@ export const departmentMemberUnlinkSchema = z.object({
   person: uuidSchema,
 })
 export type DepartmentMemberUnlink = z.infer<typeof departmentMemberUnlinkSchema>
+
+/**
+ * Create a group (AFC-758). Staff may create groups only: any other
+ * department_type is refused by the route, and area scope (branch null
+ * with an area) is required. The leader, when given, is linked as a
+ * junction leader row in the same request.
+ */
+export const departmentGroupCreateSchema = z.object({
+  name: z.string().trim().min(1, 'Name the group').max(200),
+  code: z
+    .string()
+    .trim()
+    .min(1, 'Give the group a code')
+    .max(40)
+    .regex(/^[A-Z0-9][A-Z0-9-]*$/, 'Code uses capitals, digits and dashes'),
+  department_type: z.literal('group'),
+  area: uuidSchema,
+  description: z.string().trim().max(2000).optional(),
+  leader_person: uuidSchema.optional(),
+})
+export type DepartmentGroupCreate = z.infer<typeof departmentGroupCreateSchema>
+
+/**
+ * Edit a group (AFC-758). Name/description/status/leader only — scope
+ * placement (branch/zone/area) and type never move through the app.
+ */
+export const departmentGroupPatchSchema = z.object({
+  name: z.string().trim().min(1).max(200).optional(),
+  description: z.string().trim().max(2000).nullable().optional(),
+  status: z.enum(['active', 'inactive']).optional(),
+  leader_person: uuidSchema.nullable().optional(),
+})
+export type DepartmentGroupPatch = z.infer<typeof departmentGroupPatchSchema>
