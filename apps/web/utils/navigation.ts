@@ -116,6 +116,18 @@ export const NAVIGATION: readonly NavigationItem[] = [
     inSidebar: true,
   },
   {
+    // AFC-745: marriage pipeline register (capability-gated by
+    // marriage_cases:read, matching the /marriage-cases index; the
+    // /marriage-cases/report page is linked from the index, not nav).
+    // The existing Marriage entry above is a different surface and is kept.
+    label: 'Marriage pipeline',
+    to: '/marriage-cases',
+    icon: 'i-lucide-heart-handshake',
+    requires: ['marriage_cases', 'read'],
+    group: 'office',
+    inSidebar: true,
+  },
+  {
     // Weekly remittance, monthly report and deductions all live on the
     // finance records surface; summary/formulas are reached from there.
     label: 'Finance',
