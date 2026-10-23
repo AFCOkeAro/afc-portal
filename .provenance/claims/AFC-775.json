@@ -1,0 +1,17 @@
+{
+  "issue": "AFC-775",
+  "authorAgentId": "8f6e42d7-fb6e-4e6c-904b-dfdda50000ed",
+  "authorName": "MediaTech (CTO)",
+  "claimedAt": "2026-10-24T00:05:00Z",
+  "basis": "AFC-775 merge-resolution: mechanical merge of origin/main (32e4c7f) into afc-AFC-146-church-portal to unblock PR #36 (operator reports conflicts). All 6 compliance-path files in this merge are byte-identical to origin/main (verified per file, 6/6 IDENTICAL): 0033 minutes-attendee policy mirror up/down, 0040 departments group-write up/down, suites 95 and 99-departments-group-write. They introduce zero novel compliance content. Authored conflict resolutions: 2 files, both take-main with zero blending — minutes/[id]/attendees.post.ts (add/add: keep main AFC-701/702 gated version; branch copy was the older pre-gate variant) and tests/web/office.contract.mjs (keep main formatting hunk + AFC-704 F1 parity block). Verification on the merge tree: office 57/57, household-wizard 75/75, blessings+invites+dept-groups 98/98 green; hybrid new.vue intact (14 markers); resolved files byte-identical to origin/main. No migrations authored here. This commit only makes PR #36 mergeable; it merges nothing to main. UX review (AFC-774) still governs the PR #36 merge per AFC-771 gates.",
+  "paths": [
+    "services/directus/schema/migrations/20261020_0033_minutes_attendee_policy_mirror.sql",
+    "services/directus/schema/migrations/rollback/20261020_0033_minutes_attendee_policy_mirror.down.sql",
+    "services/directus/schema/migrations/20261023_0040_departments_group_write.sql",
+    "services/directus/schema/migrations/rollback/20261023_0040_departments_group_write.down.sql",
+    "tests/db/95_minutes_attendee_policy_mirror.sql",
+    "tests/db/99_departments_group_write.sql",
+    ".provenance/claims/AFC-775.json"
+  ],
+  "scopeOfTheClaim": "R1 only: CTO authorship responsibility for the AFC-775 mechanical merge-resolution. The 6 compliance paths are verbatim main content (byte-identical); authored resolutions touch only the 2 listed non-compliance files, both take-main with zero novel logic. R2 is CTO self-review (recorded degradation: no independent security reviewer on this team); UX review of the AFC-771 UI stays on AFC-774 and governs the PR #36 merge, not this commit. This file asserts authorship responsibility, never a licence: it exempts nothing."
+}

@@ -297,6 +297,156 @@ describe('office — routes', () => {
   })
 })
 
+describe('office — minutes attendee attach (AFC-701 verdict B, AFC-702 F1–F4)', () => {
+  const ATTACH = 'apps/web/server/api/minutes/[id]/attendees.post.ts'
+
+  it('update holders keep the existing path; no minutes_attendees grant is consulted', () => {
+    const src = codeOf(ATTACH)
+    assert.match(
+      src,
+      /can\(scope, 'office_minutes', 'update'\)/,
+      'update fast path present',
+    )
+    assert.match(
+      src,
+      /requireCan\(scope, 'office_minutes', 'update'\)/,
+      'existing 403 shape reused',
+    )
+    assert.doesNotMatch(
+      src,
+      /can\(scope, 'minutes_attendees'/,
+      'no minutes_attendees capability check',
+    )
+    assert.doesNotMatch(
+      src,
+      /requireCan\(scope, 'minutes_attendees'/,
+      'no minutes_attendees gate',
+    )
+  })
+
+  it('exception opens only for create + own scoped row + authorship + draft, else 403', () => {
+    const src = codeOf(ATTACH)
+    assert.match(src, /can\(scope, 'office_minutes', 'create'\)/, 'create check present')
+    assert.match(src, /scopeFilter\(scope\)/, 'same-branch scoped load unchanged')
+    assert.match(src, /created_by/, 'authorship is read from the row')
+    assert.match(
+      src,
+      /createdBy === scope\.session\.user\.id/,
+      'strict author match, NULL never passes',
+    )
+    assert.match(
+      src,
+      /row\.status !== 'draft'/,
+      'exact-draft match denies final/published',
+    )
+  })
+
+  it('positive shape: a create-only author reaching createItem has passed all three gates', () => {
+    const src = codeOf(ATTACH)
+    const createGate = src.indexOf("can(scope, 'office_minutes', 'create')")
+    const authorGate = src.indexOf('createdBy === scope.session.user.id')
+    const draftGate = src.indexOf("row.status !== 'draft'")
+    const write = src.indexOf("'minutes_attendees',")
+    assert.ok(
+      createGate !== -1 && authorGate !== -1 && draftGate !== -1,
+      'all gates present',
+    )
+    assert.ok(
+      createGate < write && authorGate < write && draftGate < write,
+      'all gates precede the minutes_attendees write',
+    )
+  })
+
+  it('negative shapes stay denied: other author, out-of-scope branch, non-draft, neither capability', () => {
+    const src = codeOf(ATTACH)
+    // Other author: strict author match fails -> falls through to requireCan(update) 403.
+    assert.match(src, /isAuthor/, 'other-author denial path present')
+    // Out-of-scope branch: scoped load 404s before any gate passes.
+    assert.match(
+      src,
+      /findScopedItem[\s\S]*office_minutes[\s\S]*scopeFilter\(scope\)/,
+      'scoped load 404s out-of-scope branches',
+    )
+    // Non-draft: exact-draft check denies -> requireCan(update) 403.
+    assert.match(src, /status.*draft/, 'non-draft denial path present')
+    // Neither create nor update: requireCan(update) throws the existing 403.
+    assert.match(
+      src,
+      /if \(!can\(scope, 'office_minutes', 'create'\)\)/,
+      'no-create no-update callers denied',
+    )
+  })
+
+  it('F4: uuid boundary guard and explicit fail-closed row fields', () => {
+    const src = codeOf(ATTACH)
+    assert.match(src, /assertUuidParam/, ':id validated before any store read')
+    assert.match(src, /invalid_minutes_id/, 'named invalid-id code')
+    assert.match(src, /'created_by', 'status'/, 'explicit row fields requested')
+  })
+
+  it('F2: attached person resolves in-scope and attendee_user existence is verified', () => {
+    const src = codeOf(ATTACH)
+    assert.match(
+      src,
+      /findScopedItem\(event, scope, 'people', parsed\.data\.person/,
+      'person resolves inside caller scope (404 otherwise)',
+    )
+    assert.match(
+      src,
+      /isUuid\(parsed\.data\.person\)/,
+      'malformed person id is 400, never SQL',
+    )
+    assert.match(
+      src,
+      /isUuid\(parsed\.data\.attendee_user\)/,
+      'malformed attendee_user id is 400, never SQL',
+    )
+    assert.match(src, /\/users\//, 'attendee_user existence is read, not trusted')
+    assert.match(
+      src,
+      /attendee_user_unverifiable/,
+      'unreadable user registry fails closed (503), never allows',
+    )
+  })
+
+  it('F3: every successful attach writes an audit row with a storable event type', () => {
+    const src = codeOf(ATTACH)
+    assert.match(src, /writeOfficeAudit/, 'audit helper used')
+    assert.match(src, /office_minute_events/, 'audit lands in the minute trail')
+    assert.match(src, /event_type: 'note'/, 'uses a CHECK-allowed event type')
+    assert.doesNotMatch(src, /attendee_added/, 'never writes the non-storable type')
+    const write = src.indexOf("'minutes_attendees',")
+    const audit = src.indexOf("writeOfficeAudit(event, scope, 'office_minute_events'")
+    assert.ok(write !== -1 && audit !== -1, 'write and audit calls present')
+    assert.ok(audit > write, 'audit follows the successful write')
+  })
+
+  it('F1: role matrix untouched — minutesAttendees grants no create path', () => {
+    const route = codeOf(ATTACH)
+    assert.doesNotMatch(route, /minutes_attendees.*create/, 'route adds no grant path')
+    const matrix = codeOf(SHARED.matrix)
+    assert.match(matrix, /\[COLLECTIONS\.minutesAttendees\]/, 'matrix row still present')
+    assert.doesNotMatch(
+      matrix,
+      /\[COLLECTIONS\.minutesAttendees\][\s\S]{0,400}branch_admin: \[ALL/,
+      'branch roles gain no write grant',
+    )
+  })
+
+  it('attendee body validation and createItem payload are unchanged', () => {
+    const src = codeOf(ATTACH)
+    assert.match(src, /attendeeFormSchema\.safeParse/, 'zod validation kept')
+    assert.match(src, /throwValidation\(parsed\.error\)/, 'validation error shape kept')
+    assert.match(src, /minute: id,/, 'minute linkage kept')
+    assert.match(src, /person: parsed\.data\.person \?\? null,/, 'person payload kept')
+    assert.match(
+      src,
+      /attendee_user: parsed\.data\.attendee_user \?\? null,/,
+      'attendee_user payload kept',
+    )
+  })
+})
+
 describe('office — pages', () => {
   it('each domain has a list page and details link to their audit', () => {
     for (const [name, rel] of Object.entries(PAGES)) {
@@ -613,9 +763,7 @@ describe('minutes create — pages (AFC-670 §D)', () => {
  * ------------------------------------------------------------------------- */
 const listFilesRecursive = (dir) =>
   readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
-    entry.isDirectory()
-      ? listFilesRecursive(path.join(dir, entry.name))
-      : [entry.name],
+    entry.isDirectory() ? listFilesRecursive(path.join(dir, entry.name)) : [entry.name],
   )
 const DOT_PATH_ROUTE = /^\[[^\]]+\]\.[^/]+\.(get|post|patch|put|delete)\.ts$/
 
@@ -647,5 +795,114 @@ describe('minutes attendees — slash-path registration (AFC-723)', () => {
         `${page} never uses the dotted path`,
       )
     }
+  })
+})
+describe('office — F1 policy mirror parity (AFC-704, ADR-0012)', () => {
+  const POLICY_UTIL = 'apps/web/server/utils/minutes-policy.ts'
+  const GRANT_ROUTE = 'apps/web/server/api/admin/roles/[id]/permissions.post.ts'
+  const MIRROR_MIGRATION =
+    'services/directus/schema/migrations/20261020_0033_minutes_attendee_policy_mirror.sql'
+  const MIRROR_DOWN =
+    'services/directus/schema/migrations/rollback/20261020_0033_minutes_attendee_policy_mirror.down.sql'
+  const ATTACH = 'apps/web/server/api/minutes/[id]/attendees.post.ts'
+
+  it('the canonical filter carries the same three conditions as the portal rule', () => {
+    const src = codeOf(POLICY_UTIL)
+    assert.match(src, /MINUTES_ATTENDEE_CREATE_FILTER/, 'canonical filter exported')
+    assert.match(src, /branch/, 'condition 1: branch scope present')
+    assert.match(
+      src,
+      /\$CURRENT_USER\.branch_ids/,
+      'condition 1: branch scope reads the caller branches',
+    )
+    assert.match(src, /minute_status/, 'condition 2: draft status present')
+    assert.match(src, /'draft'/, 'condition 2: exact draft match')
+    assert.match(src, /minute_created_by/, 'condition 3: authorship present')
+    assert.match(src, /\$CURRENT_USER/, 'condition 3: authorship reads the caller id')
+  })
+
+  it('parity, portal-allow implies policy-allow: every portal gate has a filter twin', () => {
+    const route = codeOf(ATTACH)
+    const policy = codeOf(POLICY_UTIL)
+    // Portal gate 1: scoped row load (branch). Filter twin: branch _in caller branches.
+    assert.match(route, /scopeFilter\(scope\)/, 'portal loads the scoped row')
+    assert.match(policy, /branch/, 'policy filters the same branch scope')
+    // Portal gate 2: strict author match. Filter twin: minute_created_by _eq caller.
+    assert.match(
+      route,
+      /createdBy === scope\.session\.user\.id/,
+      'portal demands the strict author match',
+    )
+    assert.match(policy, /minute_created_by/, 'policy demands the same authorship')
+    // Portal gate 3: exact draft. Filter twin: minute_status _eq draft.
+    assert.match(route, /row\.status !== 'draft'/, 'portal demands exact draft')
+    assert.match(policy, /minute_status/, 'policy demands the same draft')
+  })
+
+  it('parity, policy-allow implies portal-allow: the filter grants nothing the portal denies', () => {
+    const policy = codeOf(POLICY_UTIL)
+    // Pure conjunction: no _or branch that could admit a row the portal denies.
+    assert.match(policy, /_and/, 'filter is a conjunction')
+    assert.doesNotMatch(policy, /_or/, 'filter has no alternative allow path')
+    // Exactly the three conditions: branch, draft, authorship -- no extra
+    // permissive clause (e.g. no status wildcard, no public fallback).
+    const andBlock = policy.slice(policy.indexOf('_and'))
+    assert.match(andBlock, /branch/, 'conjunction covers scope')
+    assert.match(andBlock, /minute_status/, 'conjunction covers draft')
+    assert.match(andBlock, /minute_created_by/, 'conjunction covers authorship')
+    assert.doesNotMatch(andBlock, /published|final|null/, 'no bypass value')
+    // Portal side denies everything else with the existing 403 shape.
+    const route = codeOf(ATTACH)
+    assert.match(
+      route,
+      /requireCan\(scope, 'office_minutes', 'update'\)/,
+      'portal denies the remainder with the update 403',
+    )
+  })
+
+  it('the mirror migration installs the denorm the flat filter reads, with rollback', () => {
+    const up = sqlOf(MIRROR_MIGRATION)
+    assert.match(up, /ADD COLUMN IF NOT EXISTS minute_status/, 'status denorm added')
+    assert.match(up, /ADD COLUMN IF NOT EXISTS minute_created_by/, 'author denorm added')
+    assert.match(
+      up,
+      /afc_set_minute_attach_scope/,
+      'write-time trigger maintains the denorm',
+    )
+    assert.match(up, /directus_migrator/, 'bootstrap-role guard present')
+    assert.doesNotMatch(up, /CREATE ROLE/, 'no role provisioning (ADR-0002)')
+    const down = read(MIRROR_DOWN)
+    assert.match(
+      down,
+      /DROP TRIGGER IF EXISTS afc_set_minute_attach_scope/,
+      'trigger dropped',
+    )
+    assert.match(
+      down,
+      /DROP FUNCTION IF EXISTS afc_set_minute_attach_scope/,
+      'function dropped',
+    )
+    assert.match(down, /DROP COLUMN IF EXISTS minute_status/, 'status column dropped')
+    assert.match(down, /DROP COLUMN IF EXISTS minute_created_by/, 'author column dropped')
+  })
+
+  it('the admin grant endpoint defaults the mirror filter for minutes_attendees:create', () => {
+    const src = codeOf(GRANT_ROUTE)
+    assert.match(src, /minutes-policy/, 'canonical filter imported (single source)')
+    assert.match(
+      src,
+      /minutesAttendeeCreateFilter\(\)/,
+      'minutes_attendees:create defaults to the mirror when no filter is supplied',
+    )
+    assert.match(
+      src,
+      /MINUTES_ATTENDEE_CREATE_COLLECTION/,
+      'default is scoped to the minutes_attendees collection only',
+    )
+    assert.match(
+      src,
+      /MINUTES_ATTENDEE_CREATE_ACTION/,
+      'default is scoped to the create action only',
+    )
   })
 })

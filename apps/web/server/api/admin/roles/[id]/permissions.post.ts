@@ -3,6 +3,11 @@ import { requireArea } from '../../../../utils/admin-guard'
 import { isProtectedRole, policiesForRole } from '../../../../utils/custom-grants'
 import { directusFetch } from '../../../../utils/directus'
 import { directusAdminToken } from '../../../../utils/directus-admin'
+import {
+  MINUTES_ATTENDEE_CREATE_ACTION,
+  MINUTES_ATTENDEE_CREATE_COLLECTION,
+  minutesAttendeeCreateFilter,
+} from '../../../../utils/minutes-policy'
 
 const ACTIONS = ['create', 'read', 'update', 'delete'] as const
 
@@ -41,6 +46,11 @@ export default defineEventHandler(async (event) => {
   }
   // Optional row filter (a Directus filter object), e.g. {"zone":{"_eq":"…"}}.
   // Lets a custom permission narrow to rows instead of whole collections.
+  // F1 mirror (AFC-704, ADR-0012): a minutes_attendees:create grant without
+  // a filter lets the holder attach to ANY minutes through the Directus API,
+  // bypassing the portal's own-draft rule. Default to the canonical mirror
+  // filter unless the admin supplies one explicitly -- a supplied filter
+  // replaces the default and the admin owns the F1 parity obligation then.
   let filter: Record<string, unknown> | undefined
   if (body?.filter !== undefined) {
     if (
@@ -55,6 +65,11 @@ export default defineEventHandler(async (event) => {
       })
     }
     filter = body.filter as Record<string, unknown>
+  } else if (
+    collection === MINUTES_ATTENDEE_CREATE_COLLECTION &&
+    action === MINUTES_ATTENDEE_CREATE_ACTION
+  ) {
+    filter = minutesAttendeeCreateFilter()
   }
   const role = await directusFetch<{ data: { id: string; name: string } }>(
     event,

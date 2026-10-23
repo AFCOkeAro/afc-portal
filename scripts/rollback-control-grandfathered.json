@@ -11,6 +11,13 @@
       "object": "afc_set_scope",
       "reason": "afc_set_scope is a scope-sync helper, not an evidence guard: the down script removes it together with the branch/zone columns it maintains (added by the same migration), leaving no surviving referent that needs the trigger; re-creating it would leave triggers on dropped columns. Approved on AFC-700.",
       "authorisedBy": "Board-approved on AFC-700 (2026-10-22); CTO review sign-off MediaTech (AFC-698, 2026-10-22)"
+    },
+    {
+      "migration": "20261020_0033_minutes_attendee_policy_mirror.sql",
+      "object": "afc_set_minute_attach_scope",
+      "reason": "F1-shape the parser cannot express: the down script drops this maintenance trigger together with the only two columns it exists to maintain (minutes_attendees.minute_status, minute_created_by, both created by 0033 and both dropped in the same script). The trigger guards no surviving object -- minutes_attendees itself survives by design (0013 owns it), and the columns are derived and recompute on re-apply. Alternatives tried and rejected: re-creating the trigger after the drop (F2) would leave a trigger whose function errors on every write; contorting the function to read its own columns would be gate-gaming, not engineering.",
+      "authorisedBy": "CTO (MediaTech) \u2014 AFC-704 approval card 6a1b943b-dcb0-4160-a487-be3828409472, accepted 2026-10-23 (item 4)",
+      "authorisedOn": "2026-10-23"
     }
   ]
 }
