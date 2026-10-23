@@ -430,6 +430,26 @@ describe('blessings — scoping (scoped list/detail/create + audit)', () => {
       'duplicate mappings must 409 with a named code',
     )
     assert.match(
+      create,
+      /DirectusAuthError/,
+      'recipient create must recognise a Directus denial (AFC-714)',
+    )
+    assert.match(
+      create,
+      /code: 'blessing_recipients_forbidden'/,
+      'a Directus denial must map to a named 403, never 400 with empty fields',
+    )
+    assert.match(
+      create,
+      /statusCode: 403[\s\S]*?blessing_recipients_forbidden/,
+      'the named denial must carry the 403 status',
+    )
+    assert.match(
+      create,
+      /directus_forbidden/,
+      'the user-token denial code must be recognised, not fall through to 400',
+    )
+    assert.match(
       codeOf(ROUTES.recipientsList),
       /blessingScopeFilter\(event, scope/,
       'the list must read through the shared scope filter',
