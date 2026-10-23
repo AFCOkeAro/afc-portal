@@ -218,6 +218,17 @@ export const NAVIGATION: readonly NavigationItem[] = [
     group: 'welfare',
     inSidebar: true,
   },
+  {
+    // AFC-744: welfare register (capability-gated by welfare_cases:read,
+    // matching GET /api/welfare + middleware/welfare; /welfare/reports is
+    // linked from the welfare page, not a separate nav entry).
+    label: 'Welfare',
+    to: '/welfare',
+    icon: 'i-lucide-heart-handshake',
+    requires: ['welfare_cases', 'read'],
+    group: 'welfare',
+    inSidebar: true,
+  },
 
   // Worship
   {
@@ -267,6 +278,16 @@ export const NAVIGATION: readonly NavigationItem[] = [
     group: 'worship',
     inSidebar: true,
   },
+  {
+    // AFC-744: blessings register (capability-gated by blessings:read,
+    // matching GET /api/blessings).
+    label: 'Blessings',
+    to: '/blessings',
+    icon: 'i-lucide-gift',
+    requires: ['blessings', 'read'],
+    group: 'worship',
+    inSidebar: true,
+  },
 
   // People
   {
@@ -292,6 +313,17 @@ export const NAVIGATION: readonly NavigationItem[] = [
     to: '/campus',
     icon: 'i-lucide-graduation-cap',
     requires: ['coaching_programmes', 'read'],
+    group: 'youth',
+    inSidebar: true,
+  },
+  {
+    // AFC-744: youth profiles register (capability-gated by
+    // youth_profiles:read, matching GET /api/youth). The Teenagers entry
+    // above is a different surface (/campus) and is kept.
+    label: 'Youth profiles',
+    to: '/youth',
+    icon: 'i-lucide-contact',
+    requires: ['youth_profiles', 'read'],
     group: 'youth',
     inSidebar: true,
   },
@@ -343,6 +375,16 @@ export const NAVIGATION: readonly NavigationItem[] = [
     label: 'Delivery log',
     to: '/communications',
     icon: 'i-lucide-scroll-text',
+    requires: ['communications', 'read'],
+    group: 'communications',
+    inSidebar: true,
+  },
+  {
+    // AFC-744: hardening status (capability-gated by communications:read,
+    // matching GET /api/hardening/status).
+    label: 'Hardening status',
+    to: '/hardening/status',
+    icon: 'i-lucide-activity',
     requires: ['communications', 'read'],
     group: 'communications',
     inSidebar: true,
