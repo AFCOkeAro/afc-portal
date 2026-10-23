@@ -465,3 +465,125 @@ describe('office — pages', () => {
     assert.match(codeOf(PAGES.calendar), /href/, 'calendar links to detail (US-U3 AC2)')
   })
 })
+
+describe('office — F1 policy mirror parity (AFC-704, ADR-0012)', () => {
+  const POLICY_UTIL = 'apps/web/server/utils/minutes-policy.ts'
+  const GRANT_ROUTE = 'apps/web/server/api/admin/roles/[id]/permissions.post.ts'
+  const MIRROR_MIGRATION =
+    'services/directus/schema/migrations/20261020_0033_minutes_attendee_policy_mirror.sql'
+  const MIRROR_DOWN =
+    'services/directus/schema/migrations/rollback/20261020_0033_minutes_attendee_policy_mirror.down.sql'
+  const ATTACH = 'apps/web/server/api/minutes/[id].attendees.post.ts'
+
+  it('the canonical filter carries the same three conditions as the portal rule', () => {
+    const src = codeOf(POLICY_UTIL)
+    assert.match(src, /MINUTES_ATTENDEE_CREATE_FILTER/, 'canonical filter exported')
+    assert.match(src, /branch/, 'condition 1: branch scope present')
+    assert.match(
+      src,
+      /\$CURRENT_USER\.branch_ids/,
+      'condition 1: branch scope reads the caller branches',
+    )
+    assert.match(src, /minute_status/, 'condition 2: draft status present')
+    assert.match(src, /'draft'/, 'condition 2: exact draft match')
+    assert.match(src, /minute_created_by/, 'condition 3: authorship present')
+    assert.match(
+      src,
+      /\$CURRENT_USER/,
+      'condition 3: authorship reads the caller id',
+    )
+  })
+
+  it('parity, portal-allow implies policy-allow: every portal gate has a filter twin', () => {
+    const route = codeOf(ATTACH)
+    const policy = codeOf(POLICY_UTIL)
+    // Portal gate 1: scoped row load (branch). Filter twin: branch _in caller branches.
+    assert.match(route, /scopeFilter\(scope\)/, 'portal loads the scoped row')
+    assert.match(
+      policy,
+      /branch/,
+      'policy filters the same branch scope',
+    )
+    // Portal gate 2: strict author match. Filter twin: minute_created_by _eq caller.
+    assert.match(
+      route,
+      /createdBy === scope\.session\.user\.id/,
+      'portal demands the strict author match',
+    )
+    assert.match(
+      policy,
+      /minute_created_by/,
+      'policy demands the same authorship',
+    )
+    // Portal gate 3: exact draft. Filter twin: minute_status _eq draft.
+    assert.match(route, /row\.status !== 'draft'/, 'portal demands exact draft')
+    assert.match(policy, /minute_status/, 'policy demands the same draft')
+  })
+
+  it('parity, policy-allow implies portal-allow: the filter grants nothing the portal denies', () => {
+    const policy = codeOf(POLICY_UTIL)
+    // Pure conjunction: no _or branch that could admit a row the portal denies.
+    assert.match(policy, /_and/, 'filter is a conjunction')
+    assert.doesNotMatch(policy, /_or/, 'filter has no alternative allow path')
+    // Exactly the three conditions: branch, draft, authorship -- no extra
+    // permissive clause (e.g. no status wildcard, no public fallback).
+    const andBlock = policy.slice(policy.indexOf('_and'))
+    assert.match(andBlock, /branch/, 'conjunction covers scope')
+    assert.match(andBlock, /minute_status/, 'conjunction covers draft')
+    assert.match(andBlock, /minute_created_by/, 'conjunction covers authorship')
+    assert.doesNotMatch(andBlock, /published|final|null/, 'no bypass value')
+    // Portal side denies everything else with the existing 403 shape.
+    const route = codeOf(ATTACH)
+    assert.match(
+      route,
+      /requireCan\(scope, 'office_minutes', 'update'\)/,
+      'portal denies the remainder with the update 403',
+    )
+  })
+
+  it('the mirror migration installs the denorm the flat filter reads, with rollback', () => {
+    const up = sqlOf(MIRROR_MIGRATION)
+    assert.match(up, /ADD COLUMN IF NOT EXISTS minute_status/, 'status denorm added')
+    assert.match(
+      up,
+      /ADD COLUMN IF NOT EXISTS minute_created_by/,
+      'author denorm added',
+    )
+    assert.match(
+      up,
+      /afc_set_minute_attach_scope/,
+      'write-time trigger maintains the denorm',
+    )
+    assert.match(up, /directus_migrator/, 'bootstrap-role guard present')
+    assert.doesNotMatch(up, /CREATE ROLE/, 'no role provisioning (ADR-0002)')
+    const down = read(MIRROR_DOWN)
+    assert.match(down, /DROP TRIGGER IF EXISTS afc_set_minute_attach_scope/, 'trigger dropped')
+    assert.match(down, /DROP FUNCTION IF EXISTS afc_set_minute_attach_scope/, 'function dropped')
+    assert.match(down, /DROP COLUMN IF EXISTS minute_status/, 'status column dropped')
+    assert.match(
+      down,
+      /DROP COLUMN IF EXISTS minute_created_by/,
+      'author column dropped',
+    )
+  })
+
+  it('the admin grant endpoint defaults the mirror filter for minutes_attendees:create', () => {
+    const src = codeOf(GRANT_ROUTE)
+    assert.match(src, /minutes-policy/, 'canonical filter imported (single source)')
+    assert.match(
+      src,
+      /minutesAttendeeCreateFilter\(\)/,
+      'minutes_attendees:create defaults to the mirror when no filter is supplied',
+    )
+    assert.match(
+      src,
+      /MINUTES_ATTENDEE_CREATE_COLLECTION/,
+      'default is scoped to the minutes_attendees collection only',
+    )
+    assert.match(
+      src,
+      /MINUTES_ATTENDEE_CREATE_ACTION/,
+      'default is scoped to the create action only',
+    )
+  })
+})
