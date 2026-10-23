@@ -53,6 +53,14 @@ COPY packages/shared ./packages/shared
 
 # Nitro needs the whole workspace at build time: the Nuxt config, the shared
 # package, and the lockfile-derived node_modules from the previous stage.
+#
+# Staging SHA-proof (AFC-718): the commit SHA enters as a build arg so the
+# Nuxt build bakes it into runtimeConfig.public.buildSha (NUXT_PUBLIC_*).
+# CI passes --build-arg NUXT_PUBLIC_BUILD_SHA=$GITHUB_SHA; local builds omit
+# it and the health probe reports 'unknown'. A commit SHA is public
+# repository metadata, never a secret.
+ARG NUXT_PUBLIC_BUILD_SHA=""
+ENV NUXT_PUBLIC_BUILD_SHA=${NUXT_PUBLIC_BUILD_SHA}
 RUN pnpm --filter web build
 
 # --------------------------------------------------------------------------

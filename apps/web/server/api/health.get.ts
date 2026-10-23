@@ -19,6 +19,19 @@ export default defineEventHandler((event) => {
     app: config.public.appName,
     directusConfigured: directusIsConfigured(event),
     registrationOpen: Boolean(String(config.directusPublicToken ?? '').trim()),
+    // Staging SHA-proof (AFC-718). Prefers runtimeConfig.public.buildSha when
+    // the Nuxt config declares it (backed by NUXT_PUBLIC_BUILD_SHA); falls
+    // back to the env var directly so the probe works even when the config
+    // key is absent. 'unknown' in dev and in images built without a SHA.
+    // A commit SHA is public repository metadata, never a secret.
+    sha: buildShaOf(config),
     at: new Date().toISOString(),
   }
 })
+
+function buildShaOf(config: ReturnType<typeof useRuntimeConfig>): string {
+  const fromConfig = (config.public as { buildSha?: unknown }).buildSha
+  const raw = fromConfig ?? process.env.NUXT_PUBLIC_BUILD_SHA ?? ''
+  const sha = String(raw).trim()
+  return sha === '' ? 'unknown' : sha
+}
