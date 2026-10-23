@@ -78,6 +78,43 @@ export const TASK_TEMPLATES: readonly TaskTemplate[] = [
       { title: 'File post-event reports', priority: 'normal', dueOffsetDays: 3 },
     ],
   },
+  {
+    id: 'weekly_service_prep',
+    label: 'Weekly service prep',
+    description:
+      'Sound, slides, stage, mics and rehearsal checks plus the volunteer roster, anchored on the Sunday service date.',
+    relatedType: 'event',
+    steps: [
+      { title: 'Confirm volunteer roster', priority: 'high', dueOffsetDays: -6 },
+      { title: 'Set up stage layout', priority: 'normal', dueOffsetDays: -3 },
+      { title: 'Run sound check', priority: 'high', dueOffsetDays: -2 },
+      { title: 'Check projection and slides', priority: 'normal', dueOffsetDays: -2 },
+      { title: 'Check microphones and batteries', priority: 'high', dueOffsetDays: -1 },
+      { title: 'Run rehearsal run-through', priority: 'high', dueOffsetDays: -1 },
+    ],
+  },
+  {
+    id: 'bulletin_production_run',
+    label: 'Bulletin production run',
+    description:
+      'Collect content, draft the layout, review and approve, print, then distribute and publish digitally, anchored on the Sunday service date.',
+    relatedType: 'event',
+    steps: [
+      {
+        title: 'Collect announcements and content',
+        priority: 'high',
+        dueOffsetDays: -4,
+      },
+      { title: 'Draft bulletin layout', priority: 'high', dueOffsetDays: -3 },
+      { title: 'Review and approve bulletin', priority: 'high', dueOffsetDays: -2 },
+      { title: 'Print bulletins', priority: 'normal', dueOffsetDays: -1 },
+      {
+        title: 'Distribute and publish digitally',
+        priority: 'normal',
+        dueOffsetDays: 0,
+      },
+    ],
+  },
 ]
 
 export function getTaskTemplate(id: string): TaskTemplate | undefined {
