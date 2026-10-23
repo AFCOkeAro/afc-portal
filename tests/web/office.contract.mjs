@@ -17,7 +17,7 @@
  */
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 
@@ -264,7 +264,7 @@ describe('office — routes', () => {
       'detail carries attendees',
     )
     assert.match(
-      codeOf('apps/web/server/api/minutes/[id].attendees.post.ts'),
+      codeOf('apps/web/server/api/minutes/[id]/attendees.post.ts'),
       /attendee/,
       'attendee route exists',
     )
@@ -327,7 +327,7 @@ const MINUTES_670 = {
   samples: 'packages/shared/src/minutes-samples.ts',
   createPage: 'apps/web/pages/minutes/new.vue',
   detailPage: 'apps/web/pages/minutes/[id].vue',
-  attendeeRoute: 'apps/web/server/api/minutes/[id].attendees.post.ts',
+  attendeeRoute: 'apps/web/server/api/minutes/[id]/attendees.post.ts',
   storeMapper: 'apps/web/server/utils/directus.ts',
 }
 
@@ -600,5 +600,52 @@ describe('minutes create — pages (AFC-670 §D)', () => {
     assert.match(src, /row\.location/, 'list shows the location snippet')
     assert.match(src, /to="\/minutes\/new"/, 'list links the create page')
     assert.match(src, /PermissionGate/, 'create entry stays permission-gated')
+  })
+})
+
+/* ---------------------------------------------------------------------------
+ * AFC-723 — dot-path routes are dead: slash-path registration.
+ * Nitro file-based routing treats dots as literal segments, so
+ * `minutes/[id].attendees.post.ts` registered `/api/minutes/:id.attendees`
+ * while every caller POSTs to `/api/minutes/:id/attendees` (slash) — a 404.
+ * Pin the fix: the directory route exists, no dot-path files remain in the
+ * minutes API dir, and both callers hit the slash path.
+ * ------------------------------------------------------------------------- */
+const listFilesRecursive = (dir) =>
+  readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
+    entry.isDirectory()
+      ? listFilesRecursive(path.join(dir, entry.name))
+      : [entry.name],
+  )
+const DOT_PATH_ROUTE = /^\[[^\]]+\]\.[^/]+\.(get|post|patch|put|delete)\.ts$/
+
+describe('minutes attendees — slash-path registration (AFC-723)', () => {
+  it('registers POST /api/minutes/:id/attendees as a directory route', () => {
+    assert.doesNotThrow(
+      () => read('apps/web/server/api/minutes/[id]/attendees.post.ts'),
+      'minutes/[id]/attendees.post.ts exists',
+    )
+  })
+
+  it('leaves no dot-path route files behind in the minutes API dir', () => {
+    const dots = listFilesRecursive(
+      path.join(root, 'apps/web/server/api/minutes'),
+    ).filter((name) => DOT_PATH_ROUTE.test(name))
+    assert.deepEqual(dots, [], `dot-path route files must not exist: ${dots.join(', ')}`)
+  })
+
+  it('both callers POST to the slash path, never the dotted one', () => {
+    for (const page of [MINUTES_670.createPage, MINUTES_670.detailPage]) {
+      assert.match(
+        codeOf(page),
+        /\/api\/minutes\/\$\{id\}\/attendees/,
+        `${page} posts to /api/minutes/:id/attendees`,
+      )
+      assert.doesNotMatch(
+        codeOf(page),
+        /\$\{id\}\.attendees/,
+        `${page} never uses the dotted path`,
+      )
+    }
   })
 })
