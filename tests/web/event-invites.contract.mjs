@@ -19,7 +19,7 @@
  */
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 
@@ -114,13 +114,17 @@ describe('invite helper: member redaction', () => {
   })
 
   it('the capability table grants export/approve/retry to branch admin and above only', () => {
+    // Whitespace-tolerant: prettier lays the literal multi-line; the
+    // contract pins the granted VALUES, not the line breaks (AFC-723 fix:
+    // the single-line regex went red on a prettier reformat, hiding real
+    // signal in this suite).
     assert.match(
       source,
-      /case 'branch_admin':\s*\n\s*return \{ create: true, read: true, readFull: true, approve: true, retry: true, exportCsv: true \}/,
+      /case 'branch_admin':\s*\n\s*return \{\s*create: true,\s*read: true,\s*readFull: true,\s*approve: true,\s*retry: true,\s*exportCsv: true,?\s*\}/,
     )
     assert.match(
       source,
-      /case 'member':\s*\n\s*return \{ create: true, read: true, readFull: false, approve: false, retry: false, exportCsv: false \}/,
+      /case 'member':\s*\n\s*return \{\s*create: true,\s*read: true,\s*readFull: false,\s*approve: false,\s*retry: false,\s*exportCsv: false,?\s*\}/,
     )
   })
 })
@@ -240,7 +244,7 @@ describe('list and detail routes: own-or-branch scope, redacted members', () => 
 })
 
 describe('approve route: no opt-out override, approvable states only', () => {
-  const src = codeOf('apps/web/server/api/invites/[id].approve.post.ts')
+  const src = codeOf('apps/web/server/api/invites/[id]/approve.post.ts')
 
   it('requires the approve capability', () => {
     assert.match(src, /requireInviteCap\(caps, 'approve', /)
@@ -259,7 +263,7 @@ describe('approve route: no opt-out override, approvable states only', () => {
 })
 
 describe('retry route: failed-only, once, as a new row', () => {
-  const src = codeOf('apps/web/server/api/invites/[id].retry.post.ts')
+  const src = codeOf('apps/web/server/api/invites/[id]/retry.post.ts')
 
   it('requires the retry capability and the failed state', () => {
     assert.match(src, /requireInviteCap\(caps, 'retry', /)
@@ -279,7 +283,7 @@ describe('retry route: failed-only, once, as a new row', () => {
 })
 
 describe('withdraw and export routes: narrow by construction', () => {
-  const withdraw = codeOf('apps/web/server/api/invites/[id].withdraw.post.ts')
+  const withdraw = codeOf('apps/web/server/api/invites/[id]/withdraw.post.ts')
   const exp = codeOf('apps/web/server/api/invites/export.get.ts')
 
   it('withdraw moves unsent invites to withdrawn only', () => {
@@ -434,5 +438,59 @@ describe('AFC-512: note hygiene + guardian helpers (F5/F7)', () => {
   it('rejects forged inviter_* fields with 403', () => {
     assert.match(source, /throwOnForgedInviterIdentity/)
     assert.match(source, /inviter_identity_forged/)
+  })
+})
+
+/* ---------------------------------------------------------------------------
+ * AFC-723 — dot-path routes are dead: slash-path registration.
+ * Nitro file-based routing treats dots as literal segments, so
+ * `invites/[id].retry.post.ts` registered `/api/invites/:id.retry` while
+ * every caller POSTs to `/api/invites/:id/retry` (slash) — a 404. Same for
+ * withdraw and approve. Pin the fix: the directory routes exist, no
+ * dot-path files remain in the invites API dir, and both callers hit the
+ * slash paths.
+ * ------------------------------------------------------------------------- */
+const listFilesRecursive = (dir) =>
+  readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
+    entry.isDirectory()
+      ? listFilesRecursive(path.join(dir, entry.name))
+      : [entry.name],
+  )
+const DOT_PATH_ROUTE = /^\[[^\]]+\]\.[^/]+\.(get|post|patch|put|delete)\.ts$/
+
+describe('invite actions — slash-path registration (AFC-723)', () => {
+  it('registers retry/withdraw/approve as directory routes under [id]', () => {
+    for (const action of ['retry', 'withdraw', 'approve']) {
+      assert.doesNotThrow(
+        () => read(`apps/web/server/api/invites/[id]/${action}.post.ts`),
+        `invites/[id]/${action}.post.ts exists`,
+      )
+    }
+  })
+
+  it('leaves no dot-path route files behind in the invites API dir', () => {
+    const dots = listFilesRecursive(
+      path.join(root, 'apps/web/server/api/invites'),
+    ).filter((name) => DOT_PATH_ROUTE.test(name))
+    assert.deepEqual(dots, [], `dot-path route files must not exist: ${dots.join(', ')}`)
+  })
+
+  it('the staff list posts approve/retry/withdraw to the slash paths', () => {
+    const src = codeOf('apps/web/pages/invites/index.vue')
+    assert.match(
+      src,
+      /\/api\/invites\/\$\{id\}\/\$\{action\}/,
+      'staff list posts to /api/invites/:id/:action',
+    )
+    assert.doesNotMatch(src, /\$\{id\}\.\$\{action\}/, 'never the dotted path')
+  })
+
+  it('the member invitations page posts withdraw to the slash path', () => {
+    const src = codeOf('apps/web/pages/me/invitations.vue')
+    assert.match(
+      src,
+      /\/api\/invites\/\$\{id\}\/withdraw/,
+      'member page posts to /api/invites/:id/withdraw',
+    )
   })
 })

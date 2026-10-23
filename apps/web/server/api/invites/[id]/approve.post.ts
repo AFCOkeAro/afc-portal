@@ -3,9 +3,9 @@ import {
   getPortalScope,
   scopeFilter,
   updateItem,
-} from '../../utils/portal'
-import { inviteCapabilities, requireInviteCap } from '../../utils/event-invites'
-import type { InviteRow } from '../../utils/event-invites'
+} from '../../../utils/portal'
+import { inviteCapabilities, requireInviteCap } from '../../../utils/event-invites'
+import type { InviteRow } from '../../../utils/event-invites'
 
 /**
  * Approve an invite (AFC-480, US-E1 AC4 + US-E3 AC4). Branch admin and

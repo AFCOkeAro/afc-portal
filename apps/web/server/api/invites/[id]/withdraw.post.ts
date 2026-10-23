@@ -3,13 +3,13 @@ import {
   getPortalScope,
   scopeFilter,
   updateItem,
-} from '../../utils/portal'
+} from '../../../utils/portal'
 import {
   inviteCapabilities,
   isMemberSession,
   requireInviteCap,
-} from '../../utils/event-invites'
-import type { InviteRow } from '../../utils/event-invites'
+} from '../../../utils/event-invites'
+import type { InviteRow } from '../../../utils/event-invites'
 
 /**
  * Withdraw an invite (AFC-480, US-E2 AC3: "I can ask staff to stop an
