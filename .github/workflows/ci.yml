@@ -169,6 +169,18 @@ jobs:
           # Paperclip API and runs inside a Paperclip agent run and on the
           # AFC-312 routine (cron 0 3 * * * UTC), never in this pipeline.
           node scripts/credential-surface-scan.mjs --self-test
+          # AFC-664 (re-landed under AFC-729: fe1bbc9 never reached main, so
+          # the guard was absent when QA smoke re-emitted the staging account
+          # identifier into run logs 15c39b3f and b037bc33). Smoke-log
+          # hygiene: smoke MUST NOT print auth response bodies (login JSON,
+          # /api/auth/me session JSON) into tool output. No checked-in smoke
+          # script exists to patch (print sites are ad-hoc QA runner
+          # commands), so this gate fails fast if the idiom is ever
+          # committed in a smoke path.
+          bash scripts/smoke-log-hygiene-gate.sh --self-test
+          # AFC-729. The staging smoke helper proves its own hygiene offline:
+          # no xtrace, no credential echo, no response-body dumping.
+          bash scripts/staging-smoke.sh --self-test
 
       - name: Awareness write-context gate
         run: bash scripts/awareness-write-context-gate.sh
@@ -190,6 +202,15 @@ jobs:
       # failure names itself.
       - name: ADR uniqueness gate
         run: bash scripts/adr-uniqueness-gate.sh
+
+      # AFC-664 (re-landed under AFC-729; see the self-test block above for
+      # why). Smoke-log hygiene: smoke MUST NOT print auth response bodies
+      # (log status code + redacted summary). Fails if a smoke path
+      # (scripts/*smoke*, tests/*smoke*, workflows, directus bin) logs a
+      # serialised auth response, curls an auth endpoint with -i, or pipes
+      # an auth body to stdout without a redactor.
+      - name: Smoke log hygiene gate
+        run: bash scripts/smoke-log-hygiene-gate.sh
 
       # AFC-266. A migration's down script must not remove a control whose
       # referent survives it without restoring that control. This is the AFC-253
