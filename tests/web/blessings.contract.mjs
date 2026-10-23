@@ -466,6 +466,30 @@ describe('blessings — scoping (scoped list/detail/create + audit)', () => {
     )
   })
 
+  it('recipients detail falls back to first + last name (AFC-747)', () => {
+    const src = codeOf(ROUTES.recipientsDetail)
+    assert.match(
+      src,
+      /first_name/,
+      'recipients detail must read first_name for the person fallback',
+    )
+    assert.match(
+      src,
+      /last_name/,
+      'recipients detail must read last_name for the person fallback',
+    )
+    assert.doesNotMatch(
+      src,
+      /full_name/,
+      'recipients detail must not rely on full_name (people carry first/last)',
+    )
+    assert.match(
+      src,
+      /preferred \|\| base \|\| null/,
+      'recipients detail must resolve preferred, then first+last, then null',
+    )
+  })
+
   it('patch audits the edit and detail returns the trail', () => {
     assert.match(codeOf(ROUTES.patch), /event_type: 'updated'/, 'patch writes updated')
     assert.match(
