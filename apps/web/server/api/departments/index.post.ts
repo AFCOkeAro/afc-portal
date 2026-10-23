@@ -1,4 +1,5 @@
 import { departmentGroupCreateSchema } from '@afc/shared'
+import { isUniqueViolation } from '../../utils/event-invites'
 import {
   createItem,
   findScopedItem,
@@ -57,10 +58,21 @@ export default defineEventHandler(async (event) => {
       status: 'active',
     })
   } catch (cause) {
-    const error = cause as { statusCode?: number; statusMessage?: string }
+    const error = cause as {
+      statusCode?: number
+      statusMessage?: string
+    }
+    // AFC-766: staging Directus answers a duplicate code with a 400 unique
+    // failure ('Value ... has to be unique', extensions code
+    // RECORD_NOT_UNIQUE) rather than 409, so the original matcher
+    // (statusCode 409 or 'departments_code_key') never fired and the raw
+    // passthrough leaked. Reuse the canonical isUniqueViolation() detector
+    // so there is one abstraction for unique detection — anything else
+    // rethrows (fail closed).
     if (
       error.statusCode === 409 ||
-      String(error.statusMessage ?? '').includes('departments_code_key')
+      String(error.statusMessage ?? '').includes('departments_code_key') ||
+      isUniqueViolation(cause)
     ) {
       throw createError({
         statusCode: 409,
