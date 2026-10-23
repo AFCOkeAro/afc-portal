@@ -126,6 +126,16 @@ export const NAVIGATION: readonly NavigationItem[] = [
     inSidebar: true,
   },
   {
+    // Departments as their own section (AFC-758): ministries plus HQ
+    // groups. Group creation lives on the section page itself.
+    label: 'Departments',
+    to: '/departments',
+    icon: 'i-lucide-network',
+    requires: ['departments', 'read'],
+    group: 'office',
+    inSidebar: true,
+  },
+  {
     // Weekly remittance, monthly report and deductions all live on the
     // finance records surface; summary/formulas are reached from there.
     label: 'Finance',

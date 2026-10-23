@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { BranchSummary, DepartmentRow } from '~/types/portal'
+import { COLLECTIONS } from '@afc/shared'
 
 definePageMeta({ middleware: 'staff' })
 
@@ -73,6 +74,68 @@ const stripItems = computed(() => {
   ]
 })
 
+const permissions = usePermissions()
+const canCreateGroup = computed(() => permissions.can(COLLECTIONS.departments, 'create'))
+const { personOptions, personPending, onPersonSearch } = usePersonSearch()
+const showCreate = ref(false)
+const groupName = ref('')
+const groupCode = ref('')
+const groupDescription = ref('')
+const groupArea = ref('')
+const groupLeader = ref('')
+const groupSaving = ref(false)
+const groupMessage = ref('')
+const groupIsError = ref(false)
+const { data: areaRows } = await useAsyncData('departments-areas', () =>
+  api.get<Array<{ id: string; name: string }>>('/api/areas'),
+)
+const areaOptions = computed(() =>
+  (areaRows.value ?? []).map((row) => ({ label: row.name, value: String(row.id) })),
+)
+async function submitGroup(): Promise<void> {
+  groupMessage.value = ''
+  if (
+    groupName.value.trim() === '' ||
+    groupCode.value.trim() === '' ||
+    groupArea.value === ''
+  ) {
+    groupIsError.value = true
+    groupMessage.value = 'Name, code and area are required.'
+    return
+  }
+  groupSaving.value = true
+  try {
+    await api.post('/api/departments', {
+      name: groupName.value.trim(),
+      code: groupCode.value.trim().toUpperCase(),
+      department_type: 'group',
+      area: groupArea.value,
+      description:
+        groupDescription.value.trim() === '' ? null : groupDescription.value.trim(),
+      leader_person: groupLeader.value === '' ? null : groupLeader.value,
+    })
+    groupIsError.value = false
+    groupMessage.value = 'Group created.'
+    groupName.value = ''
+    groupCode.value = ''
+    groupDescription.value = ''
+    groupArea.value = ''
+    groupLeader.value = ''
+    showCreate.value = false
+    await refresh()
+  } catch (cause) {
+    groupIsError.value = true
+    groupMessage.value =
+      cause instanceof ApiRequestError
+        ? cause.status === 409
+          ? 'That group code is already in use.'
+          : cause.message
+        : 'Could not create the group.'
+  } finally {
+    groupSaving.value = false
+  }
+}
+
 const branchOptions = computed(() => [
   { label: 'All branches', value: 'all' },
   ...(branches.data.value ?? []).map((row) => ({ label: row.name, value: row.id })),
@@ -103,6 +166,73 @@ const branchOptions = computed(() => [
           class="w-full"
         />
       </div>
+
+      <div v-if="canCreateGroup" class="mt-3 flex justify-end">
+        <UButton label="New group" icon="i-lucide-plus" @click="showCreate = true" />
+      </div>
+
+      <UModal v-model:open="showCreate" title="New group">
+        <p class="text-sm text-gray-500">
+          Groups are area-level member subsets (only Area HQ uses them). Departments
+          themselves stay board-managed.
+        </p>
+        <div class="mt-4 grid gap-3">
+          <UFormField label="Name" required>
+            <UInput v-model="groupName" class="w-full" />
+          </UFormField>
+          <UFormField label="Code" required hint="Capitals, digits, dashes">
+            <UInput v-model="groupCode" class="w-full" placeholder="USHERS" />
+          </UFormField>
+          <UFormField label="Area" required>
+            <EntitySelect
+              v-model="groupArea"
+              :items="areaOptions"
+              placeholder="Select area…"
+              class="w-full"
+            />
+          </UFormField>
+          <UFormField label="Description">
+            <UTextarea v-model="groupDescription" class="w-full" />
+          </UFormField>
+          <UFormField
+            label="Group leader"
+            hint="Optional — member of the church database"
+          >
+            <EntitySelect
+              v-model="groupLeader"
+              :items="personOptions"
+              placeholder="Type a name to search…"
+              :loading="personPending"
+              server-search
+              class="w-full"
+              @update:search-term="onPersonSearch"
+            />
+          </UFormField>
+        </div>
+        <p
+          v-if="groupMessage !== ''"
+          class="mt-3 text-sm"
+          :class="groupIsError ? 'text-red-600' : 'text-green-700'"
+        >
+          {{ groupMessage }}
+        </p>
+        <template #footer>
+          <div class="flex justify-end gap-2">
+            <UButton
+              color="neutral"
+              variant="ghost"
+              label="Cancel"
+              @click="showCreate = false"
+            />
+            <UButton
+              label="Create group"
+              icon="i-lucide-plus"
+              :loading="groupSaving"
+              @click="submitGroup"
+            />
+          </div>
+        </template>
+      </UModal>
 
       <UAlert
         v-if="error"
