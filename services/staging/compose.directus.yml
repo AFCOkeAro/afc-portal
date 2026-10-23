@@ -7,6 +7,8 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
+      # Cluster-owner identity: owns roles/bootstrap and provides the
+      # healthcheck + migrator path. Never the Directus runtime identity.
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -48,8 +50,14 @@ services:
       DB_HOST: postgres
       DB_PORT: 5432
       DB_DATABASE: ${POSTGRES_DB}
-      DB_USER: ${POSTGRES_USER}
-      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      # Least privilege (AFC-749): Directus connects as directus_app (LOGIN,
+      # owns nothing), provisioned by bootstrap/0001_roles.sql. The
+      # POSTGRES_* owner identity above is the migrator/healthcheck path
+      # only — it must never be the Directus runtime identity, or the
+      # migration suite's column-level grant model (0013, 0033) is
+      # unenforced on staging.
+      DB_USER: ${DIRECTUS_DB_USER}
+      DB_PASSWORD: ${DIRECTUS_DB_PASSWORD}
       ADMIN_EMAIL: ${DIRECTUS_ADMIN_EMAIL}
       ADMIN_PASSWORD: ${DIRECTUS_ADMIN_PASSWORD}
       PUBLIC_URL: ${DIRECTUS_PUBLIC_URL}

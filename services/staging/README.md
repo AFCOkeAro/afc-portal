@@ -226,6 +226,80 @@ That must answer 200 before preview login counts as up. Sign-in and public
 registration answer 503 until the static tokens are set — that is the
 expected pre-token state, not a failure.
 
+## 8. Staging schema apply + restart-after-migration (AFC-749)
+
+Scope: staging only. The base bundle (§2) has no database; this section
+applies only to the overlay boot (§7). Production compose
+(`services/directus/compose.yml`) is untouched — prod parity is a separate
+follow-up (needs host credential provisioning + ownership migration,
+board/operator action).
+
+Background: the Directus runtime identity is `directus_app` (LOGIN, owns
+nothing), per `services/directus/schema/migrations/README.md`. Migrations
+run as `directus_migrator` (owns tables); roles come from
+`services/directus/schema/bootstrap/0001_roles.sql`, run once as the
+cluster owner. Directus 11 caches its schema snapshot in memory, so after
+ANY schema apply the operator must restart it — `\d` proving columns in
+`psql` does not prove the API serves them (AFC-724 residual: 0033
+columns+grants were in PostgreSQL while Directus served its stale
+pre-0033 snapshot).
+
+### 8.1 Bootstrap roles once (cluster owner)
+
+```sh
+psql "$CLUSTER_ADMIN_DATABASE_URL" -v ON_ERROR_STOP=1 \
+     -f services/directus/schema/bootstrap/0001_roles.sql
+```
+
+Run once per cluster. Idempotent for role creation; converges the
+`retention_job` membership grant (see the file header). Needs the cluster
+owner — never a migration identity (ADR-0002).
+
+### 8.2 Apply migrations as `directus_migrator` (SET ROLE pattern)
+
+```sh
+psql "$ADMIN_DATABASE_URL" -v ON_ERROR_STOP=1 \
+     -f services/directus/schema/migrations/20261006_0001_incidents.sql \
+     -f services/directus/schema/migrations/20261006_0002_incidents_awareness_at.sql \
+     -f services/directus/schema/migrations/20261006_0003_incidents_awareness_field_policy.sql \
+     -f services/directus/schema/migrations/20261006_0004_retention.sql
+```
+
+See `services/directus/schema/migrations/README.md` "Running them" for the
+full sequence (engine file last). Do not run them as `directus_app`.
+
+### 8.3 Existing staging DBs: ownership migration (operator-run, once)
+
+Databases created before AFC-749 have every table owned by the superuser
+(`POSTGRES_USER`), so the column-level grant model is unenforced even with
+the new identity wired. One-time operator fix, BEFORE relying on §8.4:
+
+1. `pg_dump` the staging database first.
+2. As the cluster owner: `ALTER TABLE ... OWNER TO directus_migrator` for
+   every application table (or `REASSIGN OWNED BY <superuser> TO
+   directus_migrator` scoped to the staging database only).
+3. Re-assert grants by re-running §8.2 (migrations are GRANT/REVOKE-safe).
+
+§5 `down -v` warning applies throughout: never use `down -v` — it deletes
+`directus_pgdata` and `directus_uploads`.
+
+### 8.4 After ANY schema apply: restart, wait, API round-trip
+
+```sh
+docker restart staging-directus-1
+# wait for healthy: /server/health 200
+curl -fsS http://127.0.0.1:8055/server/health
+```
+
+Then verify through the API with a write + read round-trip of a row that
+touches the migrated columns — never `\d` in `psql` alone. Stale-snapshot
+failure mode: columns exist in PostgreSQL but Directus 11 serves its
+pre-migration in-memory schema until the restart above.
+
+Rollback pointer: redeploy the previous `WEB_IMAGE` tag (host `.env`,
+re-run the §7.2 start command). Named volumes survive plain `down` —
+never `down -v` on staging.
+
 ## 6. Constraints (do not negotiate on the host)
 
 - No production data and no youth data on staging. Ever.
