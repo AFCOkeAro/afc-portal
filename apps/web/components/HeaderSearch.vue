@@ -49,6 +49,16 @@ function focusSearch(): void {
   nextTick(() => inputIn(mobileWrap.value)?.focus())
 }
 
+/**
+ * Command palette entry (AFC-717). The `/` shortcut and `/search` fallback
+ * stay exactly as they were; this only opens the overlay. Mobile has no
+ * keyboard shortcut, so the search icon is its first-class entry point.
+ */
+function openPalette(): void {
+  if (!import.meta.client) return
+  window.dispatchEvent(new CustomEvent('afc:open-palette'))
+}
+
 function onGlobalKeydown(event: KeyboardEvent): void {
   const target = event.target as HTMLElement | null
   if (
@@ -75,8 +85,8 @@ onUnmounted(() => {
 
 <template>
   <div class="flex min-w-0 flex-1 items-center justify-center px-1 sm:px-2">
-    <!-- Desktop: inline field -->
-    <div ref="desktopWrap" class="hidden w-full max-w-md md:block">
+    <!-- Desktop: inline field + palette trigger (AFC-717) -->
+    <div ref="desktopWrap" class="hidden w-full max-w-md items-center gap-1 md:flex">
       <UInput
         v-model="text"
         icon="i-lucide-search"
@@ -86,9 +96,19 @@ onUnmounted(() => {
         @keyup.enter="submit"
         @keyup.escape="onEscape"
       />
+      <UButton
+        color="neutral"
+        variant="ghost"
+        square
+        icon="i-lucide-command"
+        aria-label="Open command palette"
+        title="Command palette (Ctrl+K)"
+        @click="openPalette"
+      />
     </div>
 
-    <!-- Mobile: icon that expands inline -->
+    <!-- Mobile: search icon opens the palette (AFC-717); the inline field
+      remains as the /search fallback once the palette closes. -->
     <div class="flex w-full items-center justify-end gap-1 md:hidden">
       <UButton
         v-if="!mobileOpen"
@@ -97,7 +117,7 @@ onUnmounted(() => {
         square
         icon="i-lucide-search"
         aria-label="Open search"
-        @click="mobileOpen = true"
+        @click="openPalette"
       />
       <div v-else ref="mobileWrap" class="flex w-full items-center gap-1">
         <UInput
@@ -120,5 +140,9 @@ onUnmounted(() => {
         />
       </div>
     </div>
+    <!-- Palette overlay mounts with the header (AFC-717): Ctrl/Cmd+K plus the
+      mobile search-button entry above. Kept here (not in default.vue) so the
+      header owns every search entry point in one file. -->
+    <CommandPalette />
   </div>
 </template>
