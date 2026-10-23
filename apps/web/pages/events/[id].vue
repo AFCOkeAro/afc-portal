@@ -447,10 +447,13 @@ const unitMessage = ref('')
 const unitIsError = ref(false)
 const unitTotal = computed(() =>
   unitSessions.value.reduce(
-    (sum, row) =>
+    (sum: number, row: UnitSessionRow) =>
       sum + (typeof row.headcount_total === 'number' ? row.headcount_total : 0),
     0,
   ),
+)
+const unitTypeItems = computed(() =>
+  unitTypes.value.map((row: UnitServiceType) => ({ label: row.label, value: row.key })),
 )
 function unitCategoriesOf(entry: UnitServiceType): string[] {
   if (Array.isArray(entry.categories)) return entry.categories.map(String)
@@ -484,7 +487,7 @@ async function loadUnitData(): Promise<void> {
 }
 function unitPickType(key: string): void {
   unitType.value = key
-  const entry = unitTypes.value.find((row) => row.key === key)
+  const entry = unitTypes.value.find((row: UnitServiceType) => row.key === key)
   unitCats.value = entry ? unitCategoriesOf(entry) : []
   unitSplit.value = entry?.supports_sex_split !== false
   unitCounts.value = {}
@@ -540,10 +543,13 @@ async function submitUnitCapture(): Promise<void> {
     unitSaving.value = false
   }
 }
-watch([tab, reportSubtab], ([nextTab, nextSub]) => {
-  if (nextTab === 'reports' && nextSub === 'Unit reports' && !unitLoaded.value)
-    void loadUnitData()
-})
+watch(
+  [tab, reportSubtab],
+  ([nextTab, nextSub]: [TabId, (typeof REPORT_SUBTABS)[number]]) => {
+    if (nextTab === 'reports' && nextSub === 'Unit reports' && !unitLoaded.value)
+      void loadUnitData()
+  },
+)
 
 onMounted(() => {
   void loadRollups()
@@ -1449,9 +1455,7 @@ async function afterRegistrationSaved(): Promise<void> {
                   <UFormField label="Service type">
                     <USelect
                       :model-value="unitType"
-                      :items="
-                        unitTypes.map((row) => ({ label: row.label, value: row.key }))
-                      "
+                      :items="unitTypeItems"
                       class="w-full"
                       @update:model-value="unitPickType(String($event))"
                     />
