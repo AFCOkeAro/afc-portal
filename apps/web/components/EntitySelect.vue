@@ -25,7 +25,7 @@ export interface EntityOption {
 
 const props = withDefaults(
   defineProps<{
-    modelValue: string
+    modelValue: string | undefined
     items: EntityOption[]
     placeholder?: string
     searchPlaceholder?: string
@@ -58,13 +58,13 @@ const props = withDefaults(
 defineOptions({ inheritAttrs: false })
 
 const emit = defineEmits<{
-  'update:modelValue': [value: string]
+  'update:modelValue': [value: string | undefined]
   'update:searchTerm': [term: string]
 }>()
 
 const selected = computed({
   get: () => props.modelValue,
-  set: (value: string) => emit('update:modelValue', value),
+  set: (value: string | undefined) => emit('update:modelValue', value),
 })
 </script>
 
