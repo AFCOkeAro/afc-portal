@@ -195,6 +195,13 @@ tokens after first boot from the admin UI over an SSH tunnel
 (`ssh -L 8055:127.0.0.1:8055 <vps>` — the compose port binds loopback only
 by design; publishing 8055 publicly needs CTO sign-off).
 
+  Preflight before `up` (empty `DIRECTUS_DB_USER` interpolates with a warning
+  and Directus boots privileged — this refuses instead):
+
+```sh
+test "${DIRECTUS_DB_USER:?DIRECTUS_DB_USER is empty — set DIRECTUS_DB_USER=directus_app in the host .env}" = directus_app
+```
+
 ### 7.2 Start
 
 From the repo root on the VPS:
@@ -257,16 +264,34 @@ owner — never a migration identity (ADR-0002).
 
 ### 8.2 Apply migrations as `directus_migrator` (SET ROLE pattern)
 
+`directus_migrator` is `NOLOGIN` (bootstrap `0001_roles.sql`), so no one
+connects as it directly. `$ADMIN_DATABASE_URL` must connect as a LOGIN role
+with authority to assume it — on staging that is `${POSTGRES_USER}`, the
+cluster owner/superuser from `compose.directus.yml` — never as
+`directus_app`. The `SET ROLE` runs inside the pasted block in the same
+`psql` session (`psql` executes `-c` before `-f` in order in one session,
+and a superuser may `SET ROLE` to anyone), so every file executes as
+`directus_migrator` and created tables land migrator-owned. Without the
+in-session `SET ROLE`, the block connects as the owner LOGIN and every
+created table lands owner-owned — reproducing the pre-749 defect.
+
 ```sh
+# Order-preserving glob: filename order is the migration order, and a new
+# 20*.sql file is picked up automatically — never hand-maintain a frozen
+# subset here (a partial list yields a partial schema missing field-policy,
+# hardening, and grant-matrix files). Engine file last (it is behaviour,
+# not schema history).
+for f in $(ls services/directus/schema/migrations/20*.sql | sort); do
+  psql "$ADMIN_DATABASE_URL" -v ON_ERROR_STOP=1 \
+       -c "SET ROLE directus_migrator" \
+       -f "$f"
+done
 psql "$ADMIN_DATABASE_URL" -v ON_ERROR_STOP=1 \
-     -f services/directus/schema/migrations/20261006_0001_incidents.sql \
-     -f services/directus/schema/migrations/20261006_0002_incidents_awareness_at.sql \
-     -f services/directus/schema/migrations/20261006_0003_incidents_awareness_field_policy.sql \
-     -f services/directus/schema/migrations/20261006_0004_retention.sql
+     -c "SET ROLE directus_migrator" \
+     -f services/directus/schema/engine/0001_retention_engine.sql
 ```
 
-See `services/directus/schema/migrations/README.md` "Running them" for the
-full sequence (engine file last). Do not run them as `directus_app`.
+Do not run them as `directus_app`.
 
 ### 8.3 Existing staging DBs: ownership migration (operator-run, once)
 
@@ -278,12 +303,18 @@ only grant on what `directus_migrator` owns. One-time operator fix, BEFORE
 relying on §8.4:
 
 1. `pg_dump` the staging database first.
-2. As the cluster owner, transfer ownership of application tables AND every
-   `directus_*` table and sequence to `directus_migrator`. Scoped to the
-   staging database only, either per object:
+2. Connect to the staging database via `$ADMIN_DATABASE_URL` (same
+   owner LOGIN as §8.2) and transfer ownership of application tables AND
+   every `directus_*` table and sequence to `directus_migrator`. Scoped to
+   the staging database only. Preferred: per object —
    `ALTER TABLE ... OWNER TO directus_migrator` (and `ALTER SEQUENCE ...
-   OWNER TO directus_migrator` for each `directus_*` sequence), or in one
-   step: `REASSIGN OWNED BY <superuser> TO directus_migrator`.
+   OWNER TO directus_migrator` for each `directus_*` sequence) — so only
+   the named objects move. Fallback: in one step,
+   `REASSIGN OWNED BY <superuser> TO directus_migrator`, which moves
+   EVERY object the superuser owns in the connected database (including
+   extension-owned objects) — confirm the connected database is the
+   staging database first, and prefer the per-object form when anything
+   else in the database must stay superuser-owned.
 3. Verify zero foreign-owned relations remain (must answer zero rows —
    every public table, sequence, and view should belong to the migrator):
    ```sql
@@ -346,8 +377,12 @@ interpolates empty and Directus will not boot):
 
 1. `pg_dump` first. Confirm the dump is restorable before touching wiring.
 2. Host `.env` holds `DIRECTUS_DB_USER=directus_app` + generated password
-   (mode 600, never committed). `docker compose -f services/staging/compose.yml
-   -f services/staging/compose.directus.yml config` must parse clean.
+    (mode 600, never committed). Re-run the §7.1 preflight, then confirm
+    the resolved compose parses without rendering secret values:
+    `docker compose -f services/staging/compose.yml
+    -f services/staging/compose.directus.yml config --quiet` must exit 0.
+    Never paste `config` output (without `--quiet`) into issues or logs —
+    it renders secrets to stdout.
 3. Runbook §8.1–§8.3 in order (bootstrap as cluster owner, migrations as
    `directus_migrator` including 0042, ownership transfer verified with the
    §8.3 query answering zero rows). 0042 refusing with `restrict_violation`

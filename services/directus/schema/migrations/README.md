@@ -68,13 +68,19 @@ Bootstrap runs once as the **cluster owner**. Migrations run as
 psql "$CLUSTER_ADMIN_DATABASE_URL" -v ON_ERROR_STOP=1 \
      -f services/directus/schema/bootstrap/0001_roles.sql
 
-psql "$ADMIN_DATABASE_URL" -v ON_ERROR_STOP=1 \
-     -f services/directus/schema/migrations/20261006_0001_incidents.sql \
-     -f services/directus/schema/migrations/20261006_0002_incidents_awareness_at.sql \
-     -f services/directus/schema/migrations/20261006_0003_incidents_awareness_field_policy.sql \
-     -f services/directus/schema/migrations/20261006_0004_retention.sql
+# Order-preserving glob: filename order is the migration order, and a new
+# 20*.sql file is picked up automatically -- never hand-maintain a frozen
+# subset here (a partial list yields a partial schema). directus_migrator is
+# NOLOGIN, so each file runs in a session that assumes it first; see the
+# staging runbook section 8.2 for the LOGIN it connects as.
+for f in $(ls services/directus/schema/migrations/20*.sql | sort); do
+  psql "$ADMIN_DATABASE_URL" -v ON_ERROR_STOP=1 \
+       -c "SET ROLE directus_migrator" \
+       -f "$f"
+done
 
 psql "$ADMIN_DATABASE_URL" -v ON_ERROR_STOP=1 \
+     -c "SET ROLE directus_migrator" \
      -f services/directus/schema/engine/0001_retention_engine.sql
 ```
 
