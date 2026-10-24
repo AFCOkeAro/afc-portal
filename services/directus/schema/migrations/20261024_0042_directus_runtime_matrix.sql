@@ -166,7 +166,9 @@ $$;
 --    convention: no application migration in this repository creates a
 --    directus_* table, so the loop cannot reach application data. Tables get
 --    the four DML verbs; PUBLIC is revoked for defence in depth (the 0040
---    precedent); backing sequences get USAGE + SELECT so serial inserts work.
+--    precedent) on tables AND their backing sequences, symmetrically, so the
+--    next editor copies one pattern, not an asymmetry; backing sequences get
+--    USAGE + SELECT so serial inserts work.
 --    Fresh database (Directus never booted): no tables match, NOTICE, no-op.
 -- ---------------------------------------------------------------------------
 DO $$
@@ -200,13 +202,14 @@ BEGIN
      ORDER BY c.relname
   LOOP
     EXECUTE format('GRANT USAGE, SELECT ON SEQUENCE public.%I TO directus_app', v_seq);
+    EXECUTE format('REVOKE ALL ON SEQUENCE public.%I FROM PUBLIC', v_seq);
     v_seqs := v_seqs + 1;
   END LOOP;
 
   IF v_tables = 0 THEN
     RAISE NOTICE '0042 no directus_* tables present: nothing granted. On a fresh database this is expected -- initialise the Directus system schema, transfer ownership to directus_migrator, then re-run this migration (runbook section 8).';
   ELSE
-    RAISE NOTICE '0042 Directus runtime matrix applied: % table(s) granted SELECT/INSERT/UPDATE/DELETE to directus_app with PUBLIC revoked, % sequence(s) granted USAGE/SELECT.', v_tables, v_seqs;
+    RAISE NOTICE '0042 Directus runtime matrix applied: % table(s) granted SELECT/INSERT/UPDATE/DELETE to directus_app with PUBLIC revoked, % sequence(s) granted USAGE/SELECT with PUBLIC revoked.', v_tables, v_seqs;
   END IF;
 END
 $$;

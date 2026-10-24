@@ -4,9 +4,10 @@
 --
 -- Migration 20261024_0042 grants directus_app SELECT/INSERT/UPDATE/DELETE on
 -- every migrator-owned directus_* table (USAGE + SELECT on directus_*
--- sequences), revokes PUBLIC, and refuses while any directus_* object is
--- foreign-owned. Staging root cause: Directus booted as directus_app with
--- zero grants on directus_migrations and died on SELECT at startup.
+-- sequences), revokes PUBLIC on tables AND sequences, and refuses while any
+-- directus_* object is foreign-owned. Staging root cause: Directus booted as
+-- directus_app with zero grants on directus_migrations and died on SELECT
+-- at startup.
 --
 --   42.1  matrix      -- probes owned by the migrator get the four DML verbs
 --                         (privilege catalog) plus a serial-sequence INSERT
@@ -87,8 +88,9 @@ BEGIN
 END $$;
 
 -- ---------------------------------------------------------------------------
--- 42.2  VERBS. Full round-trip as the runtime identity; the two denials that
---         prove the matrix is four verbs and PUBLIC is out.
+-- 42.2  VERBS. Full round-trip as the runtime identity; the three denials
+--         that prove the matrix is four verbs and PUBLIC is out (tables
+--         and sequences).
 -- ---------------------------------------------------------------------------
 DO $$
 BEGIN
@@ -115,6 +117,11 @@ BEGIN
   PERFORM test_support.assert_raises('directus_public',
     $q$SELECT count(*) FROM directus_probe_ledger$q$,
     '42501', 'runtime-matrix', 'PUBLIC reads nothing on the system tables after 0042');
+
+  -- PUBLIC was revoked on sequences too: no USAGE for anyone outside the matrix.
+  PERFORM test_support.assert_raises('directus_public',
+    $q$SELECT nextval('directus_probe_ledger_id_seq')$q$,
+    '42501', 'runtime-matrix', 'PUBLIC has no USAGE on the system sequences after 0042');
 END $$;
 
 -- ---------------------------------------------------------------------------
