@@ -191,7 +191,9 @@ describe('wizard page: staff-only guided submit with kit styling', () => {
 
   it('scopes the branch select to the caller branches', () => {
     assert.match(page, /\/api\/branches/)
-    assert.match(page, /Use my branch/)
+    // AFC-778: the "Use my branch" empty-value pseudo-item is gone; the
+    // no-selection state is the select placeholder + an undefined model.
+    assert.match(page, /placeholder="Select branch/)
   })
 
   it('offers the four roles and M/F gender per row', () => {
@@ -574,9 +576,12 @@ describe('AFC-771 hybrid UI: collapsed rows, M/D/Y birth, scoped selects', () =>
     assert.match(page, /statusOptions/)
     assert.match(page, /bscOptions/)
     assert.match(page, /\/api\/bscs/)
-    assert.match(page, /Same as household/)
-    assert.match(page, /Auto by age/)
-    assert.match(page, /No centre/)
+    // AFC-778: empty-value pseudo-items ("Same as household", "No centre")
+    // are gone; no-selection is placeholder + undefined. "Auto by age"
+    // survives as the status select placeholder, not an option value.
+    assert.match(page, /placeholder="Auto by age"/)
+    assert.match(page, /placeholder="Select branch/)
+    assert.match(page, /placeholder="Select centre/)
   })
 
   it('keeps middle/suffix optional and consent semantics', () => {
@@ -600,5 +605,46 @@ describe('AFC-771 hybrid UI: collapsed rows, M/D/Y birth, scoped selects', () =>
     assert.match(page, /members\.length >= 20/)
     assert.match(page, /Add person/)
     assert.match(page, /Remove person/)
+  })
+})
+
+/**
+ * AFC-778 pin — Reka UI SelectItem throws a 500 when any option carries
+ * an empty-string value. The wizard must express "no selection" with the
+ * select placeholder + an undefined model, never with `{ value: '' }`.
+ *
+ * Run: node --test tests/web/household-wizard.contract.mjs
+ */
+describe('AFC-778 select contract: no empty-value SelectItem', () => {
+  const raw = read('apps/web/pages/households/new.vue')
+
+  it('has no empty-value option in any select option list', () => {
+    assert.doesNotMatch(raw, /value:\s*''/)
+    assert.doesNotMatch(raw, /value:\s*""/)
+  })
+
+  it('uses placeholders plus undefined models for the no-selection state', () => {
+    const page = codeOf('apps/web/pages/households/new.vue')
+    assert.match(page, /placeholder="Auto by age"/)
+    assert.match(page, /placeholder="Select branch/)
+    assert.match(page, /placeholder="Select centre/)
+    assert.match(page, /ref<string \| undefined>\(undefined\)/)
+    assert.match(page, /branch: undefined/)
+    assert.match(page, /membership_status: undefined/)
+    assert.match(page, /bsc: undefined/)
+  })
+
+  it('keeps the undefined-preserving payload mapping', () => {
+    const page = codeOf('apps/web/pages/households/new.vue')
+    assert.match(page, /branch: branch\.value \|\| undefined/)
+    assert.match(page, /member\.branch \|\| undefined/)
+    assert.match(page, /member\.bsc \|\| undefined/)
+  })
+
+  it('EntitySelect accepts undefined and injects no empty-value item', () => {
+    const component = read('apps/web/components/EntitySelect.vue')
+    assert.match(component, /modelValue: string \| undefined/)
+    assert.doesNotMatch(component, /value:\s*''/)
+    assert.doesNotMatch(component, /value:\s*""/)
   })
 })
