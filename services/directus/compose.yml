@@ -91,8 +91,14 @@ services:
       DB_HOST: postgres
       DB_PORT: 5432
       DB_DATABASE: ${POSTGRES_DB}
-      DB_USER: ${POSTGRES_USER}
-      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      # Least privilege (AFC-754, parity with AFC-749 staging): Directus
+      # connects as directus_app (LOGIN, owns nothing), provisioned by
+      # bootstrap/0001_roles.sql. The POSTGRES_* owner identity is the
+      # migrator/healthcheck path only — it must never be the Directus
+      # runtime identity, or the migration suite's column-level grant model
+      # is unenforced on prod.
+      DB_USER: ${DIRECTUS_DB_USER}
+      DB_PASSWORD: ${DIRECTUS_DB_PASSWORD}
       ADMIN_EMAIL: ${DIRECTUS_ADMIN_EMAIL}
       ADMIN_PASSWORD: ${DIRECTUS_ADMIN_PASSWORD}
       PUBLIC_URL: ${DIRECTUS_PUBLIC_URL}
