@@ -16,17 +16,14 @@ const { data: bscRows } = await useAsyncData('wizard-bscs', () =>
 )
 
 const branchOptions = computed(() => [
-  { label: 'Use my branch', value: '' },
   ...(branchRows.value ?? []).map((row) => ({ label: row.name, value: row.id })),
 ])
 
 const memberBranchOptions = computed(() => [
-  { label: 'Same as household', value: '' },
   ...(branchRows.value ?? []).map((row) => ({ label: row.name, value: row.id })),
 ])
 
 const bscOptions = computed(() => [
-  { label: 'No centre', value: '' },
   ...(bscRows.value ?? []).map((row) => ({ label: row.name, value: row.id })),
 ])
 
@@ -43,7 +40,6 @@ const genderOptions = [
 ]
 
 const statusOptions = [
-  { label: 'Auto by age', value: '' },
   { label: 'Member', value: 'member' },
   { label: 'Regular attendee', value: 'regular_attendee' },
   { label: 'Visitor', value: 'visitor' },
@@ -61,7 +57,6 @@ const roleLabels: Record<string, string> = {
 }
 
 const statusLabels: Record<string, string> = {
-  '': 'Auto',
   member: 'Member',
   regular_attendee: 'Regular',
   visitor: 'Visitor',
@@ -83,9 +78,9 @@ interface WizardMember {
   birthD: string
   phone: string
   email: string
-  branch: string
-  membership_status: string
-  bsc: string
+  branch: string | undefined
+  membership_status: string | undefined
+  bsc: string | undefined
   consent_sms: boolean
   consent_whatsapp: boolean
   expanded: boolean
@@ -103,16 +98,16 @@ const blankMember = (role = '', expanded = true): WizardMember => ({
   birthD: '',
   phone: '',
   email: '',
-  branch: '',
-  membership_status: '',
-  bsc: '',
+  branch: undefined,
+  membership_status: undefined,
+  bsc: undefined,
   consent_sms: false,
   consent_whatsapp: false,
   expanded,
 })
 
 const householdName = ref('')
-const branch = ref('')
+const branch = ref<string | undefined>(undefined)
 const weddingDate = ref('')
 const address = ref('')
 const address1 = ref('')
@@ -390,7 +385,7 @@ async function submit(): Promise<void> {
               <span class="text-gray-500 dark:text-gray-400">
                 · {{ roleLabels[member.role] || 'Pick role' }} ·
                 {{ displayBirth(member) || 'No birth date' }} ·
-                {{ statusLabels[member.membership_status] }}
+                {{ member.membership_status ? statusLabels[member.membership_status] : 'Auto' }}
               </span>
             </span>
             <span
@@ -472,10 +467,10 @@ async function submit(): Promise<void> {
 
           <div class="mt-4 grid gap-4 sm:grid-cols-2">
             <UFormField label="Role" required :error="memberError(index, 'role')">
-              <USelect v-model="member.role" :items="roleOptions" class="w-full" />
+              <USelect v-model="member.role" :items="roleOptions" placeholder="Select role…" class="w-full" />
             </UFormField>
             <UFormField label="Gender" required :error="memberError(index, 'gender')">
-              <USelect v-model="member.gender" :items="genderOptions" class="w-full" />
+              <USelect v-model="member.gender" :items="genderOptions" placeholder="Select gender…" class="w-full" />
             </UFormField>
           </div>
 
@@ -489,7 +484,7 @@ async function submit(): Promise<void> {
               />
             </UFormField>
             <UFormField label="Status" :error="memberError(index, 'membership_status')">
-              <USelect v-model="member.membership_status" :items="statusOptions" class="w-full" />
+              <USelect v-model="member.membership_status" :items="statusOptions" placeholder="Auto by age" class="w-full" />
             </UFormField>
           </div>
 
