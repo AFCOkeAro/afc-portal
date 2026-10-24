@@ -551,3 +551,66 @@ BEGIN
   END IF;
 END
 $$;
+
+-- ---------------------------------------------------------------------
+-- directus_app OWNS NOTHING AND CREATES NOTHING. AFC-783.
+--
+-- The staging outage behind AFC-783 was structural: Directus booted as an
+-- identity with zero grants on its own system tables because the runtime
+-- identity owned nothing and was granted nothing there. The fix (migration
+-- 0042) grants runtime DML on the directus_* tables the migrator owns. This
+-- block pins the other half of that split so it cannot silently invert:
+--
+--   1. directus_app owns zero relations. If Directus ever boots holding a
+--      CREATE-capable identity and creates tables as itself, or an operator
+--      slip transfers ownership to the app identity, the next bootstrap
+--      fails naming each table instead of the suite going green over a
+--      runtime identity that is also an owner. Ownership transfer stays an
+--      operator step (runbook section 8.3); this assertion is what catches
+--      it landing on the wrong role.
+--   2. directus_app holds no CREATE on schema public. USAGE-only is the
+--      asymmetry the file header declares; asserting it here means a widened
+--      schema grant fails the deploy that carries it rather than surfacing
+--      as Directus-owned tables months later. Upgrades still apply through
+--      the migration sequence as directus_migrator -- Directus must never be
+--      its own migrator.
+--
+-- Both halves pass on a clean cluster (bootstrap runs before any table
+-- exists) and on staging after the 8.3 transfer (directus_app never owned
+-- anything there). Only directus_app is asserted: the NOLOGIN roles cannot be
+-- reached by a login, and pinning their defaults would turn legitimate
+-- operational change into a failed deploy -- the same reasoning as the
+-- connection-limit block above. Still no durations in this file, so the
+-- retention-literal gate stays green: it is scanned, not exempt.
+DO $$
+DECLARE
+  v_owned text;
+BEGIN
+  SELECT string_agg(n.nspname || '.' || c.relname, ', ' ORDER BY n.nspname, c.relname)
+    INTO v_owned
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+   WHERE n.nspname = 'public'
+     AND c.relkind IN ('r', 'p', 'S', 'v', 'm', 'f')
+     AND c.relowner = 'directus_app'::regrole;
+
+  IF v_owned IS NOT NULL THEN
+    RAISE EXCEPTION
+      'directus_app owns % -- the runtime identity must own nothing. '
+      'Transfer ownership to directus_migrator (runbook services/staging/README.md '
+      'section 8.3) and re-run bootstrap. A runtime identity that is also an '
+      'owner is the split inverted.',
+      v_owned
+      USING ERRCODE = 'restrict_violation';
+  END IF;
+
+  IF has_schema_privilege('directus_app', 'public', 'CREATE') THEN
+    RAISE EXCEPTION
+      'directus_app can CREATE in schema public -- it must hold USAGE only. '
+      'Revoke it: REVOKE CREATE ON SCHEMA public FROM directus_app. Schema '
+      'changes apply through the migration sequence as directus_migrator; '
+      'Directus must never be its own migrator.'
+      USING ERRCODE = 'restrict_violation';
+  END IF;
+END
+$$;
