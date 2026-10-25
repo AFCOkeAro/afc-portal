@@ -7,6 +7,7 @@ import {
   optionalText,
 } from '@afc/shared'
 import { directusFetch } from '../../utils/directus'
+import { isUniqueViolation } from '../../utils/event-invites'
 import {
   createItem,
   getPortalScope,
@@ -178,11 +179,15 @@ export default defineEventHandler(async (event) => {
     )
   } catch (cause) {
     // UNIQUE (idempotency_key): a second submit with the same key collides
-    // instead of duplicating the session. Refusal, not a twin.
+    // instead of duplicating the session. Refusal, not a twin. Live
+    // Directus surfaces the replay as 400 RECORD_NOT_UNIQUE (AFC-803), not
+    // 409, so the canonical unique detector is the matcher: the header's
+    // only unique constraint is idempotency_key, hence any unique violation
+    // here is a replay.
     const status =
       (cause as { statusCode?: number; status?: number })?.statusCode ??
       (cause as { statusCode?: number; status?: number })?.status
-    if (status === 409) {
+    if (status === 409 || isUniqueViolation(cause)) {
       throw createError({
         statusCode: 409,
         statusMessage: 'This capture was already saved',
@@ -200,34 +205,54 @@ export default defineEventHandler(async (event) => {
   // Convergent upsert: read the rows the session already holds, write only
   // what differs, and leave replays as no-ops. The DB unique constraint is
   // the backstop; this loop is what makes a retry cheap.
-  const existing = await listItems<CountRow>(event, scope, 'attendance_counts', {
-    filter: { session: { _eq: sessionId } },
-    fields: ['id', 'category', 'sex', 'count'],
-    limit: -1,
-  })
-  const byKey = new Map(existing.data.map((row) => [`${row.category}|${row.sex}`, row]))
-  for (const row of form.rows) {
-    const current = byKey.get(`${row.category}|${row.sex}`)
-    if (current && Number(current.count) === row.count) continue
-    if (current) {
-      await directusFetch(event, `/items/attendance_counts/${current.id}`, {
-        method: 'PATCH',
-        accessToken: scope.token,
-        body: {
-          count: row.count,
+  //
+  // attendance_counts.created_by REFERENCES people(id) (0003:159), so the
+  // filed value is the linked person (nullable), never the Directus user
+  // UUID — a login without a linked person (personId null) omits the column
+  // instead of tripping INVALID_FOREIGN_KEY on every capture (AFC-803).
+  const personId = scope.session.user.personId
+  try {
+    const existing = await listItems<CountRow>(event, scope, 'attendance_counts', {
+      filter: { session: { _eq: sessionId } },
+      fields: ['id', 'category', 'sex', 'count'],
+      limit: -1,
+    })
+    const byKey = new Map(existing.data.map((row) => [`${row.category}|${row.sex}`, row]))
+    for (const row of form.rows) {
+      const current = byKey.get(`${row.category}|${row.sex}`)
+      if (current && Number(current.count) === row.count) continue
+      if (current) {
+        await directusFetch(event, `/items/attendance_counts/${current.id}`, {
+          method: 'PATCH',
+          accessToken: scope.token,
+          body: {
+            count: row.count,
+            category_other_label: row.category_other_label ?? null,
+          },
+        })
+      } else {
+        await createItem(event, scope, 'attendance_counts', {
+          session: sessionId,
+          category: row.category,
           category_other_label: row.category_other_label ?? null,
-        },
-      })
-    } else {
-      await createItem(event, scope, 'attendance_counts', {
-        session: sessionId,
-        category: row.category,
-        category_other_label: row.category_other_label ?? null,
-        sex: row.sex,
-        count: row.count,
-        created_by: scope.session.user.id,
-      })
+          sex: row.sex,
+          count: row.count,
+          ...(personId ? { created_by: personId } : {}),
+        })
+      }
     }
+  } catch (cause) {
+    // The header is already written and directus_app holds no DELETE on
+    // either attendance table (least-privilege ceiling, 0003 §4 / 0023 §4),
+    // so this route cannot clean the header up — granting that would widen
+    // the privilege boundary, which is a CTO-gated migration, not a capture
+    // fix. Fail closed with a named error instead of leaking raw Directus,
+    // and keep deliberate 4xx codes untouched (AFC-566 pattern).
+    const rowsStatus =
+      (cause as { statusCode?: number; status?: number })?.statusCode ??
+      (cause as { statusCode?: number; status?: number })?.status
+    if (rowsStatus == null) throwStoreUnavailable(cause, 'attendance_store', '0023')
+    throw cause
   }
 
   const total = form.rows.reduce((sum, row) => sum + row.count, 0)
