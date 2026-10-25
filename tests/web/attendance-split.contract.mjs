@@ -153,6 +153,31 @@ describe('split capture (US-A1)', () => {
     assert.match(captureRoute, /statusCode: 409/)
   })
 
+  it('maps the live Directus 400 unique shape to the 409 refusal (AFC-803)', () => {
+    // Live Directus answers a replayed idempotency_key with 400
+    // RECORD_NOT_UNIQUE, never 409 — a statusCode-only matcher lets the raw
+    // error leak and the UI Already-recorded path never fires (AFC-766
+    // precedent in departments/index.post.ts).
+    assert.match(captureRoute, /isUniqueViolation\(cause\)/)
+    assert.match(captureRoute, /only unique constraint is idempotency_key/)
+  })
+
+  it('files counts under the linked person, never the Directus user id (AFC-803)', () => {
+    // attendance_counts.created_by REFERENCES people(id): sending the
+    // Directus user UUID 400s every capture for logins without a linked
+    // person and strands an orphan header.
+    assert.match(captureRoute, /scope\.session\.user\.personId/)
+    assert.doesNotMatch(captureRoute, /created_by: scope\.session\.user\.id/)
+  })
+
+  it('fails a rows write closed: named store error, no raw leak, no silent orphan (AFC-803)', () => {
+    assert.match(captureRoute, /cannot clean the header up/)
+    assert.match(
+      captureRoute,
+      /throwStoreUnavailable\(cause, 'attendance_store', '0023'\)/,
+    )
+  })
+
   it('converges a replayed batch: patches what changed, skips what matches', () => {
     assert.match(captureRoute, /Number\(current\.count\) === row\.count\) continue/)
     assert.match(captureRoute, /method: 'PATCH'/)
@@ -257,10 +282,7 @@ describe('attendance routes: unreadable store fails named, never bare 500 (AFC-5
   })
 
   it('the shared report collector hardens both report surfaces at once', () => {
-    assert.match(
-      collector,
-      /throwStoreUnavailable\(error, 'attendance_store', '0023'\)/,
-    )
+    assert.match(collector, /throwStoreUnavailable\(error, 'attendance_store', '0023'\)/)
   })
 
   it('deliberate 4xx pass through instead of being renamed into the store', () => {
