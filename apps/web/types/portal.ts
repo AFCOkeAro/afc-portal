@@ -281,6 +281,24 @@ export interface BlessingRecipientRow extends BlessingRecipient {
   person_name?: string | null
 }
 
+/** Per-event expense row (AFC-801): the 0044 columns as the list route returns them. */
+export interface ExpenseRow {
+  id: string
+  event: string
+  branch: string | null
+  zone: string | null
+  category: string
+  category_other_label: string | null
+  /** Decimal string (numeric(12,2) is not a float); absent for non-finance roles. */
+  amount?: string | number | null
+  currency: string
+  spent_on: string
+  receipt: string | null
+  notes?: string | null
+  recorded_by: string | null
+  created_at: string
+}
+
 /** Youth directory row (AFC-476): the shared YouthProfile plus resolved names. */
 export interface YouthRow extends YouthProfile {
   person_name: string | null
