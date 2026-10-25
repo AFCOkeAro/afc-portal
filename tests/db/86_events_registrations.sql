@@ -340,6 +340,7 @@ DO $$
 BEGIN
   PERFORM test_support.assert_true(
     (SELECT count(*) FROM event_registrations) = 0
+    AND (SELECT count(*) FROM event_expenses) = 0
     AND (SELECT count(*) FROM attendance_sessions) = 0
     AND (SELECT count(*) FROM attendance_records) = 0, 'events',
     'pre-rollback: empty registers (probes above cleaned up; 88 has not run yet)');
@@ -366,6 +367,8 @@ BEGIN
     'reverse order: sessions registers go first (0023 down)');
 END $$;
 
+\i services/directus/schema/migrations/rollback/20261025_0044_event_expenses.down.sql
+
 \i services/directus/schema/migrations/rollback/20261020_0021_events_registrations.down.sql
 
 DO $$
@@ -383,8 +386,17 @@ BEGIN
 END $$;
 
 -- Leave the registers present, as the forward migrations leave them --
--- apply order, mirroring the operator checklist.
+-- apply order, mirroring the operator checklist. Re-applied as
+-- directus_migrator (the 21_register_seal_after_rollback.sql precedent):
+-- 0044 §1 refuses unless events/branches/zones are migrator-owned, and the
+-- 0021 re-apply just above would otherwise leave events owned by the harness
+-- session role. Production runs every forward as the migrator, so this is the
+-- faithful identity, not a widened one.
+SET ROLE directus_migrator;
 \i services/directus/schema/migrations/20261020_0021_events_registrations.sql
+
+\i services/directus/schema/migrations/20261025_0044_event_expenses.sql
+RESET ROLE;
 
 \i services/directus/schema/migrations/20261020_0023_attendance_sessions.sql
 
