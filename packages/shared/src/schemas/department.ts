@@ -69,3 +69,28 @@ export const departmentGroupPatchSchema = z.object({
   leader_person: uuidSchema.nullable().optional(),
 })
 export type DepartmentGroupPatch = z.infer<typeof departmentGroupPatchSchema>
+
+/**
+ * Create a department guide (AFC-800, parent AFC-759). Guides are
+ * instructional rows owned by one department, ordered by
+ * (sort_order, id). The writer gate lives in the route: departments
+ * update grant OR an active leader link on the department. Editable
+ * through the app: title/body/sort_order only — placement (department)
+ * never moves, and there is no DELETE path (retention posture).
+ */
+export const departmentGuideCreateSchema = z.object({
+  title: z.string().trim().min(1, 'Name the guide').max(200),
+  body: z.string().trim().max(20000).default(''),
+  sort_order: z.number().int().min(0).max(9999).default(0),
+})
+export type DepartmentGuideCreate = z.infer<typeof departmentGuideCreateSchema>
+
+/**
+ * Edit a department guide (AFC-800). Title/body/sort_order only.
+ */
+export const departmentGuidePatchSchema = z.object({
+  title: z.string().trim().min(1).max(200).optional(),
+  body: z.string().trim().max(20000).optional(),
+  sort_order: z.number().int().min(0).max(9999).optional(),
+})
+export type DepartmentGuidePatch = z.infer<typeof departmentGuidePatchSchema>
