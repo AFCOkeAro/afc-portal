@@ -450,3 +450,52 @@ describe('PRD remainder sweep (§H): every events requirement line-by-line', () 
     assert.doesNotMatch(names, /event.*(confirm|remind|regist)/i)
   })
 })
+
+describe('AFC-808: empty fee round-trips client -> server (moneySchema null-safe)', () => {
+  const moneySrc = read('packages/shared/src/schemas/common.ts')
+
+  it('moneySchema accepts null input, not just empty-string input', () => {
+    const block = moneySrc.slice(moneySrc.indexOf('moneySchema'))
+    assert.match(block, /z\.null\(\)/)
+  })
+
+  it('moneySchema normalises both empty string and null to null', () => {
+    const block = moneySrc.slice(moneySrc.indexOf('moneySchema'))
+    assert.match(block, /value === '' \|\| value === null \? null/)
+  })
+
+  it('moneySchema keeps the two-decimal-places message', () => {
+    const block = moneySrc.slice(moneySrc.indexOf('moneySchema'))
+    assert.match(block, /at most two places/)
+  })
+
+  it('moneySchema stays required-safe: undefined is not absorbed inside', () => {
+    const block = moneySrc.slice(
+      moneySrc.indexOf('moneySchema'),
+      moneySrc.indexOf('optionalText'),
+    )
+    assert.doesNotMatch(block, /z\.undefined\(\)/)
+  })
+
+  it('client submit() posts parsed output, so the wire carries fee null', () => {
+    const modal = read('apps/web/components/EventFormModal.vue')
+    assert.match(modal, /eventFormSchema\.safeParse\(candidate\)/)
+    assert.match(modal, /api\.post\('\/api\/events', parsed\.data\)/)
+  })
+
+  it('server create and patch re-parse the wire with the same eventFormSchema', () => {
+    assert.match(
+      codeOf('apps/web/server/api/events/index.post.ts'),
+      /eventFormSchema\.safeParse\(/,
+    )
+    assert.match(
+      codeOf('apps/web/server/api/events/[id].patch.ts'),
+      /eventFormSchema\.safeParse\(/,
+    )
+  })
+
+  it('free events still emit fee_amount null into the Directus payload', () => {
+    const schema = read('packages/shared/src/schemas/event.ts')
+    assert.match(schema, /fee_amount: form\.fee_amount/)
+  })
+})
