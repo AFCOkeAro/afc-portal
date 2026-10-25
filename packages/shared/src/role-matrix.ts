@@ -342,6 +342,21 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     none: [NONE, 'none'],
     zone_admin: [R, 'own_zone'],
   },
+  [COLLECTIONS.eventExpenses]: {
+    // AFC-801: exact mirror of branch_financial_records (AFC-801 contract:
+    // CRU pattern, own_branch/own_zone; super/area ALL; branch CRU own;
+    // zone R own_zone). No deviations from the finance-amounts posture, so
+    // none flagged: department_leader/volunteer/none hold nothing, and the
+    // FIELD_RESTRICTIONS entry below hides amount/notes from every role
+    // outside the finance set, same as finance amounts.
+    super_admin: [ALL, 'all'],
+    area_admin: [ALL, 'all'],
+    branch_admin: [CRU, 'own_branch', 'own'],
+    department_leader: [NONE, 'none'],
+    volunteer: [NONE, 'none'],
+    none: [NONE, 'none'],
+    zone_admin: [R, 'own_zone'],
+  },
   [COLLECTIONS.wecaReturns]: {
     // data-model-expansion §11: CRUD / CRUD / R (zone) / R (own).
     // Zone admin: R (zone) per §11.
@@ -921,6 +936,15 @@ const FIELD_RESTRICTIONS: Readonly<
     fields: ['income', 'intervention', 'faith_city'],
     roles: ['super_admin', 'area_admin', 'branch_admin'],
     note: 'amounts: branch admin (own records only, enforced by policy), area+, finance lead (not a staff_role; excluded)',
+  },
+  // AFC-801: expense amounts + notes hide from non-finance roles, same as
+  // finance amounts. No finance-amount role exists outside this list
+  // ("finance lead" is not a staff_role); zone admins read rows but never
+  // amounts, enforced by the same route strip as branch_financial_records.
+  [COLLECTIONS.eventExpenses]: {
+    fields: ['amount', 'notes'],
+    roles: ['super_admin', 'area_admin', 'branch_admin'],
+    note: 'amounts + notes: branch admin (own records only, enforced by policy), area+; zone/dept/volunteer/public never see figures',
   },
   [COLLECTIONS.wecaReturns]: {
     fields: [

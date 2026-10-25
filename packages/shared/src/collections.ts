@@ -18,6 +18,8 @@ export const COLLECTIONS = {
   events: 'events',
   eventDepartments: 'events_departments',
   eventRegistrations: 'event_registrations',
+  /** Per-event expense records (AFC-801). One row per recorded spend. */
+  eventExpenses: 'event_expenses',
   /** Invites (Slice 4). One row per invitation; quota + delivery read it. */
   eventInvites: 'event_invites',
   attendanceSessions: 'attendance_sessions',
