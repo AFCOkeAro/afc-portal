@@ -1355,9 +1355,21 @@ export async function liveKnownValueCheck(api) {
     }
   }
   // Synthetic in-memory haystack: sentinels around each value, never printed.
+  // Each block contributes 1 sentinel line plus (newlines-in-value + 1) value
+  // lines, so the expected line of value i accumulates the newline counts of
+  // all preceding values (a multi-line PEM-shaped grant shifts every later
+  // line; assuming i*2+2 false-FAILs on exactly that shape).
   const haystack = fetched.map((f, i) => `SYNTHETIC-HAYSTACK-${i}\n${f.value}\n`).join('');
   const hits = findKnownValues(haystack, fetched);
-  const allFound = fetched.every((f, i) => hits.some((h) => h.via === f.source && h.line === i * 2 + 2));
+  let expectedLine = 2;
+  let allFound = true;
+  for (const f of fetched) {
+    if (!hits.some((h) => h.via === f.source && h.line === expectedLine)) {
+      allFound = false;
+      break;
+    }
+    expectedLine += (f.value.match(/\n/g) || []).length + 2;
+  }
   const checkReport = [
     'credential-surface-scan live known-value check',
     `started: ${started}`,
