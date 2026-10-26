@@ -189,13 +189,42 @@ live API with a run-scoped identity); it runs inside a Paperclip agent
 run and on the routine above.
 
 ## 8. Hardening note (AFC-319 O1, owner: CTO)
-
 Any record carrying `CONTROL_MARKER` classifies `expected`, so a marker
 planted beside a real paste would keep exit 0 — the finding still prints
 with its record id, so a reader sees it. The scanner warns on every
 expected finding outside the two designated record ids
 (`DESIGNATED_CONTROL_RECORDS`, :97; `o1Warnings`, :1054) and
 `--strict-controls` turns that warning into exit 2. Recommended standing
-posture: run the scheduled scan with `--strict-controls` once the
-designated set is stable, so a novel marker placement pages instead of
-printing.
+ posture: run the scheduled scan with `--strict-controls` once the
+ designated set is stable, so a novel marker placement pages instead of
+ printing.
+
+## 9. Run-log hygiene (AFC-810, owner: Coder; verification: CTO)
+
+Echo source, stated plainly: agent tool output is captured verbatim into
+`/heartbeat-runs/{id}/log`, and this scanner reads those logs with the
+exact known-value detector. Any secret-bearing content present in the
+agent process environment is therefore one `env` away from the corpus.
+The Oct 2026 full run found exactly that: 42 known-value hits for a
+single secret-store grant (a staging username, not a password or key)
+across 8 run logs, with hit lines deep inside large tool-output dumps —
+environment content echoed into logged output. The assignment arm's
+standing measurement says the same thing in bulk (1901 hits over 1197
+runs, dominated by environment metadata, which is why that arm stays off
+on `run_log` by default).
+
+The rule, for every agent run against this repo:
+
+- Never run raw `env`, `printenv`, `export -p`, bare `set`, or
+  `env | grep ...` in a tool call. The pipe prints matching VALUES, and
+  the values land in the run log.
+- When you need to know which variables exist, run
+  `bash scripts/safe-env-names.sh` — names only, sorted, values never in
+  the pipeline (`compgen -e`, no redaction step to get wrong).
+- Read a single value only through its purpose-built path (e.g. the
+  scanner's memory-only secret fetch), never by dumping the environment.
+
+Residual exposure for the 8 pre-fix logs is tracked on the AFC-810 issue
+thread (immutable or cleaned, with the CTO's no-rotation rationale), not
+here: this document states the mechanism and the rule; the thread owns
+the per-log disposition.
