@@ -30,6 +30,7 @@ const TABS = [
   { id: 'overview', label: 'Overview', icon: 'i-lucide-layout-grid' },
   { id: 'registrations', label: 'Registrations', icon: 'i-lucide-users' },
   { id: 'checkin', label: 'Check-in', icon: 'i-lucide-scan-line' },
+  { id: 'attendance', label: 'Attendance', icon: 'i-lucide-clipboard-list' },
   { id: 'reports', label: 'Reports', icon: 'i-lucide-chart-column' },
   { id: 'schedule', label: 'Schedule', icon: 'i-lucide-calendar-days' },
   { id: 'materials', label: 'Materials', icon: 'i-lucide-folder-open' },
@@ -488,7 +489,11 @@ async function loadUnitData(): Promise<void> {
 function unitPickType(key: string): void {
   unitType.value = key
   const entry = unitTypes.value.find((row: UnitServiceType) => row.key === key)
-  unitCats.value = entry ? unitCategoriesOf(entry) : []
+  const cats = entry ? unitCategoriesOf(entry) : []
+  // AFC-806 staging feedback: the event Attendance tab must offer the
+  // children category even if a stale service-type definition omits it.
+  unitCats.value =
+    key === 'event' && !cats.includes('children') ? ['children', ...cats] : cats
   unitSplit.value = entry?.supports_sex_split !== false
   unitCounts.value = {}
 }
@@ -546,6 +551,7 @@ async function submitUnitCapture(): Promise<void> {
 watch(
   [tab, reportSubtab],
   ([nextTab, nextSub]: [TabId, (typeof REPORT_SUBTABS)[number]]) => {
+    if (nextTab === 'attendance' && !unitLoaded.value) void loadUnitData()
     if (nextTab === 'reports' && nextSub === 'Unit reports' && !unitLoaded.value)
       void loadUnitData()
   },
@@ -1299,6 +1305,122 @@ async function afterRegistrationSaved(): Promise<void> {
               </li>
             </ul>
           </UCard>
+        </div>
+      </section>
+
+      <!-- ATTENDANCE (AFC-806): own event tab for session headcount capture.
+        Staging feedback: capture was buried in Reports > Unit reports and the
+        event flow missed the children category. This tab reuses the unit
+        capture state (same endpoint, same 409 semantics) and defaults the
+        service type to `event`; unitPickType guarantees `children` is offered
+        for events even against a stale definition. Reports > Unit reports is
+        kept for back-compat. -->
+      <section v-if="tab === 'attendance'" aria-label="Attendance" class="mt-4">
+        <div v-if="unitLoading" class="py-6 text-center text-sm text-gray-500">
+          Loading sessions…
+        </div>
+        <div v-else>
+          <table v-if="unitSessions.length > 0" class="w-full text-left text-sm">
+            <thead>
+              <tr class="border-b border-gray-200 dark:border-gray-800">
+                <th class="py-2 pr-2 font-medium">Date</th>
+                <th class="py-2 pr-2 font-medium">Session</th>
+                <th class="py-2 text-right font-medium">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="session in unitSessions"
+                :key="session.id"
+                class="border-b border-gray-100 dark:border-gray-800"
+              >
+                <td class="py-2 pr-2">{{ session.session_date }}</td>
+                <td class="py-2 pr-2">{{ session.session_name }}</td>
+                <td class="py-2 text-right tabular-nums">
+                  {{ session.headcount_total ?? '—' }}
+                </td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr>
+                <td class="py-2 pr-2 font-semibold" colspan="2">Total</td>
+                <td class="py-2 text-right font-semibold tabular-nums">
+                  {{ unitTotal }}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+          <p v-else class="text-sm text-gray-500">
+            No sessions recorded for this programme yet.
+          </p>
+          <div v-if="canEdit" class="mt-4 border-t border-gray-200 pt-4 dark:border-gray-800">
+            <h3 class="text-sm font-semibold">Record headcount</h3>
+            <div class="mt-2 grid gap-2 sm:grid-cols-3">
+              <UFormField label="Session date">
+                <UInput v-model="unitDate" type="date" class="w-full" />
+              </UFormField>
+              <UFormField label="Service type">
+                <USelect
+                  :model-value="unitType === '' ? 'event' : unitType"
+                  :items="unitTypeItems"
+                  class="w-full"
+                  @update:model-value="unitPickType(String($event))"
+                />
+              </UFormField>
+              <UFormField label="Session name">
+                <UInput v-model="unitName" type="text" class="w-full" />
+              </UFormField>
+            </div>
+            <div v-if="unitCats.length > 0" class="mt-2 grid gap-2 sm:grid-cols-2">
+              <div v-for="category in unitCats" :key="category">
+                <UFormField :label="category">
+                  <div class="flex gap-2">
+                    <UInput
+                      :model-value="unitCounts[category]?.male ?? null"
+                      type="number"
+                      min="0"
+                      :placeholder="unitSplit ? 'Male' : 'Count'"
+                      class="w-full"
+                      @update:model-value="
+                        unitCounts[category] = {
+                          male: $event === null ? null : Number($event),
+                          female: unitCounts[category]?.female ?? null,
+                        }
+                      "
+                    />
+                    <UInput
+                      v-if="unitSplit"
+                      :model-value="unitCounts[category]?.female ?? null"
+                      type="number"
+                      min="0"
+                      placeholder="Female"
+                      class="w-full"
+                      @update:model-value="
+                        unitCounts[category] = {
+                          male: unitCounts[category]?.male ?? null,
+                          female: $event === null ? null : Number($event),
+                        }
+                      "
+                    />
+                  </div>
+                </UFormField>
+              </div>
+            </div>
+            <p
+              v-if="unitMessage !== ''"
+              class="mt-2 text-sm"
+              :class="unitIsError ? 'text-red-600' : 'text-green-700'"
+            >
+              {{ unitMessage }}
+            </p>
+            <UButton
+              class="mt-2"
+              label="Save headcount"
+              icon="i-lucide-save"
+              :loading="unitSaving"
+              @click="submitUnitCapture"
+            />
+          </div>
         </div>
       </section>
 

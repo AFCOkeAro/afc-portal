@@ -122,6 +122,13 @@ describe('detail shell (§A): hero plus 6 tabs', () => {
     }
   })
 
+  it('AFC-806: attendance is its own event tab with children-category guard', () => {
+    assert.match(src, /id: 'attendance'/)
+    assert.match(src, /tab === 'attendance'/)
+    assert.match(src, /unitPickType/)
+    assert.match(src, /children/)
+  })
+
   it('tabs deep-link through ?tab=', () => {
     assert.match(src, /route\.query\.tab/)
     assert.match(src, /goTab/)
