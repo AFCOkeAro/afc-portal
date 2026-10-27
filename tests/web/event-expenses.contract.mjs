@@ -39,14 +39,15 @@ function pageTotal(rows) {
   return rows.reduce((sum, row) => sum + Number(row.amount ?? 0), 0)
 }
 
-describe('expenses tab: 8th tab, deep-linkable, hidden without the grant', () => {
+describe('expenses tab: 9th tab, deep-linkable, hidden without the grant', () => {
   const src = codeOf('apps/web/pages/events/[id].vue')
 
-  it('adds Expenses as the 8th tab with a receipt icon', () => {
+  it('adds Expenses as the 9th tab with a receipt icon', () => {
     assert.match(src, /id: 'expenses', label: 'Expenses', icon: 'i-lucide-receipt'/)
     const tabs = read('apps/web/pages/events/[id].vue').match(/\{ id: '(\w+)', label:/g)
-    assert.ok(tabs && tabs.length === 8, `eight tabs, found ${tabs ? tabs.length : 0}`)
-    assert.ok(tabs[7].includes('expenses'), 'expenses is the 8th tab')
+    // AFC-806 added the Attendance tab after this pin; nine tabs now.
+    assert.ok(tabs && tabs.length === 9, `nine tabs, found ${tabs ? tabs.length : 0}`)
+    assert.ok(tabs[8].includes('expenses'), 'expenses is the 9th tab')
   })
 
   it('deep-links through ?tab=expenses and falls back to overview', () => {
@@ -271,5 +272,46 @@ describe('permissions: eventExpenses mirrors branch_financial_records', () => {
       /\[COLLECTIONS\.eventExpenses\]: \{\s*\n\s*fields: \['amount', 'notes'\]/,
     )
     assert.match(matrix, /roles: \['super_admin', 'area_admin', 'branch_admin'\]/)
+  })
+})
+
+describe('AFC-824 receipt upload + linked download', () => {
+  const UPLOAD = 'apps/web/server/api/events/[id]/expenses/upload.post.ts'
+  const RECEIPT = 'apps/web/server/api/events/[id]/expenses/receipt.get.ts'
+  const FORM = 'apps/web/pages/events/[id].vue'
+
+  it('upload opens on the same gates as the expense create', () => {
+    const src = codeOf(UPLOAD)
+    assert.match(src, /events.*update/)
+    assert.match(src, /event_expenses.*create/)
+    assert.match(src, /Your role cannot record expenses on this event/)
+  })
+
+  it('upload caps size and type with named field errors', () => {
+    const src = codeOf(UPLOAD)
+    assert.match(src, /10 \* 1024 \* 1024/)
+    assert.match(src, /application\/pdf/)
+    assert.match(src, /image\/webp/)
+    assert.match(src, /code: 'validation_error', fields: \{ file:/)
+  })
+
+  it('receipt download requires linkage to the exact event', () => {
+    const src = codeOf(RECEIPT)
+    assert.match(src, /event_expenses.*read/)
+    assert.match(src, /receipt: \{ _eq: file \}/)
+    assert.match(src, /That receipt is not on this event/)
+  })
+
+  it('the form uploads before create and links the returned id', () => {
+    const src = codeOf(FORM)
+    assert.match(src, /expenses\/upload/)
+    assert.match(src, /receipt \? \{ receipt \} : \{\}/)
+    assert.match(src, /Could not upload that receipt/)
+  })
+
+  it('rows link receipts through the scoped proxy', () => {
+    const src = codeOf(FORM)
+    assert.match(src, /expenses\/receipt\?file=/)
+    assert.match(src, /target="_blank"/)
   })
 })
