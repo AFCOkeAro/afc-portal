@@ -126,6 +126,16 @@ export const NAVIGATION: readonly NavigationItem[] = [
     inSidebar: true,
   },
   {
+    // AFC-822: the conducted-marriages report; previously reachable only
+    // from inside the pipeline page.
+    label: 'Marriage report',
+    to: '/marriage-cases/report',
+    icon: 'i-lucide-scroll-text',
+    requires: ['marriage_cases', 'read'],
+    group: 'office',
+    inSidebar: true,
+  },
+  {
     // Departments as their own section (AFC-758): ministries plus HQ
     // groups. Group creation lives on the section page itself.
     label: 'Departments',
@@ -137,10 +147,38 @@ export const NAVIGATION: readonly NavigationItem[] = [
   },
   {
     // Weekly remittance, monthly report and deductions all live on the
-    // finance records surface; summary/formulas are reached from there.
+    // finance records surface; formulas, returns and summary also have
+    // sidebar entries (AFC-822).
     label: 'Finance',
     to: '/finance/records',
     icon: 'i-lucide-landmark',
+    requires: ['branch_financial_records', 'read'],
+    group: 'office',
+    inSidebar: true,
+  },
+  {
+    // AFC-822: exposed next to Finance; previously reachable only in-page.
+    label: 'Formulas',
+    to: '/finance/formulas',
+    icon: 'i-lucide-notebook-text',
+    requires: ['branch_financial_records', 'read'],
+    group: 'office',
+    inSidebar: true,
+  },
+  {
+    // AFC-822: exposed next to Finance; previously reachable only in-page.
+    label: 'Returns',
+    to: '/finance/returns',
+    icon: 'i-lucide-clipboard-check',
+    requires: ['branch_financial_records', 'read'],
+    group: 'office',
+    inSidebar: true,
+  },
+  {
+    // AFC-822: exposed next to Finance; previously reachable only in-page.
+    label: 'Finance summary',
+    to: '/finance/summary',
+    icon: 'i-lucide-chart-column',
     requires: ['branch_financial_records', 'read'],
     group: 'office',
     inSidebar: true,
@@ -208,6 +246,15 @@ export const NAVIGATION: readonly NavigationItem[] = [
     group: 'outreach',
     inSidebar: true,
   },
+  {
+    // AFC-822: stage-by-stage visitor funnel; previously unlinked.
+    label: 'Visitor funnel',
+    to: '/visitors/funnel',
+    icon: 'i-lucide-clipboard-list',
+    requires: ['visitors', 'read'],
+    group: 'outreach',
+    inSidebar: true,
+  },
 
   // Welfare
   {
@@ -230,6 +277,15 @@ export const NAVIGATION: readonly NavigationItem[] = [
     label: 'Welfare',
     to: '/welfare',
     icon: 'i-lucide-heart-handshake',
+    requires: ['welfare_cases', 'read'],
+    group: 'welfare',
+    inSidebar: true,
+  },
+  {
+    // AFC-822: welfare analytics; previously reachable only in-page.
+    label: 'Welfare reports',
+    to: '/welfare/reports',
+    icon: 'i-lucide-heart',
     requires: ['welfare_cases', 'read'],
     group: 'welfare',
     inSidebar: true,
@@ -409,6 +465,15 @@ export const NAVIGATION: readonly NavigationItem[] = [
     label: 'Roles and Permission',
     to: '/admin/roles',
     icon: 'i-lucide-shield-check',
+    requires: ['directus_users', 'read'],
+    group: 'admin',
+    inSidebar: true,
+  },
+  {
+    // AFC-822: staff scope preview; previously reachable only by URL.
+    label: 'Preview scope',
+    to: '/admin/impersonate',
+    icon: 'i-lucide-user-check',
     requires: ['directus_users', 'read'],
     group: 'admin',
     inSidebar: true,
