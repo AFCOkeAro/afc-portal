@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { COLLECTIONS, isTaskOverdue } from '@afc/shared'
+import { COLLECTIONS, TASK_TEMPLATES, isTaskOverdue } from '@afc/shared'
 
 /**
  * Notion-style multi-view task board (AFC-666): one scoped task list rendered
@@ -83,13 +83,17 @@ const { data, pending, error, refresh } = await useAsyncData(
 const rows = computed<TaskItem[]>(() => data.value?.data ?? [])
 const total = computed(() => data.value?.meta.total ?? rows.value.length)
 
-/** One-click recurring checklist (AFC-668): applies the configured template
- *  for this scope (branch + related record + base date). */
+/** Recurring checklists (AFC-668, AFC-832): the caller suggests one
+ *  template; the user picks from the available list before applying. */
 const applying = ref(false)
+const chosenTemplate = ref(props.templateId ?? 'event_programme')
+const templateOptions = computed(() =>
+  TASK_TEMPLATES.map((entry) => ({ label: entry.label, value: entry.id })),
+)
 const appliedCount = ref<number | null>(null)
 const applyError = ref('')
 async function applyChecklist() {
-  if (!props.templateId) return
+  if (!chosenTemplate.value) return
   applying.value = true
   applyError.value = ''
   appliedCount.value = null
@@ -97,7 +101,7 @@ async function applyChecklist() {
     const res = await api.post<{ data: { created: number; ids: string[] } }>(
       '/api/tasks/from-template',
       {
-        template: props.templateId,
+        template: chosenTemplate.value,
         ...(props.branchId ? { branch: props.branchId } : {}),
         base_date: props.baseDate ?? null,
         related_id: props.relatedId ?? null,
@@ -282,15 +286,24 @@ const timelineGroups = computed(() => {
         :collection="COLLECTIONS.tasks"
         action="create"
       >
-        <UButton
-          label="Apply checklist"
-          icon="i-lucide-clipboard-list"
-          size="xs"
-          color="neutral"
-          variant="outline"
-          :loading="applying"
-          @click="applyChecklist()"
-        />
+        <div class="flex items-center gap-1">
+          <USelect
+            v-model="chosenTemplate"
+            :items="templateOptions"
+            size="xs"
+            class="w-40"
+            aria-label="Choose a checklist template"
+          />
+          <UButton
+            label="Apply"
+            icon="i-lucide-clipboard-list"
+            size="xs"
+            color="neutral"
+            variant="outline"
+            :loading="applying"
+            @click="applyChecklist()"
+          />
+        </div>
       </PermissionGate>
       <NuxtLink
         v-if="props.branchId"
