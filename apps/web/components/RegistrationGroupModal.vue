@@ -50,6 +50,15 @@ interface GroupMember {
   registrant_last_name: string
   phone: string
   email: string
+  /** Internal link back to the directory row (never submitted). */
+  personId?: string
+}
+
+interface BranchMember {
+  id: string
+  name: string
+  phone: string
+  email: string
 }
 
 function blankMember(): GroupMember {
@@ -70,6 +79,87 @@ const branchOptions = computed(() => [
   { label: 'Event branch', value: '' },
   ...props.branches.map((row) => ({ label: row.name, value: row.id })),
 ])
+
+/* Branch member tick-list (AFC-837): pick directory members instead of
+ * retyping details the portal already holds. Ticked rows append as member
+ * rows (prefilled, editable); the submit path is unchanged. */
+const branchMembers = ref<BranchMember[]>([])
+const membersPending = ref(false)
+const membersError = ref('')
+const memberSearch = ref('')
+const tickedIds = ref<string[]>([])
+const addedPersonIds = ref<string[]>([])
+
+function displayName(row: Record<string, unknown>): string {
+  const preferred = String(row.preferred_name ?? '').trim()
+  const full =
+    `${String(row.first_name ?? '').trim()} ${String(row.last_name ?? '').trim()}`.trim()
+  return preferred || full || 'Unnamed member'
+}
+
+const filteredBranchMembers = computed(() => {
+  const term = memberSearch.value.trim().toLowerCase()
+  if (!term) return branchMembers.value
+  return branchMembers.value.filter(
+    (row: BranchMember) =>
+      row.name.toLowerCase().includes(term) ||
+      row.phone.toLowerCase().includes(term) ||
+      row.email.toLowerCase().includes(term),
+  )
+})
+
+async function loadBranchMembers(): Promise<void> {
+  const branchId = branch.value || props.eventBranch || ''
+  branchMembers.value = []
+  tickedIds.value = []
+  if (!branchId) return
+  membersPending.value = true
+  membersError.value = ''
+  try {
+    const result = await api.get<{ data: Record<string, unknown>[] }>('/api/people', {
+      query: { branch: branchId, limit: 200 },
+    })
+    branchMembers.value = (result.data ?? []).map((row: Record<string, unknown>) => ({
+      id: String(row.id),
+      name: displayName(row),
+      phone: String(row.phone ?? ''),
+      email: String(row.email ?? ''),
+    }))
+  } catch (cause) {
+    membersError.value =
+      (cause as { message?: string }).message ?? 'Could not load branch members'
+  } finally {
+    membersPending.value = false
+  }
+}
+
+function addTicked(): void {
+  for (const id of tickedIds.value) {
+    if (addedPersonIds.value.includes(id)) continue
+    const person = branchMembers.value.find((row: BranchMember) => row.id === id)
+    if (!person) continue
+    const nameParts = person.name.split(' ')
+    members.push({
+      registrant_first_name: nameParts[0] ?? '',
+      registrant_last_name: nameParts.slice(1).join(' ') ?? '',
+      phone: person.phone,
+      email: person.email,
+      personId: id,
+    })
+    addedPersonIds.value = [...addedPersonIds.value, id]
+  }
+  tickedIds.value = []
+}
+
+watch(
+  [() => props.open, branch, () => props.eventBranch],
+  ([isOpen]: [boolean, ...unknown[]]) => {
+    if (!isOpen) return
+    addedPersonIds.value = []
+    void loadBranchMembers()
+  },
+  { immediate: true },
+)
 
 watch(
   () => props.open,
@@ -211,6 +301,72 @@ async function submit(): Promise<void> {
             class="w-full"
           />
         </UFormField>
+
+        <UCard>
+          <template #header>
+            <h3 class="text-sm font-semibold">Branch members — tick to add</h3>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Members of the selected branch, from details the portal already holds.
+              Ticked rows append below, prefilled and editable.
+            </p>
+          </template>
+          <UInput
+            v-model="memberSearch"
+            placeholder="Search name, phone or email…"
+            icon="i-lucide-search"
+            class="mb-2 w-full"
+          />
+          <div v-if="membersPending" class="flex justify-center py-4">
+            <UIcon
+              name="i-lucide-loader-circle"
+              class="size-5 animate-spin text-gray-400"
+            />
+          </div>
+          <p v-else-if="membersError" class="text-sm text-red-600 dark:text-red-400">
+            {{ membersError }}
+          </p>
+          <p
+            v-else-if="branchMembers.length === 0"
+            class="text-sm text-gray-500 dark:text-gray-400"
+          >
+            Pick a branch with members to tick them in.
+          </p>
+          <ul v-else class="max-h-64 space-y-1 overflow-y-auto">
+            <li
+              v-for="person in filteredBranchMembers"
+              :key="person.id"
+              class="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-800"
+            >
+              <UCheckbox
+                :model-value="tickedIds.includes(person.id)"
+                :aria-label="`Tick ${person.name}`"
+                @update:model-value="
+                  (on: boolean) => {
+                    tickedIds = on
+                      ? [...tickedIds, person.id]
+                      : tickedIds.filter((id: string) => id !== person.id)
+                  }
+                "
+              />
+              <span class="min-w-0 flex-1 truncate text-sm">
+                {{ person.name }}
+                <span class="text-xs text-gray-500 dark:text-gray-400">
+                  {{ person.phone }}{{ person.phone && person.email ? ' · ' : ''
+                  }}{{ person.email }}
+                </span>
+              </span>
+            </li>
+          </ul>
+          <div class="mt-2 flex justify-end">
+            <UButton
+              size="sm"
+              :disabled="tickedIds.length === 0"
+              :label="`Add ticked (${tickedIds.length})`"
+              icon="i-lucide-user-plus"
+              @click="addTicked"
+            />
+          </div>
+        </UCard>
 
         <div
           v-for="(member, index) in members"
