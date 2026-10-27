@@ -8,6 +8,15 @@ import type { CollectionName, PermissionAction } from '@afc/shared'
  * touching a component and adding a capability never requires touching a role
  * name in the UI (data-model §13 rule 7).
  */
+/** Submenu entry (AFC-831): rendered nested under its parent item,
+ *  filtered by its own capability. One level only, on purpose. */
+export interface NavigationChild {
+  label: string
+  to: string
+  icon: string
+  requires: readonly [CollectionName, PermissionAction]
+}
+
 export interface NavigationItem {
   label: string
   to: string
@@ -17,6 +26,8 @@ export interface NavigationItem {
   group: NavigationGroup
   /** Shown in the sidebar only; the dashboard lists everything. */
   inSidebar?: boolean
+  /** Submenu entries (AFC-831). */
+  children?: readonly NavigationChild[]
 }
 
 /**
@@ -323,21 +334,22 @@ export const NAVIGATION: readonly NavigationItem[] = [
     inSidebar: true,
   },
   {
-    label: 'Attendance',
-    to: '/attendance',
-    icon: 'i-lucide-clipboard-check',
-    requires: ['attendance_sessions', 'read'],
-    group: 'worship',
-    inSidebar: true,
-  },
-  {
-    // Overview, attendance and blessings reporting.
+    // Overview, attendance and blessings reporting. Attendance renders
+    // nested under it (AFC-831) instead of as a second top-level entry.
     label: 'Reporting',
     to: '/attendance/report',
     icon: 'i-lucide-chart-column',
     requires: ['attendance_sessions', 'read'],
     group: 'worship',
     inSidebar: true,
+    children: [
+      {
+        label: 'Attendance',
+        to: '/attendance',
+        icon: 'i-lucide-clipboard-check',
+        requires: ['attendance_sessions', 'read'],
+      },
+    ],
   },
   {
     // Bulk entry + individual mapping (AFC-671); reports live on the page.

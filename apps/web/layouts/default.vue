@@ -23,9 +23,14 @@ const permissions = usePermissions()
 const route = useRoute()
 
 const items = computed(() =>
-  NAVIGATION.filter(
-    (item) => permissions.can(...item.requires) && item.inSidebar !== false,
-  ),
+  NAVIGATION.filter((item) => item.inSidebar !== false)
+    .map((item) => ({
+      ...item,
+      children: (item.children ?? []).filter((child) =>
+        permissions.can(...child.requires),
+      ),
+    }))
+    .filter((item) => permissions.can(...item.requires) || item.children.length > 0),
 )
 
 /**
@@ -115,18 +120,20 @@ function sectionForPath(path: string): string | null {
     return exact.find((key) => isExpanded(key)) ?? exact[0] ?? null
   }
   let best: { key: string; length: number } | null = null
+  const candidates: Array<{ to: string; key: string }> = []
   for (const section of sections.value) {
     for (const item of section.items) {
-      if (path === item.to || path.startsWith(`${item.to}/`)) {
-        if (!best || item.to.length > best.length) {
-          best = { key: section.key, length: item.to.length }
-        } else if (
-          item.to.length === best.length &&
-          section.key !== best.key &&
-          isExpanded(section.key)
-        ) {
-          best = { key: section.key, length: item.to.length }
-        }
+      candidates.push({ to: item.to, key: section.key })
+      for (const child of item.children ?? [])
+        candidates.push({ to: child.to, key: section.key })
+    }
+  }
+  for (const { to, key } of candidates) {
+    if (path === to || path.startsWith(`${to}/`)) {
+      if (!best || to.length > best.length) {
+        best = { key, length: to.length }
+      } else if (to.length === best.length && key !== best.key && isExpanded(key)) {
+        best = { key, length: to.length }
       }
     }
   }
@@ -336,6 +343,24 @@ const menuItems = computed(() => [
                   <UIcon :name="item.icon" class="size-5 shrink-0" />
                   <span>{{ item.label }}</span>
                 </NuxtLink>
+                <ul
+                  v-if="item.children.length > 0"
+                  class="ml-8 mt-1 space-y-1 border-l border-gray-200 pl-2 dark:border-gray-800"
+                >
+                  <li
+                    v-for="child in item.children"
+                    :key="`${section.key}:${item.to}:${child.to}`"
+                  >
+                    <NuxtLink
+                      :to="child.to"
+                      class="flex items-center gap-3 rounded-lg px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-200 dark:text-gray-300 dark:hover:bg-gray-800"
+                      active-class="bg-gray-200 font-medium text-gray-900 dark:bg-gray-800 dark:text-white"
+                    >
+                      <UIcon :name="child.icon" class="size-4 shrink-0" />
+                      <span>{{ child.label }}</span>
+                    </NuxtLink>
+                  </li>
+                </ul>
               </li>
             </ul>
           </div>
@@ -358,17 +383,31 @@ const menuItems = computed(() => [
               'mt-2 border-t border-gray-200 pt-2 dark:border-gray-800': index > 0,
             }"
           >
-            <NuxtLink
+            <template
               v-for="(item, index) in section.items"
               :key="`${section.key}:${index}:${item.to}`"
-              :to="item.to"
-              :title="item.label"
-              :aria-label="item.label"
-              class="flex items-center justify-center rounded-lg p-2 text-gray-700 hover:bg-gray-200 dark:text-gray-200 dark:hover:bg-gray-800"
-              active-class="bg-gray-200 text-gray-900 dark:bg-gray-800 dark:text-white"
             >
-              <UIcon :name="item.icon" class="size-5 shrink-0" />
-            </NuxtLink>
+              <NuxtLink
+                :to="item.to"
+                :title="item.label"
+                :aria-label="item.label"
+                class="flex items-center justify-center rounded-lg p-2 text-gray-700 hover:bg-gray-200 dark:text-gray-200 dark:hover:bg-gray-800"
+                active-class="bg-gray-200 text-gray-900 dark:bg-gray-800 dark:text-white"
+              >
+                <UIcon :name="item.icon" class="size-5 shrink-0" />
+              </NuxtLink>
+              <NuxtLink
+                v-for="child in item.children"
+                :key="`${section.key}:${item.to}:${child.to}`"
+                :to="child.to"
+                :title="`${item.label} / ${child.label}`"
+                :aria-label="`${item.label} / ${child.label}`"
+                class="flex items-center justify-center rounded-lg p-2 text-gray-500 hover:bg-gray-200 dark:text-gray-400 dark:hover:bg-gray-800"
+                active-class="bg-gray-200 text-gray-900 dark:bg-gray-800 dark:text-white"
+              >
+                <UIcon :name="child.icon" class="size-4 shrink-0" />
+              </NuxtLink>
+            </template>
           </div>
         </div>
       </nav>
