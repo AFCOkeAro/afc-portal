@@ -13,7 +13,7 @@
  *   4. Registrations (§C): reg-no/name/phone/home-church/registered/
  *      check-in columns, Export CSV, Add registrant, bulk select, all on
  *      existing fields.
- *   5. Check-in / Reports / Schedule / Materials (§D): session selector,
+ *   5. Check-in / Reports / Schedule / Resources (§D): session selector,
  *      scan + type/search modes, device list; report sub-tabs; empty
  *      states with coordinator affordance.
  *   6. Comms (§E): explicit opt-in per channel, quiet-hours note, caps,
@@ -272,7 +272,7 @@ describe('check-in / reports / schedule / materials (§D)', () => {
 
   it('schedule and materials are empty states with coordinator affordance', () => {
     assert.match(src, /No schedule yet/)
-    assert.match(src, /No materials yet/)
+    assert.match(src, /No resources yet/)
     assert.match(src, /Open programme settings/)
   })
 })
