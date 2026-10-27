@@ -26,9 +26,10 @@ export function buildModules(): ModuleDef[] {
   return NAVIGATION_GROUPS.map((group) => {
     const collections = [
       ...new Set(
-        NAVIGATION.filter((item) => item.group === group.key).map(
-          (item) => item.requires[0],
-        ),
+        NAVIGATION.filter((item) => item.group === group.key).flatMap((item) => [
+          item.requires[0],
+          ...(item.children ?? []).map((child) => child.requires[0]),
+        ]),
       ),
     ]
     const roles = (STAFF_ROLES as readonly string[]).filter(

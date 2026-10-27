@@ -220,12 +220,25 @@ watch(debounced, async (term: string) => {
   activeIndex.value = 0
 })
 
+const flatPages = computed<NavigationItem[]>(() =>
+  NAVIGATION.flatMap((item: NavigationItem) => [
+    item,
+    ...(item.children ?? []).map((child) => ({
+      ...child,
+      group: item.group,
+      inSidebar: item.inSidebar,
+      label: `${item.label} / ${child.label}`,
+    })),
+  ]),
+)
+
 const pageItems = computed<PaletteItem[]>(() => {
   const term = debounced.value.trim().toLowerCase()
-  return NAVIGATION.filter(
-    (item: NavigationItem) =>
-      permissions.can(...item.requires) && item.inSidebar !== false,
-  )
+  return flatPages.value
+    .filter(
+      (item: NavigationItem) =>
+        permissions.can(...item.requires) && item.inSidebar !== false,
+    )
     .filter((item: NavigationItem) => !term || item.label.toLowerCase().includes(term))
     .slice(0, 7)
     .map((item: NavigationItem) => ({
