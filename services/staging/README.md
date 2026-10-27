@@ -59,9 +59,9 @@ In the Cloudflare dashboard for `bluespace.ng`, add both records (create the
 AAAA only if the VPS has an IPv6 address), replacing `<VPS-IP>` with the
 VPS addresses and keeping the proxy on:
 
-| Type | Name | Content | Proxy status |
-| --- | --- | --- | --- |
-| A | `afc-staging` | `<VPS-IPv4>` | Proxied (orange cloud on) |
+| Type | Name          | Content      | Proxy status              |
+| ---- | ------------- | ------------ | ------------------------- |
+| A    | `afc-staging` | `<VPS-IPv4>` | Proxied (orange cloud on) |
 | AAAA | `afc-staging` | `<VPS-IPv6>` | Proxied (orange cloud on) |
 
 Wait for propagation, then confirm from any machine:
@@ -106,14 +106,14 @@ and re-run the start command).
 1. Copy the env template on the host and lock it down:
    `cp services/staging/.env.example services/staging/.env && chmod 600 services/staging/.env`
 2. Edit `services/staging/.env` (values live **only** here):
-   | Variable | Staging value |
-   | --- | --- |
-   | `WEB_IMAGE` | Image tag from CI (AFC-384), or empty for a local `build` |
-   | `NUXT_STUB_AUTH` | `false` — staging serves the real auth path |
-   | `NUXT_SESSION_SECRET` | **required** — output of `openssl rand -base64 48` |
+   | Variable                                                                                                    | Staging value                                                                                                                      |
+   | ----------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+   | `WEB_IMAGE`                                                                                                 | Image tag from CI (AFC-384), or empty for a local `build`                                                                          |
+   | `NUXT_STUB_AUTH`                                                                                            | `false` — staging serves the real auth path                                                                                        |
+   | `NUXT_SESSION_SECRET`                                                                                       | **required** — output of `openssl rand -base64 48`                                                                                 |
    | `NUXT_DIRECTUS_URL`, `NUXT_PUBLIC_DIRECTUS_URL`, `NUXT_DIRECTUS_SERVER_TOKEN`, `NUXT_DIRECTUS_PUBLIC_TOKEN` | empty — Directus is not deployed; the app is degraded-safe (health 200 with `directusConfigured:false`; login/register answer 503) |
 3. `services/staging/Caddyfile` already targets `afc-staging.bluespace.ng`.
-    Only edit it if the board changes the domain again.
+   Only edit it if the board changes the domain again.
 4. `NITRO_HOST 0.0.0.0` / `NITRO_PORT 3000` are fixed in `compose.yml`
    (matching `apps/web/Dockerfile`); there is nothing to set.
 
@@ -125,6 +125,29 @@ From the repo root on the VPS:
 docker compose -f services/staging/compose.yml --env-file services/staging/.env up -d --build
 docker compose -f services/staging/compose.yml ps
 ```
+
+## 2.5 Auto-deploy (AFC-820)
+
+`auto-deploy.sh` stages origin/main without an operator: fetch; no-op when
+`NUXT_PUBLIC_BUILD_SHA` already matches; refuse on a dirty tree or a
+non-ancestor SHA; `pg_dump` first; apply only the migration files new since
+the deployed SHA (`ON_ERROR_STOP`, abort before the build on failure, never
+touches `rollback/`); then the standard bump/build/recreate with a SHA-proof
+health check. Migrations stay human-written and CI-gated; the script only
+applies what already passed on main.
+
+On CT105 it runs every 5 minutes under systemd:
+
+```sh
+# /etc/systemd/system/afc-staging-deploy.service runs
+#   /opt/afc-portal-git/services/staging/auto-deploy.sh
+systemctl status afc-staging-deploy.timer
+journalctl -u afc-staging-deploy.service --since today
+```
+
+To pause it (manual-deploy window): `systemctl stop afc-staging-deploy.timer`.
+To resume: `systemctl start afc-staging-deploy.timer`. The manual sequence in
+§2–§3 keeps working unchanged while the timer is stopped.
 
 ## 3. Verify (acceptance: 200 on `/api/health`)
 
@@ -195,8 +218,8 @@ tokens after first boot from the admin UI over an SSH tunnel
 (`ssh -L 8055:127.0.0.1:8055 <vps>` — the compose port binds loopback only
 by design; publishing 8055 publicly needs CTO sign-off).
 
-  Preflight before `up` (empty `DIRECTUS_DB_USER` interpolates with a warning
-  and Directus boots privileged — this refuses instead):
+Preflight before `up` (empty `DIRECTUS_DB_USER` interpolates with a warning
+and Directus boots privileged — this refuses instead):
 
 ```sh
 test "${DIRECTUS_DB_USER:?DIRECTUS_DB_USER is empty — set DIRECTUS_DB_USER=directus_app in the host .env}" = directus_app
@@ -308,7 +331,7 @@ relying on §8.4:
    every `directus_*` table and sequence to `directus_migrator`. Scoped to
    the staging database only. Preferred: per object —
    `ALTER TABLE ... OWNER TO directus_migrator` (and `ALTER SEQUENCE ...
-   OWNER TO directus_migrator` for each `directus_*` sequence) — so only
+OWNER TO directus_migrator` for each `directus_*` sequence) — so only
    the named objects move. Fallback: in one step,
    `REASSIGN OWNED BY <superuser> TO directus_migrator`, which moves
    EVERY object the superuser owns in the connected database (including
@@ -377,12 +400,12 @@ interpolates empty and Directus will not boot):
 
 1. `pg_dump` first. Confirm the dump is restorable before touching wiring.
 2. Host `.env` holds `DIRECTUS_DB_USER=directus_app` + generated password
-    (mode 600, never committed). Re-run the §7.1 preflight, then confirm
-    the resolved compose parses without rendering secret values:
-    `docker compose -f services/staging/compose.yml
-    -f services/staging/compose.directus.yml config --quiet` must exit 0.
-    Never paste `config` output (without `--quiet`) into issues or logs —
-    it renders secrets to stdout.
+   (mode 600, never committed). Re-run the §7.1 preflight, then confirm
+   the resolved compose parses without rendering secret values:
+   `docker compose -f services/staging/compose.yml
+ -f services/staging/compose.directus.yml config --quiet` must exit 0.
+   Never paste `config` output (without `--quiet`) into issues or logs —
+   it renders secrets to stdout.
 3. Runbook §8.1–§8.3 in order (bootstrap as cluster owner, migrations as
    `directus_migrator` including 0042, ownership transfer verified with the
    §8.3 query answering zero rows). 0042 refusing with `restrict_violation`
