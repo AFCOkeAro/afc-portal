@@ -461,6 +461,12 @@ const unitLoaded = ref(false)
 const unitDate = ref('')
 const unitType = ref('')
 const unitName = ref('')
+/**
+ * Picked session (AFC-827). Empty means a brand-new session typed below;
+ * otherwise the date/type/name auto-fill from the programme's session list
+ * and the save targets that session (no twin is created).
+ */
+const unitSessionId = ref('')
 const unitCats = ref<string[]>([])
 const unitSplit = ref(true)
 const unitCounts = ref<Record<string, { male: number | null; female: number | null }>>({})
@@ -477,6 +483,30 @@ const unitTotal = computed(() =>
 const unitTypeItems = computed(() =>
   unitTypes.value.map((row: UnitServiceType) => ({ label: row.label, value: row.key })),
 )
+
+const unitSessionItems = computed(() => [
+  { label: 'New session — enter details below', value: '' },
+  ...unitSessions.value.map((row: UnitSessionRow) => ({
+    label: `${row.session_date} · ${row.session_name}`,
+    value: String(row.id),
+  })),
+])
+
+function unitPickSession(id: string): void {
+  unitSessionId.value = id
+  if (id === '') return
+  const picked = unitSessions.value.find((row: UnitSessionRow) => String(row.id) === id)
+  if (!picked) return
+  unitDate.value = picked.session_date
+  unitName.value = picked.session_name
+  if (unitTypes.value.some((row: UnitServiceType) => row.key === picked.session_type)) {
+    unitPickType(picked.session_type)
+  } else {
+    unitType.value = picked.session_type
+    unitCats.value = []
+    unitSplit.value = true
+  }
+}
 function unitCategoriesOf(entry: UnitServiceType): string[] {
   if (Array.isArray(entry.categories)) return entry.categories.map(String)
   try {
@@ -550,6 +580,7 @@ async function submitUnitCapture(): Promise<void> {
       session_date: unitDate.value,
       session_type: unitType.value,
       session_name: unitName.value.trim(),
+      ...(unitSessionId.value !== '' ? { session_id: unitSessionId.value } : {}),
       idempotency_key: crypto.randomUUID(),
       rows,
     })
@@ -1515,20 +1546,42 @@ watch(
             class="mt-4 border-t border-gray-200 pt-4 dark:border-gray-800"
           >
             <h3 class="text-sm font-semibold">Record headcount</h3>
+            <UFormField
+              v-if="unitSessions.length > 0"
+              label="Session (optional — pick from this programme's list)"
+            >
+              <USelect
+                :model-value="unitSessionId"
+                :items="unitSessionItems"
+                class="w-full"
+                @update:model-value="unitPickSession(String($event))"
+              />
+            </UFormField>
             <div class="mt-2 grid gap-2 sm:grid-cols-3">
               <UFormField label="Session date">
-                <UInput v-model="unitDate" type="date" class="w-full" />
+                <UInput
+                  v-model="unitDate"
+                  type="date"
+                  class="w-full"
+                  :disabled="unitSessionId !== ''"
+                />
               </UFormField>
               <UFormField label="Service type">
                 <USelect
                   :model-value="unitType === '' ? 'event' : unitType"
                   :items="unitTypeItems"
                   class="w-full"
+                  :disabled="unitSessionId !== ''"
                   @update:model-value="unitPickType(String($event))"
                 />
               </UFormField>
               <UFormField label="Session name">
-                <UInput v-model="unitName" type="text" class="w-full" />
+                <UInput
+                  v-model="unitName"
+                  type="text"
+                  class="w-full"
+                  :disabled="unitSessionId !== ''"
+                />
               </UFormField>
             </div>
             <div v-if="unitCats.length > 0" class="mt-2 grid gap-2 sm:grid-cols-2">
@@ -1730,20 +1783,42 @@ watch(
                 class="mt-4 border-t border-gray-200 pt-4 dark:border-gray-800"
               >
                 <h3 class="text-sm font-semibold">Record headcount</h3>
+                <UFormField
+                  v-if="unitSessions.length > 0"
+                  label="Session (optional — pick from this programme's list)"
+                >
+                  <USelect
+                    :model-value="unitSessionId"
+                    :items="unitSessionItems"
+                    class="w-full"
+                    @update:model-value="unitPickSession(String($event))"
+                  />
+                </UFormField>
                 <div class="mt-2 grid gap-2 sm:grid-cols-3">
                   <UFormField label="Session date">
-                    <UInput v-model="unitDate" type="date" class="w-full" />
+                    <UInput
+                      v-model="unitDate"
+                      type="date"
+                      class="w-full"
+                      :disabled="unitSessionId !== ''"
+                    />
                   </UFormField>
                   <UFormField label="Service type">
                     <USelect
                       :model-value="unitType"
                       :items="unitTypeItems"
                       class="w-full"
+                      :disabled="unitSessionId !== ''"
                       @update:model-value="unitPickType(String($event))"
                     />
                   </UFormField>
                   <UFormField label="Session name">
-                    <UInput v-model="unitName" type="text" class="w-full" />
+                    <UInput
+                      v-model="unitName"
+                      type="text"
+                      class="w-full"
+                      :disabled="unitSessionId !== ''"
+                    />
                   </UFormField>
                 </div>
                 <div v-if="unitCats.length > 0" class="mt-2 grid gap-2 sm:grid-cols-2">

@@ -115,3 +115,51 @@ describe('event unit reports — server scope (existing guards)', () => {
     assert.match(src, /scopeFilter\(/, 'branch callers see only their rows')
   })
 })
+
+describe('AFC-827 pick from the programme session list', () => {
+  const CAPTURE = 'apps/web/server/api/attendance/capture.post.ts'
+
+  it('the form offers the programme session list with a manual fallback', () => {
+    const page = codeOf(PAGE)
+    assert.match(
+      page,
+      /unitSessionItems/,
+      'session picker items derive from the loaded programme sessions',
+    )
+    assert.match(
+      page,
+      /New session/,
+      'manual entry stays available when no listed session fits',
+    )
+    assert.match(page, /unitSessionId/, 'the picked session id rides the save')
+  })
+
+  it('picking a session auto-fills date and name and locks the manual fields', () => {
+    const page = codeOf(PAGE)
+    assert.match(
+      page,
+      /unitPickSession/,
+      'picking fills date/type/name from the listed session',
+    )
+    assert.match(
+      page,
+      /:disabled="unitSessionId !== ''"/,
+      'manual fields lock while a listed session is picked',
+    )
+  })
+
+  it('the capture route targets the session instead of twinning it', () => {
+    const route = codeOf(CAPTURE)
+    assert.match(
+      route,
+      /session_id/,
+      'capture accepts an optional existing-session target',
+    )
+    assert.match(route, /session_not_found/, 'an unknown session id fails closed')
+    assert.match(
+      route,
+      /session_event_mismatch/,
+      'a session from another event fails closed',
+    )
+  })
+})
