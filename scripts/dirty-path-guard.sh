@@ -224,7 +224,16 @@ GUARDED_PATHS=(
 # named .github/ at all: the dirty query never asked about it and R2 never
 # applied to it, so the one commit that removes or neuters the dirty-path
 # guard job in CI -- the mechanism by which this guard is enforced -- could
-# ship with no claim and no reviewer. The claim registry already treated
+# ship with no claim and no reviewer.
+#
+# scripts/dirty-path-guard.sh itself is on R2 as of AFC-339. The list above is
+# this guard's own escape hatch: an unreviewed edit here could drop a path
+# (e.g. bootstrap/**) from review with no mechanical check, which is exactly
+# the inversion AFC-233 closed for the grandfather list. Whole-file scope, on
+# purpose: review_required() matches paths, not blocks, so block-scoping the
+# entry would need a matcher this guard does not have; self-test-only edits
+# take the same named reviewer as everything else rather than a second
+# mechanism. The claim registry already treated
 # ci.yml as claimable (AFC-202, AFC-203), so the registry and the guard
 # disagreed about whether the file is governed; the guard is now in line
 # with the registry. Only ci.yml is on R2, not .github/workflows/ as a
@@ -240,6 +249,7 @@ REVIEW_REQUIRED_PATHS=(
   "tests/db/**"
   "scripts/retention-literal-gate.sh"
   "scripts/r2-grandfathered.json"
+  "scripts/dirty-path-guard.sh"
   ".github/workflows/ci.yml"
 )
 
@@ -863,12 +873,13 @@ Reviewed-by: Someone
       # the repo, so prove the boundary is respected.
       echo "SELF-TEST FAIL: review_required flagged tests/assert.sql; R2 names tests/db/**, not tests/"
       rc=1
-    elif review_required "scripts/dirty-path-guard.sh"; then
-      # The sharpest instance of the two-lists decision: this file lives under
-      # scripts/, which the DIRTY guard covers, but R2 names
-      # scripts/retention-literal-gate.sh specifically. Conflating them would
-      # demand a reviewer on every script in the repo.
-      echo "SELF-TEST FAIL: review_required flagged scripts/dirty-path-guard.sh; R2 names one script, not scripts/"
+    elif ! review_required "scripts/dirty-path-guard.sh"; then
+      # AFC-339: the guard itself is on the R2 review path. Before that, the
+      # dirty guard covered it (it is under scripts/) but R2 did not, so the
+      # R2 list itself could be edited with no review record. The two-lists
+      # decision stands: other files under scripts/ stay off R2 (proved by
+      # 12c), only this named file joins the two named above it.
+      echo "SELF-TEST FAIL: review_required did not match scripts/dirty-path-guard.sh; AFC-339 added it to R2"
       rc=1
     elif review_required "docs/adr/ADR-0003-control-suite-real-engine.md"; then
       echo "SELF-TEST FAIL: review_required flagged a path outside the R2 list"
@@ -1916,7 +1927,7 @@ Issue: AFC-998
 { "issue": "AFC-997", "authorAgentId": "agent-elsewhere",
   "claimedAt": "2026-10-06T03:00:00Z", "paths": ["tests/db/**"] }
 JSON
-  git -C "$good_repo" add -A
+  git -C "$good_repo" add tests/db/61_cli_clean.sql "$CLAIMS_DIR/AFC-997.json"
   git -C "$good_repo" commit -q -m "feat(retention): claimed and reviewed compliance-path commit
 
 Issue: AFC-997
@@ -2403,6 +2414,9 @@ Issue: AFC-995
   #           with the same empty trailers still passes, so "refuse every
   #           scripts/ commit" cannot satisfy 12b.
   #      12d  the dirty-tree side, on a tree whose `git status` is EMPTY.
+  #      12f  the guard covers itself (AFC-339): review_required() names this
+  #           file, and a commit editing the R2 list is refused without a
+  #           reviewer and passes with one.
 
   # 12a. Matcher both ways, and the premise.
   if ! never_exist "scripts/grep-awareness-write-context.sh"; then
@@ -2550,6 +2564,66 @@ Issue: AFC-995
         echo "  self-test ok: the commit that deletes the forbidden path is not refused"
       fi
     fi
+  fi
+
+  # 12f. THE GUARD COVERS ITSELF. AFC-339.
+  #
+  #      review_required() must name this file: otherwise an unreviewed edit
+  #      to the R2 list above ships with no mechanical review. Both
+  #      directions at the commit level, on a fixture carrying this script:
+  #      without a reviewer the R2-list edit is refused as R2; with a
+  #      Reviewed-by trailer and its own R1 claim it passes.
+  if ! review_required "scripts/dirty-path-guard.sh"; then
+    echo "SELF-TEST FAIL: the guard's own path is not on REVIEW_REQUIRED_PATHS (AFC-339)"
+    rc=1
+  else
+    echo "  self-test ok: review_required names the guard itself"
+  fi
+  local self_repo="$tmp/self-cover"
+  mkdir -p "$self_repo/scripts" "$self_repo/$CLAIMS_DIR"
+  git -C "$self_repo" init -q
+  git -C "$self_repo" config user.email guard@afc.test
+  git -C "$self_repo" config user.name "AFC guard self-test"
+  cp "$0" "$self_repo/scripts/dirty-path-guard.sh"
+  printf '# fixture\n' > "$self_repo/notes.md"
+  git -C "$self_repo" add -A
+  git -C "$self_repo" commit -q -m "chore: non-compliance fixture commit"
+  printf '# AFC-339 fixture edit\n' >> "$self_repo/scripts/dirty-path-guard.sh"
+  git -C "$self_repo" add scripts/dirty-path-guard.sh
+  git -C "$self_repo" commit -q -m "chore(gates): unreviewed edit to the R2 list"
+  local self_out self_rc
+  self_out=$(check_commit "$self_repo" "HEAD^..HEAD" 2>&1)
+  self_rc=$?
+  if [ "$self_rc" -eq 0 ]; then
+    echo "SELF-TEST FAIL: an unreviewed edit to the guard's R2 list exited 0"
+    printf '%s\n' "$self_out" | sed 's/^/    /'
+    rc=1
+  elif ! printf '%s\n' "$self_out" | grep -q 'R2 VIOLATION'; then
+    echo "SELF-TEST FAIL: the R2-list edit was refused, but not as R2"
+    printf '%s\n' "$self_out" | sed 's/^/    /'
+    rc=1
+  else
+    echo "  self-test ok: an unreviewed edit to the R2 list is refused as R2"
+  fi
+  # The other direction: the same edit with a named reviewer and its own R1
+  # claim passes, so the refusal above is about the review and nothing else.
+  cat > "$self_repo/$CLAIMS_DIR/AFC-999.json" <<'JSON'
+{ "issue": "AFC-999", "authorAgentId": "agent-author",
+  "claimedAt": "2026-10-06T02:57:00Z", "paths": ["scripts/dirty-path-guard.sh"] }
+JSON
+  git -C "$self_repo" add "$CLAIMS_DIR/AFC-999.json"
+  git -C "$self_repo" commit -q -m "chore(provenance): claim the R2-list edit"
+  printf '# AFC-339 fixture edit, reviewed\n' >> "$self_repo/scripts/dirty-path-guard.sh"
+  git -C "$self_repo" add scripts/dirty-path-guard.sh
+  git -C "$self_repo" commit -q -m "chore(gates): reviewed edit to the R2 list" -m "Issue: AFC-999" -m "Reviewed-by: Tester"
+  self_out=$(check_commit "$self_repo" "HEAD^..HEAD" 2>&1)
+  self_rc=$?
+  if [ "$self_rc" -ne 0 ]; then
+    echo "SELF-TEST FAIL: a reviewed R2-list edit was refused"
+    printf '%s\n' "$self_out" | sed 's/^/    /'
+    rc=1
+  else
+    echo "  self-test ok: a reviewed edit to the R2 list passes"
   fi
 
   return $rc

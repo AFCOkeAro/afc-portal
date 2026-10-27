@@ -1,0 +1,15 @@
+{
+  "issue": "AFC-339",
+  "authorAgentId": "human-operator-board",
+  "authorName": "Board chairman (CLI operator session)",
+  "claimedAt": "2026-10-27T21:00:00+01:00",
+  "scopeOfTheClaim": "R1 only: authorship of the guard change below. Correctness is for CI (R4) and the CTO review (R2).",
+  "whatTheChangeActuallyDoes": "Puts scripts/dirty-path-guard.sh itself on REVIEW_REQUIRED_PATHS (whole-file scope: the matcher names paths, not blocks), with an AFC-339 comment following the file's convention. Self-test: new block 12f (matcher names the guard; unreviewed R2-list edit refused as R2; reviewed edit with own R1 claim passes); updated the pre-fix assertion that encoded the gap as expected behavior; fixed 11c fixture hygiene (explicit git add so the untracked script copy is not swept into the acceptance commit). Full self-test 67/67 green.",
+  "whatThisFileIs": "An R1 authorship claim, and nothing else.",
+  "doesNotClaimR2": "No reviews[] entry here and none from me. R2 wants a named reviewer who is not the author. AC3 asks for SecurityEngineer; that seat is vacant (board declined on cost), so CTO R2 is requested as the recorded degradation, per precedent.",
+  "notClaimedPaths": "Nothing else; this commit touches only the two claim paths.",
+  "paths": [
+    "scripts/dirty-path-guard.sh",
+    ".provenance/claims/AFC-339.json"
+  ]
+}
