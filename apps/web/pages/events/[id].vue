@@ -38,7 +38,7 @@ const TABS = [
   { id: 'attendance', label: 'Attendance', icon: 'i-lucide-clipboard-list' },
   { id: 'reports', label: 'Reports', icon: 'i-lucide-chart-column' },
   { id: 'schedule', label: 'Schedule', icon: 'i-lucide-calendar-days' },
-  { id: 'materials', label: 'Materials', icon: 'i-lucide-folder-open' },
+  { id: 'materials', label: 'Resources', icon: 'i-lucide-folder-open' },
   { id: 'tasks', label: 'Tasks', icon: 'i-lucide-square-kanban' },
   { id: 'expenses', label: 'Expenses', icon: 'i-lucide-receipt' },
 ] as const
@@ -1873,11 +1873,11 @@ watch(
       </section>
 
       <!-- MATERIALS -->
-      <section v-if="tab === 'materials'" aria-label="Materials" class="mt-4">
+      <section v-if="tab === 'materials'" aria-label="Resources" class="mt-4">
         <p class="mb-3 text-sm text-gray-500">0 items</p>
         <UCard>
           <EmptyState
-            title="No materials yet"
+            title="No resources yet"
             description="Guidelines, handbooks and the order of programme will appear here once they're shared."
           >
             <UButton
