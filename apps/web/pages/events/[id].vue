@@ -605,6 +605,20 @@ const expenseForm = ref({
   notes: '',
 })
 
+/**
+ * Receipt scan for the expense being recorded (AFC-824). Expenses are
+ * append-only, so the file uploads first and its id rides the create.
+ */
+const expenseReceiptFile = ref<File | null>(null)
+const expenseReceiptName = ref('')
+
+function pickExpenseReceipt(target: EventTarget | null): void {
+  const files = (target as HTMLInputElement | null)?.files
+  const first = files && files.length > 0 ? files[0] : null
+  expenseReceiptFile.value = first
+  expenseReceiptName.value = first?.name ?? ''
+}
+
 const expenseCategoryOptions = EXPENSE_CATEGORIES.map((value) => ({
   label: value.charAt(0).toUpperCase() + value.slice(1),
   value,
@@ -686,6 +700,23 @@ async function submitExpense(): Promise<void> {
   expenseError.value = ''
   expenseFieldErrors.value = {}
   try {
+    let receipt: string | undefined
+    if (expenseReceiptFile.value) {
+      const uploadBody = new FormData()
+      uploadBody.append('file', expenseReceiptFile.value)
+      try {
+        const uploaded = await api.post<{ data: { id: string } }>(
+          `/api/events/${id}/expenses/upload`,
+          uploadBody,
+        )
+        receipt = uploaded.data.id
+      } catch {
+        expenseError.value =
+          'Could not upload that receipt — check the file and try again'
+        expenseFieldErrors.value = { file: 'Could not upload that receipt' }
+        return
+      }
+    }
     await api.post(`/api/events/${id}/expenses`, {
       category: parsed.data.category,
       ...(parsed.data.category_other_label
@@ -695,6 +726,7 @@ async function submitExpense(): Promise<void> {
       currency: parsed.data.currency,
       spent_on: parsed.data.spent_on,
       ...(parsed.data.notes ? { notes: parsed.data.notes } : {}),
+      ...(receipt ? { receipt } : {}),
     })
     showExpenseForm.value = false
     expenseForm.value = {
@@ -705,6 +737,8 @@ async function submitExpense(): Promise<void> {
       spent_on: new Date().toISOString().slice(0, 10),
       notes: '',
     }
+    expenseReceiptFile.value = null
+    expenseReceiptName.value = ''
     await loadExpenses()
   } catch (cause) {
     const error = cause as { message?: string; fields?: Record<string, string> }
@@ -1965,6 +1999,7 @@ watch(
                   <th class="px-3 py-2 font-medium">Category</th>
                   <th class="px-3 py-2 font-medium">Amount</th>
                   <th class="px-3 py-2 font-medium">Notes</th>
+                  <th class="px-3 py-2 font-medium">Receipt</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
@@ -1981,6 +2016,19 @@ watch(
                   <td class="px-3 py-3 text-gray-600 dark:text-gray-300">
                     {{ row.notes || '—' }}
                   </td>
+                  <td class="px-3 py-3">
+                    <UButton
+                      v-if="row.receipt"
+                      size="xs"
+                      color="neutral"
+                      variant="ghost"
+                      icon="i-lucide-receipt"
+                      label="View"
+                      :to="`/api/events/${id}/expenses/receipt?file=${row.receipt}`"
+                      target="_blank"
+                    />
+                    <span v-else class="text-gray-400">—</span>
+                  </td>
                 </tr>
                 <tr class="font-medium">
                   <td class="px-3 py-2">Total</td>
@@ -1992,6 +2040,7 @@ watch(
                         : '—'
                     }}
                   </td>
+                  <td class="px-3 py-2" />
                   <td class="px-3 py-2" />
                 </tr>
               </tbody>
@@ -2082,6 +2131,23 @@ watch(
             </div>
             <UFormField label="Notes" :error="expenseFieldErrors.notes">
               <UTextarea v-model="expenseForm.notes" class="w-full" :rows="3" />
+            </UFormField>
+            <UFormField label="Receipt (optional)" :error="expenseFieldErrors.file">
+              <input
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png,.webp"
+                class="w-full text-sm text-gray-500 file:mr-3 file:rounded-lg file:border-0 file:bg-gray-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-gray-700 dark:file:bg-gray-800 dark:file:text-gray-200"
+                @change="pickExpenseReceipt($event.target)"
+              />
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                PDF, JPG, PNG or WebP, up to 10 MB. Sent when you record the expense.
+              </p>
+              <p
+                v-if="expenseReceiptName"
+                class="mt-1 text-xs text-gray-500 dark:text-gray-400"
+              >
+                Attached: {{ expenseReceiptName }}
+              </p>
             </UFormField>
             <div class="flex justify-end gap-2">
               <UButton
