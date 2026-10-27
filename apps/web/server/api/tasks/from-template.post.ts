@@ -1,13 +1,17 @@
 import { expandTaskTemplate, getTaskTemplate, taskFromTemplateSchema } from '@afc/shared'
 import {
   createItem,
+  eventScopeFilter,
+  findScopedItem,
   getPortalScope,
   requireCan,
   resolveBranch,
+  scopeFilter,
   scopeZoneIds,
+  throwStoreUnavailable,
   throwValidation,
 } from '../../utils/portal'
-import { writeOfficeAudit } from '../../utils/office'
+import { officeZoneScope, writeOfficeAudit } from '../../utils/office'
 
 /**
  * POST /api/tasks/from-template — apply a recurring checklist template
@@ -32,6 +36,48 @@ export default defineEventHandler(async (event) => {
       statusMessage: 'Unknown template',
       data: { code: 'validation_error', fields: { template: 'Unknown template' } },
     })
+  }
+
+  // AFC-832: a template only attaches inside its own domain. A marriage
+  // template linked to an event (or vice versa) fails closed here instead
+  // of scattering mislabelled tasks. Unlinked applies (no related_id)
+  // behave as before.
+  if (form.related_id) {
+    if (template.relatedType === 'event') {
+      await findScopedItem<Record<string, unknown>>(
+        event,
+        scope,
+        'events',
+        form.related_id,
+        {
+          fields: ['id', 'branch'],
+          scope: eventScopeFilter(scope),
+        },
+      ).catch((error: unknown) => {
+        if (error && typeof error === 'object' && 'statusCode' in error) throw error
+        throwStoreUnavailable(error, 'event store', '0021')
+      })
+    } else if (template.relatedType === 'marriage') {
+      await findScopedItem<Record<string, unknown>>(
+        event,
+        scope,
+        'marriage_cases',
+        form.related_id,
+        { scope: { ...scopeFilter(scope), ...officeZoneScope(scope) } },
+      ).catch((error: unknown) => {
+        if (error && typeof error === 'object' && 'statusCode' in error) throw error
+        throwStoreUnavailable(error, 'marriage store', '0035')
+      })
+    } else {
+      throw createError({
+        statusCode: 400,
+        statusMessage: 'That template cannot attach to a record',
+        data: {
+          code: 'template_domain_unknown',
+          fields: { template: 'Pick a supported template' },
+        },
+      })
+    }
   }
 
   const branch = resolveBranch(scope, form.branch)
