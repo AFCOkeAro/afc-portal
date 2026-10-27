@@ -825,7 +825,7 @@ watch(
           <UButton
             size="xs"
             color="neutral"
-            variant="ghost"
+            variant="outline"
             label="Edit programme"
             icon="i-lucide-pencil"
             @click="showEdit = true"
