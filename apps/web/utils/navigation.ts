@@ -40,6 +40,8 @@ export interface NavigationItem {
 export type NavigationGroup =
   | 'dashboard'
   | 'office'
+  | 'family'
+  | 'finance'
   | 'outreach'
   | 'welfare'
   | 'worship'
@@ -64,7 +66,9 @@ export const NAVIGATION_GROUPS: readonly NavigationGroupDef[] = [
     icon: 'i-lucide-layout-dashboard',
     to: '/dashboard',
   },
-  { key: 'office', label: 'Office Admin', icon: 'i-lucide-briefcase', to: '/minutes' },
+  { key: 'office', label: 'Church Office', icon: 'i-lucide-briefcase', to: '/minutes' },
+  { key: 'family', label: 'Family', icon: 'i-lucide-heart', to: '/marriage' },
+  { key: 'finance', label: 'Finance', icon: 'i-lucide-landmark', to: '/finance/records' },
   { key: 'outreach', label: 'Outreach', icon: 'i-lucide-radar', to: '/departments' },
   { key: 'welfare', label: 'Welfare', icon: 'i-lucide-heart-handshake', to: '/visitors' },
   { key: 'worship', label: 'Worship', icon: 'i-lucide-church', to: '/departments' },
@@ -123,7 +127,7 @@ export const NAVIGATION: readonly NavigationItem[] = [
     to: '/marriage',
     icon: 'i-lucide-heart',
     requires: ['marriage_matters', 'read'],
-    group: 'office',
+    group: 'family',
     inSidebar: true,
   },
   {
@@ -133,7 +137,7 @@ export const NAVIGATION: readonly NavigationItem[] = [
     to: '/marriage-cases',
     icon: 'i-lucide-heart-handshake',
     requires: ['marriage_cases', 'read'],
-    group: 'office',
+    group: 'family',
     inSidebar: true,
   },
   {
@@ -143,7 +147,7 @@ export const NAVIGATION: readonly NavigationItem[] = [
     to: '/marriage-cases/report',
     icon: 'i-lucide-scroll-text',
     requires: ['marriage_cases', 'read'],
-    group: 'office',
+    group: 'family',
     inSidebar: true,
   },
   {
@@ -164,7 +168,7 @@ export const NAVIGATION: readonly NavigationItem[] = [
     to: '/finance/records',
     icon: 'i-lucide-landmark',
     requires: ['branch_financial_records', 'read'],
-    group: 'office',
+    group: 'finance',
     inSidebar: true,
   },
   {
@@ -173,7 +177,7 @@ export const NAVIGATION: readonly NavigationItem[] = [
     to: '/finance/formulas',
     icon: 'i-lucide-notebook-text',
     requires: ['branch_financial_records', 'read'],
-    group: 'office',
+    group: 'finance',
     inSidebar: true,
   },
   {
@@ -182,7 +186,7 @@ export const NAVIGATION: readonly NavigationItem[] = [
     to: '/finance/returns',
     icon: 'i-lucide-clipboard-check',
     requires: ['branch_financial_records', 'read'],
-    group: 'office',
+    group: 'finance',
     inSidebar: true,
   },
   {
@@ -191,7 +195,7 @@ export const NAVIGATION: readonly NavigationItem[] = [
     to: '/finance/summary',
     icon: 'i-lucide-chart-column',
     requires: ['branch_financial_records', 'read'],
-    group: 'office',
+    group: 'finance',
     inSidebar: true,
   },
   {
@@ -199,7 +203,7 @@ export const NAVIGATION: readonly NavigationItem[] = [
     to: '/transfers',
     icon: 'i-lucide-arrow-right-left',
     requires: ['transfers', 'read'],
-    group: 'office',
+    group: 'finance',
     inSidebar: true,
   },
   {
