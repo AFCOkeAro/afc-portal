@@ -9,6 +9,16 @@
 import type { NavigationItem } from '~/utils/navigation'
 
 const { user, logout } = useAuth()
+
+/**
+ * Update banner flag (AFC-821). Set by the version-check plugin when
+ * staging serves a newer build than this page was bundled from.
+ */
+const updateAvailable = useState<boolean>('afc:update-available', () => false)
+
+function refreshPage(): void {
+  window.location.reload()
+}
 const permissions = usePermissions()
 const route = useRoute()
 
@@ -439,6 +449,28 @@ const menuItems = computed(() => [
       <main class="min-w-0 flex-1 p-5 lg:p-8">
         <slot />
       </main>
+
+      <!-- Update banner (AFC-821): the open page runs an older build than
+        staging serves. One click replaces the logout-and-hard-reset dance
+        for code updates. -->
+      <div
+        v-if="updateAvailable"
+        class="fixed bottom-4 right-4 z-[60] max-w-sm rounded-xl border border-primary-200 bg-white p-4 shadow-lg dark:border-primary-900 dark:bg-gray-900"
+        role="status"
+      >
+        <p class="text-sm font-semibold">A new version is available</p>
+        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          Staging was updated since this page loaded. Refresh to load it — no sign-out
+          needed for the new screens.
+        </p>
+        <UButton
+          class="mt-3"
+          size="sm"
+          label="Refresh now"
+          icon="i-lucide-refresh-cw"
+          @click="refreshPage"
+        />
+      </div>
     </div>
   </div>
 </template>
