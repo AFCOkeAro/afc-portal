@@ -288,13 +288,13 @@ function hasStructuredAddress(form: {
 }): boolean {
   return Boolean(
     form.address_1 ??
-      form.address_2 ??
-      form.city ??
-      form.state ??
-      form.zip ??
-      form.country ??
-      form.latitude ??
-      form.longitude,
+    form.address_2 ??
+    form.city ??
+    form.state ??
+    form.zip ??
+    form.country ??
+    form.latitude ??
+    form.longitude,
   )
 }
 
@@ -311,7 +311,14 @@ function composeAddress(form: {
   zip?: string | null
   country?: string | null
 }): string | null {
-  const parts = [form.address_1, form.address_2, form.city, form.state, form.zip, form.country]
+  const parts = [
+    form.address_1,
+    form.address_2,
+    form.city,
+    form.state,
+    form.zip,
+    form.country,
+  ]
     .map((part) => part?.trim())
     .filter((part): part is string => Boolean(part))
   return parts.length > 0 ? parts.join(', ') : null
@@ -329,22 +336,27 @@ async function resolveBscInScope(
   bscId: string,
 ): Promise<string> {
   const visibleZones = await scopeZoneIds(event, scope)
-  const scoped = await listItems<{ id: string | number }>(event, scope, 'bible_study_centres', {
-    filter: mergeFilters(
-      { id: { _eq: bscId } },
-      { status: { _eq: 'active' } },
-      scope.isArea
-        ? undefined
-        : scope.zoneIds.length > 0
-          ? zoneScopeFilter(scope)
-          : { parent_branch: { _in: scope.branchIds } },
-      !scope.isArea && visibleZones.length > 0 && scope.zoneIds.length === 0
-        ? { zone: { _in: visibleZones } }
-        : undefined,
-    ),
-    fields: ['id'],
-    limit: 1,
-  })
+  const scoped = await listItems<{ id: string | number }>(
+    event,
+    scope,
+    'bible_study_centres',
+    {
+      filter: mergeFilters(
+        { id: { _eq: bscId } },
+        { status: { _eq: 'active' } },
+        scope.isArea
+          ? undefined
+          : scope.zoneIds.length > 0
+            ? zoneScopeFilter(scope)
+            : { parent_branch: { _in: scope.branchIds } },
+        !scope.isArea && visibleZones.length > 0 && scope.zoneIds.length === 0
+          ? { zone: { _in: visibleZones } }
+          : undefined,
+      ),
+      fields: ['id'],
+      limit: 1,
+    },
+  )
   if (scoped.data.length === 0) {
     throw createError({
       statusCode: 403,

@@ -17,7 +17,14 @@
  * same pair the staff person form validates against.
  */
 import { z } from 'zod'
-import { dateSchema, emailSchema, optionalNote, optionalText, phoneSchema, uuidSchema } from './common'
+import {
+  dateSchema,
+  emailSchema,
+  optionalNote,
+  optionalText,
+  phoneSchema,
+  uuidSchema,
+} from './common'
 import { MEMBERSHIP_STATUSES } from './person'
 
 /** Household member roles for the wizard. `households.household_head`

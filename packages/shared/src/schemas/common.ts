@@ -32,7 +32,9 @@ export const timeSchema = z
 /** Postgres `numeric(12,2)` arrives as a string; it is not a float. */
 export const moneySchema = z
   .union([
-    z.string().regex(/^\d+(\.\d{1,2})?$/, 'Expected a decimal amount with at most two places'),
+    z
+      .string()
+      .regex(/^\d+(\.\d{1,2})?$/, 'Expected a decimal amount with at most two places'),
     z.literal(''),
     z.null(),
   ])

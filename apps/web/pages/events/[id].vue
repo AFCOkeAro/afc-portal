@@ -1510,7 +1510,10 @@ watch(
           <p v-else class="text-sm text-gray-500">
             No sessions recorded for this programme yet.
           </p>
-          <div v-if="canEdit" class="mt-4 border-t border-gray-200 pt-4 dark:border-gray-800">
+          <div
+            v-if="canEdit"
+            class="mt-4 border-t border-gray-200 pt-4 dark:border-gray-800"
+          >
             <h3 class="text-sm font-semibold">Record headcount</h3>
             <div class="mt-2 grid gap-2 sm:grid-cols-3">
               <UFormField label="Session date">
