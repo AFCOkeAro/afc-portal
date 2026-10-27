@@ -143,7 +143,11 @@ function birthIso(member: WizardMember): string | undefined {
   const day = Number(d)
   if (!year || !month || !day) return 'incomplete'
   const date = new Date(year, month - 1, day)
-  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
     return 'invalid'
   }
   return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
@@ -305,8 +309,15 @@ async function submit(): Promise<void> {
           <UFormField label="Wedding date (optional)" :error="fieldErrors.wedding_date">
             <UInput v-model="weddingDate" type="date" class="w-full" />
           </UFormField>
-          <UFormField label="Old address line (kept readable)" :error="fieldErrors.address">
-            <UInput v-model="address" class="w-full" placeholder="Legacy single-line address" />
+          <UFormField
+            label="Old address line (kept readable)"
+            :error="fieldErrors.address"
+          >
+            <UInput
+              v-model="address"
+              class="w-full"
+              placeholder="Legacy single-line address"
+            />
           </UFormField>
         </div>
         <div class="mt-4 grid gap-4 sm:grid-cols-2">
@@ -314,7 +325,11 @@ async function submit(): Promise<void> {
             <UInput v-model="address1" class="w-full" placeholder="14 Church St" />
           </UFormField>
           <UFormField label="Address line 2 (optional)" :error="fieldErrors.address_2">
-            <UInput v-model="address2" class="w-full" placeholder="Flat, block, landmark" />
+            <UInput
+              v-model="address2"
+              class="w-full"
+              placeholder="Flat, block, landmark"
+            />
           </UFormField>
         </div>
         <div class="mt-4 grid gap-4 sm:grid-cols-3">
@@ -333,10 +348,20 @@ async function submit(): Promise<void> {
             <UInput v-model="country" class="w-full" placeholder="Nigeria" />
           </UFormField>
           <UFormField label="Latitude (optional)" :error="fieldErrors.latitude">
-            <UInput v-model="latitude" inputmode="decimal" class="w-full" placeholder="6.5244" />
+            <UInput
+              v-model="latitude"
+              inputmode="decimal"
+              class="w-full"
+              placeholder="6.5244"
+            />
           </UFormField>
           <UFormField label="Longitude (optional)" :error="fieldErrors.longitude">
-            <UInput v-model="longitude" inputmode="decimal" class="w-full" placeholder="3.3792" />
+            <UInput
+              v-model="longitude"
+              inputmode="decimal"
+              class="w-full"
+              placeholder="3.3792"
+            />
           </UFormField>
         </div>
       </UCard>
@@ -372,7 +397,11 @@ async function submit(): Promise<void> {
           <button
             type="button"
             class="flex w-full items-center gap-2 px-3 py-2 text-left"
-            :class="member.expanded ? 'mb-3 border-b border-gray-100 pb-3 dark:border-gray-800' : ''"
+            :class="
+              member.expanded
+                ? 'mb-3 border-b border-gray-100 pb-3 dark:border-gray-800'
+                : ''
+            "
             :aria-expanded="member.expanded"
             @click="toggleMember(index)"
           >
@@ -385,11 +414,21 @@ async function submit(): Promise<void> {
               <span class="text-gray-500 dark:text-gray-400">
                 · {{ roleLabels[member.role] || 'Pick role' }} ·
                 {{ displayBirth(member) || 'No birth date' }} ·
-                {{ member.membership_status ? statusLabels[member.membership_status] : 'Auto' }}
+                {{
+                  member.membership_status
+                    ? statusLabels[member.membership_status]
+                    : 'Auto'
+                }}
               </span>
             </span>
             <span
-              v-if="memberError(index, 'role') || memberError(index, 'first_name') || memberError(index, 'last_name') || memberError(index, 'gender') || memberError(index, 'date_of_birth')"
+              v-if="
+                memberError(index, 'role') ||
+                memberError(index, 'first_name') ||
+                memberError(index, 'last_name') ||
+                memberError(index, 'gender') ||
+                memberError(index, 'date_of_birth')
+              "
               class="size-2 shrink-0 rounded-full bg-red-500"
               aria-label="This row has errors"
             />
@@ -405,129 +444,153 @@ async function submit(): Promise<void> {
           </button>
 
           <div v-if="member.expanded" class="px-1 pb-1">
+            <div class="grid gap-4 sm:grid-cols-2">
+              <UFormField
+                label="First name"
+                required
+                :error="memberError(index, 'first_name')"
+              >
+                <UInput v-model="member.first_name" class="w-full" />
+              </UFormField>
+              <UFormField
+                label="Middle name (optional)"
+                :error="memberError(index, 'middle_name')"
+              >
+                <UInput v-model="member.middle_name" class="w-full" />
+              </UFormField>
+            </div>
 
-          <div class="grid gap-4 sm:grid-cols-2">
-            <UFormField
-              label="First name"
-              required
-              :error="memberError(index, 'first_name')"
-            >
-              <UInput v-model="member.first_name" class="w-full" />
-            </UFormField>
-            <UFormField label="Middle name (optional)" :error="memberError(index, 'middle_name')">
-              <UInput v-model="member.middle_name" class="w-full" />
-            </UFormField>
-          </div>
+            <div class="mt-4 grid gap-4 sm:grid-cols-2">
+              <UFormField
+                label="Last name"
+                required
+                :error="memberError(index, 'last_name')"
+              >
+                <UInput v-model="member.last_name" class="w-full" />
+              </UFormField>
+              <UFormField label="Suffix (optional)" :error="memberError(index, 'suffix')">
+                <UInput
+                  v-model="member.suffix"
+                  class="w-full"
+                  placeholder="Jr, Sr, III"
+                />
+              </UFormField>
+            </div>
 
-          <div class="mt-4 grid gap-4 sm:grid-cols-2">
-            <UFormField
-              label="Last name"
-              required
-              :error="memberError(index, 'last_name')"
-            >
-              <UInput v-model="member.last_name" class="w-full" />
-            </UFormField>
-            <UFormField label="Suffix (optional)" :error="memberError(index, 'suffix')">
-              <UInput v-model="member.suffix" class="w-full" placeholder="Jr, Sr, III" />
-            </UFormField>
-          </div>
+            <div class="mt-4 grid gap-4 sm:grid-cols-3">
+              <UFormField
+                label="Birth month"
+                :error="memberError(index, 'date_of_birth')"
+              >
+                <UInput
+                  v-model="member.birthM"
+                  inputmode="numeric"
+                  class="w-full"
+                  placeholder="MM"
+                  maxlength="2"
+                  aria-label="Birth month"
+                />
+              </UFormField>
+              <UFormField label="Birth day" :error="memberError(index, 'date_of_birth')">
+                <UInput
+                  v-model="member.birthD"
+                  inputmode="numeric"
+                  class="w-full"
+                  placeholder="DD"
+                  maxlength="2"
+                  aria-label="Birth day"
+                />
+              </UFormField>
+              <UFormField label="Birth year" :error="memberError(index, 'date_of_birth')">
+                <UInput
+                  v-model="member.birthY"
+                  inputmode="numeric"
+                  class="w-full"
+                  placeholder="YYYY"
+                  maxlength="4"
+                  aria-label="Birth year"
+                />
+              </UFormField>
+            </div>
 
-          <div class="mt-4 grid gap-4 sm:grid-cols-3">
-            <UFormField label="Birth month" :error="memberError(index, 'date_of_birth')">
-              <UInput
-                v-model="member.birthM"
-                inputmode="numeric"
-                class="w-full"
-                placeholder="MM"
-                maxlength="2"
-                aria-label="Birth month"
+            <div class="mt-4 grid gap-4 sm:grid-cols-2">
+              <UFormField label="Role" required :error="memberError(index, 'role')">
+                <USelect
+                  v-model="member.role"
+                  :items="roleOptions"
+                  placeholder="Select role…"
+                  class="w-full"
+                />
+              </UFormField>
+              <UFormField label="Gender" required :error="memberError(index, 'gender')">
+                <USelect
+                  v-model="member.gender"
+                  :items="genderOptions"
+                  placeholder="Select gender…"
+                  class="w-full"
+                />
+              </UFormField>
+            </div>
+
+            <div class="mt-4 grid gap-4 sm:grid-cols-2">
+              <UFormField label="Member branch" :error="memberError(index, 'branch')">
+                <EntitySelect
+                  v-model="member.branch"
+                  :items="memberBranchOptions"
+                  placeholder="Select branch…"
+                  class="w-full"
+                />
+              </UFormField>
+              <UFormField label="Status" :error="memberError(index, 'membership_status')">
+                <USelect
+                  v-model="member.membership_status"
+                  :items="statusOptions"
+                  placeholder="Auto by age"
+                  class="w-full"
+                />
+              </UFormField>
+            </div>
+
+            <div class="mt-4">
+              <UFormField label="Bible Study Centre" :error="memberError(index, 'bsc')">
+                <EntitySelect
+                  v-model="member.bsc"
+                  :items="bscOptions"
+                  placeholder="Select centre…"
+                  class="w-full"
+                />
+              </UFormField>
+            </div>
+
+            <div class="mt-4 grid gap-4 sm:grid-cols-2">
+              <UFormField label="Phone" :error="memberError(index, 'phone')">
+                <UInput
+                  v-model="member.phone"
+                  type="tel"
+                  class="w-full"
+                  placeholder="08012345678"
+                />
+              </UFormField>
+              <UFormField label="Email" :error="memberError(index, 'email')">
+                <UInput
+                  v-model="member.email"
+                  type="email"
+                  class="w-full"
+                  placeholder="name@example.com"
+                />
+              </UFormField>
+            </div>
+
+            <div class="mt-4 flex flex-wrap gap-x-8 gap-y-2">
+              <UCheckbox
+                v-model="member.consent_sms"
+                label="SMS consent — writes one SMS record"
               />
-            </UFormField>
-            <UFormField label="Birth day" :error="memberError(index, 'date_of_birth')">
-              <UInput
-                v-model="member.birthD"
-                inputmode="numeric"
-                class="w-full"
-                placeholder="DD"
-                maxlength="2"
-                aria-label="Birth day"
+              <UCheckbox
+                v-model="member.consent_whatsapp"
+                label="WhatsApp consent — writes one WhatsApp record"
               />
-            </UFormField>
-            <UFormField label="Birth year" :error="memberError(index, 'date_of_birth')">
-              <UInput
-                v-model="member.birthY"
-                inputmode="numeric"
-                class="w-full"
-                placeholder="YYYY"
-                maxlength="4"
-                aria-label="Birth year"
-              />
-            </UFormField>
-          </div>
-
-          <div class="mt-4 grid gap-4 sm:grid-cols-2">
-            <UFormField label="Role" required :error="memberError(index, 'role')">
-              <USelect v-model="member.role" :items="roleOptions" placeholder="Select role…" class="w-full" />
-            </UFormField>
-            <UFormField label="Gender" required :error="memberError(index, 'gender')">
-              <USelect v-model="member.gender" :items="genderOptions" placeholder="Select gender…" class="w-full" />
-            </UFormField>
-          </div>
-
-          <div class="mt-4 grid gap-4 sm:grid-cols-2">
-            <UFormField label="Member branch" :error="memberError(index, 'branch')">
-              <EntitySelect
-                v-model="member.branch"
-                :items="memberBranchOptions"
-                placeholder="Select branch…"
-                class="w-full"
-              />
-            </UFormField>
-            <UFormField label="Status" :error="memberError(index, 'membership_status')">
-              <USelect v-model="member.membership_status" :items="statusOptions" placeholder="Auto by age" class="w-full" />
-            </UFormField>
-          </div>
-
-          <div class="mt-4">
-            <UFormField label="Bible Study Centre" :error="memberError(index, 'bsc')">
-              <EntitySelect
-                v-model="member.bsc"
-                :items="bscOptions"
-                placeholder="Select centre…"
-                class="w-full"
-              />
-            </UFormField>
-          </div>
-
-          <div class="mt-4 grid gap-4 sm:grid-cols-2">
-            <UFormField label="Phone" :error="memberError(index, 'phone')">
-              <UInput
-                v-model="member.phone"
-                type="tel"
-                class="w-full"
-                placeholder="08012345678"
-              />
-            </UFormField>
-            <UFormField label="Email" :error="memberError(index, 'email')">
-              <UInput
-                v-model="member.email"
-                type="email"
-                class="w-full"
-                placeholder="name@example.com"
-              />
-            </UFormField>
-          </div>
-
-          <div class="mt-4 flex flex-wrap gap-x-8 gap-y-2">
-            <UCheckbox
-              v-model="member.consent_sms"
-              label="SMS consent — writes one SMS record"
-            />
-            <UCheckbox
-              v-model="member.consent_whatsapp"
-              label="WhatsApp consent — writes one WhatsApp record"
-            />
-          </div>
+            </div>
           </div>
         </div>
       </UCard>

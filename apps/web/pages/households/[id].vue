@@ -286,7 +286,10 @@ const sections = computed(() => [
                   .join(', ') || household.address
               }}
             </p>
-            <p v-if="household.latitude != null && household.longitude != null" class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            <p
+              v-if="household.latitude != null && household.longitude != null"
+              class="mt-1 text-xs text-gray-500 dark:text-gray-400"
+            >
               Map pin: {{ household.latitude }}, {{ household.longitude }}
             </p>
           </div>

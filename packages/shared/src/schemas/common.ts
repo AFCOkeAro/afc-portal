@@ -31,10 +31,14 @@ export const timeSchema = z
 
 /** Postgres `numeric(12,2)` arrives as a string; it is not a float. */
 export const moneySchema = z
-  .string()
-  .regex(/^\d+(\.\d{1,2})?$/, 'Expected a decimal amount with at most two places')
-  .or(z.literal(''))
-  .transform((value) => (value === '' ? null : value))
+  .union([
+    z
+      .string()
+      .regex(/^\d+(\.\d{1,2})?$/, 'Expected a decimal amount with at most two places'),
+    z.literal(''),
+    z.null(),
+  ])
+  .transform((value) => (value === '' || value === null ? null : value))
 
 /**
  * A trimmed string that is optional, and normalises `""` to `undefined`.

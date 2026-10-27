@@ -195,6 +195,13 @@ tokens after first boot from the admin UI over an SSH tunnel
 (`ssh -L 8055:127.0.0.1:8055 <vps>` — the compose port binds loopback only
 by design; publishing 8055 publicly needs CTO sign-off).
 
+  Preflight before `up` (empty `DIRECTUS_DB_USER` interpolates with a warning
+  and Directus boots privileged — this refuses instead):
+
+```sh
+test "${DIRECTUS_DB_USER:?DIRECTUS_DB_USER is empty — set DIRECTUS_DB_USER=directus_app in the host .env}" = directus_app
+```
+
 ### 7.2 Start
 
 From the repo root on the VPS:
@@ -257,31 +264,80 @@ owner — never a migration identity (ADR-0002).
 
 ### 8.2 Apply migrations as `directus_migrator` (SET ROLE pattern)
 
+`directus_migrator` is `NOLOGIN` (bootstrap `0001_roles.sql`), so no one
+connects as it directly. `$ADMIN_DATABASE_URL` must connect as a LOGIN role
+with authority to assume it — on staging that is `${POSTGRES_USER}`, the
+cluster owner/superuser from `compose.directus.yml` — never as
+`directus_app`. The `SET ROLE` runs inside the pasted block in the same
+`psql` session (`psql` executes `-c` before `-f` in order in one session,
+and a superuser may `SET ROLE` to anyone), so every file executes as
+`directus_migrator` and created tables land migrator-owned. Without the
+in-session `SET ROLE`, the block connects as the owner LOGIN and every
+created table lands owner-owned — reproducing the pre-749 defect.
+
 ```sh
+# Order-preserving glob: filename order is the migration order, and a new
+# 20*.sql file is picked up automatically — never hand-maintain a frozen
+# subset here (a partial list yields a partial schema missing field-policy,
+# hardening, and grant-matrix files). Engine file last (it is behaviour,
+# not schema history).
+for f in $(ls services/directus/schema/migrations/20*.sql | sort); do
+  psql "$ADMIN_DATABASE_URL" -v ON_ERROR_STOP=1 \
+       -c "SET ROLE directus_migrator" \
+       -f "$f"
+done
 psql "$ADMIN_DATABASE_URL" -v ON_ERROR_STOP=1 \
-     -f services/directus/schema/migrations/20261006_0001_incidents.sql \
-     -f services/directus/schema/migrations/20261006_0002_incidents_awareness_at.sql \
-     -f services/directus/schema/migrations/20261006_0003_incidents_awareness_field_policy.sql \
-     -f services/directus/schema/migrations/20261006_0004_retention.sql
+     -c "SET ROLE directus_migrator" \
+     -f services/directus/schema/engine/0001_retention_engine.sql
 ```
 
-See `services/directus/schema/migrations/README.md` "Running them" for the
-full sequence (engine file last). Do not run them as `directus_app`.
+Do not run them as `directus_app`.
 
 ### 8.3 Existing staging DBs: ownership migration (operator-run, once)
 
 Databases created before AFC-749 have every table owned by the superuser
 (`POSTGRES_USER`), so the column-level grant model is unenforced even with
-the new identity wired. One-time operator fix, BEFORE relying on §8.4:
+the new identity wired. The AFC-783 outage added the second half: the
+`directus_*` system tables are superuser-owned too, and migration 0042 can
+only grant on what `directus_migrator` owns. One-time operator fix, BEFORE
+relying on §8.4:
 
 1. `pg_dump` the staging database first.
-2. As the cluster owner: `ALTER TABLE ... OWNER TO directus_migrator` for
-   every application table (or `REASSIGN OWNED BY <superuser> TO
-   directus_migrator` scoped to the staging database only).
-3. Re-assert grants by re-running §8.2 (migrations are GRANT/REVOKE-safe).
+2. Connect to the staging database via `$ADMIN_DATABASE_URL` (same
+   owner LOGIN as §8.2) and transfer ownership of application tables AND
+   every `directus_*` table and sequence to `directus_migrator`. Scoped to
+   the staging database only. Preferred: per object —
+   `ALTER TABLE ... OWNER TO directus_migrator` (and `ALTER SEQUENCE ...
+   OWNER TO directus_migrator` for each `directus_*` sequence) — so only
+   the named objects move. Fallback: in one step,
+   `REASSIGN OWNED BY <superuser> TO directus_migrator`, which moves
+   EVERY object the superuser owns in the connected database (including
+   extension-owned objects) — confirm the connected database is the
+   staging database first, and prefer the per-object form when anything
+   else in the database must stay superuser-owned.
+3. Verify zero foreign-owned relations remain (must answer zero rows —
+   every public table, sequence, and view should belong to the migrator):
+   ```sql
+   SELECT n.nspname || '.' || c.relname AS object,
+          r.rolname AS owner
+     FROM pg_class c
+     JOIN pg_namespace n ON n.oid = c.relnamespace
+     JOIN pg_roles r ON r.oid = c.relowner
+    WHERE n.nspname = 'public'
+      AND c.relkind IN ('r', 'p', 'S', 'v', 'm', 'f')
+      AND r.rolname <> 'directus_migrator';
+   ```
+4. Re-assert grants by re-running §8.2 (migrations are GRANT/REVOKE-safe),
+   including `20261024_0042_directus_runtime_matrix.sql`, which refuses with
+   a named `restrict_violation` while anything in step 3 is still outstanding.
 
 §5 `down -v` warning applies throughout: never use `down -v` — it deletes
 `directus_pgdata` and `directus_uploads`.
+
+Fresh databases (no Directus boot yet): there are no `directus_*` tables, so
+0042 is a NOTICE-only no-op. Initialise the system schema first with a
+one-time owner-capable Directus run, then do steps 2–4 above, then re-run
+0042 — never grant `directus_app` CREATE to make the first boot work.
 
 ### 8.4 After ANY schema apply: restart, wait, API round-trip
 
@@ -299,6 +355,51 @@ pre-migration in-memory schema until the restart above.
 Rollback pointer: redeploy the previous `WEB_IMAGE` tag (host `.env`,
 re-run the §7.2 start command). Named volumes survive plain `down` —
 never `down -v` on staging.
+
+### 8.5 Directus runtime grant matrix on `directus_*` (AFC-783) + re-try procedure
+
+Root cause of the rolled-back identity switch (2026-10-23): `directus_app`
+held zero grants on any `directus_*` system table, and Directus 11 cannot
+boot without reading `directus_migrations` (then activity/revisions/sessions
+on the first request). The fix is migration `20261024_0042`, not a flag flip:
+uniform `SELECT, INSERT, UPDATE, DELETE` on every migrator-owned `directus_*`
+table, `USAGE, SELECT` on their sequences, `PUBLIC` revoked. No new role —
+Directus holds a single `DB_USER`, so a second role cannot be wired without
+forking that connection (decision recorded in the migration header).
+Deliberately no per-table carve-outs, no `TRUNCATE`, no DDL, no default
+privileges, no ownership change: the application-table ceiling is untouched
+(suite `tests/db/42_directus_runtime_matrix.sql` asserts `incidents` stays
+`SELECT`-only for `directus_app`).
+
+Re-try checklist (ONE maintenance action, QA paused — same accepted risk as
+before; do NOT redeploy `compose.directus.yml` alone or `DIRECTUS_DB_USER`
+interpolates empty and Directus will not boot):
+
+1. `pg_dump` first. Confirm the dump is restorable before touching wiring.
+2. Host `.env` holds `DIRECTUS_DB_USER=directus_app` + generated password
+    (mode 600, never committed). Re-run the §7.1 preflight, then confirm
+    the resolved compose parses without rendering secret values:
+    `docker compose -f services/staging/compose.yml
+    -f services/staging/compose.directus.yml config --quiet` must exit 0.
+    Never paste `config` output (without `--quiet`) into issues or logs —
+    it renders secrets to stdout.
+3. Runbook §8.1–§8.3 in order (bootstrap as cluster owner, migrations as
+   `directus_migrator` including 0042, ownership transfer verified with the
+   §8.3 query answering zero rows). 0042 refusing with `restrict_violation`
+   means the transfer is incomplete — finish it, never widen the migration
+   identity.
+4. `up`, `docker restart staging-directus-1`, wait `service_healthy`
+   (`/server/health` 200), then API write + read round-trip (item/collection
+   write and read-back through the Directus API — never `psql \d` alone).
+5. Rollback on any failure: previous compose wiring + previous `WEB_IMAGE`,
+   retained volumes, never `down -v`. Portal health proof stays the SHA
+   check (`/api/health` reporting the served commit).
+
+Directus version upgrades stay operator-migrated: apply the new image's
+system migrations as `directus_migrator` first; a boot with pending system
+migrations under `directus_app` fails loudly (no DDL by design). A Directus
+version that adds a `directus_*` table needs a follow-up grant migration —
+0042's loop covers whatever matches the prefix at apply time.
 
 ## 6. Constraints (do not negotiate on the host)
 

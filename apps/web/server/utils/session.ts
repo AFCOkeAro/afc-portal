@@ -133,7 +133,9 @@ export async function writeSession(
   const session = await portalSession(event)
   const current = session.data as unknown as Record<string, unknown>
   for (const key of Object.keys(current)) {
-    delete current[key]
+    // Reflect.deleteProperty keeps replace-semantics without the dynamic
+    // delete expression the lint rule forbids.
+    Reflect.deleteProperty(current, key)
   }
   await session.update(data)
 }

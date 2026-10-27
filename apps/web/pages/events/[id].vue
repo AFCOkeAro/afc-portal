@@ -1,7 +1,12 @@
 <script setup lang="ts">
-import { COLLECTIONS } from '@afc/shared'
+import { COLLECTIONS, EXPENSE_CATEGORIES, expenseFormSchema } from '@afc/shared'
 import { ApiRequestError } from '~/composables/useApi'
-import type { BranchSummary, EventDetail, RegistrationRow } from '~/types/portal'
+import type {
+  BranchSummary,
+  EventDetail,
+  ExpenseRow,
+  RegistrationRow,
+} from '~/types/portal'
 
 /**
  * Programme detail (AFC-649 §A–D, F; AFC-666 Tasks tab): hero with public
@@ -35,6 +40,7 @@ const TABS = [
   { id: 'schedule', label: 'Schedule', icon: 'i-lucide-calendar-days' },
   { id: 'materials', label: 'Materials', icon: 'i-lucide-folder-open' },
   { id: 'tasks', label: 'Tasks', icon: 'i-lucide-square-kanban' },
+  { id: 'expenses', label: 'Expenses', icon: 'i-lucide-receipt' },
 ] as const
 
 type TabId = (typeof TABS)[number]['id']
@@ -81,7 +87,7 @@ const selectedRegs = ref<Set<string>>(new Set())
 const tab = computed<TabId>(() => {
   const raw = route.query.tab
   const value = Array.isArray(raw) ? raw[0] : raw
-  return (TABS as readonly { id: string }[]).some((entry) => entry.id === value)
+  return shownTabs.value.some((entry: (typeof TABS)[number]) => entry.id === value)
     ? (value as TabId)
     : 'overview'
 })
@@ -133,6 +139,21 @@ const canExport = computed(
 )
 const medicalVisible = computed(() =>
   permissions.isFieldVisible(COLLECTIONS.eventRegistrations, 'medical_notes'),
+)
+
+/* Expenses tab (AFC-801): the 8th tab, hidden without the grant. */
+const canExpenses = computed(() => permissions.can(COLLECTIONS.eventExpenses, 'read'))
+const canRecordExpenses = computed(
+  () =>
+    canExpenses.value &&
+    (permissions.can(COLLECTIONS.eventExpenses, 'create') ||
+      permissions.can(COLLECTIONS.events, 'update')),
+)
+const expenseAmountVisible = computed(() =>
+  permissions.isFieldVisible(COLLECTIONS.eventExpenses, 'amount'),
+)
+const shownTabs = computed<(typeof TABS)[number][]>(() =>
+  TABS.filter((entry) => entry.id !== 'expenses' || canExpenses.value),
 )
 
 const restrictedMessage = computed(() => {
@@ -565,6 +586,142 @@ async function afterRegistrationSaved(): Promise<void> {
   selectedRegs.value = new Set()
   await Promise.all([refresh(), loadRollups()])
 }
+
+/* ---------- Expenses tab (AFC-801): scoped list + client-side total ---------- */
+
+const expenses = ref<ExpenseRow[]>([])
+const expensesPending = ref(false)
+const expensesError = ref('')
+const showExpenseForm = ref(false)
+const savingExpense = ref(false)
+const expenseError = ref('')
+const expenseFieldErrors = ref<Record<string, string>>({})
+const expenseForm = ref({
+  category: 'venue',
+  category_other_label: '',
+  amount: '',
+  currency: 'NGN',
+  spent_on: new Date().toISOString().slice(0, 10),
+  notes: '',
+})
+
+const expenseCategoryOptions = EXPENSE_CATEGORIES.map((value) => ({
+  label: value.charAt(0).toUpperCase() + value.slice(1),
+  value,
+}))
+
+/**
+ * Displayed total. It IS the sum of the listed rows (AFC-801 totals parity:
+ * no separate endpoint, the contract pins sum(amounts) === total).
+ */
+const expenseTotal = computed(() =>
+  expenses.value.reduce(
+    (sum: number, row: ExpenseRow) => sum + Number(row.amount ?? 0),
+    0,
+  ),
+)
+
+const expenseRestrictedMessage = computed(() => {
+  const hidden = permissions.hiddenFields(COLLECTIONS.eventExpenses)
+  if (hidden.length === 0) return ''
+  return `Expense fields not shown on this account: ${hidden.join(', ')}.`
+})
+
+function formatExpenseAmount(row: ExpenseRow): string {
+  if (!expenseAmountVisible.value) return '—'
+  const numeric = Number(row.amount ?? 0)
+  const formatted = Number.isNaN(numeric) ? String(row.amount ?? 0) : numeric.toFixed(2)
+  return `${formatted} ${row.currency ?? ''}`.trim()
+}
+
+function expenseCategoryLabel(row: ExpenseRow): string {
+  if (row.category === 'other' && row.category_other_label)
+    return row.category_other_label
+  return row.category.replace(/_/g, ' ')
+}
+
+async function loadExpenses(): Promise<void> {
+  if (!canExpenses.value) {
+    expenses.value = []
+    return
+  }
+  expensesPending.value = true
+  expensesError.value = ''
+  try {
+    const result = await api.get<{ data: ExpenseRow[] }>(`/api/events/${id}/expenses`)
+    expenses.value = result.data.map((row) => ({
+      ...row,
+      id: String(row.id),
+    }))
+  } catch (cause) {
+    expenses.value = []
+    expensesError.value =
+      cause instanceof ApiRequestError ? cause.message : 'Could not load expenses.'
+  } finally {
+    expensesPending.value = false
+  }
+}
+
+async function submitExpense(): Promise<void> {
+  const parsed = expenseFormSchema.safeParse({
+    category: expenseForm.value.category,
+    category_other_label: expenseForm.value.category_other_label || undefined,
+    amount: expenseForm.value.amount,
+    currency: expenseForm.value.currency,
+    spent_on: expenseForm.value.spent_on,
+    notes: expenseForm.value.notes || undefined,
+  })
+  if (!parsed.success) {
+    const errors: Record<string, string> = {}
+    for (const issue of parsed.error.issues) {
+      const key = issue.path.map(String).join('.')
+      if (key && !errors[key]) errors[key] = issue.message
+    }
+    expenseFieldErrors.value = errors
+    expenseError.value = 'Some fields need attention'
+    return
+  }
+
+  savingExpense.value = true
+  expenseError.value = ''
+  expenseFieldErrors.value = {}
+  try {
+    await api.post(`/api/events/${id}/expenses`, {
+      category: parsed.data.category,
+      ...(parsed.data.category_other_label
+        ? { category_other_label: parsed.data.category_other_label }
+        : {}),
+      amount: parsed.data.amount,
+      currency: parsed.data.currency,
+      spent_on: parsed.data.spent_on,
+      ...(parsed.data.notes ? { notes: parsed.data.notes } : {}),
+    })
+    showExpenseForm.value = false
+    expenseForm.value = {
+      category: 'venue',
+      category_other_label: '',
+      amount: '',
+      currency: 'NGN',
+      spent_on: new Date().toISOString().slice(0, 10),
+      notes: '',
+    }
+    await loadExpenses()
+  } catch (cause) {
+    const error = cause as { message?: string; fields?: Record<string, string> }
+    expenseError.value = error.message ?? 'Could not record that expense'
+    expenseFieldErrors.value = error.fields ?? {}
+  } finally {
+    savingExpense.value = false
+  }
+}
+
+watch(
+  () => [tab.value, canExpenses.value] as const,
+  ([next, allowed]: readonly [TabId, boolean]) => {
+    if (next === 'expenses' && allowed) void loadExpenses()
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
@@ -699,7 +856,7 @@ async function afterRegistrationSaved(): Promise<void> {
           class="flex gap-1 overflow-x-auto rounded-xl border border-gray-200 bg-white p-1 dark:border-gray-800 dark:bg-gray-900"
         >
           <button
-            v-for="entry in TABS"
+            v-for="entry in shownTabs"
             :key="entry.id"
             type="button"
             :aria-current="tab === entry.id ? 'page' : undefined"
@@ -1353,7 +1510,10 @@ async function afterRegistrationSaved(): Promise<void> {
           <p v-else class="text-sm text-gray-500">
             No sessions recorded for this programme yet.
           </p>
-          <div v-if="canEdit" class="mt-4 border-t border-gray-200 pt-4 dark:border-gray-800">
+          <div
+            v-if="canEdit"
+            class="mt-4 border-t border-gray-200 pt-4 dark:border-gray-800"
+          >
             <h3 class="text-sm font-semibold">Record headcount</h3>
             <div class="mt-2 grid gap-2 sm:grid-cols-3">
               <UFormField label="Session date">
@@ -1745,6 +1905,101 @@ async function afterRegistrationSaved(): Promise<void> {
         />
       </section>
 
+      <!-- EXPENSES (AFC-801): scoped spend list + client-side total -->
+      <section v-if="tab === 'expenses'" aria-label="Programme expenses" class="mt-4">
+        <div class="mb-3 flex flex-wrap items-center gap-2 text-sm">
+          <p>
+            <strong class="tabular-nums">{{ expenses.length }}</strong> expense
+            {{ expenses.length === 1 ? 'record' : 'records' }}
+          </p>
+          <span class="text-xs text-gray-500">
+            <UIcon name="i-lucide-map-pin" class="mr-1 inline size-3" />{{ scopePill }}
+          </span>
+          <span class="ml-auto flex gap-2">
+            <UButton
+              v-if="canRecordExpenses"
+              size="sm"
+              icon="i-lucide-plus"
+              label="New expense"
+              @click="showExpenseForm = true"
+            />
+          </span>
+        </div>
+
+        <UAlert
+          v-if="expenseRestrictedMessage"
+          class="mb-3"
+          color="warning"
+          variant="subtle"
+          icon="i-lucide-shield-alert"
+          title="Restricted on this account"
+          :description="expenseRestrictedMessage"
+        />
+
+        <div v-if="expensesPending" class="flex justify-center py-10">
+          <UIcon
+            name="i-lucide-loader-circle"
+            class="size-6 animate-spin text-gray-400"
+          />
+        </div>
+        <UAlert
+          v-else-if="expensesError"
+          color="error"
+          variant="subtle"
+          title="Could not load expenses"
+          :description="expensesError"
+        />
+        <EmptyState
+          v-else-if="expenses.length === 0"
+          title="No expenses recorded"
+          description="Spend recorded against this programme will appear here."
+        />
+        <UCard v-else>
+          <div class="overflow-x-auto">
+            <table
+              class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800"
+            >
+              <thead>
+                <tr class="text-left text-xs uppercase tracking-wide text-gray-500">
+                  <th class="px-3 py-2 font-medium">Date</th>
+                  <th class="px-3 py-2 font-medium">Category</th>
+                  <th class="px-3 py-2 font-medium">Amount</th>
+                  <th class="px-3 py-2 font-medium">Notes</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                <tr v-for="row in expenses" :key="row.id">
+                  <td class="px-3 py-3 text-gray-600 dark:text-gray-300">
+                    {{ formatDay(row.spent_on) }}
+                  </td>
+                  <td class="px-3 py-3 font-medium capitalize">
+                    {{ expenseCategoryLabel(row) }}
+                  </td>
+                  <td class="px-3 py-3 tabular-nums">
+                    {{ formatExpenseAmount(row) }}
+                  </td>
+                  <td class="px-3 py-3 text-gray-600 dark:text-gray-300">
+                    {{ row.notes || '—' }}
+                  </td>
+                </tr>
+                <tr class="font-medium">
+                  <td class="px-3 py-2">Total</td>
+                  <td class="px-3 py-2" />
+                  <td class="px-3 py-2 tabular-nums">
+                    {{
+                      expenseAmountVisible
+                        ? `${expenseTotal.toFixed(2)} ${event.currency ?? ''}`.trim()
+                        : '—'
+                    }}
+                  </td>
+                  <td class="px-3 py-2" />
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </UCard>
+      </section>
+
       <!-- Modals (unchanged) -->
       <RegistrationManageModal
         v-model:open="showManageOpen"
@@ -1780,6 +2035,66 @@ async function afterRegistrationSaved(): Promise<void> {
         :branches="branches.data.value ?? []"
         @saved="refresh()"
       />
+      <UModal
+        v-model:open="showExpenseForm"
+        title="Record expense"
+        description="Spend against this programme. The branch and zone are copied from the programme — never typed here."
+      >
+        <template #body>
+          <form class="space-y-4" novalidate @submit.prevent="submitExpense()">
+            <UAlert
+              v-if="expenseError"
+              color="error"
+              variant="subtle"
+              :description="expenseError"
+            />
+            <UFormField label="Category" required :error="expenseFieldErrors.category">
+              <USelect
+                v-model="expenseForm.category"
+                :items="expenseCategoryOptions"
+                class="w-full"
+              />
+            </UFormField>
+            <UFormField
+              v-if="expenseForm.category === 'other'"
+              label="Describe the expense"
+              required
+              :error="expenseFieldErrors.category_other_label"
+            >
+              <UInput v-model="expenseForm.category_other_label" class="w-full" />
+            </UFormField>
+            <div class="grid gap-4 sm:grid-cols-2">
+              <UFormField label="Amount" required :error="expenseFieldErrors.amount">
+                <UInput
+                  v-model="expenseForm.amount"
+                  inputmode="decimal"
+                  placeholder="0.00"
+                  class="w-full"
+                />
+              </UFormField>
+              <UFormField
+                label="Date spent"
+                required
+                :error="expenseFieldErrors.spent_on"
+              >
+                <UInput v-model="expenseForm.spent_on" type="date" class="w-full" />
+              </UFormField>
+            </div>
+            <UFormField label="Notes" :error="expenseFieldErrors.notes">
+              <UTextarea v-model="expenseForm.notes" class="w-full" :rows="3" />
+            </UFormField>
+            <div class="flex justify-end gap-2">
+              <UButton
+                color="neutral"
+                variant="ghost"
+                label="Cancel"
+                @click="showExpenseForm = false"
+              />
+              <UButton type="submit" label="Record expense" :loading="savingExpense" />
+            </div>
+          </form>
+        </template>
+      </UModal>
       <BlessingFormModal
         v-model:open="showBlessingForm"
         :branches="branches.data.value ?? []"
