@@ -499,3 +499,20 @@ describe('AFC-808: empty fee round-trips client -> server (moneySchema null-safe
     assert.match(schema, /fee_amount: form\.fee_amount/)
   })
 })
+
+describe('AFC-829: public-but-unpublished states the feed gate', () => {
+  const page = codeOf('apps/web/pages/events/[id].vue')
+
+  it('warns when a public programme is not published yet', () => {
+    assert.match(
+      page,
+      /event\.visibility === 'public' && event\.status !== 'published'/,
+      'the hint fires exactly on public-but-unpublished',
+    )
+    assert.match(
+      page,
+      /Not on the public page yet/,
+      'the hint names the public page, calendar and registration picker',
+    )
+  })
+})

@@ -914,6 +914,15 @@ watch(
         title="Restricted on this account"
         :description="restrictedMessage"
       />
+      <UAlert
+        v-if="event.visibility === 'public' && event.status !== 'published'"
+        class="mt-4"
+        color="warning"
+        variant="subtle"
+        icon="i-lucide-eye-off"
+        title="Not on the public page yet"
+        description="This programme is marked public but not published — it will not appear on the public page, calendar or registration picker until published. Change the status above."
+      />
 
       <!-- 7 tabs -->
       <nav aria-label="Programme sections" class="mt-4">
