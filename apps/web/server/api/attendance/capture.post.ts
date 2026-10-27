@@ -10,6 +10,8 @@ import { directusFetch } from '../../utils/directus'
 import { isUniqueViolation } from '../../utils/event-invites'
 import {
   createItem,
+  eventScopeFilter,
+  findScopedItem,
   getPortalScope,
   listItems,
   requireCan,
@@ -55,6 +57,7 @@ const captureBodySchema = z.object({
   session_date: dateSchema,
   session_type: z.enum(SERVICE_TYPE_KEYS).default('sunday_service'),
   session_name: z.string().trim().min(1, 'Name the session').max(200),
+  session_id: z.string().trim().min(1).max(36).optional(),
   service: optionalText(36),
   event: optionalText(36),
   idempotency_key: z.string().trim().min(1).max(128),
@@ -114,12 +117,53 @@ export default defineEventHandler(async (event) => {
     }
   }
 
+  // AFC-827: recording INTO an existing session. The target is read
+  // scoped (its event must be in scope and match the filing event); the
+  // session's own date/type/name win over the client fields, and the
+  // header create below is skipped so no twin session is born.
+  interface TargetSession {
+    id: string | number
+    event: string | null
+    session_date: string
+    session_type: string
+    session_name: string
+  }
+  let target: TargetSession | null = null
+  if (form.session_id) {
+    const found = await listItems<TargetSession>(event, scope, 'attendance_sessions', {
+      filter: { id: { _eq: form.session_id } },
+      fields: ['id', 'event', 'session_date', 'session_type', 'session_name'],
+      limit: 1,
+    })
+    target = found.data[0] ?? null
+    if (!target) {
+      throw createError({
+        statusCode: 404,
+        statusMessage: 'That session is not on record',
+        data: { code: 'session_not_found' },
+      })
+    }
+    const targetEvent = String(target.event ?? '')
+    if (!targetEvent || (form.event && targetEvent !== form.event)) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: 'That session belongs to a different event',
+        data: { code: 'session_event_mismatch' },
+      })
+    }
+    await findScopedItem<Record<string, unknown>>(event, scope, 'events', targetEvent, {
+      fields: ['id', 'branch'],
+      scope: eventScopeFilter(scope),
+    })
+  }
+  const effectiveType = target ? String(target.session_type) : form.session_type
+
   const definitions = await listItems<DefinitionRow>(
     event,
     scope,
     'service_type_definitions',
     {
-      filter: { key: { _eq: form.session_type }, status: { _eq: 'active' } },
+      filter: { key: { _eq: effectiveType }, status: { _eq: 'active' } },
       fields: ['id', 'key', 'categories'],
       limit: 1,
     },
@@ -156,51 +200,56 @@ export default defineEventHandler(async (event) => {
     }
   }
 
-  let session: Record<string, unknown>
-  try {
-    session = await createItem<Record<string, unknown>>(
-      event,
-      scope,
-      'attendance_sessions',
-      {
-        branch: branch ?? null,
-        zone: form.zone ?? null,
-        bsc: form.bsc ?? null,
-        session_date: form.session_date,
-        session_type: form.session_type,
-        session_name: form.session_name,
-        service: form.service ?? null,
-        event: form.event ?? null,
-        service_type_def: String(definition.id),
-        idempotency_key: form.idempotency_key,
-        recorded_by: scope.session.user.id,
-        recorded_at: form.recorded_at ?? new Date().toISOString(),
-      },
-    )
-  } catch (cause) {
-    // UNIQUE (idempotency_key): a second submit with the same key collides
-    // instead of duplicating the session. Refusal, not a twin. Live
-    // Directus surfaces the replay as 400 RECORD_NOT_UNIQUE (AFC-803), not
-    // 409, so the canonical unique detector is the matcher: the header's
-    // only unique constraint is idempotency_key, hence any unique violation
-    // here is a replay.
-    const status =
-      (cause as { statusCode?: number; status?: number })?.statusCode ??
-      (cause as { statusCode?: number; status?: number })?.status
-    if (status === 409 || isUniqueViolation(cause)) {
-      throw createError({
-        statusCode: 409,
-        statusMessage: 'This capture was already saved',
-        data: { code: 'duplicate_capture' },
-      })
+  let sessionId: string
+  if (target) {
+    sessionId = String(target.id)
+  } else {
+    let created: Record<string, unknown>
+    try {
+      created = await createItem<Record<string, unknown>>(
+        event,
+        scope,
+        'attendance_sessions',
+        {
+          branch: branch ?? null,
+          zone: form.zone ?? null,
+          bsc: form.bsc ?? null,
+          session_date: form.session_date,
+          session_type: form.session_type,
+          session_name: form.session_name,
+          service: form.service ?? null,
+          event: form.event ?? null,
+          service_type_def: String(definition.id),
+          idempotency_key: form.idempotency_key,
+          recorded_by: scope.session.user.id,
+          recorded_at: form.recorded_at ?? new Date().toISOString(),
+        },
+      )
+    } catch (cause) {
+      // UNIQUE (idempotency_key): a second submit with the same key collides
+      // instead of duplicating the session. Refusal, not a twin. Live
+      // Directus surfaces the replay as 400 RECORD_NOT_UNIQUE (AFC-803), not
+      // 409, so the canonical unique detector is the matcher: the header's
+      // only unique constraint is idempotency_key, hence any unique violation
+      // here is a replay.
+      const status =
+        (cause as { statusCode?: number; status?: number })?.statusCode ??
+        (cause as { statusCode?: number; status?: number })?.status
+      if (status === 409 || isUniqueViolation(cause)) {
+        throw createError({
+          statusCode: 409,
+          statusMessage: 'This capture was already saved',
+          data: { code: 'duplicate_capture' },
+        })
+      }
+      // AFC-566: a missing/unreadable sessions register arrives here without
+      // a status (DirectusAuthError) — map it to the named store error, never
+      // a bare 500. Deliberate 4xx keep their codes.
+      if (status == null) throwStoreUnavailable(cause, 'attendance_store', '0023')
+      throw cause
     }
-    // AFC-566: a missing/unreadable sessions register arrives here without
-    // a status (DirectusAuthError) — map it to the named store error, never
-    // a bare 500. Deliberate 4xx keep their codes.
-    if (status == null) throwStoreUnavailable(cause, 'attendance_store', '0023')
-    throw cause
+    sessionId = String(created.id)
   }
-  const sessionId = String(session.id)
 
   // Convergent upsert: read the rows the session already holds, write only
   // what differs, and leave replays as no-ops. The DB unique constraint is
@@ -259,7 +308,6 @@ export default defineEventHandler(async (event) => {
 
   return {
     data: {
-      ...session,
       id: sessionId,
       total,
       rows_saved: form.rows.length,
