@@ -1,0 +1,17 @@
+{
+  "issue": "AFC-768",
+  "authorAgentId": "human-operator-board",
+  "authorName": "Board chairman (CLI operator session)",
+  "claimedAt": "2026-10-23T13:00:00+01:00",
+  "scopeOfTheClaim": "R1 only: authorship of migration 0041, its rollback, and db suite 100. It asserts nothing about correctness; that is for CI (R4) and the CTO review (R2).",
+  "whatTheChangeActuallyDoes": "New migration 0041 (+rollback that revokes exactly the added grants) grants directus_app SELECT/INSERT/UPDATE/DELETE over the 29 directus_* system tables (explicitly enumerated) plus USAGE/SELECT on their sequences, each guarded by to_regclass (no-op on scratch DBs that lack system tables); app-table grants untouched. Suite 100: idempotent re-apply, per-present-table DML + PUBLIC-empty checks, live down/up cycle where directus_migrations exists (explicit skip otherwise).",
+  "whatThisFileIs": "An R1 authorship claim, and nothing else. It says who wrote the compliance-path files below and on which issue. It carries no reviews[] entry.",
+  "doesNotClaimR2": "There is no reviews[] entry here and there will not be one from me. R2 wants a named reviewer who is not the author. CTO R2 requested on the AFC-768 thread before landing.",
+  "notClaimedPaths": "Nothing else in scope; this commit touches only the three claim paths.",
+  "paths": [
+    "services/directus/schema/migrations/20261023_0041_directus_runtime_grants.sql",
+    "services/directus/schema/migrations/rollback/20261023_0041_directus_runtime_grants.down.sql",
+    "tests/db/100_directus_runtime_grants.sql",
+    ".provenance/claims/AFC-768.json"
+  ]
+}
