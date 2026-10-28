@@ -72,6 +72,47 @@ async function submitFeedback(): Promise<void> {
   }
 }
 
+/* Downloadable resources (AFC-828 phase 3): approved items only, with
+ * file downloads proxied through the event route (never a bare
+ * Directus URL). Drafts and rejections never reach this feed. */
+interface PublicResource {
+  id: string
+  title: string
+  kind: string
+  source_type: string
+  url: string | null
+  file_id: string | null
+}
+
+const KIND_LABELS: Record<string, string> = {
+  document: 'Document',
+  spreadsheet: 'Spreadsheet',
+  pdf: 'PDF',
+  image: 'Image',
+  video: 'Video',
+  archive: 'Zip',
+  other: 'Other',
+}
+
+const { data: resourcesData } = await useAsyncData(`public-event-resources-${id}`, () =>
+  $fetch<{ data: PublicResource[] }>(`/api/public/events/${id}/resources`).catch(() => ({
+    data: [] as PublicResource[],
+  })),
+)
+
+const resources = computed(() => resourcesData.value?.data ?? [])
+
+function resourceHref(item: PublicResource): string {
+  if (item.source_type === 'link' && item.url) return item.url
+  if (item.source_type === 'upload' && item.file_id)
+    return `/api/public/events/${id}/resources/file?file=${item.file_id}`
+  return '#'
+}
+
+function kindLabel(kind: string): string {
+  return KIND_LABELS[kind] ?? kind
+}
+
 function formatDate(value: string | null): string {
   if (!value) return ''
   const parsed = new Date(value)
@@ -163,6 +204,28 @@ function formatDate(value: string | null): string {
             {{ feedbackError }}
           </p>
         </div>
+      </section>
+      <section v-if="resources.length > 0" aria-label="Event resources" class="mt-8">
+        <h2 class="text-lg font-semibold">Resources</h2>
+        <ul class="mt-3 space-y-2">
+          <li
+            v-for="item in resources"
+            :key="item.id"
+            class="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-800"
+          >
+            <UBadge color="neutral" variant="subtle">{{ kindLabel(item.kind) }}</UBadge>
+            <span class="min-w-0 flex-1 truncate font-medium">{{ item.title }}</span>
+            <UButton
+              size="xs"
+              color="neutral"
+              variant="outline"
+              icon="i-lucide-external-link"
+              label="Open"
+              :to="resourceHref(item)"
+              :target="item.source_type === 'link' ? '_blank' : undefined"
+            />
+          </li>
+        </ul>
       </section>
       <div class="mt-8 flex flex-wrap gap-3">
         <UButton
