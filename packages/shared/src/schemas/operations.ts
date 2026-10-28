@@ -187,6 +187,41 @@ export const leaveDecisionSchema = z.object({
 })
 
 export type LeaveDecision = z.infer<typeof leaveDecisionSchema>
+export const SPEAKER_STATUSES = [
+  'invited',
+  'pending',
+  'booked',
+  'confirmed',
+  'declined',
+] as const
+
+/**
+ * Speaker booking (AFC-843). Directory person or typed external name —
+ * exactly one, enforced here to mirror the 0053 person-or-name CHECK so
+ * the error points at the form instead of arriving from Postgres.
+ */
+export const speakerFormSchema = z
+  .object({
+    person: z.string().trim().max(36).optional(),
+    external_name: z.string().trim().max(200).optional(),
+    status: z.enum(SPEAKER_STATUSES).default('pending'),
+    special_requests: optionalText(2000),
+    bio: optionalText(2000),
+  })
+  .refine((form) => Boolean(form.person) !== Boolean(form.external_name?.trim()), {
+    message: 'Choose a directory person or type an external name — not both',
+    path: ['person'],
+  })
+
+export type SpeakerForm = z.infer<typeof speakerFormSchema>
+
+export const speakerPatchSchema = z.object({
+  status: z.enum(SPEAKER_STATUSES).optional(),
+  special_requests: optionalText(2000),
+  bio: optionalText(2000),
+})
+
+export type SpeakerPatch = z.infer<typeof speakerPatchSchema>
 
 const VISITOR_STATUSES = ['new', 'follow_up', 'converted', 'closed', 'declined'] as const
 

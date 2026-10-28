@@ -42,6 +42,7 @@ const TABS = [
   { id: 'materials', label: 'Resources', icon: 'i-lucide-folder-open' },
   { id: 'tasks', label: 'Tasks', icon: 'i-lucide-square-kanban' },
   { id: 'expenses', label: 'Expenses', icon: 'i-lucide-receipt' },
+  { id: 'speakers', label: 'Speakers', icon: 'i-lucide-mic' },
 ] as const
 
 type TabId = (typeof TABS)[number]['id']
@@ -150,6 +151,14 @@ const medicalVisible = computed(() =>
 
 /* Expenses tab (AFC-801): the 8th tab, hidden without the grant. */
 const canExpenses = computed(() => permissions.can(COLLECTIONS.eventExpenses, 'read'))
+/* Speakers tab (AFC-843): bookings, hidden without the grant. */
+const canSpeakers = computed(() => permissions.can(COLLECTIONS.eventSpeakers, 'read'))
+const canManageSpeakers = computed(
+  () =>
+    canSpeakers.value &&
+    (permissions.can(COLLECTIONS.eventSpeakers, 'create') ||
+      permissions.can(COLLECTIONS.events, 'update')),
+)
 const canRecordExpenses = computed(
   () =>
     canExpenses.value &&
@@ -160,7 +169,11 @@ const expenseAmountVisible = computed(() =>
   permissions.isFieldVisible(COLLECTIONS.eventExpenses, 'amount'),
 )
 const shownTabs = computed<(typeof TABS)[number][]>(() =>
-  TABS.filter((entry) => entry.id !== 'expenses' || canExpenses.value),
+  TABS.filter(
+    (entry) =>
+      (entry.id !== 'expenses' || canExpenses.value) &&
+      (entry.id !== 'speakers' || canSpeakers.value),
+  ),
 )
 
 const restrictedMessage = computed(() => {
@@ -2558,6 +2571,13 @@ watch(
             </table>
           </div>
         </UCard>
+      </section>
+
+      <!-- SPEAKERS -->
+      <!-- AFC-843: booked vs pending at a glance. SpeakerManager owns the
+        list/book/move/withdraw cycle; scope is enforced server-side. -->
+      <section v-if="tab === 'speakers'" aria-label="Programme speakers" class="mt-4">
+        <SpeakerManager :event-id="id" :can-manage="canManageSpeakers" />
       </section>
 
       <!-- Modals (unchanged) -->

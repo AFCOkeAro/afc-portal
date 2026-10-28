@@ -1,0 +1,18 @@
+{
+  "issue": "AFC-843",
+  "authorAgentId": "human-operator-board",
+  "authorName": "Board chairman (CLI operator session)",
+  "claimedAt": "2026-10-28T04:10:00+01:00",
+  "scopeOfTheClaim": "R1 only: authorship of the compliance-path files below. Correctness is for CI (R4) and the CTO review (R2).",
+  "whatTheChangeActuallyDoes": "Migration 0053 (+rollback): event_speakers (event FK CASCADE; branch/zone route-stamped denorms SET NULL per the 0044 choice-8 precedent with no scope trigger so suite 94 is untouched; person FK SET NULL + external_name with person-XOR-name CHECK; closed 5-key status set; unique event+person+external_name) with SELECT/INSERT(col-list)/UPDATE/DELETE grants to directus_app and PUBLIC revoked; ownership + bootstrap-role preconditions per the 0042 pattern. Suite 53: rerun no-op, shape (external booking/personXORname refusal/neither-nor refusal/closed-status refusal/booked move/withdraw; probe event created and removed in-suite since events is empty at suite time), grants (SELECT, INSERT+UPDATE+DELETE, PUBLIC-empty), live down/up cycle with restrict_violation refusal while rows exist. Suite 86 evolved with rationale: park the 0053 event FK around the 0021 empty rollback and re-add after (blessing_recipients precedent).",
+  "whatThisFileIs": "An R1 authorship claim, and nothing else. It says who wrote the compliance-path files below and on which issue. It asserts nothing about whether they are correct, and it carries no reviews[] entry.",
+  "doesNotClaimR2": "There is no reviews[] entry here and there will not be one from me. R2 wants a named reviewer who is not the author. CTO R2 requested on the AFC-843 thread before landing.",
+  "notClaimedPaths": "Non-compliance paths in the same packet (shared COLLECTIONS + role-matrix entry mirroring session_activities hands + speaker schemas with person-or-name refine, four speaker API routes with parent-event scope-gating and zone-from-branch stamping, SpeakerManager.vue with booked/pending counts and status moves, Speakers tab wiring, speakers contract) need no claim and land with the R2 verdict.",
+  "paths": [
+    "services/directus/schema/migrations/20261028_0053_event_speakers.sql",
+    "services/directus/schema/migrations/rollback/20261028_0053_event_speakers.down.sql",
+    "tests/db/53_event_speakers.sql",
+    "tests/db/86_events_registrations.sql",
+    ".provenance/claims/AFC-843.json"
+  ]
+}
