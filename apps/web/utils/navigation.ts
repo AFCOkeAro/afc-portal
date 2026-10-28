@@ -357,6 +357,22 @@ export const NAVIGATION: readonly NavigationItem[] = [
 
   // Communications
   {
+    label: 'New communication',
+    to: '/communications/new',
+    icon: 'i-lucide-square-pen',
+    requires: ['communications', 'create'],
+    group: 'communications',
+    inSidebar: true,
+  },
+  {
+    label: 'Workflows',
+    to: '/workflows',
+    icon: 'i-lucide-git-branch',
+    requires: ['communications', 'read'],
+    group: 'communications',
+    inSidebar: true,
+  },
+  {
     label: 'Campaigns',
     to: '/campaigns',
     icon: 'i-lucide-workflow',
