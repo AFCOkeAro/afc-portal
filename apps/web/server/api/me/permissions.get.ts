@@ -7,7 +7,12 @@ import {
 } from '@afc/shared/role-matrix'
 import { requireSession } from '../../utils/session'
 import { intersectGrants } from '../../utils/impersonation'
-import { customGrantsForRole, isBuiltInRole } from '../../utils/custom-grants'
+import {
+  applyOverrides,
+  customGrantsForRole,
+  isBuiltInRole,
+  overridesForRole,
+} from '../../utils/custom-grants'
 
 /**
  * GET /api/me/permissions
@@ -36,6 +41,13 @@ export default defineEventHandler(async (event): Promise<CapabilitiesPayload> =>
     zoneIds: session.user.zoneIds ?? [],
   })
 
+  // Super-admin matrix deltas (AFC-836): revokes win over the matrix and
+  // override grants extend it, for built-ins and customs alike.
+  const overrides = await overridesForRole(event, String(session.user.staffRole)).catch(
+    () => [],
+  )
+  payload.grants = applyOverrides(payload.grants, overrides)
+
   // Custom roles (AFC-669) resolve through Directus permissions rather than
   // the code matrix, so the sidebar sees the same grants the route gate
   // enforces. Fail-closed: a resolution failure keeps the empty payload.
@@ -45,7 +57,7 @@ export default defineEventHandler(async (event): Promise<CapabilitiesPayload> =>
       String(session.user.staffRole),
     ).catch(() => [] as Grant[])
     if (custom.length > 0) {
-      const grants = sortGrants(custom)
+      const grants = sortGrants(applyOverrides(custom, overrides))
       // Impersonation (AFC-684): a preview through a custom-role target still
       // intersects with the actor's grants — never a union.
       if (impersonatedBy) {
