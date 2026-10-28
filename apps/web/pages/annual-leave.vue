@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { COLLECTIONS, LEAVE_STATUSES, LEAVE_TYPES } from '@afc/shared'
+import { COLLECTIONS, LEAVE_STATUSES, LEAVE_TYPES, workingDaysBetween } from '@afc/shared'
 
 /**
  * Annual Leave (AFC-842): Church Office leave requests.
@@ -53,6 +53,53 @@ const newRequest = ref({
 const requestSaving = ref(false)
 const requestError = ref('')
 const actionError = ref('')
+
+/* Balance preview (AFC-854 phase 2): allowance, used and the cost of the
+ * draft dates, so a request is filed with eyes open. Unknown until the
+ * person and both dates are chosen. */
+const previewBalance = ref<{
+  allowance: number
+  used: number | null
+} | null>(null)
+const previewPending = ref(false)
+
+const previewDays = computed(() => {
+  if (newRequest.value.start_date === '' || newRequest.value.end_date === '') return null
+  return workingDaysBetween(newRequest.value.start_date, newRequest.value.end_date)
+})
+
+async function loadPreview(): Promise<void> {
+  previewBalance.value = null
+  if (newRequest.value.person === '' || newRequest.value.start_date === '') return
+  const year = newRequest.value.start_date.slice(0, 4)
+  previewPending.value = true
+  try {
+    const res = await api.get<{ data: Array<Record<string, unknown>> }>(
+      '/api/leave-balances',
+      {
+        query: { person: newRequest.value.person, year },
+      },
+    )
+    const row = (res.data ?? [])[0]
+    previewBalance.value = row
+      ? {
+          allowance: Number(row.allowance_days ?? 0),
+          used: row.used_days === null ? null : Number(row.used_days),
+        }
+      : { allowance: 0, used: null }
+  } catch {
+    previewBalance.value = null
+  } finally {
+    previewPending.value = false
+  }
+}
+
+watch(
+  () => [newRequest.value.person, newRequest.value.start_date],
+  () => {
+    void loadPreview()
+  },
+)
 
 const statusItems = computed(() => [
   { label: 'All statuses', value: 'all' },
@@ -300,6 +347,23 @@ watch(statusFilter, () => {
           <UInput v-model="newRequest.reason" placeholder="Optional" class="w-full" />
         </UFormField>
       </div>
+      <p v-if="previewPending" class="mt-3 text-sm text-gray-500">Checking balance…</p>
+      <p
+        v-else-if="previewBalance && previewDays !== null"
+        class="mt-3 text-sm text-gray-600 dark:text-gray-400"
+      >
+        Balance: {{ previewBalance.allowance }} allowed<template
+          v-if="previewBalance.used !== null"
+        >
+          · {{ previewBalance.used }} used</template
+        >
+        · this request {{ previewDays }} working day<template v-if="previewDays !== 1"
+          >s</template
+        ><template v-if="previewBalance.used !== null">
+          → {{ previewBalance.allowance - previewBalance.used - previewDays }} left
+          after</template
+        >.
+      </p>
       <UButton
         class="mt-3"
         label="File request"

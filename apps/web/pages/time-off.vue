@@ -22,6 +22,8 @@ interface LeaveBalance {
   name: string | null
   year: number
   allowance_days: number
+  used_days: number | null
+  remaining_days: number | null
 }
 
 const canManage = computed(() => permissions.can(COLLECTIONS.leaveBalances, 'create'))
@@ -151,8 +153,12 @@ watch(yearFilter, () => {
         }}</span>
         <UBadge color="neutral" variant="subtle">{{ row.year }}</UBadge>
         <span class="text-gray-600 dark:text-gray-400"
-          >{{ row.allowance_days }} days</span
+          >{{ row.allowance_days }} allowed</span
         >
+        <span v-if="row.used_days !== null" class="text-gray-600 dark:text-gray-400"
+          >{{ row.used_days }} used &middot; {{ row.remaining_days }} left</span
+        >
+        <span v-else class="text-xs text-gray-400">used n/a</span>
         <UButton
           v-if="canManage"
           size="xs"
