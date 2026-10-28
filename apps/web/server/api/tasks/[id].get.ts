@@ -5,6 +5,7 @@ import {
   requireCan,
   scopeFilter,
 } from '../../utils/portal'
+import { resolveTaskPeople } from '../../utils/office'
 
 /** GET /api/tasks/:id — scoped detail with the audit trail (404 when out of scope). */
 export default defineEventHandler(async (event) => {
@@ -20,5 +21,20 @@ export default defineEventHandler(async (event) => {
     sort: 'created_at',
     limit: 100,
   })
-  return { data: row, audit: trail.data }
+  const { ownerByTask, personNames } = await resolveTaskPeople(event, scope, [row])
+  const nameOf = (value: unknown): string | null =>
+    typeof value === 'string' ? (personNames.get(value) ?? null) : null
+  return {
+    data: {
+      ...row,
+      owner_name: ownerByTask.get(String(row.id)) ?? null,
+      raci_names: {
+        responsible: nameOf(row.raci_responsible),
+        accountable: nameOf(row.raci_accountable),
+        consulted: nameOf(row.raci_consulted),
+        informed: nameOf(row.raci_informed),
+      },
+    },
+    audit: trail.data,
+  }
 })

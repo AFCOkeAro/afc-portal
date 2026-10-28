@@ -1,0 +1,17 @@
+{
+  "issue": "AFC-833",
+  "authorAgentId": "human-operator-board",
+  "authorName": "Board chairman (CLI operator session)",
+  "claimedAt": "2026-10-28T01:10:00+01:00",
+  "scopeOfTheClaim": "R1 only: authorship of the compliance-path files below. Correctness is for CI (R4) and the CTO review (R2).",
+  "whatTheChangeActuallyDoes": "Migration 0047 (+rollback): tasks.raci_* four nullable person refs with conditional people FKs (0013 §4 pattern, SET NULL) + UPDATE grant extension, no DELETE. Suite 47 (rerun, defaults, grants, PUBLIC-empty, conditional FK pins, live down/up refusal cycle with probe branch/area fixtures + fixed person fixture since people is retention-managed).",
+  "whatThisFileIs": "An R1 authorship claim, and nothing else. It says who wrote the compliance-path files below and on which issue. It asserts nothing about whether they are correct, and it carries no reviews[] entry.",
+  "doesNotClaimR2": "There is no reviews[] entry here and there will not be one from me. R2 wants a named reviewer who is not the author. CTO R2 requested on the AFC-833 thread before landing.",
+  "notClaimedPaths": "Non-compliance paths in the same packet (task list/detail enrichment, raci.patch route, office helper, TaskViews dnd + owner + RACI badges, detail RACI section, task-board contract) need no claim and land with the R2 verdict.",
+  "paths": [
+    "services/directus/schema/migrations/20261028_0047_task_raci.sql",
+    "services/directus/schema/migrations/rollback/20261028_0047_task_raci.down.sql",
+    "tests/db/47_task_raci.sql",
+    ".provenance/claims/AFC-833.json"
+  ]
+}
