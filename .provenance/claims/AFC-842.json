@@ -1,0 +1,17 @@
+{
+  "issue": "AFC-842",
+  "authorAgentId": "human-operator-board",
+  "authorName": "Board chairman (CLI operator session)",
+  "claimedAt": "2026-10-28T03:40:00+01:00",
+  "scopeOfTheClaim": "R1 only: authorship of the compliance-path files below. Correctness is for CI (R4) and the CTO review (R2).",
+  "whatTheChangeActuallyDoes": "Migration 0052 (+rollback): leave_requests (branch/zone route-stamped denorms SET NULL per the 0044 choice-8 precedent with no scope trigger so suite 94 is untouched; person FK SET NULL; start/end dates with end>=start CHECK; days int>=1 stamped by the route; closed 6-key leave_type and 4-key status sets; decisions ride the same row via decided_by/at) with SELECT/INSERT(col-list)/UPDATE/DELETE grants to directus_app and PUBLIC revoked; ownership + bootstrap-role preconditions per the 0042 pattern. Suite 52: rerun no-op, shape (pending default/closed-set refusals/date-order refusal/decide-on-row/withdraw), grants (SELECT, INSERT+UPDATE+DELETE, no TRUNCATE, PUBLIC-empty), live down/up cycle with restrict_violation refusal while rows exist. No existing suite touched: parents (branches/zones/people) are never dropped in-harness.",
+  "whatThisFileIs": "An R1 authorship claim, and nothing else. It says who wrote the compliance-path files below and on which issue. It asserts nothing about whether they are correct, and it carries no reviews[] entry.",
+  "doesNotClaimR2": "There is no reviews[] entry here and there will not be one from me. R2 wants a named reviewer who is not the author. CTO R2 requested on the AFC-842 thread before landing.",
+  "notClaimedPaths": "Non-compliance paths in the same packet (shared COLLECTIONS + role-matrix entry mirroring session_activities hands + leave schemas, four leave API routes with day-count stamping and transition table, annual-leave.vue with file/correct/decide/withdraw, Church Office nav entry, annual-leave contract) need no claim and land with the R2 verdict.",
+  "paths": [
+    "services/directus/schema/migrations/20261028_0052_leave_requests.sql",
+    "services/directus/schema/migrations/rollback/20261028_0052_leave_requests.down.sql",
+    "tests/db/52_leave_requests.sql",
+    ".provenance/claims/AFC-842.json"
+  ]
+}

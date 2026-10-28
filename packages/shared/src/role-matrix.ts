@@ -193,6 +193,18 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     none: [NONE, 'none'],
     zone_admin: [ALL, 'own_zone'],
   },
+  // Leave requests (AFC-842): Church Office working list, same hands as
+  // the other programme registers. No finance amounts, no
+  // FIELD_RESTRICTIONS entry.
+  [COLLECTIONS.leaveRequests]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [ALL, 'all'],
+    branch_admin: [ALL, 'own_branch'],
+    department_leader: [CRU, 'assigned_branches'],
+    volunteer: [CU, 'own_branch'],
+    none: [NONE, 'none'],
+    zone_admin: [ALL, 'own_zone'],
+  },
   [COLLECTIONS.sundayServices]: {
     super_admin: [ALL, 'all'],
     area_admin: [ALL, 'all'],

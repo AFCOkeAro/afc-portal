@@ -149,6 +149,44 @@ export const outreachSecretaryFormSchema = z.object({
 })
 
 export type OutreachSecretaryForm = z.infer<typeof outreachSecretaryFormSchema>
+export const LEAVE_TYPES = [
+  'annual',
+  'sick',
+  'maternity',
+  'compassionate',
+  'unpaid',
+  'other',
+] as const
+
+export const LEAVE_STATUSES = ['pending', 'approved', 'declined', 'cancelled'] as const
+
+/**
+ * Leave request (AFC-842). Days count start..end inclusive and are stamped
+ * by the route, never trusted from the client.
+ */
+export const leaveRequestFormSchema = z.object({
+  branch: optionalText(36),
+  person: z.string().trim().min(1, 'Choose who the leave is for').max(36),
+  start_date: dateSchema,
+  end_date: dateSchema,
+  leave_type: z.enum(LEAVE_TYPES).default('annual'),
+  reason: optionalText(2000),
+})
+
+export type LeaveRequestForm = z.infer<typeof leaveRequestFormSchema>
+
+export const leaveRequestPatchSchema = z.object({
+  leave_type: z.enum(LEAVE_TYPES).optional(),
+  reason: optionalText(2000),
+})
+
+export type LeaveRequestPatch = z.infer<typeof leaveRequestPatchSchema>
+
+export const leaveDecisionSchema = z.object({
+  status: z.enum(['approved', 'declined', 'cancelled']),
+})
+
+export type LeaveDecision = z.infer<typeof leaveDecisionSchema>
 
 const VISITOR_STATUSES = ['new', 'follow_up', 'converted', 'closed', 'declined'] as const
 
