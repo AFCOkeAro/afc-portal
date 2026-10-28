@@ -10,6 +10,7 @@ import {
   weekDays,
   yearMonths,
 } from '~/utils/calendar-ranges'
+import { calendarPillClass } from '@afc/shared'
 import type { CalendarView, CalendarViewItem } from '~/utils/calendar-ranges'
 
 /**
@@ -256,17 +257,23 @@ function isToday(iso: string): boolean {
                 <li
                   v-for="item in itemsOn(iso).slice(0, 3)"
                   :key="`${item.item_type}-${item.id}`"
-                  class="truncate text-xs"
+                  class="text-xs"
                 >
                   <slot name="row" :item="item">
-                    <NuxtLink
-                      v-if="item.href"
-                      :to="item.href"
-                      class="hover:text-primary-600 dark:hover:text-primary-400"
+                    <span
+                      :class="[
+                        'block truncate rounded px-1.5 py-0.5 font-medium',
+                        calendarPillClass(item.item_type),
+                      ]"
                     >
-                      {{ item.title }}
-                    </NuxtLink>
-                    <span v-else>{{ item.title }}</span>
+                      <NuxtLink
+                        v-if="item.href"
+                        :to="item.href"
+                        class="block truncate hover:underline"
+                        >{{ item.title }}</NuxtLink
+                      >
+                      <span v-else class="block truncate">{{ item.title }}</span>
+                    </span>
                   </slot>
                 </li>
               </ul>
@@ -317,14 +324,20 @@ function isToday(iso: string): boolean {
                   {{ formatTime(item.starts_at) }}
                 </span>
                 <slot name="row" :item="item">
-                  <NuxtLink
-                    v-if="item.href"
-                    :to="item.href"
-                    class="hover:text-primary-600 dark:hover:text-primary-400"
+                  <span
+                    :class="[
+                      'block truncate rounded px-1.5 py-0.5 font-medium',
+                      calendarPillClass(item.item_type),
+                    ]"
                   >
-                    {{ item.title }}
-                  </NuxtLink>
-                  <span v-else>{{ item.title }}</span>
+                    <NuxtLink
+                      v-if="item.href"
+                      :to="item.href"
+                      class="block truncate hover:underline"
+                      >{{ item.title }}</NuxtLink
+                    >
+                    <span v-else class="block truncate">{{ item.title }}</span>
+                  </span>
                 </slot>
               </li>
             </ul>
@@ -344,7 +357,14 @@ function isToday(iso: string): boolean {
             :key="`${item.item_type}-${item.id}`"
             class="flex flex-wrap items-center gap-x-3 gap-y-1 py-2.5 text-sm"
           >
-            <UBadge color="neutral" variant="subtle">{{ item.item_type }}</UBadge>
+            <span
+              :class="[
+                'rounded px-1.5 py-0.5 text-xs font-medium',
+                calendarPillClass(item.item_type),
+              ]"
+            >
+              {{ item.item_type }}
+            </span>
             <span
               v-if="formatTime(item.starts_at)"
               class="font-mono text-gray-500 dark:text-gray-400"
@@ -352,16 +372,17 @@ function isToday(iso: string): boolean {
               {{ formatTime(item.starts_at) }}
             </span>
             <slot name="row" :item="item">
-              <NuxtLink
-                v-if="item.href"
-                :to="item.href"
-                class="font-medium text-gray-900 hover:text-primary-600 dark:text-white"
+              <span
+                :class="[
+                  'rounded px-1.5 py-0.5 font-medium',
+                  calendarPillClass(item.item_type),
+                ]"
               >
-                {{ item.title }}
-              </NuxtLink>
-              <span v-else class="font-medium text-gray-900 dark:text-white">{{
-                item.title
-              }}</span>
+                <NuxtLink v-if="item.href" :to="item.href" class="hover:underline">{{
+                  item.title
+                }}</NuxtLink>
+                <span v-else>{{ item.title }}</span>
+              </span>
             </slot>
           </li>
         </ul>
@@ -387,7 +408,14 @@ function isToday(iso: string): boolean {
               :key="`${item.item_type}-${item.id}`"
               class="flex flex-wrap items-center gap-x-3 gap-y-1 py-2.5 text-sm"
             >
-              <UBadge color="neutral" variant="subtle">{{ item.item_type }}</UBadge>
+              <span
+                :class="[
+                  'rounded px-1.5 py-0.5 text-xs font-medium',
+                  calendarPillClass(item.item_type),
+                ]"
+              >
+                {{ item.item_type }}
+              </span>
               <span
                 v-if="formatTime(item.starts_at)"
                 class="font-mono text-gray-500 dark:text-gray-400"
@@ -395,16 +423,17 @@ function isToday(iso: string): boolean {
                 {{ formatTime(item.starts_at) }}
               </span>
               <slot name="row" :item="item">
-                <NuxtLink
-                  v-if="item.href"
-                  :to="item.href"
-                  class="font-medium text-gray-900 hover:text-primary-600 dark:text-white"
+                <span
+                  :class="[
+                    'rounded px-1.5 py-0.5 font-medium',
+                    calendarPillClass(item.item_type),
+                  ]"
                 >
-                  {{ item.title }}
-                </NuxtLink>
-                <span v-else class="font-medium text-gray-900 dark:text-white">{{
-                  item.title
-                }}</span>
+                  <NuxtLink v-if="item.href" :to="item.href" class="hover:underline">{{
+                    item.title
+                  }}</NuxtLink>
+                  <span v-else>{{ item.title }}</span>
+                </span>
               </slot>
               <span v-if="item.branch_name" class="text-gray-500 dark:text-gray-400">
                 {{ item.branch_name }}

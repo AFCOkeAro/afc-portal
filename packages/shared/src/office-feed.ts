@@ -48,6 +48,57 @@ export interface CalendarFeedOptions {
   limit?: number
 }
 
+/**
+ * Display language for calendar types (AFC-853, Kargul reference). Pastel
+ * pill per type with a dark-mode variant; full class strings so Tailwind
+ * picks them up at build time (never constructed dynamically). Display
+ * only: scope, feeds and links are untouched.
+ */
+export interface CalendarTypeMeta {
+  label: string
+  /** Pill: tinted background + readable text, light and dark. */
+  pill: string
+  /** Solid dot for legends. */
+  dot: string
+}
+
+export const CALENDAR_TYPE_META: Record<CalendarItemType, CalendarTypeMeta> = {
+  service: {
+    label: 'Service',
+    pill: 'bg-purple-100 text-purple-900 dark:bg-purple-950 dark:text-purple-200',
+    dot: 'bg-purple-500',
+  },
+  event: {
+    label: 'Event',
+    pill: 'bg-blue-100 text-blue-900 dark:bg-blue-950 dark:text-blue-200',
+    dot: 'bg-blue-500',
+  },
+  programme: {
+    label: 'Programme',
+    pill: 'bg-green-100 text-green-900 dark:bg-green-950 dark:text-green-200',
+    dot: 'bg-green-500',
+  },
+  celebration: {
+    label: 'Celebration',
+    pill: 'bg-pink-100 text-pink-900 dark:bg-pink-950 dark:text-pink-200',
+    dot: 'bg-pink-500',
+  },
+}
+
+/** Pill classes for a feed type; unknown types fall back to neutral. */
+export function calendarPillClass(itemType: string): string {
+  const meta = (CALENDAR_TYPE_META as Record<string, CalendarTypeMeta>)[itemType]
+  return meta
+    ? meta.pill
+    : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200'
+}
+
+/** Solid dot classes for a feed type; unknown types fall back to neutral. */
+export function calendarDotClass(itemType: string): string {
+  const meta = (CALENDAR_TYPE_META as Record<string, CalendarTypeMeta>)[itemType]
+  return meta ? meta.dot : 'bg-gray-400'
+}
+
 /** Sort key: date, then type order (service, event, programme, celebration). */
 const TYPE_ORDER: Record<CalendarItemType, number> = {
   service: 0,
