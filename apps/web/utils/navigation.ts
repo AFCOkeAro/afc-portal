@@ -218,11 +218,22 @@ export const NAVIGATION: readonly NavigationItem[] = [
   // AFC-839: no My tasks entry — /tasks carries the Assigned to me
   // checkbox, so a second entry is a second truth to maintain.
   {
-    // No dedicated automation surface yet; tasks is the closest working page.
-    label: 'Workflow and Automation',
-    to: '/tasks',
+    // AFC-840: dedicated template catalogue; applying a template fans out
+    // to ordinary task rows through /api/tasks/from-template.
+    label: 'Workflows',
+    to: '/workflows',
     icon: 'i-lucide-workflow',
     requires: ['tasks', 'read'],
+    group: 'office',
+    inSidebar: true,
+  },
+  {
+    // AFC-840: hub of every data-entry point; each card gates on its own
+    // create grant, so the hub itself needs only the widest read.
+    label: 'Forms',
+    to: '/forms',
+    icon: 'i-lucide-file-text',
+    requires: ['events', 'read'],
     group: 'office',
     inSidebar: true,
   },
