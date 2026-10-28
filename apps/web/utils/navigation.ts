@@ -74,7 +74,8 @@ export const NAVIGATION_GROUPS: readonly NavigationGroupDef[] = [
   { key: 'worship', label: 'Worship', icon: 'i-lucide-church', to: '/departments' },
   { key: 'people', label: 'People', icon: 'i-lucide-users', to: '/people' },
   { key: 'youth', label: 'Youth', icon: 'i-lucide-sparkles', to: '/campus' },
-  { key: 'events', label: 'Events', icon: 'i-lucide-calendar-days', to: '/events' },
+  // AFC-845: the section is Programs (routes stay /events; no URL churn).
+  { key: 'events', label: 'Programs', icon: 'i-lucide-calendar-days', to: '/events' },
   {
     key: 'communications',
     label: 'Communications',
