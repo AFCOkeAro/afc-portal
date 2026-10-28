@@ -105,11 +105,8 @@ export const sessionActivityFormSchema = z.object({
   duration_minutes: z.coerce.number().int().min(0).max(1440).optional(),
   notes: optionalText(2000),
 })
-
 export type SessionActivityForm = z.infer<typeof sessionActivityFormSchema>
-
 export const sessionActivityPatchSchema = sessionActivityFormSchema.partial()
-
 export type SessionActivityPatch = z.infer<typeof sessionActivityPatchSchema>
 export const OUTREACH_LOCATION_CATEGORIES = [
   'primary_school',
@@ -117,11 +114,8 @@ export const OUTREACH_LOCATION_CATEGORIES = [
   'prison',
   'skills_centre',
   'hospital',
-  'other',
 ] as const
-
 export const OUTREACH_LOCATION_OWNERSHIP = ['private', 'public'] as const
-
 /**
  * AVS mission field (AFC-841). Branch/zone stamp server-side from the
  * caller's scope (0044 choice-8); contact + visiting days are free text.
@@ -137,17 +131,12 @@ export const outreachLocationFormSchema = z.object({
   visiting_days: optionalText(200),
   notes: optionalText(2000),
 })
-
 export type OutreachLocationForm = z.infer<typeof outreachLocationFormSchema>
-
 export const outreachLocationPatchSchema = outreachLocationFormSchema.partial()
-
 export type OutreachLocationPatch = z.infer<typeof outreachLocationPatchSchema>
-
 export const outreachSecretaryFormSchema = z.object({
   person: z.string().trim().min(1, 'Choose the secretary').max(36),
 })
-
 export type OutreachSecretaryForm = z.infer<typeof outreachSecretaryFormSchema>
 export const LEAVE_TYPES = [
   'annual',
@@ -277,7 +266,19 @@ export const resourceDecisionSchema = z.object({
 })
 
 export type ResourceDecision = z.infer<typeof resourceDecisionSchema>
+/**
+ * Fan feedback (AFC-828 phase 2). Submitted session-free through the
+ * public proxy; the message floor is enforced here so the error points
+ * at the form. Rating is 1-5; contact is for follow-up only.
+ */
+export const feedbackFormSchema = z.object({
+  name: optionalText(200),
+  message: z.string().trim().min(1, 'Tell us what stood out').max(2000),
+  rating: z.coerce.number().int().min(1).max(5).optional(),
+  contact: optionalText(200),
+})
 
+export type FeedbackForm = z.infer<typeof feedbackFormSchema>
 const VISITOR_STATUSES = ['new', 'follow_up', 'converted', 'closed', 'declined'] as const
 
 export const visitorFormSchema = z.object({

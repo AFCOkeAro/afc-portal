@@ -2244,16 +2244,13 @@ watch(
             </div>
           </template>
 
+          <template v-else-if="reportSubtab === 'Feedback'">
+            <FeedbackList :event-id="id" />
+          </template>
           <template v-else>
             <EmptyState
-              :title="
-                reportSubtab === 'Feedback' ? 'No feedback yet' : 'No testimonies yet'
-              "
-              :description="
-                reportSubtab === 'Feedback'
-                  ? 'Participant feedback collected for this programme will appear here.'
-                  : 'Testimonies shared from this programme will appear here.'
-              "
+              title="No testimonies yet"
+              description="Testimonies shared from this programme will appear here."
             />
           </template>
         </UCard>

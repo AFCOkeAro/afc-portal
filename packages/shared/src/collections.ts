@@ -42,6 +42,8 @@ export const COLLECTIONS = {
   eventSpeakers: 'event_speakers',
   /** Programme materials per event, approval-gated (AFC-844). */
   eventResources: 'event_resources',
+  /** Fan feedback per event, public-submitted (AFC-828 phase 2). */
+  eventFeedback: 'event_feedback',
   /**
    * Attendance sex/category split (AFC-468, data-model-expansion §3).
    * `serviceTypeDefinitions` is board config (capture renders its ordered

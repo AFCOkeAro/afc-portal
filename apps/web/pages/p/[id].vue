@@ -31,6 +31,47 @@ const { data, pending, error } = await useAsyncData(`public-event-${id}`, () =>
 
 const event = computed(() => data.value?.data ?? null)
 
+/* Fan feedback (AFC-828 phase 2): session-free submit through the
+ * public proxy route. The server re-checks visibility + published
+ * status; nothing renders publicly — staff read it on the event
+ * Reports > Feedback tab. */
+const feedback = ref({ name: '', message: '', rating: 0, contact: '' })
+const feedbackSaving = ref(false)
+const feedbackError = ref('')
+const feedbackDone = ref(false)
+
+async function submitFeedback(): Promise<void> {
+  if (feedback.value.message.trim() === '') {
+    feedbackError.value = 'Tell us what stood out before sending.'
+    return
+  }
+  feedbackSaving.value = true
+  feedbackError.value = ''
+  try {
+    await $fetch(`/api/public/events/${id}/feedback`, {
+      method: 'POST',
+      body: {
+        ...(feedback.value.name.trim() === ''
+          ? {}
+          : { name: feedback.value.name.trim() }),
+        message: feedback.value.message.trim(),
+        ...(feedback.value.rating === 0 ? {} : { rating: feedback.value.rating }),
+        ...(feedback.value.contact.trim() === ''
+          ? {}
+          : { contact: feedback.value.contact.trim() }),
+      },
+    })
+    feedbackDone.value = true
+  } catch (cause) {
+    feedbackError.value =
+      (cause as { data?: { message?: string }; message?: string }).data?.message ??
+      (cause as { message?: string }).message ??
+      'Could not send your feedback'
+  } finally {
+    feedbackSaving.value = false
+  }
+}
+
 function formatDate(value: string | null): string {
   if (!value) return ''
   const parsed = new Date(value)
@@ -66,6 +107,63 @@ function formatDate(value: string | null): string {
       <p v-if="event.summary" class="mt-4 whitespace-pre-line text-gray-700">
         {{ event.summary }}
       </p>
+      <section
+        aria-label="Share your feedback"
+        class="mt-10 rounded-xl border border-gray-200 p-5 dark:border-gray-800"
+      >
+        <h2 class="text-lg font-semibold">Share your feedback</h2>
+        <p v-if="feedbackDone" class="mt-2 text-sm text-green-700">
+          Thank you — your words have been shared with the organisers.
+        </p>
+        <div v-else class="mt-3 space-y-3">
+          <UFormField label="Your name (optional)">
+            <UInput v-model="feedback.name" placeholder="e.g. Adaeze" class="w-full" />
+          </UFormField>
+          <UFormField label="What stood out?" required>
+            <UTextarea
+              v-model="feedback.message"
+              placeholder="The choir lifted the whole hall…"
+              class="w-full"
+            />
+          </UFormField>
+          <UFormField label="Rating (optional)">
+            <div class="flex gap-1" role="radiogroup" aria-label="Rating">
+              <button
+                v-for="star in [1, 2, 3, 4, 5]"
+                :key="star"
+                type="button"
+                class="text-2xl"
+                :class="
+                  star <= feedback.rating
+                    ? 'text-amber-500'
+                    : 'text-gray-300 dark:text-gray-600'
+                "
+                :aria-label="`Rate ${star} of 5`"
+                :aria-pressed="feedback.rating === star"
+                @click="feedback.rating = star"
+              >
+                ★
+              </button>
+            </div>
+          </UFormField>
+          <UFormField label="Contact for follow-up (optional)">
+            <UInput
+              v-model="feedback.contact"
+              placeholder="Phone or email"
+              class="w-full"
+            />
+          </UFormField>
+          <UButton
+            label="Send feedback"
+            icon="i-lucide-send"
+            :loading="feedbackSaving"
+            @click="submitFeedback"
+          />
+          <p v-if="feedbackError !== ''" class="text-sm text-red-600">
+            {{ feedbackError }}
+          </p>
+        </div>
+      </section>
       <div class="mt-8 flex flex-wrap gap-3">
         <UButton
           :to="`/register?event=${event.id}`"
