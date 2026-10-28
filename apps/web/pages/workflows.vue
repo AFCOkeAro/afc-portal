@@ -1,6 +1,10 @@
 <script setup lang="ts">
-import { TASK_TEMPLATES, expandTaskTemplate, getTaskTemplate } from '@afc/shared'
-import { COLLECTIONS } from '@afc/shared'
+import {
+  COLLECTIONS,
+  TASK_TEMPLATES,
+  expandTaskTemplate,
+  getTaskTemplate,
+} from '@afc/shared'
 
 /**
  * Workflows & Automations (AFC-840 phase 1): the task-template catalogue.
