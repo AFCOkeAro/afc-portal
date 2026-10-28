@@ -40,6 +40,8 @@ export const COLLECTIONS = {
   leaveRequests: 'leave_requests',
   /** Speaker bookings per event (AFC-843). */
   eventSpeakers: 'event_speakers',
+  /** Programme materials per event, approval-gated (AFC-844). */
+  eventResources: 'event_resources',
   /**
    * Attendance sex/category split (AFC-468, data-model-expansion §3).
    * `serviceTypeDefinitions` is board config (capture renders its ordered

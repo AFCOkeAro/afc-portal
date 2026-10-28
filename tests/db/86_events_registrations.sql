@@ -365,6 +365,8 @@ ALTER TABLE blessing_recipients DROP CONSTRAINT IF EXISTS blessing_recipients_ev
 ALTER TABLE session_activities DROP CONSTRAINT IF EXISTS session_activities_session_fkey;
 -- AFC-843: 0053 links event_speakers the same way; park its event FK too.
 ALTER TABLE event_speakers DROP CONSTRAINT IF EXISTS event_speakers_event_fkey;
+-- AFC-844: 0054 links event_resources the same way; park its event FK too.
+ALTER TABLE event_resources DROP CONSTRAINT IF EXISTS event_resources_event_fkey;
 \i services/directus/schema/migrations/rollback/20261020_0023_attendance_sessions.down.sql
 
 DO $$
@@ -420,6 +422,9 @@ ALTER TABLE session_activities ADD CONSTRAINT session_activities_session_fkey
   FOREIGN KEY (session) REFERENCES attendance_sessions(id) ON DELETE CASCADE;
 -- AFC-843: re-add the parked 0053 event FK now events is back.
 ALTER TABLE event_speakers ADD CONSTRAINT event_speakers_event_fkey
+  FOREIGN KEY (event) REFERENCES events(id) ON DELETE CASCADE;
+-- AFC-844: re-add the parked 0054 event FK now events is back.
+ALTER TABLE event_resources ADD CONSTRAINT event_resources_event_fkey
   FOREIGN KEY (event) REFERENCES events(id) ON DELETE CASCADE;
 
 -- The 0023 re-apply above recreates attendance_sessions/attendance_records

@@ -222,6 +222,61 @@ export const speakerPatchSchema = z.object({
 })
 
 export type SpeakerPatch = z.infer<typeof speakerPatchSchema>
+export const RESOURCE_SOURCE_TYPES = ['link', 'upload'] as const
+
+export const RESOURCE_KINDS = [
+  'document',
+  'spreadsheet',
+  'pdf',
+  'image',
+  'video',
+  'archive',
+  'other',
+] as const
+
+export const RESOURCE_STATUSES = ['pending', 'approved', 'rejected'] as const
+
+/**
+ * Programme material (AFC-844). Link XOR upload is enforced here to
+ * mirror the 0054 link-or-upload CHECK, so the error points at the form.
+ * New items always open pending; approval is a separate PATCH.
+ */
+export const resourceFormSchema = z
+  .object({
+    speaker: z.string().trim().max(36).optional(),
+    title: z.string().trim().min(1, 'Name the resource').max(200),
+    source_type: z.enum(RESOURCE_SOURCE_TYPES),
+    kind: z.enum(RESOURCE_KINDS),
+    url: z.string().trim().max(2000).optional(),
+    file_id: z.string().trim().max(36).optional(),
+  })
+  .refine(
+    (form) =>
+      (form.source_type === 'link' && Boolean(form.url?.trim()) && !form.file_id) ||
+      (form.source_type === 'upload' && Boolean(form.file_id) && !form.url?.trim()),
+    {
+      message: 'A link needs its URL; an upload needs its file — never both',
+      path: ['url'],
+    },
+  )
+
+export type ResourceForm = z.infer<typeof resourceFormSchema>
+
+export const resourcePatchSchema = z.object({
+  speaker: optionalText(36),
+  title: z.string().trim().min(1).max(200).optional(),
+  kind: z.enum(RESOURCE_KINDS).optional(),
+  url: optionalText(2000),
+  file_id: optionalText(36),
+})
+
+export type ResourcePatch = z.infer<typeof resourcePatchSchema>
+
+export const resourceDecisionSchema = z.object({
+  status: z.enum(['approved', 'rejected']),
+})
+
+export type ResourceDecision = z.infer<typeof resourceDecisionSchema>
 
 const VISITOR_STATUSES = ['new', 'follow_up', 'converted', 'closed', 'declined'] as const
 
