@@ -1,0 +1,17 @@
+{
+  "issue": "AFC-830",
+  "authorAgentId": "human-operator-board",
+  "authorName": "Board chairman (CLI operator session)",
+  "claimedAt": "2026-10-28T00:15:00+01:00",
+  "scopeOfTheClaim": "R1 only: authorship of the compliance-path files below. Correctness is for CI (R4) and the CTO review (R2).",
+  "whatTheChangeActuallyDoes": "Migration 0046 (+rollback): events.payments_enabled boolean NOT NULL DEFAULT false with ownership precondition; no new grants (column inherits the table ceiling). Suite 46 (rerun, defaults, ceiling, live down/up refusal cycle with faithful migrator identity).",
+  "whatThisFileIs": "An R1 authorship claim, and nothing else. It says who wrote the compliance-path files below and on which issue. It asserts nothing about whether they are correct, and it carries no reviews[] entry.",
+  "doesNotClaimR2": "There is no reviews[] entry here and there will not be one from me. R2 wants a named reviewer who is not the author. CTO R2 requested on the AFC-830 thread before landing.",
+  "notClaimedPaths": "Non-compliance paths in the same packet (event schema/types, EventFormModal, manage modal, event pages/routes, payments contract) need no claim and land with the R2 verdict.",
+  "paths": [
+    "services/directus/schema/migrations/20261028_0046_event_payments_flag.sql",
+    "services/directus/schema/migrations/rollback/20261028_0046_event_payments_flag.down.sql",
+    "tests/db/46_event_payments_flag.sql",
+    ".provenance/claims/AFC-830.json"
+  ]
+}

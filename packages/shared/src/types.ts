@@ -263,6 +263,7 @@ export interface EventRecord {
   registration_closes_at: string | null
   fee_amount: string | null
   currency: 'NGN' | 'USD' | 'GBP' | null
+  payments_enabled: boolean
   requires_guardian_consent: boolean
   collect_medical: boolean
   age_min: number | null

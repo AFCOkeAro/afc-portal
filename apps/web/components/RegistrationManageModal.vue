@@ -40,6 +40,8 @@ const props = defineProps<{
   open: boolean
   registration: RegistrationRow | null
   currency?: string | null
+  /** AFC-830: payment fields render only when the event charges. */
+  paymentsEnabled?: boolean | null
 }>()
 
 const emit = defineEmits<{
@@ -144,7 +146,7 @@ async function submit(): Promise<void> {
           />
         </UFormField>
 
-        <div class="grid gap-4 sm:grid-cols-2">
+        <div v-if="props.paymentsEnabled" class="grid gap-4 sm:grid-cols-2">
           <UFormField
             :label="`Amount expected${currency ? ` (${currency})` : ''}`"
             :error="fieldErrors.amount_expected"
@@ -159,7 +161,7 @@ async function submit(): Promise<void> {
           </UFormField>
         </div>
 
-        <div class="grid gap-4 sm:grid-cols-2">
+        <div v-if="props.paymentsEnabled" class="grid gap-4 sm:grid-cols-2">
           <UFormField label="Payment status" :error="fieldErrors.payment_status">
             <USelect
               v-model="form.payment_status"

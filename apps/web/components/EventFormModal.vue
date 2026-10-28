@@ -39,6 +39,7 @@ function empty() {
     registration_closes_at: '',
     fee_amount: '',
     currency: 'NGN',
+    payments_enabled: false,
     requires_guardian_consent: false,
     collect_medical: false,
     age_min: '' as string | number,
@@ -133,6 +134,7 @@ watch(
         registration_closes_at: toLocal(row.registration_closes_at),
         fee_amount: row.fee_amount ?? '',
         currency: row.currency ?? 'NGN',
+        payments_enabled: row.payments_enabled ?? false,
         requires_guardian_consent: row.requires_guardian_consent,
         collect_medical: row.collect_medical,
         age_min: row.age_min ?? '',
@@ -287,7 +289,11 @@ async function submit(): Promise<void> {
               </UFormField>
             </div>
             <div class="grid gap-4 sm:grid-cols-3">
-              <UFormField label="Fee" :error="fieldErrors.fee_amount">
+              <UFormField
+                v-if="form.payments_enabled"
+                label="Fee"
+                :error="fieldErrors.fee_amount"
+              >
                 <UInput
                   v-model="form.fee_amount"
                   type="number"
@@ -296,7 +302,11 @@ async function submit(): Promise<void> {
                   class="w-full"
                 />
               </UFormField>
-              <UFormField label="Currency" :error="fieldErrors.currency">
+              <UFormField
+                v-if="form.payments_enabled"
+                label="Currency"
+                :error="fieldErrors.currency"
+              >
                 <USelect
                   v-model="form.currency"
                   :items="currencyOptions"
@@ -329,6 +339,10 @@ async function submit(): Promise<void> {
                 label="Requires guardian consent"
               />
               <UCheckbox v-model="form.collect_medical" label="Collect medical notes" />
+              <UCheckbox
+                v-model="form.payments_enabled"
+                label="Accept payments for this event"
+              />
             </div>
           </div>
         </details>

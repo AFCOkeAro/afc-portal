@@ -43,6 +43,10 @@ export const eventFormSchema = z
       .transform((value) => (value === '' ? undefined : value)),
     fee_amount: moneySchema,
     currency: z.enum(CURRENCIES).default('NGN'),
+    // AFC-830: charging is opt-in per event. The fee/currency fields below
+    // only render when this is on; the route stores whatever the form
+    // sends, so an off event simply never sends a fee.
+    payments_enabled: z.boolean().default(false),
     requires_guardian_consent: z.boolean().default(false),
     collect_medical: z.boolean().default(false),
     age_min: z.coerce.number().int().min(0).optional(),
@@ -136,6 +140,7 @@ export function toEventPayload(form: EventForm): Record<string, unknown> {
     registration_closes_at: form.registration_closes_at ?? null,
     fee_amount: form.fee_amount,
     currency: form.currency,
+    payments_enabled: form.payments_enabled,
     requires_guardian_consent: form.requires_guardian_consent,
     collect_medical: form.collect_medical,
     age_min: form.age_min ?? null,

@@ -33,6 +33,7 @@ const EVENT_FIELDS = [
   'registration_closes_at',
   'fee_amount',
   'currency',
+  'payments_enabled',
   'requires_guardian_consent',
   'collect_medical',
   'age_min',

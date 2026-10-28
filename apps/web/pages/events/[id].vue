@@ -1291,7 +1291,7 @@ watch(
         </UCard>
 
         <div class="mt-4 grid gap-4 xl:grid-cols-2">
-          <UCard>
+          <UCard v-if="event.payments_enabled">
             <template #header
               ><h2 class="text-sm font-semibold">Payment status</h2></template
             >
@@ -2416,6 +2416,7 @@ watch(
         v-model:open="showManageOpen"
         :registration="managingRegistration"
         :currency="event.currency"
+        :payments-enabled="event.payments_enabled"
         @saved="afterRegistrationSaved()"
       />
       <RegistrationCreateModal
