@@ -124,6 +124,11 @@ BEGIN
   DELETE FROM events WHERE id = v_event;
 END $test$;
 
+-- AFC-844: park the resources speaker link so the 0053 down script can
+-- drop its referent (the down script refuses to touch a landed 844 link
+-- itself). Restored after the re-apply below.
+ALTER TABLE IF EXISTS event_resources DROP CONSTRAINT IF EXISTS event_resources_speaker_fkey;
+
 \i services/directus/schema/migrations/rollback/20261028_0053_event_speakers.down.sql
 
 DO $$
@@ -140,4 +145,16 @@ BEGIN
   PERFORM test_support.assert_true(
     to_regclass('public.event_speakers') IS NOT NULL,
     'speakers', '53.4: re-apply restores the speakers table');
+END $$;
+
+-- AFC-844: restore the parked speaker link (conditional merge-contract
+-- form, mirroring 0054 §2: only when event_speakers exists).
+DO $$
+BEGIN
+  IF to_regclass('public.event_speakers') IS NULL THEN
+    RAISE NOTICE 'Skipping event_resources_speaker_fkey restore: event_speakers absent.';
+  ELSIF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'event_resources_speaker_fkey') THEN
+    ALTER TABLE event_resources ADD CONSTRAINT event_resources_speaker_fkey
+      FOREIGN KEY (speaker) REFERENCES event_speakers(id) ON DELETE SET NULL;
+  END IF;
 END $$;

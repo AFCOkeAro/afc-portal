@@ -1,0 +1,19 @@
+{
+  "issue": "AFC-844",
+  "authorAgentId": "human-operator-board",
+  "authorName": "Board chairman (CLI operator session)",
+  "claimedAt": "2026-10-28T04:40:00+01:00",
+  "scopeOfTheClaim": "R1 only: authorship of the compliance-path files below. Correctness is for CI (R4) and the CTO review (R2).",
+  "whatTheChangeActuallyDoes": "Migration 0054 (+rollback): event_resources (event FK CASCADE; speaker bare uuid with conditional event_resources_speaker_fkey via the 0023 merge-contract pattern for the unmerged AFC-843 slice; branch/zone route-stamped denorms SET NULL per the 0044 choice-8 precedent with no scope trigger so suite 94 is untouched; title; source link/upload with strict link-XOR-upload CHECK; closed 7-kind and 3-status sets; approval rides the same row via decided_by/at) with SELECT/INSERT(col-list)/UPDATE/DELETE grants to directus_app and PUBLIC revoked; ownership + bootstrap-role preconditions per the 0042 pattern. Suite 54: rerun no-op, shape (pending default/pairing refusals/closed-set refusal/approve-on-row/withdraw; probe events created+removed in-suite), grants (SELECT, INSERT+UPDATE+DELETE, PUBLIC-empty), live down/up cycle with restrict_violation refusal while rows exist. Suite 86 evolved with rationale: park the 0054 event FK around the 0021 empty rollback and re-add after (blessing_recipients precedent). Landing order note: 0054 applies cleanly before or after 0053 (conditional FK); re-applying 0054 after 0053 completes the speaker link. Suite 53 accommodation: parks event_resources_speaker_fkey around the 0053 down-drop test and restores it after re-apply (the 0053 down script documents that a landed 844 link must be parked by the caller).",
+  "whatThisFileIs": "An R1 authorship claim, and nothing else. It says who wrote the compliance-path files below and on which issue. It asserts nothing about whether they are correct, and it carries no reviews[] entry.",
+  "doesNotClaimR2": "There is no reviews[] entry here and there will not be one from me. R2 wants a named reviewer who is not the author. CTO R2 requested on the AFC-844 thread before landing.",
+  "notClaimedPaths": "Non-compliance paths in the same packet (shared COLLECTIONS + role-matrix entry mirroring session_activities hands + resource schemas with link-or-upload refine, six resource API routes with approved-only default and manage-gated queue + zone-from-branch stamping + 50MB upload with extended MIME set + file proxy that verifies the file belongs to the event, ResourceLibrary.vue with library/queue/share form, Resources tab rework, resources contract) need no claim and land with the R2 verdict.",
+  "paths": [
+    "services/directus/schema/migrations/20261028_0054_event_resources.sql",
+    "services/directus/schema/migrations/rollback/20261028_0054_event_resources.down.sql",
+    "tests/db/54_event_resources.sql",
+    "tests/db/86_events_registrations.sql",
+    ".provenance/claims/AFC-844.json",
+    "tests/db/53_event_speakers.sql"
+  ]
+}

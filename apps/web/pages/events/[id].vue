@@ -159,6 +159,15 @@ const canManageSpeakers = computed(
     (permissions.can(COLLECTIONS.eventSpeakers, 'create') ||
       permissions.can(COLLECTIONS.events, 'update')),
 )
+/* Resources tab (AFC-844): approved library for readers; the pending
+ * queue and share form need the manage grant. */
+const canResources = computed(() => permissions.can(COLLECTIONS.eventResources, 'read'))
+const canManageResources = computed(
+  () =>
+    canResources.value &&
+    (permissions.can(COLLECTIONS.eventResources, 'create') ||
+      permissions.can(COLLECTIONS.events, 'update')),
+)
 const canRecordExpenses = computed(
   () =>
     canExpenses.value &&
@@ -2295,9 +2304,16 @@ watch(
       </section>
 
       <!-- MATERIALS -->
+      <!-- AFC-844: approved library + approval queue + share form. Only
+        approved rows render as the library; pending items wait for a
+        manager. Scope is enforced server-side. -->
       <section v-if="tab === 'materials'" aria-label="Resources" class="mt-4">
-        <p class="mb-3 text-sm text-gray-500">0 items</p>
-        <UCard>
+        <ResourceLibrary
+          v-if="canResources"
+          :event-id="id"
+          :can-manage="canManageResources"
+        />
+        <UCard v-else>
           <EmptyState
             title="No resources yet"
             description="Guidelines, handbooks and the order of programme will appear here once they're shared."
