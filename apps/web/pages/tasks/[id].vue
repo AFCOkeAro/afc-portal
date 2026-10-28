@@ -29,6 +29,61 @@ async function setStatus(status: string) {
   }
 }
 
+/* RACI ring (AFC-833): four person seats, saved to the dedicated endpoint
+ * (null clears a seat). Initialised from the loaded row on every refresh. */
+const { personOptions, personPending, onPersonSearch } = usePersonSearch()
+const raci = ref({
+  raci_responsible: '',
+  raci_accountable: '',
+  raci_consulted: '',
+  raci_informed: '',
+})
+const raciError = ref('')
+const raciSaving = ref(false)
+const RACI_SEATS = [
+  { key: 'raci_responsible', label: 'Responsible (does the work)' },
+  { key: 'raci_accountable', label: 'Accountable (owns the outcome)' },
+  { key: 'raci_consulted', label: 'Consulted (two-way input)' },
+  { key: 'raci_informed', label: 'Informed (one-way update)' },
+] as const
+
+function resetRaci(): void {
+  const row = (data.value?.data ?? {}) as Record<string, unknown>
+  raci.value = {
+    raci_responsible:
+      typeof row.raci_responsible === 'string' ? row.raci_responsible : '',
+    raci_accountable:
+      typeof row.raci_accountable === 'string' ? row.raci_accountable : '',
+    raci_consulted: typeof row.raci_consulted === 'string' ? row.raci_consulted : '',
+    raci_informed: typeof row.raci_informed === 'string' ? row.raci_informed : '',
+  }
+}
+
+watch(
+  () => data.value?.data,
+  () => resetRaci(),
+  { immediate: true },
+)
+
+async function saveRaci(): Promise<void> {
+  raciError.value = ''
+  raciSaving.value = true
+  try {
+    const body: Record<string, string | null> = {}
+    for (const seat of RACI_SEATS) {
+      const value = raci.value[seat.key]
+      body[seat.key] = value === '' ? null : value
+    }
+    await api.patch(`/api/tasks/${id}/raci`, body)
+    await refresh()
+  } catch (cause) {
+    raciError.value =
+      (cause as { message?: string }).message ?? 'Could not save the RACI ring'
+  } finally {
+    raciSaving.value = false
+  }
+}
+
 const title = computed(() => String(data.value?.data?.title ?? 'Task'))
 </script>
 
@@ -115,6 +170,49 @@ const title = computed(() => String(data.value?.data?.title ?? 'Task'))
               @click="setStatus('blocked')"
             />
             <UButton label="Done" icon="i-lucide-check" @click="setStatus('done')" />
+          </div>
+        </PermissionGate>
+      </UCard>
+
+      <UCard>
+        <template #header>
+          <h2 class="font-semibold">RACI ring</h2>
+        </template>
+        <UAlert
+          v-if="raciError"
+          class="mb-3"
+          color="error"
+          variant="subtle"
+          title="Could not save the RACI ring"
+          :description="raciError"
+        />
+        <PermissionGate :collection="COLLECTIONS.tasks" action="update">
+          <div class="grid gap-3 sm:grid-cols-2">
+            <UFormField v-for="seat in RACI_SEATS" :key="seat.key" :label="seat.label">
+              <div class="flex items-center gap-1">
+                <EntitySelect
+                  v-model="raci[seat.key]"
+                  :items="personOptions"
+                  placeholder="Type a name to search…"
+                  :loading="personPending"
+                  server-search
+                  class="w-full"
+                  @update:search-term="onPersonSearch"
+                />
+                <UButton
+                  v-if="raci[seat.key]"
+                  variant="ghost"
+                  color="neutral"
+                  size="xs"
+                  icon="i-lucide-x"
+                  aria-label="Clear seat"
+                  @click="raci[seat.key] = ''"
+                />
+              </div>
+            </UFormField>
+          </div>
+          <div class="mt-3 flex justify-end">
+            <UButton label="Save RACI" :loading="raciSaving" @click="saveRaci()" />
           </div>
         </PermissionGate>
       </UCard>

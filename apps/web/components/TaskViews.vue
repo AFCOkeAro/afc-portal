@@ -17,6 +17,8 @@ interface TaskItem {
   status: unknown
   priority: unknown
   due_date: unknown
+  owner_name?: unknown
+  raci_names?: unknown
 }
 
 const props = defineProps<{
@@ -33,6 +35,7 @@ const props = defineProps<{
 }>()
 
 const api = useApi()
+const permissions = usePermissions()
 
 type ViewId = 'board' | 'table' | 'list' | 'calendar' | 'timeline' | 'gallery'
 const VIEWS: { id: ViewId; label: string; icon: string }[] = [
@@ -167,6 +170,71 @@ const boardColumns = computed(() =>
   })),
 )
 
+const canMove = computed(() => permissions.can(COLLECTIONS.tasks, 'update'))
+const dragId = ref<string | null>(null)
+const dragOverColumn = ref<string | null>(null)
+const moveError = ref('')
+
+function ownerOf(row: TaskItem): string {
+  const name = row.owner_name
+  return typeof name === 'string' ? name : ''
+}
+
+function raciOf(row: TaskItem): Array<{ letter: string; name: string }> {
+  const names = (row.raci_names ?? {}) as Record<string, unknown>
+  const out: Array<{ letter: string; name: string }> = []
+  const seats = [
+    ['responsible', 'R'],
+    ['accountable', 'A'],
+    ['consulted', 'C'],
+    ['informed', 'I'],
+  ] as const
+  for (const [key, letter] of seats) {
+    const name = names[key]
+    if (typeof name === 'string' && name !== '') out.push({ letter, name })
+  }
+  return out
+}
+
+function onDragStart(event: DragEvent, id: string): void {
+  if (!canMove.value) {
+    event.preventDefault()
+    return
+  }
+  dragId.value = id
+  moveError.value = ''
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move'
+    try {
+      event.dataTransfer.setData('text/plain', id)
+    } catch {
+      // Some browsers restrict payloads; dragId carries the move.
+    }
+  }
+}
+
+function onDragEnd(): void {
+  dragId.value = null
+  dragOverColumn.value = null
+}
+
+async function onDrop(targetStatus: string): Promise<void> {
+  const id = dragId.value
+  dragOverColumn.value = null
+  if (!id || !canMove.value) {
+    dragId.value = null
+    return
+  }
+  dragId.value = null
+  try {
+    await api.patch(`/api/tasks/${id}`, { status: targetStatus })
+    await refresh()
+  } catch (cause) {
+    moveError.value =
+      (cause as { message?: string }).message ?? 'Could not move that task'
+  }
+}
+
 /* ---------- Calendar state (month grid, Monday-first) ---------- */
 const now = new Date()
 const calYear = ref(now.getFullYear())
@@ -281,6 +349,14 @@ const timelineGroups = computed(() => {
       <span class="text-xs text-gray-500 tabular-nums dark:text-gray-400">
         {{ filtered.length }} of {{ total }}
       </span>
+      <UAlert
+        v-if="moveError"
+        class="w-full"
+        color="error"
+        variant="subtle"
+        title="Could not move that task"
+        :description="moveError"
+      />
       <PermissionGate
         v-if="props.templateId"
         :collection="COLLECTIONS.tasks"
@@ -380,11 +456,25 @@ const timelineGroups = computed(() => {
             column.items.length
           }}</span>
         </header>
-        <ul class="mt-1 space-y-2">
+        <ul
+          class="mt-1 space-y-2 rounded-lg"
+          :class="
+            dragOverColumn === column.id
+              ? 'bg-primary-50 outline outline-1 outline-primary-300 dark:bg-primary-950/40'
+              : ''
+          "
+          @dragover.prevent="dragOverColumn = column.id"
+          @dragleave="dragOverColumn = null"
+          @drop.prevent="onDrop(column.id)"
+        >
           <li
             v-for="row in column.items"
             :key="idOf(row)"
+            :draggable="canMove"
             class="rounded-lg border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-700 dark:bg-gray-950"
+            :class="canMove ? 'cursor-grab active:cursor-grabbing' : ''"
+            @dragstart="onDragStart($event, idOf(row))"
+            @dragend="onDragEnd"
           >
             <NuxtLink
               :to="`/tasks/${idOf(row)}`"
@@ -392,6 +482,19 @@ const timelineGroups = computed(() => {
             >
               {{ titleOf(row) }}
             </NuxtLink>
+            <p v-if="ownerOf(row)" class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Owner: {{ ownerOf(row) }}
+            </p>
+            <p v-if="raciOf(row).length > 0" class="mt-1 flex flex-wrap gap-1">
+              <span
+                v-for="seat in raciOf(row)"
+                :key="seat.letter"
+                :title="seat.name"
+                class="inline-flex size-5 items-center justify-center rounded-full bg-gray-100 text-[10px] font-semibold text-gray-600 dark:bg-gray-800 dark:text-gray-300"
+              >
+                {{ seat.letter }}
+              </span>
+            </p>
             <div
               class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 dark:text-gray-400"
             >

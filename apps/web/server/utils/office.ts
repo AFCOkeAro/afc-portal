@@ -109,3 +109,95 @@ export async function tryListDomain<T>(
     return []
   }
 }
+
+function taskPersonName(row: Record<string, unknown>): string | null {
+  const first = String(row.first_name ?? '').trim()
+  const last = String(row.last_name ?? '').trim()
+  const full = `${first} ${last}`.trim()
+  if (full) return full
+  const email = String(row.email ?? '').trim()
+  return email || null
+}
+
+/**
+ * Owner + RACI display names for task rows (AFC-833). Person refs resolve
+ * against people; user refs fall back to Directus users (fail-soft: a
+ * caller whose policy hides users still sees person names, never an
+ * error). Person names win over user names when both are set.
+ */
+export async function resolveTaskPeople(
+  event: H3Event,
+  scope: PortalScope,
+  rows: Array<Record<string, unknown>>,
+): Promise<{
+  ownerByTask: Map<string, string | null>
+  personNames: Map<string, string>
+}> {
+  const personIds = new Set<string>()
+  const userIds = new Set<string>()
+  for (const row of rows) {
+    for (const key of [
+      'assignee_person',
+      'raci_responsible',
+      'raci_accountable',
+      'raci_consulted',
+      'raci_informed',
+    ]) {
+      const value = row[key]
+      if (typeof value === 'string' && value.length > 0) personIds.add(value)
+    }
+    const user = row.assignee_user
+    if (typeof user === 'string' && user.length > 0) userIds.add(user)
+  }
+
+  const personNames = new Map<string, string>()
+  if (personIds.size > 0) {
+    try {
+      const people = await listItems<Record<string, unknown>>(event, scope, 'people', {
+        filter: { id: { _in: [...personIds] } },
+        fields: ['id', 'first_name', 'last_name'],
+        limit: -1,
+      })
+      for (const person of people.data) {
+        const name = taskPersonName(person)
+        if (name) personNames.set(String(person.id), name)
+      }
+    } catch {
+      // Caller-scoped people read refused: cards fall back to user names.
+    }
+  }
+
+  const userNames = new Map<string, string>()
+  if (userIds.size > 0) {
+    try {
+      const users = await listItems<Record<string, unknown>>(
+        event,
+        scope,
+        'directus_users',
+        {
+          filter: { id: { _in: [...userIds] } },
+          fields: ['id', 'first_name', 'last_name', 'email'],
+          limit: -1,
+        },
+      )
+      for (const user of users.data) {
+        const name = taskPersonName(user)
+        if (name) userNames.set(String(user.id), name)
+      }
+    } catch {
+      // Non-admin callers may not read users: owner falls back to null.
+    }
+  }
+
+  const ownerByTask = new Map<string, string | null>()
+  for (const row of rows) {
+    const person =
+      typeof row.assignee_person === 'string'
+        ? personNames.get(row.assignee_person)
+        : undefined
+    const user =
+      typeof row.assignee_user === 'string' ? userNames.get(row.assignee_user) : undefined
+    ownerByTask.set(String(row.id), person ?? user ?? null)
+  }
+  return { ownerByTask, personNames }
+}

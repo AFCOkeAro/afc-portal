@@ -5,7 +5,7 @@ import {
   requireCan,
   stripHiddenMany,
 } from '../../utils/portal'
-import { logScopedQuery, officeBranchScope } from '../../utils/office'
+import { logScopedQuery, officeBranchScope, resolveTaskPeople } from '../../utils/office'
 
 /**
  * GET /api/tasks?status=&mine=1&branch= — scoped task list (US-E3 AC1).
@@ -48,5 +48,19 @@ export default defineEventHandler(async (event) => {
     limit: paging.limit,
     sort: paging.sort,
   })
-  return { data: stripHiddenMany(scope, 'tasks', data), meta }
+  const rows = stripHiddenMany(scope, 'tasks', data)
+  const { ownerByTask, personNames } = await resolveTaskPeople(event, scope, rows)
+  const nameOf = (value: unknown): string | null =>
+    typeof value === 'string' ? (personNames.get(value) ?? null) : null
+  const enriched = rows.map((row) => ({
+    ...row,
+    owner_name: ownerByTask.get(String(row.id)) ?? null,
+    raci_names: {
+      responsible: nameOf(row.raci_responsible),
+      accountable: nameOf(row.raci_accountable),
+      consulted: nameOf(row.raci_consulted),
+      informed: nameOf(row.raci_informed),
+    },
+  }))
+  return { data: enriched, meta }
 })
