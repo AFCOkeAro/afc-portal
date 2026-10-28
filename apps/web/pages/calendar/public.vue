@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { CALENDAR_TYPE_META, calendarDotClass } from '@afc/shared'
 import {
   isCalendarView,
   isISODate,
@@ -60,6 +61,22 @@ const typeOptions = [
   { label: 'Events', value: 'event' },
 ]
 
+const legendCounts = computed<Record<string, number>>(() => {
+  const counts: Record<string, number> = { event: 0 }
+  for (const row of rows.value) {
+    if (row.item_type === 'event') counts.event! += 1
+  }
+  return counts
+})
+
+/* AFC-575 verdict: the session-free feed carries events only, so the
+ * legend offers no other option. */
+const legendTypes = ['event']
+
+function toggleType(type: string): void {
+  itemType.value = itemType.value === type ? 'all' : type
+}
+
 const rows = computed<CalendarViewItem[]>(() =>
   (data.value?.data ?? []).map((row) => ({
     id: String(row.id ?? ''),
@@ -96,6 +113,31 @@ const rows = computed<CalendarViewItem[]>(() =>
           size="sm"
           label="Register for an event"
         />
+      </div>
+
+      <div
+        class="mt-3 flex flex-wrap items-center gap-1.5"
+        aria-label="Entry type legend"
+      >
+        <button
+          v-for="type in legendTypes"
+          :key="type"
+          type="button"
+          class="flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium"
+          :class="
+            itemType === type
+              ? 'border-primary-500 bg-primary-50 dark:bg-primary-950'
+              : 'border-gray-200 dark:border-gray-800'
+          "
+          :aria-pressed="itemType === type"
+          @click="toggleType(type)"
+        >
+          <span :class="['size-2 rounded-full', calendarDotClass(type)]" />
+          {{ CALENDAR_TYPE_META[type as keyof typeof CALENDAR_TYPE_META].label }}
+          <span class="text-gray-500 dark:text-gray-400">{{
+            legendCounts[type] ?? 0
+          }}</span>
+        </button>
       </div>
 
       <CalendarViews
