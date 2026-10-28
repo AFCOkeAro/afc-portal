@@ -80,6 +80,8 @@ const reportSubtab = ref<(typeof REPORT_SUBTABS)[number]>('Unit reports')
 const regSearch = ref('')
 const regStatus = ref('all')
 const regCheckin = ref('all')
+const regBranch = ref('all')
+const regAgeGroup = ref('all')
 const regSort = ref('newest')
 const selectedRegs = ref<Set<string>>(new Set())
 
@@ -165,6 +167,38 @@ const isUpcoming = computed(() => {
   if (!event.value) return true
   const start = new Date(event.value.start_at).getTime()
   return Number.isNaN(start) || start >= Date.now()
+})
+
+/**
+ * Active programme (AFC-867): started and not yet ended. Single-moment
+ * programmes (no end date) are live on their calendar day only.
+ */
+const isActive = computed(() => {
+  if (!event.value) return false
+  const start = new Date(event.value.start_at).getTime()
+  if (Number.isNaN(start) || start > Date.now()) return false
+  if (event.value.end_at) {
+    const end = new Date(event.value.end_at).getTime()
+    if (Number.isNaN(end)) return true
+    return end >= Date.now()
+  }
+  const begun = new Date(event.value.start_at)
+  const today = new Date()
+  return (
+    begun.getFullYear() === today.getFullYear() &&
+    begun.getMonth() === today.getMonth() &&
+    begun.getDate() === today.getDate()
+  )
+})
+
+/** Hero registration badge (AFC-867): mirrors the list card state. */
+const heroRegistration = computed(() => {
+  if (!event.value) return { label: 'No registration', open: false }
+  if (event.value.status === 'cancelled') return { label: 'Cancelled', open: false }
+  if (event.value.status === 'closed')
+    return { label: 'Registration closed', open: false }
+  if (event.value.registration_open) return { label: 'Registration open', open: true }
+  return { label: 'No registration', open: false }
 })
 
 /** Scope pill wording matches the programmes list (review item 10). */
@@ -282,6 +316,12 @@ const filteredRegs = computed<RegistrationRow[]>(() => {
       return false
     if (regCheckin.value === 'in' && row.registration_status !== 'attended') return false
     if (regCheckin.value === 'not' && row.registration_status === 'attended') return false
+    /* AFC-867: branch + age-group narrow the same scoped rows (existing
+     * fields only — gender/marital/membership/mode/education are not
+     * collected on registrations and stay out rather than guessed). */
+    if (regBranch.value !== 'all' && String(row.branch ?? '') !== regBranch.value)
+      return false
+    if (regAgeGroup.value !== 'all' && row.age_group !== regAgeGroup.value) return false
     if (!needle) return true
     const haystack = [
       row.ticket_code,
@@ -346,6 +386,22 @@ const regCheckinOptions = [
   { label: 'Check-in: all', value: 'all' },
   { label: 'Checked in', value: 'in' },
   { label: 'Not yet', value: 'not' },
+]
+
+/* AFC-867: branch + age-group narrow existing fields (scoped branches
+ * already loaded for the hero; no new endpoint). */
+const regBranchOptions = computed(() => [
+  { label: 'Branch: all', value: 'all' },
+  ...(branches.data.value ?? []).map((row) => ({ label: row.name, value: row.id })),
+])
+
+const regAgeGroupOptions = [
+  { label: 'Age: all', value: 'all' },
+  { label: 'Adult', value: 'adult' },
+  { label: 'Youth', value: 'youth' },
+  { label: 'Teen', value: 'teen' },
+  { label: 'Child', value: 'child' },
+  { label: 'Unknown', value: 'unknown' },
 ]
 
 const regSortOptions = [
@@ -581,6 +637,39 @@ watch(
   },
   { immediate: true },
 )
+
+/**
+ * Schedule day-strip (AFC-867): the reference timeline (Fri 23 – Sun 25)
+ * is the programme's date range rendered as day chips. Timed sessions
+ * have no collection behind them, so the strip names the days and the
+ * empty state below stays honest about per-service detail.
+ */
+const scheduleDays = computed<
+  Array<{ key: string; weekday: string; label: string; today: boolean }>
+>(() => {
+  if (!event.value?.start_at) return []
+  const start = new Date(event.value.start_at)
+  if (Number.isNaN(start.getTime())) return []
+  const endRaw = event.value.end_at ? new Date(event.value.end_at) : start
+  const end = Number.isNaN(endRaw.getTime()) ? start : endRaw
+  const days: Array<{ key: string; weekday: string; label: string; today: boolean }> = []
+  const cursor = new Date(start.getFullYear(), start.getMonth(), start.getDate())
+  const last = new Date(end.getFullYear(), end.getMonth(), end.getDate())
+  const today = new Date()
+  const todayKey = `${today.getFullYear()}-${today.getMonth()}-${today.getDate()}`
+  /* Cap the strip so a long date typo cannot flood the tab. */
+  while (cursor <= last && days.length < 31) {
+    const key = `${cursor.getFullYear()}-${cursor.getMonth()}-${cursor.getDate()}`
+    days.push({
+      key,
+      weekday: cursor.toLocaleDateString(undefined, { weekday: 'short' }),
+      label: cursor.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }),
+      today: key === todayKey,
+    })
+    cursor.setDate(cursor.getDate() + 1)
+  }
+  return days
+})
 </script>
 
 <template>
@@ -605,9 +694,20 @@ watch(
         <NuxtLink to="/events" class="text-xs text-primary-200 hover:text-white">
           ← All programmes
         </NuxtLink>
-        <div class="mt-2">
-          <UBadge color="neutral" variant="solid" size="xs">
-            {{ isUpcoming ? 'Upcoming' : 'Past' }}
+        <div class="mt-2 flex flex-wrap items-center gap-2">
+          <UBadge
+            :color="isActive ? 'error' : 'neutral'"
+            variant="solid"
+            size="xs"
+          >
+            {{ isActive ? 'Live now' : isUpcoming ? 'Upcoming' : 'Past' }}
+          </UBadge>
+          <UBadge
+            :color="heroRegistration.open ? 'success' : 'neutral'"
+            variant="subtle"
+            size="xs"
+          >
+            {{ heroRegistration.label }}
           </UBadge>
         </div>
         <h1 class="mt-2 text-2xl font-bold">{{ event.title }}</h1>
@@ -985,8 +1085,11 @@ watch(
             Gender, marital status, membership status, mode of attendance,
             education/career, class, role and position splits from the reference need
             fields registrations do not collect — they are omitted rather than guessed.
-            The area drill-down and unit-report coverage need a follow-up aggregate with
-            its own scoping decision.
+            Members-versus-guests needs a person-membership join the detail route
+            deliberately does not make. The area drill-down needs zone names behind
+            the zones read grant; report coverage needs the unit-report form model;
+            check-ins-by-event needs an event filter on attendance sessions. Each is
+            a named follow-up with its own scoping decision, not a silent drop.
           </p>
         </UCard>
       </section>
@@ -1041,11 +1144,25 @@ watch(
               aria-label="Filter by check-in"
             />
             <USelect
+              v-model="regBranch"
+              :items="regBranchOptions"
+              aria-label="Filter by branch"
+            />
+            <USelect
+              v-model="regAgeGroup"
+              :items="regAgeGroupOptions"
+              aria-label="Filter by age group"
+            />
+            <USelect
               v-model="regSort"
               :items="regSortOptions"
               aria-label="Sort registrations"
             />
           </div>
+          <p class="mt-2 text-xs text-gray-500">
+            Gender, marital, membership, mode and education filters need fields
+            registrations do not collect — omitted rather than guessed.
+          </p>
 
           <UAlert
             v-if="!canReadRegistrations"
@@ -1486,11 +1603,41 @@ watch(
 
       <!-- SCHEDULE -->
       <section v-if="tab === 'schedule'" aria-label="Schedule" class="mt-4">
-        <p class="mb-3 text-sm text-gray-500">0 events</p>
+        <p class="mb-3 text-sm text-gray-500">
+          {{ scheduleDays.length }}
+          {{ scheduleDays.length === 1 ? 'day' : 'days' }} ·
+          {{ formatDay(event.start_at)
+          }}{{ event.end_at ? ` – ${formatDay(event.end_at)}` : '' }}
+        </p>
+        <ol
+          v-if="scheduleDays.length > 0"
+          class="mb-4 flex gap-2 overflow-x-auto pb-1"
+          aria-label="Programme days"
+        >
+          <li
+            v-for="day in scheduleDays"
+            :key="day.key"
+            :class="[
+              'flex min-w-20 flex-col items-center rounded-xl border px-3 py-2',
+              day.today
+                ? 'border-error-400 bg-error-50 font-medium dark:bg-error-950'
+                : 'border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900',
+            ]"
+            :aria-current="day.today ? 'date' : undefined"
+          >
+            <span class="text-xs uppercase tracking-wide text-gray-500">{{
+              day.weekday
+            }}</span>
+            <span class="text-sm">{{ day.label }}</span>
+            <UBadge v-if="day.today" color="error" variant="subtle" size="xs">
+              Today
+            </UBadge>
+          </li>
+        </ol>
         <UCard>
           <EmptyState
-            title="No schedule yet"
-            description="Add days, services and sessions. Turn on check-in for any event where ushers take attendance."
+            title="No timed sessions yet"
+            description="Day order above comes from the programme dates. Per-service times need a schedule organisers have not shared yet — check-in stays on the Check-in tab."
           >
             <UButton
               v-if="canEdit"

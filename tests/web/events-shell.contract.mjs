@@ -263,9 +263,9 @@ describe('check-in / reports / schedule / materials (§D)', () => {
     assert.match(src, /No unit report form yet/)
   })
 
-  it('schedule and materials are empty states with coordinator affordance', () => {
-    assert.match(src, /No schedule yet/)
-    assert.match(src, /No materials yet/)
+  it('schedule is a day-strip from the programme dates with an honest sessions note', () => {
+    assert.match(src, /scheduleDays/)
+    assert.match(src, /No timed sessions yet/)
     assert.match(src, /Open programme settings/)
   })
 })
@@ -441,6 +441,47 @@ describe('PRD remainder sweep (§H): every events requirement line-by-line', () 
     const flowsDir = path.join(root, 'services/directus/flows')
     const names = readdirSync(flowsDir).join('\n')
     assert.doesNotMatch(names, /event.*(confirm|remind|regist)/i)
+  })
+})
+
+describe('AFC-867: active-programme parity (Happening now + Live + filters + day-strip)', () => {
+  const list = read('apps/web/pages/events/index.vue')
+  const detail = read('apps/web/pages/events/[id].vue')
+
+  it('list partitions a Happening-now section client-side (no new endpoint)', () => {
+    assert.match(list, /Happening now/)
+    assert.match(list, /happeningNowRows/)
+    assert.match(list, /isActive/)
+    assert.doesNotMatch(
+      codeOf('apps/web/pages/events/index.vue'),
+      /\/api\/events\/[^`'"]*(active|live|happening)/,
+    )
+  })
+
+  it('active cards and the detail hero carry the Live badge, not Upcoming/Past', () => {
+    assert.match(list, /Live now/)
+    assert.match(detail, /Live now/)
+    assert.match(detail, /isActive/)
+    assert.match(detail, /heroRegistration/)
+  })
+
+  it('registrations tab narrows by branch and age group on existing fields only', () => {
+    assert.match(detail, /regBranch/)
+    assert.match(detail, /regAgeGroup/)
+    assert.match(detail, /regBranchOptions/)
+    assert.match(detail, /regAgeGroupOptions/)
+    assert.match(detail, /omitted rather than guessed/)
+  })
+
+  it('schedule renders a capped day-strip with a today marker', () => {
+    assert.match(detail, /scheduleDays/)
+    assert.match(detail, /days\.length < 31/)
+    assert.match(detail, /Today/)
+  })
+
+  it('unfoldable reference panels stay named, not silent', () => {
+    assert.match(detail, /Breakdowns not shown/)
+    assert.match(detail, /check-ins-by-event/)
   })
 })
 

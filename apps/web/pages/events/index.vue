@@ -114,8 +114,24 @@ function inYear(row: EventRow): boolean {
   return year.value === 'all' || eventYear(row.start_at) === year.value
 }
 
-const upcomingRows = computed(() => (upcoming.value?.data ?? []).filter(inYear))
-const pastRows = computed(() => (past.value?.data ?? []).filter(inYear))
+const upcomingRows = computed(() =>
+  (upcoming.value?.data ?? []).filter((row) => inYear(row) && !isActive(row)),
+)
+const pastRows = computed(() =>
+  (past.value?.data ?? []).filter((row) => inYear(row) && !isActive(row)),
+)
+
+/**
+ * Happening now (AFC-867): active rows surface here, not under Past — a
+ * multi-day programme that started yesterday and ends tomorrow previously
+ * read as finished because `start_at < now`. Partitioned client-side from
+ * the already-loaded scoped sets; no new endpoint.
+ */
+const happeningNowRows = computed(() =>
+  [...(upcoming.value?.data ?? []), ...(past.value?.data ?? [])].filter(
+    (row) => inYear(row) && isActive(row),
+  ),
+)
 
 const scopeLabel = computed(() => {
   if (branch.value === 'all') return 'Showing all in your scope'
@@ -149,6 +165,30 @@ function isImminent(row: EventRow): boolean {
   if (Number.isNaN(start)) return false
   const delta = start - Date.now()
   return delta > 0 && delta < 30 * 3600 * 1000
+}
+
+/**
+ * Active programme (AFC-867 §A): started and not yet ended. A row without
+ * an end date is a single-moment programme — live on its calendar day only,
+ * so a past single-day event never reads "Live".
+ */
+function isActive(row: EventRow): boolean {
+  const start = new Date(row.start_at).getTime()
+  if (Number.isNaN(start)) return false
+  const now = Date.now()
+  if (row.end_at) {
+    const end = new Date(row.end_at).getTime()
+    if (Number.isNaN(end)) return start <= now
+    return start <= now && end >= now
+  }
+  const begun = new Date(row.start_at)
+  const today = new Date()
+  return (
+    start <= now &&
+    begun.getFullYear() === today.getFullYear() &&
+    begun.getMonth() === today.getMonth() &&
+    begun.getDate() === today.getDate()
+  )
 }
 
 function registrationState(row: EventRow): { label: string; open: boolean } {
@@ -229,6 +269,71 @@ async function refreshAll(): Promise<void> {
     </div>
 
     <template v-else>
+      <section aria-label="Happening now" class="mt-6">
+        <h2
+          class="mb-3 flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-300"
+        >
+          <span class="relative flex size-2">
+            <span
+              class="absolute inline-flex h-full w-full animate-ping rounded-full bg-error-400 opacity-75"
+            />
+            <span class="relative inline-flex size-2 rounded-full bg-error-500" />
+          </span>
+          Happening now
+          <UBadge color="error" variant="subtle">{{ happeningNowRows.length }}</UBadge>
+        </h2>
+        <EmptyState
+          v-if="happeningNowRows.length === 0"
+          title="Nothing live right now"
+          description="Programmes that have started and not yet ended will appear here with a Live badge."
+        />
+        <div v-else class="grid gap-4 md:grid-cols-2">
+          <NuxtLink
+            v-for="row in happeningNowRows"
+            :key="row.id"
+            :to="`/events/${row.id}`"
+            class="overflow-hidden rounded-xl border-2 border-error-300 bg-white transition hover:shadow-md dark:border-error-800 dark:bg-gray-900"
+          >
+            <div
+              class="relative h-24 bg-gradient-to-br from-primary-950 via-primary-900 to-primary-950"
+            >
+              <UBadge color="error" variant="solid" size="xs" class="absolute left-3 top-3">
+                Live now
+              </UBadge>
+            </div>
+            <div class="space-y-1.5 p-4">
+              <p class="font-semibold text-gray-900 dark:text-white">{{ row.title }}</p>
+              <p class="text-xs text-gray-500 dark:text-gray-400">
+                {{ seriesLine(row) }}
+              </p>
+              <p class="text-xs text-gray-600 dark:text-gray-300">
+                <UIcon name="i-lucide-calendar" class="mr-1 inline size-3" />{{
+                  formatDates(row)
+                }}
+              </p>
+              <div
+                class="flex items-center justify-between border-t border-gray-100 pt-2 text-xs dark:border-gray-800"
+              >
+                <UBadge
+                  :color="registrationState(row).open ? 'success' : 'neutral'"
+                  variant="subtle"
+                >
+                  {{ registrationState(row).label }}
+                </UBadge>
+                <p class="text-gray-500 dark:text-gray-400">
+                  <span class="font-medium tabular-nums">{{ row.registered_count }}</span>
+                  registered
+                  <span class="ml-2 font-medium tabular-nums">{{
+                    row.attended_count
+                  }}</span>
+                  in
+                </p>
+              </div>
+            </div>
+          </NuxtLink>
+        </div>
+      </section>
+
       <section aria-label="Upcoming programmes" class="mt-6">
         <h2
           class="mb-3 flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-300"
