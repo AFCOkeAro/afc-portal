@@ -59,6 +59,27 @@ export const attendanceRecordFormSchema = z.object({
 
 export type AttendanceRecordForm = z.infer<typeof attendanceRecordFormSchema>
 
+const LEAVE_YEAR_MIN = 2000
+const LEAVE_YEAR_MAX = 2100
+
+/**
+ * Annual allowance (AFC-854 Time Off phase 1). One row per person per
+ * year; used/remaining compute against leave_requests in phase 2.
+ */
+export const leaveBalanceFormSchema = z.object({
+  person: z.string().trim().min(1, 'Choose who the allowance is for').max(36),
+  year: z.coerce.number().int().min(LEAVE_YEAR_MIN).max(LEAVE_YEAR_MAX),
+  allowance_days: z.coerce.number().int().min(0, 'Allowance cannot be negative'),
+})
+
+export type LeaveBalanceForm = z.infer<typeof leaveBalanceFormSchema>
+
+export const leaveBalancePatchSchema = z.object({
+  allowance_days: z.coerce.number().int().min(0, 'Allowance cannot be negative'),
+})
+
+export type LeaveBalancePatch = z.infer<typeof leaveBalancePatchSchema>
+
 const VISITOR_STATUSES = ['new', 'follow_up', 'converted', 'closed', 'declined'] as const
 
 export const visitorFormSchema = z.object({

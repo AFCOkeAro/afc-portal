@@ -28,6 +28,8 @@ export const COLLECTIONS = {
   eventInvites: 'event_invites',
   attendanceSessions: 'attendance_sessions',
   attendanceRecords: 'attendance_records',
+  /** Annual leave allowances per person per year (AFC-854 Time Off). */
+  leaveBalances: 'leave_balances',
   /**
    * Attendance sex/category split (AFC-468, data-model-expansion §3).
    * `serviceTypeDefinitions` is board config (capture renders its ordered
