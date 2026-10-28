@@ -149,6 +149,17 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     none: [NONE, 'none'],
     zone_admin: [ALL, 'own_zone'],
   },
+  // Leave balances (AFC-854 Time Off): same hands as the other staff
+  // registers. No finance amounts, no FIELD_RESTRICTIONS entry.
+  [COLLECTIONS.leaveBalances]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [ALL, 'all'],
+    branch_admin: [ALL, 'own_branch'],
+    department_leader: [CRU, 'assigned_branches'],
+    volunteer: [CU, 'own_branch'],
+    none: [NONE, 'none'],
+    zone_admin: [ALL, 'own_zone'],
+  },
   [COLLECTIONS.sundayServices]: {
     super_admin: [ALL, 'all'],
     area_admin: [ALL, 'all'],

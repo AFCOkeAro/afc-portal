@@ -124,6 +124,16 @@ export const NAVIGATION: readonly NavigationItem[] = [
     inSidebar: true,
   },
   {
+    // AFC-854: Time Off (minimal HR) — annual allowances today; used and
+    // remaining days compute against leave_requests in phase 2.
+    label: 'Time Off',
+    to: '/time-off',
+    icon: 'i-lucide-calendar-range',
+    requires: ['leave_balances', 'read'],
+    group: 'office',
+    inSidebar: true,
+  },
+  {
     label: 'Marriage',
     to: '/marriage',
     icon: 'i-lucide-heart',
