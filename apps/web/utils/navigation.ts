@@ -199,11 +199,12 @@ export const NAVIGATION: readonly NavigationItem[] = [
     inSidebar: true,
   },
   {
+    // AFC-839: monetary moves live with the Church Office, not Finance.
     label: 'Transfers',
     to: '/transfers',
     icon: 'i-lucide-arrow-right-left',
     requires: ['transfers', 'read'],
-    group: 'finance',
+    group: 'office',
     inSidebar: true,
   },
   {
@@ -214,15 +215,8 @@ export const NAVIGATION: readonly NavigationItem[] = [
     group: 'office',
     inSidebar: true,
   },
-  {
-    // My assignments (AFC-668): same list pre-filtered to the session user.
-    label: 'My tasks',
-    to: '/tasks?mine=1',
-    icon: 'i-lucide-user-check',
-    requires: ['tasks', 'read'],
-    group: 'office',
-    inSidebar: true,
-  },
+  // AFC-839: no My tasks entry — /tasks carries the Assigned to me
+  // checkbox, so a second entry is a second truth to maintain.
   {
     // No dedicated automation surface yet; tasks is the closest working page.
     label: 'Workflow and Automation',
@@ -263,11 +257,12 @@ export const NAVIGATION: readonly NavigationItem[] = [
   },
   {
     // AFC-822: stage-by-stage visitor funnel; previously unlinked.
+    // AFC-839: the funnel is a welfare working list, not outreach.
     label: 'Visitor funnel',
     to: '/visitors/funnel',
     icon: 'i-lucide-clipboard-list',
     requires: ['visitors', 'read'],
-    group: 'outreach',
+    group: 'welfare',
     inSidebar: true,
   },
 

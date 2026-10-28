@@ -60,7 +60,9 @@ describe('AFC-838 office sections', () => {
     assert.equal(groupOf(src, '/finance/formulas'), 'finance')
     assert.equal(groupOf(src, '/finance/returns'), 'finance')
     assert.equal(groupOf(src, '/finance/summary'), 'finance')
-    assert.equal(groupOf(src, '/transfers'), 'finance')
+    // AFC-839: transfers moved to Church Office (chairman direction
+    // supersedes the AFC-838 placement); the gate travels with it.
+    assert.equal(groupOf(src, '/transfers'), 'office')
   })
 
   it('capability gates travel with their entries', () => {
