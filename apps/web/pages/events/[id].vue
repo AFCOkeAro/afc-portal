@@ -3,6 +3,7 @@ import { COLLECTIONS, EXPENSE_CATEGORIES, expenseFormSchema } from '@afc/shared'
 import { ApiRequestError } from '~/composables/useApi'
 import type {
   BranchSummary,
+  BudgetRow,
   EventDetail,
   ExpenseRow,
   RegistrationRow,
@@ -118,6 +119,12 @@ const branchNameOf = computed(() => {
 })
 
 const canEdit = computed(() => permissions.can(COLLECTIONS.events, 'update'))
+const { user: authUser } = useAuth()
+const canManageCategories = computed(
+  () =>
+    authUser.value?.staffRole === 'area_admin' ||
+    authUser.value?.staffRole === 'super_admin',
+)
 const canBlessings = computed(() => permissions.can(COLLECTIONS.blessings, 'read'))
 const canRecordBlessings = computed(() =>
   permissions.can(COLLECTIONS.blessings, 'create'),
@@ -636,10 +643,6 @@ const expenseForm = ref({
   notes: '',
 })
 
-/**
- * Receipt scan for the expense being recorded (AFC-824). Expenses are
- * append-only, so the file uploads first and its id rides the create.
- */
 const expenseReceiptFile = ref<File | null>(null)
 const expenseReceiptName = ref('')
 
@@ -650,10 +653,28 @@ function pickExpenseReceipt(target: EventTarget | null): void {
   expenseReceiptName.value = first?.name ?? ''
 }
 
-const expenseCategoryOptions = EXPENSE_CATEGORIES.map((value) => ({
-  label: value.charAt(0).toUpperCase() + value.slice(1),
-  value,
-}))
+const expenseCats = ref<Array<{ key: string; label: string }>>([])
+
+async function loadExpenseCategories(): Promise<void> {
+  try {
+    const result = await api.get<{ data: Array<{ key: string; label: string }> }>(
+      '/api/expense-categories',
+    )
+    if (result.data.length > 0) expenseCats.value = result.data
+  } catch {
+    expenseCats.value = []
+  }
+}
+
+const expenseCategoryOptions = computed(() =>
+  (expenseCats.value.length > 0
+    ? expenseCats.value
+    : EXPENSE_CATEGORIES.map((value) => ({
+        key: value,
+        label: value.charAt(0).toUpperCase() + value.slice(1),
+      }))
+  ).map((row: { key: string; label: string }) => ({ label: row.label, value: row.key })),
+)
 
 /**
  * Displayed total. It IS the sum of the listed rows (AFC-801 totals parity:
@@ -665,6 +686,123 @@ const expenseTotal = computed(() =>
     0,
   ),
 )
+
+/* Budgets vs actual (AFC-825): latest planned line per category against
+ * summed spend. Revision = new row; the route resolves latest-wins. */
+const budgets = ref<BudgetRow[]>([])
+const budgetsPending = ref(false)
+const budgetError = ref('')
+const budgetFieldErrors = ref<Record<string, string>>({})
+const budgetSaving = ref(false)
+const budgetForm = ref({ category_key: 'venue', amount: '', notes: '' })
+const newCategory = ref({ key: '', label: '' })
+const categorySaving = ref(false)
+const categoryError = ref('')
+
+async function loadBudgets(): Promise<void> {
+  if (!canExpenses.value) {
+    budgets.value = []
+    return
+  }
+  budgetsPending.value = true
+  try {
+    const result = await api.get<{ data: BudgetRow[] }>(`/api/events/${id}/budgets`)
+    budgets.value = result.data.map((row: BudgetRow) => ({ ...row, id: String(row.id) }))
+  } catch (cause) {
+    budgets.value = []
+    budgetError.value =
+      cause instanceof ApiRequestError ? cause.message : 'Could not load budgets.'
+  } finally {
+    budgetsPending.value = false
+  }
+}
+
+const budgetVariance = computed(() => {
+  const actualByCat = new Map<string, number>()
+  for (const row of expenses.value as ExpenseRow[]) {
+    const key = String(row.category ?? '')
+    actualByCat.set(key, (actualByCat.get(key) ?? 0) + Number(row.amount ?? 0))
+  }
+  const cats =
+    expenseCats.value.length > 0
+      ? expenseCats.value
+      : EXPENSE_CATEGORIES.map((value) => ({
+          key: value,
+          label: value.charAt(0).toUpperCase() + value.slice(1),
+        }))
+  return cats.map((cat: { key: string; label: string }) => {
+    const planned = budgets.value.find(
+      (row: BudgetRow) => String(row.category_key) === cat.key,
+    )
+    const budget = planned ? Number(planned.amount ?? 0) : null
+    const actual = actualByCat.get(cat.key) ?? 0
+    return {
+      key: cat.key,
+      label: cat.label,
+      budget,
+      actual,
+      left: budget === null ? null : budget - actual,
+      pct:
+        budget === null || budget <= 0
+          ? actual > 0
+            ? 100
+            : 0
+          : Math.min(100, Math.round((actual / budget) * 100)),
+    }
+  })
+})
+
+async function submitBudget(): Promise<void> {
+  budgetError.value = ''
+  budgetFieldErrors.value = {}
+  if (budgetForm.value.category_key.trim() === '' || budgetForm.value.amount === '') {
+    budgetError.value = 'Pick a category and enter a planned amount'
+    return
+  }
+  budgetSaving.value = true
+  try {
+    await api.post(`/api/events/${id}/budgets`, {
+      category_key: budgetForm.value.category_key,
+      amount: budgetForm.value.amount,
+      ...(budgetForm.value.notes ? { notes: budgetForm.value.notes } : {}),
+    })
+    budgetForm.value = {
+      category_key: budgetForm.value.category_key,
+      amount: '',
+      notes: '',
+    }
+    await loadBudgets()
+  } catch (cause) {
+    const error = cause as { message?: string; fields?: Record<string, string> }
+    budgetError.value = error.message ?? 'Could not record that budget'
+    budgetFieldErrors.value = error.fields ?? {}
+  } finally {
+    budgetSaving.value = false
+  }
+}
+
+async function submitCategory(): Promise<void> {
+  categoryError.value = ''
+  if (newCategory.value.key.trim() === '' || newCategory.value.label.trim() === '') {
+    categoryError.value = 'Give the category a key and a label'
+    return
+  }
+  categorySaving.value = true
+  try {
+    await api.post('/api/expense-categories', {
+      key: newCategory.value.key.trim().toLowerCase(),
+      label: newCategory.value.label.trim(),
+    })
+    newCategory.value = { key: '', label: '' }
+    await loadExpenseCategories()
+    await loadBudgets()
+  } catch (cause) {
+    categoryError.value =
+      cause instanceof ApiRequestError ? cause.message : 'Could not add that category'
+  } finally {
+    categorySaving.value = false
+  }
+}
 
 const expenseRestrictedMessage = computed(() => {
   const hidden = permissions.hiddenFields(COLLECTIONS.eventExpenses)
@@ -783,7 +921,11 @@ async function submitExpense(): Promise<void> {
 watch(
   () => [tab.value, canExpenses.value] as const,
   ([next, allowed]: readonly [TabId, boolean]) => {
-    if (next === 'expenses' && allowed) void loadExpenses()
+    if (next === 'expenses' && allowed) {
+      void loadExpenses()
+      void loadBudgets()
+      void loadExpenseCategories()
+    }
   },
   { immediate: true },
 )
@@ -2053,6 +2195,142 @@ watch(
           title="Restricted on this account"
           :description="expenseRestrictedMessage"
         />
+
+        <!-- Budget vs actual (AFC-825): per-category plan against summed
+          spend. Bars read actual/budget; revision = record again. -->
+        <UCard class="mb-3">
+          <h3 class="text-sm font-semibold">Budget vs actual</h3>
+          <p v-if="budgetError" class="mt-1 text-xs text-red-600 dark:text-red-400">
+            {{ budgetError }}
+          </p>
+          <div v-else-if="budgetsPending" class="flex justify-center py-4">
+            <UIcon
+              name="i-lucide-loader-circle"
+              class="size-5 animate-spin text-gray-400"
+            />
+          </div>
+          <table v-else class="mt-2 w-full text-left text-sm">
+            <thead>
+              <tr
+                class="border-b border-gray-200 text-xs uppercase tracking-wide text-gray-500 dark:border-gray-800"
+              >
+                <th class="py-2 pr-2 font-medium">Category</th>
+                <th class="py-2 pr-2 text-right font-medium">Budget</th>
+                <th class="py-2 pr-2 text-right font-medium">Actual</th>
+                <th class="py-2 pr-2 text-right font-medium">Left</th>
+                <th class="py-2 font-medium">Spend</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="line in budgetVariance"
+                :key="line.key"
+                class="border-b border-gray-100 dark:border-gray-800"
+              >
+                <td class="py-2 pr-2 font-medium capitalize">{{ line.label }}</td>
+                <td class="py-2 pr-2 text-right tabular-nums">
+                  {{ line.budget === null ? '—' : line.budget.toFixed(2) }}
+                </td>
+                <td class="py-2 pr-2 text-right tabular-nums">
+                  {{ line.actual.toFixed(2) }}
+                </td>
+                <td
+                  class="py-2 pr-2 text-right tabular-nums"
+                  :class="
+                    line.left !== null && line.left < 0
+                      ? 'text-red-600 dark:text-red-400'
+                      : ''
+                  "
+                >
+                  {{ line.left === null ? '—' : line.left.toFixed(2) }}
+                </td>
+                <td class="py-2">
+                  <div
+                    class="h-2 min-w-16 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800"
+                  >
+                    <div
+                      class="h-full rounded-full"
+                      :class="
+                        line.left !== null && line.left < 0
+                          ? 'bg-red-500'
+                          : 'bg-primary-500'
+                      "
+                      :style="{ width: `${line.pct}%` }"
+                    />
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <div
+            v-if="canRecordExpenses"
+            class="mt-3 border-t border-gray-200 pt-3 dark:border-gray-800"
+          >
+            <h4 class="text-sm font-semibold">Record a budget line</h4>
+            <div class="mt-2 grid gap-2 sm:grid-cols-3">
+              <UFormField label="Category" :error="budgetFieldErrors.category_key">
+                <USelect
+                  v-model="budgetForm.category_key"
+                  :items="expenseCategoryOptions"
+                  class="w-full"
+                />
+              </UFormField>
+              <UFormField label="Planned amount" :error="budgetFieldErrors.amount">
+                <UInput
+                  v-model="budgetForm.amount"
+                  inputmode="decimal"
+                  placeholder="0.00"
+                  class="w-full"
+                />
+              </UFormField>
+              <UFormField label="Notes" :error="budgetFieldErrors.notes">
+                <UInput v-model="budgetForm.notes" class="w-full" />
+              </UFormField>
+            </div>
+            <div class="mt-2 flex justify-end">
+              <UButton
+                size="sm"
+                label="Record budget"
+                :loading="budgetSaving"
+                @click="submitBudget()"
+              />
+            </div>
+            <div
+              v-if="canManageCategories"
+              class="mt-3 border-t border-gray-200 pt-3 dark:border-gray-800"
+            >
+              <h4 class="text-sm font-semibold">Add a spend category</h4>
+              <p v-if="categoryError" class="mt-1 text-xs text-red-600 dark:text-red-400">
+                {{ categoryError }}
+              </p>
+              <div class="mt-2 grid gap-2 sm:grid-cols-3">
+                <UFormField label="Key (lowercase, no spaces)">
+                  <UInput
+                    v-model="newCategory.key"
+                    placeholder="e.g. sound"
+                    class="w-full"
+                  />
+                </UFormField>
+                <UFormField label="Label">
+                  <UInput
+                    v-model="newCategory.label"
+                    placeholder="e.g. Sound"
+                    class="w-full"
+                  />
+                </UFormField>
+                <div class="flex items-end justify-end">
+                  <UButton
+                    size="sm"
+                    variant="outline"
+                    label="Add category"
+                    :loading="categorySaving"
+                    @click="submitCategory()"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </UCard>
 
         <div v-if="expensesPending" class="flex justify-center py-10">
           <UIcon

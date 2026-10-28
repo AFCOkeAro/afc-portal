@@ -20,6 +20,10 @@ export const COLLECTIONS = {
   eventRegistrations: 'event_registrations',
   /** Per-event expense records (AFC-801). One row per recorded spend. */
   eventExpenses: 'event_expenses',
+  /** Per-event budget lines (AFC-825). Append-only; latest row per category wins. */
+  eventBudgets: 'event_budgets',
+  /** Spend taxonomy (AFC-825). Seeded with the 0044 eight + other; area admins extend it. */
+  expenseCategories: 'expense_categories',
   /** Invites (Slice 4). One row per invitation; quota + delivery read it. */
   eventInvites: 'event_invites',
   attendanceSessions: 'attendance_sessions',
