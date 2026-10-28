@@ -1,6 +1,16 @@
 import { COLLECTIONS } from '@afc/shared'
-import { requireArea } from '../../../../utils/admin-guard'
-import { isProtectedRole, policiesForRole } from '../../../../utils/custom-grants'
+import { grantsForRole } from '@afc/shared/role-matrix'
+import { requireArea, requireSuperAdmin } from '../../../../utils/admin-guard'
+import {
+  clearOverride,
+  forgetRoleGrantCaches,
+  isProtectedRole,
+  policiesForRole,
+  readOverride,
+  staffRoleForDirectusRoleName,
+  storedDirectusGrants,
+  writeOverride,
+} from '../../../../utils/custom-grants'
 import { directusFetch } from '../../../../utils/directus'
 import { directusAdminToken } from '../../../../utils/directus-admin'
 import {
@@ -12,15 +22,21 @@ import {
 const ACTIONS = ['create', 'read', 'update', 'delete'] as const
 
 /**
- * POST /api/admin/roles/:id/permissions — add one custom permission
- * (collection + action) to a custom role's policy (AFC-669). Refused for
- * built-in roles: those grants live in role-matrix.ts, and a second source
- * of truth would silently disagree with the enforced one.
+ * POST /api/admin/roles/:id/permissions — grant a collection + action
+ * (AFC-669, extended AFC-836).
+ *
+ * Custom roles (unchanged path): requireArea; creates a Directus permission
+ * row on the role's policy.
+ *
+ * Built-in roles (AFC-836): super_admin only. The grant is recorded as an
+ * explicit super-admin override AND mirrored as a Directus permission row,
+ * so the portal gate and the Directus policy agree. An existing
+ * revoke-override for the triple is honoured first (its snapshotted
+ * Directus rows are restored), then the triple is ensured granted.
  */
 export default defineEventHandler(async (event) => {
   await requireArea(event)
   const adminToken = await directusAdminToken(event)
-  const id = String(getRouterParam(event, 'id') ?? '')
   const body = await readBody<{
     collection?: unknown
     action?: unknown
@@ -71,6 +87,7 @@ export default defineEventHandler(async (event) => {
   ) {
     filter = minutesAttendeeCreateFilter()
   }
+  const id = String(getRouterParam(event, 'id') ?? '')
   const role = await directusFetch<{ data: { id: string; name: string } }>(
     event,
     `/roles/${id}`,
@@ -83,37 +100,123 @@ export default defineEventHandler(async (event) => {
       data: { code: 'not_found' },
     })
   }
-  if (isProtectedRole(role.data.name)) {
-    throw createError({
-      statusCode: 400,
-      statusMessage: 'Built-in roles are governed by role-matrix.ts in code',
-      data: { code: 'validation_error' },
-    })
-  }
-  let policies = await policiesForRole(event, adminToken, id)
-  if (policies.length === 0) {
-    const policy = await directusFetch<{ data: { id: string } }>(event, '/policies', {
+  const builtIn = isProtectedRole(role.data.name)
+  const staffKey = builtIn
+    ? (staffRoleForDirectusRoleName(role.data.name) ?? role.data.name)
+    : role.data.name
+  if (!builtIn) {
+    let policies = await policiesForRole(event, adminToken, id)
+    if (policies.length === 0) {
+      const policy = await directusFetch<{ data: { id: string } }>(event, '/policies', {
+        accessToken: adminToken,
+        method: 'POST',
+        body: { name: `${role.data.name} policy`, app_access: true, admin_access: false },
+      })
+      await directusFetch(event, '/access', {
+        accessToken: adminToken,
+        method: 'POST',
+        body: { role: id, policy: policy.data.id },
+      })
+      policies = [policy.data.id]
+    }
+    const created = await directusFetch<{ data: { id: string } }>(event, '/permissions', {
       accessToken: adminToken,
       method: 'POST',
-      body: { name: `${role.data.name} policy`, app_access: true, admin_access: false },
+      body: {
+        policy: policies[0],
+        collection: storedCollection,
+        action,
+        fields: ['*'],
+        ...(filter === undefined ? {} : { permissions: filter }),
+      },
     })
-    await directusFetch(event, '/access', {
+    forgetRoleGrantCaches(staffKey)
+    return { data: { id: created.data.id } }
+  }
+
+  // Built-in path: super admins only, recorded as an explicit override so
+  // the change is visible, audited, and reversible (never a silent edit).
+  const superScope = await requireSuperAdmin(event)
+  const prior = await readOverride(event, staffKey, storedCollection, action)
+  if (prior && prior.effect === 'revoke') {
+    const snap = (prior.snapshot ?? {}) as { deleted?: Array<Record<string, unknown>> }
+    const failures: unknown[] = []
+    for (const row of snap.deleted ?? []) {
+      try {
+        await directusFetch(event, '/permissions', {
+          accessToken: adminToken,
+          method: 'POST',
+          body: {
+            policy: row.policy,
+            collection: row.collection,
+            action: row.action,
+            fields: row.fields ?? ['*'],
+            ...(row.permissions ? { permissions: row.permissions } : {}),
+          },
+        })
+      } catch (error) {
+        failures.push(error)
+      }
+    }
+    if (failures.length > 0) {
+      throw createError({
+        statusCode: 503,
+        statusMessage: 'Could not restore a revoked permission; nothing was changed',
+        data: { code: 'unavailable' },
+      })
+    }
+    await clearOverride(event, staffKey, storedCollection, action)
+  }
+  const matrixGrants = grantsForRole(staffKey as never).some(
+    (grant) => grant.collection === storedCollection && grant.action === action,
+  )
+  const existing = await storedDirectusGrants(
+    event,
+    adminToken,
+    id,
+    storedCollection,
+    action,
+  )
+  let createdId: string | null = null
+  if (existing.length === 0) {
+    let policies = await policiesForRole(event, adminToken, id)
+    if (policies.length === 0) {
+      const policy = await directusFetch<{ data: { id: string } }>(event, '/policies', {
+        accessToken: adminToken,
+        method: 'POST',
+        body: { name: `${role.data.name} policy`, app_access: true, admin_access: false },
+      })
+      await directusFetch(event, '/access', {
+        accessToken: adminToken,
+        method: 'POST',
+        body: { role: id, policy: policy.data.id },
+      })
+      policies = [policy.data.id]
+    }
+    const created = await directusFetch<{ data: { id: string } }>(event, '/permissions', {
       accessToken: adminToken,
       method: 'POST',
-      body: { role: id, policy: policy.data.id },
+      body: {
+        policy: policies[0],
+        collection: storedCollection,
+        action,
+        fields: ['*'],
+        ...(filter === undefined ? {} : { permissions: filter }),
+      },
     })
-    policies = [policy.data.id]
+    createdId = created.data.id
   }
-  const created = await directusFetch<{ data: { id: string } }>(event, '/permissions', {
-    accessToken: adminToken,
-    method: 'POST',
-    body: {
-      policy: policies[0],
-      collection: storedCollection,
+  if (!matrixGrants) {
+    await writeOverride(
+      event,
+      staffKey,
+      storedCollection,
       action,
-      fields: ['*'],
-      ...(filter === undefined ? {} : { permissions: filter }),
-    },
-  })
-  return { data: { id: created.data.id } }
+      'grant',
+      { created: createdId ? [createdId] : [], deleted: [] },
+      superScope.session.user.id,
+    )
+  }
+  forgetRoleGrantCaches(staffKey)
+  return { data: { id: createdId, effective: true } }
 })

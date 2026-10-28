@@ -2,7 +2,7 @@ import type { H3Event } from 'h3'
 import type { AuthSession, Grant, PermissionAction, StaffRole } from '@afc/shared'
 import { grantsForRole, hiddenFieldsForRole } from '@afc/shared/role-matrix'
 import { DirectusAuthError, directusFetch } from './directus'
-import { customGrantsForRole } from './custom-grants'
+import { customGrantsForRole, overridesForRole, type RoleOverride } from './custom-grants'
 import { STUB_ACCESS_TOKEN, requireSession } from './session'
 
 /**
@@ -38,6 +38,12 @@ export interface PortalScope {
    * through the code matrix. Row scoping still comes from branchIds/zoneIds.
    */
   customGrants: Grant[]
+  /**
+   * Super-admin matrix deltas for this staff role (AFC-836). Consulted by
+   * can() with deny-wins: a revoke refuses even when the matrix or a stored
+   * grant would allow, and a grant allows where neither otherwise does.
+   */
+  overrides: RoleOverride[]
 }
 
 type Filter = Record<string, unknown>
@@ -132,6 +138,7 @@ export async function getPortalScope(event: H3Event): Promise<PortalScope> {
     hiddenFields: hiddenFieldsForRole(role),
     token,
     customGrants: await customGrantsForRole(event, role),
+    overrides: await overridesForRole(event, role).catch(() => []),
   }
 }
 
@@ -140,15 +147,24 @@ export function can(
   collection: string,
   action: PermissionAction,
 ): boolean {
+  const override = scope.overrides.find(
+    (entry) => entry.collection === collection && entry.action === action,
+  )
+  // Deny wins: an explicit revoke refuses even where the matrix allows.
+  if (override?.effect === 'revoke') return false
   if (
     grantsForRole(scope.role).some(
       (grant) => grant.collection === collection && grant.action === action,
     )
   )
     return true
-  return scope.customGrants.some(
-    (grant) => grant.collection === collection && grant.action === action,
+  if (
+    scope.customGrants.some(
+      (grant) => grant.collection === collection && grant.action === action,
+    )
   )
+    return true
+  return override?.effect === 'grant'
 }
 
 export function requireCan(

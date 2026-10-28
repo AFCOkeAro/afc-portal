@@ -1,0 +1,17 @@
+{
+  "issue": "AFC-836",
+  "authorAgentId": "human-operator-board",
+  "authorName": "Board chairman (CLI operator session)",
+  "claimedAt": "2026-10-28T02:00:00+01:00",
+  "scopeOfTheClaim": "R1 only: authorship of the compliance-path files below. Correctness is for CI (R4) and the CTO review (R2).",
+  "whatTheChangeActuallyDoes": "Migration 0049 (+rollback): role_grant_overrides register (role_key, collection, action, UNIQUE triple, effect grant|revoke with CHECK, nullable snapshot jsonb for symmetric un-do, created_by/at); directus_app gets SELECT/INSERT/DELETE (no UPDATE) + PUBLIC revoked; ownership + bootstrap-role preconditions per the 0042 pattern. Suite 49: rerun no-op, shape (write/toggle/delete cycle + duplicate refusal 23505), grants (SELECT, INSERT+DELETE, no UPDATE, PUBLIC-empty table+columns), live down/up cycle with restrict_violation refusal while rows exist. The revert path refuses while deltas exist so a rolled-back revoke cannot silently re-open a grant and a rolled-back grant cannot silently persist. App code (not claimed): GET merges matrix+stored+override with per-cell source; POST grants built-ins for super_admin only with Directus parity writes; new revoke endpoint snapshots and deletes Directus rows; can() enforces deny-wins; UI gates built-in toggles on super_admin.",
+  "whatThisFileIs": "An R1 authorship claim, and nothing else. It says who wrote the compliance-path files below and on which issue. It asserts nothing about whether they are correct, and it carries no reviews[] entry.",
+  "doesNotClaimR2": "There is no reviews[] entry here and there will not be one from me. R2 wants a named reviewer who is not the author. CTO R2 requested on the AFC-836 thread before landing.",
+  "notClaimedPaths": "Non-compliance paths in the same packet (roles admin UI matrix, revocations endpoints, GET effective-grants merge, can() deny-wins, custom-grants override helpers, role-overrides contract) need no claim and land with the R2 verdict.",
+  "paths": [
+    "services/directus/schema/migrations/20261028_0049_role_grant_overrides.sql",
+    "services/directus/schema/migrations/rollback/20261028_0049_role_grant_overrides.down.sql",
+    "tests/db/49_role_grant_overrides.sql",
+    ".provenance/claims/AFC-836.json"
+  ]
+}

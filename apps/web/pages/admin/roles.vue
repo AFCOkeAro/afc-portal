@@ -17,6 +17,9 @@
  */
 
 const api = useApi()
+const { user: sessionUser } = useAuth()
+/** Super admins may reshape built-in roles; everyone else sees them read-only. */
+const isSuperAdmin = computed(() => sessionUser.value?.staffRole === 'super_admin')
 
 type TabId = 'modules' | 'bundles' | 'roles' | 'people'
 const tab = ref<TabId>('modules')
@@ -54,9 +57,14 @@ interface AdminRole {
   builtIn: boolean
 }
 interface RolePermission {
-  id: string
   collection: string
   action: string
+  /** Effective grant state after matrix + stored + overrides. */
+  granted: boolean
+  /** Where the grant comes from: matrix, stored, override, revoked. */
+  sources: string[]
+  /** Directus row id when a stored row confers it (custom delete path). */
+  ref: string | null
   filter: Record<string, unknown> | null
 }
 interface AdminUser {
@@ -158,12 +166,21 @@ const newRoleError = ref('')
 const permForm = ref({ collection: '', action: 'read', filter: '' })
 const permFormError = ref('')
 
-const permKey = (collection: string, action: string): string | null => {
-  const found = rolePermissions.value.find(
+const grantOf = (collection: string, action: string): RolePermission | undefined =>
+  rolePermissions.value.find(
     (perm: RolePermission) => perm.collection === collection && perm.action === action,
   )
-  return found ? found.id : null
+const isGranted = (collection: string, action: string): boolean =>
+  grantOf(collection, action)?.granted ?? false
+const grantTitle = (collection: string, action: string): string => {
+  const entry = grantOf(collection, action)
+  if (!entry?.granted) return `${action} ${collection} — not granted`
+  const via = entry.sources.length > 0 ? ` (via ${entry.sources.join('+')})` : ''
+  return `${action} ${collection} — granted${via}`
 }
+const canEditRole = computed(
+  () => !!selectedRole.value && (!selectedRole.value.builtIn || isSuperAdmin.value),
+)
 
 async function loadRolePermissions(): Promise<void> {
   if (selectedRoleId.value === '') {
@@ -202,17 +219,23 @@ async function createRole(): Promise<void> {
 }
 
 async function togglePermission(collection: string, action: string): Promise<void> {
-  if (!selectedRole.value || selectedRole.value.builtIn) return
+  const role = selectedRole.value
+  if (!role || (role.builtIn && !isSuperAdmin.value)) return
   actionError.value = ''
   try {
-    const existing = permKey(collection, action)
-    if (existing) {
-      await api.remove(`/api/admin/permissions/${existing}`)
+    const entry = grantOf(collection, action)
+    if (entry?.granted) {
+      if (role.builtIn) {
+        // Built-ins: revoke (snapshot + delete Directus rows + override row).
+        await api.post(`/api/admin/roles/${role.id}/revocations`, { collection, action })
+      } else if (entry.ref) {
+        await api.remove(`/api/admin/permissions/${entry.ref}`)
+      } else {
+        return
+      }
     } else {
-      await api.post(`/api/admin/roles/${selectedRoleId.value}/permissions`, {
-        collection,
-        action,
-      })
+      // Grant (built-ins included for super admins; revokes are honoured first server-side).
+      await api.post(`/api/admin/roles/${role.id}/permissions`, { collection, action })
     }
     await loadRolePermissions()
   } catch (cause) {
@@ -222,7 +245,7 @@ async function togglePermission(collection: string, action: string): Promise<voi
 }
 
 async function addPermission(): Promise<void> {
-  if (!selectedRole.value || selectedRole.value.builtIn) return
+  if (!selectedRole.value || (selectedRole.value.builtIn && !isSuperAdmin.value)) return
   permFormError.value = ''
   actionError.value = ''
   let filter: Record<string, unknown> | undefined
@@ -554,7 +577,9 @@ await useAsyncData('admin-zones-branches', async () => {
             <p class="mt-1 text-sm text-gray-500">
               {{
                 selectedRole?.builtIn
-                  ? 'Built-in roles are governed by role-matrix.ts in code — read-only here.'
+                  ? isSuperAdmin
+                    ? 'Built-in role: the code matrix is the default; your changes are recorded as super-admin overrides (revoke wins) and mirrored to Directus.'
+                    : 'Built-in roles are governed by role-matrix.ts in code — read-only here. A super admin can adjust them.'
                   : 'Toggle a collection + action to grant or revoke it. Changes apply to the next request (60s grant cache).'
               }}
             </p>
@@ -592,13 +617,16 @@ await useAsyncData('admin-zones-branches', async () => {
                   >
                     <UButton
                       :icon="
-                        permKey(collection, action) ? 'i-lucide-check' : 'i-lucide-minus'
+                        isGranted(collection, action)
+                          ? 'i-lucide-check'
+                          : 'i-lucide-minus'
                       "
-                      :color="permKey(collection, action) ? 'success' : 'neutral'"
+                      :color="isGranted(collection, action) ? 'success' : 'neutral'"
                       variant="ghost"
                       size="xs"
-                      :disabled="!selectedRole || selectedRole.builtIn"
-                      :aria-label="`${action} ${collection}`"
+                      :disabled="!canEditRole"
+                      :aria-label="grantTitle(collection, action)"
+                      :title="grantTitle(collection, action)"
                       @click="togglePermission(collection, action)"
                     />
                   </td>
@@ -606,7 +634,7 @@ await useAsyncData('admin-zones-branches', async () => {
               </tbody>
             </table>
             <div
-              v-if="selectedRole && !selectedRole.builtIn"
+              v-if="canEditRole"
               class="mt-4 border-t border-gray-200 pt-4 dark:border-gray-800"
             >
               <h3 class="text-sm font-semibold">Row filters</h3>
@@ -617,7 +645,7 @@ await useAsyncData('admin-zones-branches', async () => {
               <ul class="mt-2 space-y-1 text-xs">
                 <li
                   v-for="perm in filteredRolePermissions"
-                  :key="perm.id"
+                  :key="`${perm.collection}:${perm.action}`"
                   class="flex flex-wrap items-center gap-2 rounded-lg bg-gray-50 px-2 py-1.5 font-mono dark:bg-gray-900"
                 >
                   <span>{{ perm.collection }}:{{ perm.action }}</span>
