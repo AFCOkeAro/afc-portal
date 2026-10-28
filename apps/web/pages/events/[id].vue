@@ -2248,10 +2248,7 @@ watch(
             <FeedbackList :event-id="id" />
           </template>
           <template v-else>
-            <EmptyState
-              title="No testimonies yet"
-              description="Testimonies shared from this programme will appear here."
-            />
+            <TestimonyList :event-id="id" />
           </template>
         </UCard>
 

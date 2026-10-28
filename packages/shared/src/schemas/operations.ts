@@ -59,6 +59,19 @@ export const attendanceRecordFormSchema = z.object({
 
 export type AttendanceRecordForm = z.infer<typeof attendanceRecordFormSchema>
 
+/**
+ * Public testimony (AFC-828 phase 4). Submitted session-free through the
+ * public proxy; the message floor is enforced here so the error points
+ * at the form. Contact is for follow-up only.
+ */
+export const testimonyFormSchema = z.object({
+  name: optionalText(200),
+  message: z.string().trim().min(1, 'Share what happened in a sentence or two').max(2000),
+  contact: optionalText(200),
+})
+
+export type TestimonyForm = z.infer<typeof testimonyFormSchema>
+
 const LEAVE_YEAR_MIN = 2000
 const LEAVE_YEAR_MAX = 2100
 
@@ -114,6 +127,7 @@ export const OUTREACH_LOCATION_CATEGORIES = [
   'prison',
   'skills_centre',
   'hospital',
+  'other',
 ] as const
 export const OUTREACH_LOCATION_OWNERSHIP = ['private', 'public'] as const
 /**

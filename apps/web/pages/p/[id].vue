@@ -39,6 +39,41 @@ const feedback = ref({ name: '', message: '', rating: 0, contact: '' })
 const feedbackSaving = ref(false)
 const feedbackError = ref('')
 const feedbackDone = ref(false)
+const testimony = ref({ name: '', message: '', contact: '' })
+const testimonySaving = ref(false)
+const testimonyError = ref('')
+const testimonyDone = ref(false)
+
+async function submitTestimony(): Promise<void> {
+  if (testimony.value.message.trim() === '') {
+    testimonyError.value = 'Share what happened in a sentence or two.'
+    return
+  }
+  testimonySaving.value = true
+  testimonyError.value = ''
+  try {
+    await $fetch(`/api/public/events/${id}/testimonies`, {
+      method: 'POST',
+      body: {
+        ...(testimony.value.name.trim() === ''
+          ? {}
+          : { name: testimony.value.name.trim() }),
+        message: testimony.value.message.trim(),
+        ...(testimony.value.contact.trim() === ''
+          ? {}
+          : { contact: testimony.value.contact.trim() }),
+      },
+    })
+    testimonyDone.value = true
+  } catch (cause) {
+    testimonyError.value =
+      (cause as { data?: { message?: string }; message?: string }).data?.message ??
+      (cause as { message?: string }).message ??
+      'Could not share your testimony'
+  } finally {
+    testimonySaving.value = false
+  }
+}
 
 async function submitFeedback(): Promise<void> {
   if (feedback.value.message.trim() === '') {
@@ -226,6 +261,43 @@ function formatDate(value: string | null): string {
             />
           </li>
         </ul>
+      </section>
+      <section
+        aria-label="Share your testimony"
+        class="mt-10 rounded-xl border border-gray-200 p-5 dark:border-gray-800"
+      >
+        <h2 class="text-lg font-semibold">Share your testimony</h2>
+        <p v-if="testimonyDone" class="mt-2 text-sm text-green-700">
+          Thank you — your testimony has been shared with the organisers.
+        </p>
+        <div v-else class="mt-3 space-y-3">
+          <UFormField label="Your name (optional)">
+            <UInput v-model="testimony.name" placeholder="e.g. Emeka" class="w-full" />
+          </UFormField>
+          <UFormField label="What happened? *" required>
+            <UTextarea
+              v-model="testimony.message"
+              placeholder="I walked in bound and walked out free…"
+              class="w-full"
+            />
+          </UFormField>
+          <UFormField label="Contact for follow-up (optional)">
+            <UInput
+              v-model="testimony.contact"
+              placeholder="Phone or email"
+              class="w-full"
+            />
+          </UFormField>
+          <UButton
+            label="Share testimony"
+            icon="i-lucide-sparkles"
+            :loading="testimonySaving"
+            @click="submitTestimony"
+          />
+          <p v-if="testimonyError !== ''" class="text-sm text-red-600">
+            {{ testimonyError }}
+          </p>
+        </div>
       </section>
       <div class="mt-8 flex flex-wrap gap-3">
         <UButton
