@@ -57,7 +57,6 @@ else
   log "no new migrations"
 fi
 
-sed -i "s/^NUXT_PUBLIC_BUILD_SHA=.*/NUXT_PUBLIC_BUILD_SHA=$REMOTE/" "$ENV_FILE"
 cd "$COMPOSE_DIR" || exit 1
 docker compose build --build-arg "NUXT_PUBLIC_BUILD_SHA=$REMOTE" web >/dev/null 2>&1 \
   || { log "FATAL: web build failed; old container still running"; exit 1; }
@@ -70,6 +69,8 @@ for _ in $(seq 1 12); do
   sleep 10
   SERVED="$(curl -s --max-time 10 "http://$WIP:3000/api/health" | grep -o '"sha":"[0-9a-f]*"' | cut -d'"' -f4)"
   if [ "$SERVED" = "$REMOTE" ]; then
+    # Marker LAST, only after the new container proves itself (2026-10-28).
+    sed -i "s/^NUXT_PUBLIC_BUILD_SHA=.*/NUXT_PUBLIC_BUILD_SHA=$REMOTE/" "$ENV_FILE"
     log "staging now serves ${REMOTE:0:7}; healthy"
     exit 0
   fi
