@@ -2274,25 +2274,11 @@ watch(
       </section>
 
       <!-- SCHEDULE -->
+      <!-- AFC-826: sessions ARE attendance_sessions (one model); the builder
+        below lists the event's sessions and manages each session's
+        programme items (session_activities). -->
       <section v-if="tab === 'schedule'" aria-label="Schedule" class="mt-4">
-        <p class="mb-3 text-sm text-gray-500">0 events</p>
-        <UCard>
-          <EmptyState
-            title="No schedule yet"
-            description="Add days, services and sessions. Turn on check-in for any event where ushers take attendance."
-          >
-            <UButton
-              v-if="canEdit"
-              class="mt-4"
-              size="sm"
-              color="neutral"
-              variant="outline"
-              label="Open programme settings"
-              icon="i-lucide-settings"
-              @click="showEdit = true"
-            />
-          </EmptyState>
-        </UCard>
+        <ScheduleBuilder :event-id="id" :can-edit="canEdit" />
       </section>
 
       <!-- MATERIALS -->

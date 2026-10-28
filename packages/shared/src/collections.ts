@@ -30,6 +30,8 @@ export const COLLECTIONS = {
   attendanceRecords: 'attendance_records',
   /** Annual leave allowances per person per year (AFC-854 Time Off). */
   leaveBalances: 'leave_balances',
+  /** Programme items inside a session (AFC-826 schedule builder). */
+  sessionActivities: 'session_activities',
   /**
    * Attendance sex/category split (AFC-468, data-model-expansion §3).
    * `serviceTypeDefinitions` is board config (capture renders its ordered

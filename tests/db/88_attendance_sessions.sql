@@ -320,8 +320,10 @@ END $$;
 
 -- 0034 links blessing_recipients to attendance_sessions/events; those FKs
 -- would block the register drops below, so they are parked and re-added after.
+-- AFC-826: 0050 links session_activities the same way; park its named FK too.
 ALTER TABLE blessing_recipients DROP CONSTRAINT IF EXISTS blessing_recipients_session_fkey;
 ALTER TABLE blessing_recipients DROP CONSTRAINT IF EXISTS blessing_recipients_event_fkey;
+ALTER TABLE session_activities DROP CONSTRAINT IF EXISTS session_activities_session_fkey;
 \i services/directus/schema/migrations/rollback/20261020_0023_attendance_sessions.down.sql
 
 DO $$
@@ -342,6 +344,10 @@ END $$;
 -- re-apply the idempotent 0030 + 0031 forwards in apply order (AFC-698),
 -- or suite 94's shape contract fails on these tables.
 \i services/directus/schema/migrations/20261020_0023_attendance_sessions.sql
+
+-- AFC-826: re-add the parked 0050 FK now the sessions register is back.
+ALTER TABLE session_activities ADD CONSTRAINT session_activities_session_fkey
+  FOREIGN KEY (session) REFERENCES attendance_sessions(id) ON DELETE CASCADE;
 
 -- The register rollback above drops the 0030/0031 scope triggers; re-apply
 -- them (rebased idempotent forwards from AFC-698) plus the 0034 links parked

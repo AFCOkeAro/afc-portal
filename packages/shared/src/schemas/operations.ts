@@ -79,6 +79,38 @@ export const leaveBalancePatchSchema = z.object({
 })
 
 export type LeaveBalancePatch = z.infer<typeof leaveBalancePatchSchema>
+export const SESSION_ACTIVITY_TYPES = [
+  'music',
+  'prayer',
+  'announcement',
+  'talk',
+  'bible_reading',
+  'offering',
+  'testimony',
+  'drama',
+  'communion',
+  'welcome',
+  'closing',
+  'other',
+] as const
+
+/**
+ * Programme item (AFC-826). Position orders items within a session;
+ * duration is advisory (the order of service is not a timesheet).
+ */
+export const sessionActivityFormSchema = z.object({
+  activity_type: z.enum(SESSION_ACTIVITY_TYPES),
+  title: z.string().trim().min(1, 'Name the item').max(200),
+  position: z.coerce.number().int().min(0).default(0),
+  duration_minutes: z.coerce.number().int().min(0).max(1440).optional(),
+  notes: optionalText(2000),
+})
+
+export type SessionActivityForm = z.infer<typeof sessionActivityFormSchema>
+
+export const sessionActivityPatchSchema = sessionActivityFormSchema.partial()
+
+export type SessionActivityPatch = z.infer<typeof sessionActivityPatchSchema>
 
 const VISITOR_STATUSES = ['new', 'follow_up', 'converted', 'closed', 'declined'] as const
 
