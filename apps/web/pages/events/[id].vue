@@ -469,13 +469,17 @@ async function checkIn(): Promise<void> {
 
 /* Unit reports headcount capture (AFC-757): aggregate session headcounts
    recorded through the existing capture endpoint — no new backend. Totals
-   below are the stored per-session headcount_total values. */
+   below are display totals (AFC-859): the split-aggregate SUM where at
+   least one attendance_counts row exists, else the stored headcount_total.
+   attendance-flows.md S2 owns the canonical rule; the Flow attendance.total
+   owns the derived total_headcount. */
 interface UnitSessionRow {
   id: string
   session_date: string
   session_type: string
   session_name: string
   headcount_total: number | null
+  split_total: number | null
 }
 interface UnitServiceType {
   key: string
@@ -503,10 +507,18 @@ const unitOtherLabel = ref('')
 const unitSaving = ref(false)
 const unitMessage = ref('')
 const unitIsError = ref(false)
+/**
+ * Display total (AFC-859): split-aggregate SUM where at least one split
+ * row exists, else the legacy stored headcount_total. Null when both are
+ * absent — the table renders an em dash and the grand total treats it as 0.
+ */
+function unitDisplayTotal(row: UnitSessionRow): number | null {
+  if (typeof row.split_total === 'number') return row.split_total
+  return row.headcount_total
+}
 const unitTotal = computed(() =>
   unitSessions.value.reduce(
-    (sum: number, row: UnitSessionRow) =>
-      sum + (typeof row.headcount_total === 'number' ? row.headcount_total : 0),
+    (sum: number, row: UnitSessionRow) => sum + (unitDisplayTotal(row) ?? 0),
     0,
   ),
 )
@@ -1799,7 +1811,7 @@ watch(
                 <td class="py-2 pr-2">{{ session.session_date }}</td>
                 <td class="py-2 pr-2">{{ session.session_name }}</td>
                 <td class="py-2 text-right tabular-nums">
-                  {{ session.headcount_total ?? '—' }}
+                  {{ unitDisplayTotal(session) ?? '—' }}
                 </td>
               </tr>
             </tbody>
@@ -2072,7 +2084,7 @@ watch(
                     <td class="py-2 pr-2">{{ session.session_date }}</td>
                     <td class="py-2 pr-2">{{ session.session_name }}</td>
                     <td class="py-2 text-right tabular-nums">
-                      {{ session.headcount_total ?? '—' }}
+                      {{ unitDisplayTotal(session) ?? '—' }}
                     </td>
                   </tr>
                 </tbody>

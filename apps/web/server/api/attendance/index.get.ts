@@ -85,12 +85,48 @@ export default defineEventHandler(async (event) => {
     throwStoreUnavailable(error, 'attendance_store', '0023')
   }
 
+  // AFC-859: split-aggregate display totals. One batched attendance_counts
+  // read (session _in listed ids, fields session/count), summed per session.
+  // Best-effort on purpose: roles without attendance_counts read (e.g.
+  // volunteer CU) keep the stored headcount_total view instead of losing the
+  // whole sessions list, so a denial here degrades to split_total null
+  // rather than failing the request. No new endpoint, no DDL.
+  const splitTotals = new Map<string, number>()
+  {
+    const ids = result.data.map((row) => String(row.id))
+    if (ids.length > 0) {
+      try {
+        const splits = await listItems<{ session: unknown; count: unknown }>(
+          event,
+          scope,
+          'attendance_counts',
+          {
+            filter: { session: { _in: ids } },
+            fields: ['session', 'count'],
+            limit: -1,
+          },
+        )
+        for (const split of splits.data) {
+          const key = String(split.session)
+          const amount = Number(split.count)
+          splitTotals.set(
+            key,
+            (splitTotals.get(key) ?? 0) + (Number.isFinite(amount) ? amount : 0),
+          )
+        }
+      } catch {
+        // Deliberate degradation: split_total stays null below.
+      }
+    }
+  }
+
   const names = await branchNames(event, scope)
   const rows = result.data.map((row) => ({
     ...row,
     id: String(row.id),
     branch_name: row.branch ? (names.get(String(row.branch)) ?? null) : null,
     records_count: counts.get(String(row.id)) ?? 0,
+    split_total: splitTotals.get(String(row.id)) ?? null,
   }))
 
   return { data: rows, meta: result.meta }

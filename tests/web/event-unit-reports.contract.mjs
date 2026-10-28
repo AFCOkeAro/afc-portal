@@ -6,8 +6,9 @@
  *
  * Pins: capture call shape (event preset, idempotency key, rows),
  * duplicate_capture 409 surfaced (not a twin, not a 400), sessions list
- * scoped to the event, totals parity (stored headcount_total sum),
- * service-types read for categories, scope fail-closed.
+ * scoped to the event, display-total parity (split aggregate with legacy
+ * headcount_total fallback), service-types read for categories,
+ * scope fail-closed.
  *
  * Run: node --test tests/web/event-unit-reports.contract.mjs
  */
@@ -83,8 +84,48 @@ describe('event unit reports — capture wiring (AFC-757)', () => {
       /\/api\/attendance',\s*\{\s*query:\s*\{\s*event:\s*id/,
       'sessions list is filtered to this event',
     )
-    assert.match(page, /headcount_total/, 'rows render the stored per-session total')
-    assert.match(page, /unitTotal/, 'a grand total sums the stored session totals')
+    assert.match(page, /headcount_total/, 'legacy stored total still read')
+    assert.match(page, /unitTotal/, 'a grand total sums the session totals')
+  })
+
+  it('rows render the split aggregate, not the stored total alone (AFC-859)', () => {
+    const page = codeOf(PAGE)
+    assert.match(page, /unitDisplayTotal/, 'a display-total helper exists')
+    assert.match(
+      page,
+      /unitDisplayTotal\(session\)/,
+      'table Total cells render the display total',
+    )
+    assert.doesNotMatch(
+      page,
+      /\{\{\s*session\.headcount_total/,
+      'no cell renders the stored total alone (fails on headcount_total-only rendering)',
+    )
+    const server = codeOf(SESSIONS_LIST)
+    assert.match(
+      server,
+      /attendance_counts/,
+      'the sessions list batches the split rows server-side',
+    )
+    assert.match(
+      server,
+      /split_total/,
+      'the sessions list exposes a per-session split total',
+    )
+  })
+
+  it('unsplit sessions fall back to the stored total (AFC-859)', () => {
+    const page = codeOf(PAGE)
+    assert.match(
+      page,
+      /split_total[\s\S]*headcount_total|headcount_total[\s\S]*split_total/,
+      'the display total considers both the split sum and the stored total',
+    )
+    assert.match(
+      page,
+      /unitTotal[\s\S]*unitDisplayTotal|unitDisplayTotal[\s\S]*unitTotal/,
+      'the grand total sums display totals (parity)',
+    )
   })
 
   it('reads categories from service types and respects the split flag', () => {
