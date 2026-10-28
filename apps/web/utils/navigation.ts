@@ -134,6 +134,15 @@ export const NAVIGATION: readonly NavigationItem[] = [
     inSidebar: true,
   },
   {
+    // AFC-842: Church Office leave requests — file, correct, decide.
+    label: 'Annual Leave',
+    to: '/annual-leave',
+    icon: 'i-lucide-calendar-range',
+    requires: ['leave_requests', 'read'],
+    group: 'office',
+    inSidebar: true,
+  },
+  {
     label: 'Marriage',
     to: '/marriage',
     icon: 'i-lucide-heart',

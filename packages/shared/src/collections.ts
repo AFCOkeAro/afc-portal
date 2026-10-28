@@ -36,6 +36,8 @@ export const COLLECTIONS = {
   outreachLocations: 'outreach_locations',
   /** Secretary assignments to outreach locations (AFC-841 junction). */
   outreachLocationSecretaries: 'outreach_location_secretaries',
+  /** Staff leave requests (AFC-842, Church Office). */
+  leaveRequests: 'leave_requests',
   /**
    * Attendance sex/category split (AFC-468, data-model-expansion §3).
    * `serviceTypeDefinitions` is board config (capture renders its ordered
