@@ -121,17 +121,21 @@ BEGIN
 
   -- The category set matches the child table: no definition may offer a
   -- category the counts table cannot store.
+  -- AFC-835 (migration 0048): ministers + altar workers left the
+  -- definitions; secretaries + senior_friends + spillover joined.
   PERFORM test_support.assert_true(
     (SELECT count(*) FROM service_type_definitions d,
        LATERAL jsonb_array_elements_text(d.categories) c
      WHERE c NOT IN ('children','teens','adults','youth','teachers',
-                     'ministers','altar_workers','avs','visitors','other')) = 0,
+                     'secretaries','senior_friends','spillover',
+                     'avs','visitors','other')) = 0,
     'attendance', 'every configured category is a legal counts category');
 
   -- The spec example, order included: the form renders this array in order.
+  -- AFC-835: the spec example grew the three new keys (order kept).
   PERFORM test_support.assert_equals(
     (SELECT categories::text FROM service_type_definitions WHERE key = 'sunday_school'),
-    '["children", "teens", "adults", "teachers"]',
+    '["children", "teens", "adults", "teachers", "secretaries", "senior_friends", "spillover"]',
     'attendance', 'sunday_school offers exactly the spec example set in order');
 
   PERFORM test_support.assert_true(
@@ -300,8 +304,8 @@ BEGIN
   INSERT INTO attendance_counts (session, category, sex, count) VALUES
     ('33333333-3333-3333-3333-333333333333', 'teens', 'male', 9),
     ('33333333-3333-3333-3333-333333333333', 'teens', 'female', 11),
-    ('33333333-3333-3333-3333-333333333333', 'ministers', 'male', 3),
-    ('33333333-3333-3333-3333-333333333333', 'ministers', 'female', 2)
+    ('33333333-3333-3333-3333-333333333333', 'secretaries', 'male', 3),
+    ('33333333-3333-3333-3333-333333333333', 'secretaries', 'female', 2)
   ON CONFLICT (session, category, sex) DO UPDATE SET count = EXCLUDED.count;
 
   PERFORM test_support.assert_equals(
@@ -309,7 +313,7 @@ BEGIN
       WHERE session = '33333333-3333-3333-3333-333333333333'
         AND sex IN ('male', 'female')),
     '70',
-    'attendance', 'male + female reconcile (19+22 youth, 9+11 teens, 3+2 ministers, 4 labelled-other)');
+    'attendance', 'male + female reconcile (19+22 youth, 9+11 teens, 3+2 secretaries, 4 labelled-other)');
 END $$;
 
 -- ---------------------------------------------------------------------------

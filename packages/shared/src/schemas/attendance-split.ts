@@ -14,16 +14,19 @@
 import { z } from 'zod'
 import { dateSchema, optionalText } from './common'
 
-/** The ten categories from §3.3. Order here is display order, not authority. */
+/** The eleven categories from §3.3 as evolved by AFC-835 (migration
+ * 0048): ministers + altar_workers out; secretaries + senior_friends +
+ * spillover in. Order here is display order, not authority. */
 export const ATTENDANCE_CATEGORIES = [
   'children',
   'teens',
   'adults',
   'youth',
   'teachers',
-  'ministers',
-  'altar_workers',
   'avs',
+  'secretaries',
+  'senior_friends',
+  'spillover',
   'visitors',
   'other',
 ] as const
