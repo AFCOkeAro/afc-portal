@@ -477,6 +477,7 @@ const unitSessionId = ref('')
 const unitCats = ref<string[]>([])
 const unitSplit = ref(true)
 const unitCounts = ref<Record<string, { male: number | null; female: number | null }>>({})
+const unitOtherLabel = ref('')
 const unitSaving = ref(false)
 const unitMessage = ref('')
 const unitIsError = ref(false)
@@ -498,6 +499,19 @@ const unitSessionItems = computed(() => [
     value: String(row.id),
   })),
 ])
+
+/** Display label for a category key (AFC-835). */
+function unitCatLabel(key: string): string {
+  if (key === 'avs') return 'AVS'
+  if (key === 'other') return 'Other (describe below)'
+  return key
+    .split('_')
+    .map((part) => (part.length > 0 ? part[0]!.toUpperCase() + part.slice(1) : part))
+    .join(' ')
+}
+
+/** Default rows (AFC-835): Adult, Youth, Children, Visitors where offered. */
+const UNIT_DEFAULT_CATS = ['adults', 'youth', 'children', 'visitors']
 
 function unitPickSession(id: string): void {
   unitSessionId.value = id
@@ -550,10 +564,37 @@ function unitPickType(key: string): void {
   const cats = entry ? unitCategoriesOf(entry) : []
   // AFC-806 staging feedback: the event Attendance tab must offer the
   // children category even if a stale service-type definition omits it.
-  unitCats.value =
+  const offered =
     key === 'event' && !cats.includes('children') ? ['children', ...cats] : cats
+  // AFC-835: default rows are Adult/Youth/Children/Visitors where offered;
+  // the rest wait in the add-row picker. Fall back to the full offered set
+  // when none of the defaults is present.
+  const defaults = UNIT_DEFAULT_CATS.filter((cat) => offered.includes(cat))
+  unitCats.value = defaults.length > 0 ? defaults : [...offered]
   unitSplit.value = entry?.supports_sex_split !== false
   unitCounts.value = {}
+}
+
+const unitAddableCats = computed(() => {
+  const entry = unitTypes.value.find((row: UnitServiceType) => row.key === unitType.value)
+  const cats = entry ? unitCategoriesOf(entry) : []
+  return cats.filter((cat: string) => !unitCats.value.includes(cat))
+})
+
+const unitAddableItems = computed(() =>
+  unitAddableCats.value.map((cat: string) => ({ label: unitCatLabel(cat), value: cat })),
+)
+
+function unitAddCategory(key: string): void {
+  if (key !== '' && !unitCats.value.includes(key))
+    unitCats.value = [...unitCats.value, key]
+}
+
+function unitRemoveCategory(key: string): void {
+  unitCats.value = unitCats.value.filter((cat: string) => cat !== key)
+  const counts = { ...unitCounts.value }
+  Reflect.deleteProperty(counts, key)
+  unitCounts.value = counts
 }
 async function submitUnitCapture(): Promise<void> {
   unitMessage.value = ''
@@ -562,16 +603,42 @@ async function submitUnitCapture(): Promise<void> {
     unitMessage.value = 'Fill in the session date, service type and session name.'
     return
   }
-  const rows: Array<{ category: string; sex: string; count: number }> = []
+  if (unitCats.value.includes('other') && unitOtherLabel.value.trim() === '') {
+    unitIsError.value = true
+    unitMessage.value = 'Name the Other category before saving.'
+    return
+  }
+  const rows: Array<{
+    category: string
+    sex: string
+    count: number
+    category_other_label?: string
+  }> = []
   for (const category of unitCats.value) {
     const entry = unitCounts.value[category] ?? { male: null, female: null }
+    const label = category === 'other' ? unitOtherLabel.value.trim() : undefined
     if (unitSplit.value) {
       if (typeof entry.male === 'number' && entry.male > 0)
-        rows.push({ category, sex: 'male', count: entry.male })
+        rows.push({
+          category,
+          sex: 'male',
+          count: entry.male,
+          ...(label ? { category_other_label: label } : {}),
+        })
       if (typeof entry.female === 'number' && entry.female > 0)
-        rows.push({ category, sex: 'female', count: entry.female })
+        rows.push({
+          category,
+          sex: 'female',
+          count: entry.female,
+          ...(label ? { category_other_label: label } : {}),
+        })
     } else if (typeof entry.male === 'number' && entry.male > 0) {
-      rows.push({ category, sex: 'unspecified', count: entry.male })
+      rows.push({
+        category,
+        sex: 'unspecified',
+        count: entry.male,
+        ...(label ? { category_other_label: label } : {}),
+      })
     }
   }
   if (rows.length === 0) {
@@ -1771,7 +1838,18 @@ watch(
             </div>
             <div v-if="unitCats.length > 0" class="mt-2 grid gap-2 sm:grid-cols-2">
               <div v-for="category in unitCats" :key="category">
-                <UFormField :label="category">
+                <UFormField>
+                  <template #label>
+                    <span class="mr-auto">{{ unitCatLabel(category) }}</span>
+                    <UButton
+                      size="xs"
+                      color="neutral"
+                      variant="ghost"
+                      icon="i-lucide-x"
+                      :aria-label="`Remove ${unitCatLabel(category)} row`"
+                      @click="unitRemoveCategory(category)"
+                    />
+                  </template>
                   <div class="flex gap-2">
                     <UInput
                       :model-value="unitCounts[category]?.male ?? null"
@@ -1811,6 +1889,43 @@ watch(
             >
               {{ unitMessage }}
             </p>
+            <div
+              v-if="unitAddableCats.length > 0"
+              class="mt-2 flex flex-wrap items-end gap-2"
+            >
+              <UFormField label="Add a row" class="min-w-48 flex-1">
+                <USelect
+                  :model-value="''"
+                  :items="unitAddableItems"
+                  placeholder="Choose a category…"
+                  class="w-full"
+                  @update:model-value="unitAddCategory(String($event))"
+                />
+              </UFormField>
+              <UFormField
+                v-if="unitCats.includes('other')"
+                label="Describe Other"
+                class="min-w-48 flex-1"
+              >
+                <UInput
+                  v-model="unitOtherLabel"
+                  placeholder="e.g. Ushers"
+                  class="w-full"
+                />
+              </UFormField>
+            </div>
+            <div
+              v-else-if="unitCats.includes('other')"
+              class="mt-2 grid gap-2 sm:grid-cols-2"
+            >
+              <UFormField label="Describe Other">
+                <UInput
+                  v-model="unitOtherLabel"
+                  placeholder="e.g. Ushers"
+                  class="w-full"
+                />
+              </UFormField>
+            </div>
             <UButton
               class="mt-2"
               label="Save headcount"
@@ -2008,7 +2123,18 @@ watch(
                 </div>
                 <div v-if="unitCats.length > 0" class="mt-2 grid gap-2 sm:grid-cols-2">
                   <div v-for="category in unitCats" :key="category">
-                    <UFormField :label="category">
+                    <UFormField>
+                      <template #label>
+                        <span class="mr-auto">{{ unitCatLabel(category) }}</span>
+                        <UButton
+                          size="xs"
+                          color="neutral"
+                          variant="ghost"
+                          icon="i-lucide-x"
+                          :aria-label="`Remove ${unitCatLabel(category)} row`"
+                          @click="unitRemoveCategory(category)"
+                        />
+                      </template>
                       <div class="flex gap-2">
                         <UInput
                           :model-value="unitCounts[category]?.male ?? null"
@@ -2048,6 +2174,43 @@ watch(
                 >
                   {{ unitMessage }}
                 </p>
+                <div
+                  v-if="unitAddableCats.length > 0"
+                  class="mt-2 flex flex-wrap items-end gap-2"
+                >
+                  <UFormField label="Add a row" class="min-w-48 flex-1">
+                    <USelect
+                      :model-value="''"
+                      :items="unitAddableItems"
+                      placeholder="Choose a category…"
+                      class="w-full"
+                      @update:model-value="unitAddCategory(String($event))"
+                    />
+                  </UFormField>
+                  <UFormField
+                    v-if="unitCats.includes('other')"
+                    label="Describe Other"
+                    class="min-w-48 flex-1"
+                  >
+                    <UInput
+                      v-model="unitOtherLabel"
+                      placeholder="e.g. Ushers"
+                      class="w-full"
+                    />
+                  </UFormField>
+                </div>
+                <div
+                  v-else-if="unitCats.includes('other')"
+                  class="mt-2 grid gap-2 sm:grid-cols-2"
+                >
+                  <UFormField label="Describe Other">
+                    <UInput
+                      v-model="unitOtherLabel"
+                      placeholder="e.g. Ushers"
+                      class="w-full"
+                    />
+                  </UFormField>
+                </div>
                 <UButton
                   class="mt-2"
                   label="Save headcount"

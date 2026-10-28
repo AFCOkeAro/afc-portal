@@ -1,0 +1,19 @@
+{
+  "issue": "AFC-835",
+  "authorAgentId": "human-operator-board",
+  "authorName": "Board chairman (CLI operator session)",
+  "claimedAt": "2026-10-28T00:45:00+01:00",
+  "scopeOfTheClaim": "R1 only: authorship of the compliance-path files below. Correctness is for CI (R4) and the CTO review (R2).",
+  "whatTheChangeActuallyDoes": "Migration 0048 (+rollback): service_type_definitions categories evolved (ministers/altar_workers out; secretaries/senior_friends/spillover in; relatives order kept) + attendance_counts category CHECK evolved to the eleven-way set (was blocking inserts of the new keys, caught by suite 71). Suite 48 (rerun, per-key pins incl. 3 exact arrays, FK-free readable check, live down/up cycle restoring 0003 sets). Suite 71: allowlist + sunday_school array evolved with rationale; reconcile fixture moved ministers->secretaries. Shared ATTENDANCE_CATEGORIES evolved identically (single source; capture validation + form enums follow).",
+  "whatThisFileIs": "An R1 authorship claim, and nothing else. It says who wrote the compliance-path files below and on which issue. It asserts nothing about whether they are correct, and it carries no reviews[] entry.",
+  "doesNotClaimR2": "There is no reviews[] entry here and there will not be one from me. R2 wants a named reviewer who is not the author. CTO R2 requested on the AFC-835 thread before landing.",
+  "notClaimedPaths": "Non-compliance paths in the same packet (headcount form defaults/add-row/labels/other-label, attendance contract) need no claim and land with the R2 verdict.",
+  "paths": [
+    "services/directus/schema/migrations/20261028_0048_attendance_categories.sql",
+    "services/directus/schema/migrations/rollback/20261028_0048_attendance_categories.down.sql",
+    "tests/db/48_attendance_categories.sql",
+    "tests/db/71_attendance_counts.sql",
+    "packages/shared/src/schemas/attendance-split.ts",
+    ".provenance/claims/AFC-835.json"
+  ]
+}
