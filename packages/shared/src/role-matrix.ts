@@ -357,6 +357,31 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     none: [NONE, 'none'],
     zone_admin: [R, 'own_zone'],
   },
+  [COLLECTIONS.eventBudgets]: {
+    // AFC-825: exact mirror of eventExpenses above (CRU pattern,
+    // own_branch/own_zone; super/area ALL; branch CRU own; zone R
+    // own_zone; nobody else). Budgets are finance amounts, so the field
+    // restriction below matches too.
+    super_admin: [ALL, 'all'],
+    area_admin: [ALL, 'all'],
+    branch_admin: [CRU, 'own_branch', 'own'],
+    department_leader: [NONE, 'none'],
+    volunteer: [NONE, 'none'],
+    none: [NONE, 'none'],
+    zone_admin: [R, 'own_zone'],
+  },
+  [COLLECTIONS.expenseCategories]: {
+    // AFC-825: global read for staff (forms list the taxonomy); writes are
+    // route-gated to area admins, with area ALL here to match. No branch
+    // scoping: categories are not branch data.
+    super_admin: [ALL, 'all'],
+    area_admin: [ALL, 'all'],
+    branch_admin: [R, 'all'],
+    department_leader: [R, 'all'],
+    volunteer: [R, 'all'],
+    none: [NONE, 'none'],
+    zone_admin: [R, 'all'],
+  },
   [COLLECTIONS.wecaReturns]: {
     // data-model-expansion §11: CRUD / CRUD / R (zone) / R (own).
     // Zone admin: R (zone) per §11.
@@ -945,6 +970,11 @@ const FIELD_RESTRICTIONS: Readonly<
     fields: ['amount', 'notes'],
     roles: ['super_admin', 'area_admin', 'branch_admin'],
     note: 'amounts + notes: branch admin (own records only, enforced by policy), area+; zone/dept/volunteer/public never see figures',
+  },
+  [COLLECTIONS.eventBudgets]: {
+    fields: ['amount', 'notes'],
+    roles: ['super_admin', 'area_admin', 'branch_admin'],
+    note: 'amounts + notes: same finance set as eventExpenses (AFC-825)',
   },
   [COLLECTIONS.wecaReturns]: {
     fields: [

@@ -13,7 +13,9 @@ import { z } from 'zod'
 import { dateSchema, optionalNote, optionalText, uuidSchema } from './common'
 import { requiredMoneySchema } from './weca'
 
-/** The 0044 category CHECK, byte for byte. */
+/** Seed keys for expense_categories (AFC-825: the register, seeded by
+ * 0045, is the authority; the route rejects unknown keys. Kept for the
+ * form fallback when the categories endpoint is unreachable). */
 export const EXPENSE_CATEGORIES = [
   'venue',
   'feeding',
@@ -32,7 +34,10 @@ const EXPENSE_CURRENCIES = ['NGN', 'USD', 'GBP'] as const
 
 export const expenseFormSchema = z
   .object({
-    category: z.enum(EXPENSE_CATEGORIES),
+    // AFC-825: register-backed (expense_categories). The route verifies
+    // the key exists and names unknown_category otherwise; the enum is
+    // gone on purpose so admin-added categories validate.
+    category: z.string().trim().min(1).max(60),
     category_other_label: optionalText(120),
     amount: requiredMoneySchema,
     currency: z.enum(EXPENSE_CURRENCIES).default('NGN'),
@@ -79,6 +84,32 @@ export function toExpensePayload(
     notes: form.notes ?? null,
     branch: scope.branch,
     zone: scope.zone,
+    recorded_by: scope.recordedBy,
+  }
+}
+
+/**
+ * Per-event budget line (AFC-825). Latest row per (event, category) wins;
+ * the route resolves that, so the form never edits — it only plans.
+ */
+export const budgetFormSchema = z.object({
+  category_key: z.string().trim().min(1).max(60),
+  amount: requiredMoneySchema,
+  notes: optionalNote(),
+})
+
+export type BudgetForm = z.infer<typeof budgetFormSchema>
+
+/** Row payload for `event_budgets`. Attribution is route-stamped. */
+export function toBudgetPayload(
+  form: BudgetForm,
+  scope: { event: string; recordedBy: string },
+): Record<string, unknown> {
+  return {
+    event: scope.event,
+    category_key: form.category_key,
+    amount: form.amount,
+    notes: form.notes ?? null,
     recorded_by: scope.recordedBy,
   }
 }

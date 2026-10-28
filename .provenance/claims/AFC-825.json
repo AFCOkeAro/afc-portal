@@ -1,0 +1,19 @@
+{
+  "issue": "AFC-825",
+  "authorAgentId": "human-operator-board",
+  "authorName": "Board chairman (CLI operator session)",
+  "claimedAt": "2026-10-27T23:30:00+01:00",
+  "scopeOfTheClaim": "R1 only: authorship of the compliance-path files below. Correctness is for CI (R4) and the CTO review (R2).",
+  "whatTheChangeActuallyDoes": "Migration 0045 (+rollback): expense_categories register seeded with the 0044 eight + other; event_budgets append-only register (latest-wins, no UPDATE/DELETE); event_expenses.category CHECK replaced by FK into the register (CHECK enforced exactly the seeded set, so no row can violate the FK). Suite 45 (seeds, latest-wins, FK guards incl. 23503 evolution, grants, PUBLIC-empty, live down/up cycle with faithful migrator identity). Suite 44: two stale 23514 pins evolved to 23503 with rationale (harness applies all migrations before suites). Suite 86.7: reverses/re-applies 0045 around the events drop (budgets RESTRICT events) + emptiness + FK-gone pins.",
+  "whatThisFileIs": "An R1 authorship claim, and nothing else. It says who wrote the compliance-path files below and on which issue. It asserts nothing about whether they are correct, and it carries no reviews[] entry.",
+  "doesNotClaimR2": "There is no reviews[] entry here and there will not be one from me. R2 wants a named reviewer who is not the author. CTO R2 requested on the AFC-825 thread before landing.",
+  "notClaimedPaths": "Non-compliance paths in the same packet (routes, UI, shared schema/matrix/collections/types, event-budgets contract) need no claim and land with the R2 verdict.",
+  "paths": [
+    "services/directus/schema/migrations/20261028_0045_event_budgets.sql",
+    "services/directus/schema/migrations/rollback/20261028_0045_event_budgets.down.sql",
+    "tests/db/45_event_budgets.sql",
+    "tests/db/44_event_expenses.sql",
+    "tests/db/86_events_registrations.sql",
+    ".provenance/claims/AFC-825.json"
+  ]
+}

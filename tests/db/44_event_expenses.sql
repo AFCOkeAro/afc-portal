@@ -106,9 +106,12 @@ BEGIN
   INSERT INTO events (title, start_at, end_at)
     VALUES ('Expense Enum Probe', now(), now()) RETURNING id INTO v_event;
 
+  -- AFC-825 (migration 0045): the static eight-way CHECK became a FOREIGN
+  -- KEY into expense_categories, so an undocumented category now fails as
+  -- 23503 rather than 23514. Still rejected, different constraint.
   PERFORM test_support.assert_raises(NULL,
     'INSERT INTO event_expenses (event, category, amount, spent_on) VALUES (''' || v_event::text || ''', ''confetti'', 10, CURRENT_DATE)',
-    '23514', 'expenses', 'an undocumented category is rejected at creation');
+    '23503', 'expenses', 'an undocumented category is rejected at creation');
   PERFORM test_support.assert_raises(NULL,
     'INSERT INTO event_expenses (event, category, amount, spent_on) VALUES (''' || v_event::text || ''', ''other'', 10, CURRENT_DATE)',
     '23514', 'expenses', '''other'' without a label is rejected (other requires category_other_label)');
@@ -233,9 +236,10 @@ BEGIN
   PERFORM test_support.assert_raises('directus_app',
     $q$DELETE FROM event_expenses WHERE false$q$,
     '42501', 'expenses', 'app cannot DELETE expenses (append-only, corrections are new rows)');
+  -- AFC-825: same FK evolution for the app ceiling (23503, not 23514).
   PERFORM test_support.assert_raises('directus_app',
     'INSERT INTO event_expenses (event, category, amount, spent_on) VALUES (''' || v_event::text || ''', ''confetti'', 10, CURRENT_DATE)',
-    '23514', 'expenses', 'an undocumented category is rejected for the app too');
+    '23503', 'expenses', 'an undocumented category is rejected for the app too');
 
   DELETE FROM event_expenses WHERE event = v_event;
   DELETE FROM events WHERE id = v_event;

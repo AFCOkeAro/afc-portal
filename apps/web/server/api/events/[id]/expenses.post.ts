@@ -66,6 +66,41 @@ export default defineEventHandler(async (event) => {
       zone = typeof raw === 'string' && raw.length > 0 ? raw : null
     }
 
+    // AFC-825: category is register-backed (expense_categories). The
+    // schema accepts any well-formed key; existence + active state are
+    // enforced here with field errors, never a bare 500.
+    const kinds = await listItems<{ key: string; active: boolean }>(
+      event,
+      scope,
+      'expense_categories',
+      {
+        filter: { key: { _eq: parsed.data.category } },
+        fields: ['key', 'active'],
+        limit: 1,
+      },
+    )
+    const kind = kinds.data[0]
+    if (!kind) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: 'That expense category is not on record',
+        data: {
+          code: 'unknown_category',
+          fields: { category: 'Pick a listed category' },
+        },
+      })
+    }
+    if (!kind.active) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: 'That expense category is retired',
+        data: {
+          code: 'category_inactive',
+          fields: { category: 'Pick an active category' },
+        },
+      })
+    }
+
     const created = await createItem<Record<string, unknown>>(
       event,
       scope,

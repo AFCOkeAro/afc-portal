@@ -344,6 +344,10 @@ BEGIN
     AND (SELECT count(*) FROM attendance_sessions) = 0
     AND (SELECT count(*) FROM attendance_records) = 0, 'events',
     'pre-rollback: empty registers (probes above cleaned up; 88 has not run yet)');
+  PERFORM test_support.assert_true(
+    to_regclass('public.event_budgets') IS NULL
+    OR (SELECT count(*) FROM event_budgets) = 0, 'events',
+    'pre-rollback: budgets register empty (AFC-825: 0045 down refuses with rows)');
 
   DELETE FROM events WHERE id = '00000000-0000-4000-8000-0000000000e1';
   PERFORM test_support.assert_true(
@@ -369,6 +373,10 @@ END $$;
 
 \i services/directus/schema/migrations/rollback/20261025_0044_event_expenses.down.sql
 
+-- AFC-825: event_budgets.event is RESTRICT on events, so the 0045 register
+-- reverses here -- after the expenses drop, before the events drop.
+\i services/directus/schema/migrations/rollback/20261028_0045_event_budgets.down.sql
+
 \i services/directus/schema/migrations/rollback/20261020_0021_events_registrations.down.sql
 
 DO $$
@@ -381,8 +389,9 @@ BEGIN
     NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname IN
       ('event_referrals_event_fkey', 'blessings_event_fkey',
        'attendance_counts_session_fkey', 'blessings_session_fkey',
-       'events_attendance_session_fkey')), 'events',
-    'empty-table rollback: all five merge FKs are gone with their referents');
+       'events_attendance_session_fkey', 'event_budgets_event_fkey',
+       'event_expenses_category_fkey')), 'events',
+    'empty-table rollback: all seven FKs are gone with their referents (AFC-825: budgets + category link)');
 END $$;
 
 -- Leave the registers present, as the forward migrations leave them --
@@ -396,6 +405,8 @@ SET ROLE directus_migrator;
 \i services/directus/schema/migrations/20261020_0021_events_registrations.sql
 
 \i services/directus/schema/migrations/20261025_0044_event_expenses.sql
+
+\i services/directus/schema/migrations/20261028_0045_event_budgets.sql
 RESET ROLE;
 
 \i services/directus/schema/migrations/20261020_0023_attendance_sessions.sql

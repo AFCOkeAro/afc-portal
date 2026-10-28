@@ -281,6 +281,17 @@ export interface BlessingRecipientRow extends BlessingRecipient {
   person_name?: string | null
 }
 
+/** Per-event budget line (AFC-825): latest row per category wins (resolved in the route). */
+export interface BudgetRow {
+  id: string
+  event: string
+  category_key: string
+  amount?: string | number | null
+  notes?: string | null
+  recorded_by?: string | null
+  created_at: string
+}
+
 /** Per-event expense row (AFC-801): the 0044 columns as the list route returns them. */
 export interface ExpenseRow {
   id: string
