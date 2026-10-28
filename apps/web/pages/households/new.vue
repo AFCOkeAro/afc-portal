@@ -210,7 +210,23 @@ function payload(): HouseholdWizardInput {
   }
 }
 
-async function submit(): Promise<void> {
+function resetWizard(): void {
+  householdName.value = ''
+  branch.value = undefined
+  weddingDate.value = ''
+  address.value = ''
+  address1.value = ''
+  address2.value = ''
+  city.value = ''
+  state.value = ''
+  zip.value = ''
+  country.value = ''
+  latitude.value = ''
+  longitude.value = ''
+  members.value = [blankMember('head_of_household')]
+}
+
+async function submit(saveAndNew = false): Promise<void> {
   formError.value = ''
   fieldErrors.value = {}
 
@@ -242,6 +258,11 @@ async function submit(): Promise<void> {
       '/api/households/wizard',
       parsed.data,
     )
+    if (saveAndNew) {
+      resetWizard()
+      formError.value = ''
+      return
+    }
     await router.push(`/households/${result.data.household_id}`)
   } catch (cause) {
     const error = cause as { message?: string; fields?: Record<string, string> }
@@ -271,7 +292,7 @@ async function submit(): Promise<void> {
       description="Add a household with its members and messaging consent in one guided submit. A checked box writes one consent record; an unchecked box stores nothing."
     />
 
-    <form novalidate @submit.prevent="submit">
+    <form novalidate @submit.prevent="submit(false)">
       <UAlert
         v-if="formError"
         class="mb-4"
@@ -532,8 +553,16 @@ async function submit(): Promise<void> {
         </div>
       </UCard>
 
-      <div class="mt-6 flex justify-end gap-2">
+      <div class="mt-6 flex flex-wrap justify-end gap-2">
         <UButton to="/households" color="neutral" variant="ghost" label="Cancel" />
+        <UButton
+          type="button"
+          label="Save and add new"
+          color="neutral"
+          variant="outline"
+          :loading="saving"
+          @click="submit(true)"
+        />
         <UButton type="submit" label="Save family" :loading="saving" />
       </div>
     </form>
