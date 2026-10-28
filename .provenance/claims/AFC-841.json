@@ -1,0 +1,17 @@
+{
+  "issue": "AFC-841",
+  "authorAgentId": "human-operator-board",
+  "authorName": "Board chairman (CLI operator session)",
+  "claimedAt": "2026-10-28T03:10:00+01:00",
+  "scopeOfTheClaim": "R1 only: authorship of the compliance-path files below. Correctness is for CI (R4) and the CTO review (R2).",
+  "whatTheChangeActuallyDoes": "Migration 0051 (+rollback): outreach_locations (branch/zone route-stamped denorms SET NULL per the 0044 choice-8 precedent with no scope trigger so suite 94 is untouched; closed 6-key category set incl. primary/secondary school, prison, skills centre, hospital, other; ownership private/public; contact name+phone; visiting days; unique name+category) + outreach_location_secretaries junction (location FK CASCADE, person FK SET NULL, unique pair) with SELECT/INSERT(col-list)/UPDATE/DELETE grants to directus_app and PUBLIC revoked; ownership + bootstrap-role preconditions per the 0042 pattern. Suite 51: rerun no-op, shape (write/closed-set refusals/ownership refusal/duplicate-assignment refusal/cascade), grants (SELECT, INSERT+UPDATE+DELETE, PUBLIC-empty), live down/up cycle with restrict_violation refusal while rows exist. No existing suite touched: parents (branches/zones/people) are never dropped in-harness.",
+  "whatThisFileIs": "An R1 authorship claim, and nothing else. It says who wrote the compliance-path files below and on which issue. It asserts nothing about whether they are correct, and it carries no reviews[] entry.",
+  "doesNotClaimR2": "There is no reviews[] entry here and there will not be one from me. R2 wants a named reviewer who is not the author. CTO R2 requested on the AFC-841 thread before landing.",
+  "notClaimedPaths": "Non-compliance paths in the same packet (shared COLLECTIONS + role-matrix entries mirroring session_activities hands + outreach schemas, seven outreach API routes with dual scope-gating and zone-from-branch stamping, avs.vue with locations table + secretary assign/unassign + Outreach List link, nav entries, avs-locations contract) need no claim and land with the R2 verdict.",
+  "paths": [
+    "services/directus/schema/migrations/20261028_0051_outreach_locations.sql",
+    "services/directus/schema/migrations/rollback/20261028_0051_outreach_locations.down.sql",
+    "tests/db/51_outreach_locations.sql",
+    ".provenance/claims/AFC-841.json"
+  ]
+}

@@ -251,11 +251,12 @@ export const NAVIGATION: readonly NavigationItem[] = [
 
   // Outreach
   {
-    // AVS centres are served by the centres register today.
+    // AFC-841: AVS is the outreach mission-fields surface (schools,
+    // prisons, skills centres, hospitals) — not Bible Study Centres.
     label: 'AVS',
-    to: '/bscs',
+    to: '/avs',
     icon: 'i-lucide-school',
-    requires: ['bible_study_centres', 'read'],
+    requires: ['outreach_locations', 'read'],
     group: 'outreach',
     inSidebar: true,
   },
@@ -485,14 +486,8 @@ export const NAVIGATION: readonly NavigationItem[] = [
   // redirects into the filtered Churches view (pages/branches/index.vue,
   // pages/zones/index.vue); the outreach AVS entry is untouched (separate
   // centres register, not the BSC kind filter).
-  {
-    label: 'AVS',
-    to: '/bscs',
-    icon: 'i-lucide-school',
-    requires: ['bible_study_centres', 'read'],
-    group: 'admin',
-    inSidebar: true,
-  },
+  // AFC-841: no Admin AVS entry — AVS lives under Outreach on the
+  // outreach_locations register. /bscs/[id] stays as a deep link.
   {
     // Directus owns roles/policies; the portal redirects to its admin view.
     label: 'Roles and Permission',

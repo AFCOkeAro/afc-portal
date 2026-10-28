@@ -32,6 +32,10 @@ export const COLLECTIONS = {
   leaveBalances: 'leave_balances',
   /** Programme items inside a session (AFC-826 schedule builder). */
   sessionActivities: 'session_activities',
+  /** AVS mission fields (AFC-841): schools, prisons, skills centres, hospitals. */
+  outreachLocations: 'outreach_locations',
+  /** Secretary assignments to outreach locations (AFC-841 junction). */
+  outreachLocationSecretaries: 'outreach_location_secretaries',
   /**
    * Attendance sex/category split (AFC-468, data-model-expansion §3).
    * `serviceTypeDefinitions` is board config (capture renders its ordered

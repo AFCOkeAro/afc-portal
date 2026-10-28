@@ -111,6 +111,44 @@ export type SessionActivityForm = z.infer<typeof sessionActivityFormSchema>
 export const sessionActivityPatchSchema = sessionActivityFormSchema.partial()
 
 export type SessionActivityPatch = z.infer<typeof sessionActivityPatchSchema>
+export const OUTREACH_LOCATION_CATEGORIES = [
+  'primary_school',
+  'secondary_school',
+  'prison',
+  'skills_centre',
+  'hospital',
+  'other',
+] as const
+
+export const OUTREACH_LOCATION_OWNERSHIP = ['private', 'public'] as const
+
+/**
+ * AVS mission field (AFC-841). Branch/zone stamp server-side from the
+ * caller's scope (0044 choice-8); contact + visiting days are free text.
+ */
+export const outreachLocationFormSchema = z.object({
+  branch: optionalText(36),
+  name: z.string().trim().min(1, 'Name the location').max(200),
+  category: z.enum(OUTREACH_LOCATION_CATEGORIES),
+  address: optionalText(1000),
+  ownership: z.enum(OUTREACH_LOCATION_OWNERSHIP).default('private'),
+  contact_name: optionalText(200),
+  contact_phone: optionalText(40),
+  visiting_days: optionalText(200),
+  notes: optionalText(2000),
+})
+
+export type OutreachLocationForm = z.infer<typeof outreachLocationFormSchema>
+
+export const outreachLocationPatchSchema = outreachLocationFormSchema.partial()
+
+export type OutreachLocationPatch = z.infer<typeof outreachLocationPatchSchema>
+
+export const outreachSecretaryFormSchema = z.object({
+  person: z.string().trim().min(1, 'Choose the secretary').max(36),
+})
+
+export type OutreachSecretaryForm = z.infer<typeof outreachSecretaryFormSchema>
 
 const VISITOR_STATUSES = ['new', 'follow_up', 'converted', 'closed', 'declined'] as const
 
