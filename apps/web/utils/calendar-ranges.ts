@@ -186,3 +186,26 @@ export function dayNumber(iso: string): number {
 export function isSameMonth(a: string, b: string): boolean {
   return a.slice(0, 7) === b.slice(0, 7)
 }
+
+/**
+ * Count feed items per calendar type (AFC-865). Pure helper for the
+ * colour legend and the Year mini-month counts: when `prefix` (a
+ * `YYYY-MM` month prefix) is given, only items in that month count.
+ * Unknown types are ignored so a future feed type cannot break the grid.
+ */
+export function countByType(
+  items: Pick<CalendarViewItem, 'item_type' | 'date'>[],
+  prefix?: string,
+): Record<string, number> {
+  const counts: Record<string, number> = {
+    service: 0,
+    event: 0,
+    programme: 0,
+    celebration: 0,
+  }
+  for (const item of items) {
+    if (prefix && !item.date.startsWith(prefix)) continue
+    if (item.item_type in counts) counts[item.item_type] = (counts[item.item_type] ?? 0) + 1
+  }
+  return counts
+}
