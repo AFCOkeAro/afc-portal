@@ -37,6 +37,8 @@ export default defineEventHandler(async (event) => {
   const branch = typeof query.branch === 'string' ? query.branch : undefined
   const sessionType =
     typeof query.session_type === 'string' ? query.session_type : undefined
+  // AFC-826: the Schedule tab lists one event's sessions.
+  const eventId = typeof query.event === 'string' ? query.event : undefined
 
   // AFC-566: both reads hit 0023 registers. A missing table and a
   // missing read grant both arrive as DirectusAuthError — map to the named
@@ -51,6 +53,7 @@ export default defineEventHandler(async (event) => {
       filter: mergeFilters(
         branch ? { branch: { _eq: branch } } : undefined,
         sessionType ? { session_type: { _eq: sessionType } } : undefined,
+        eventId ? { event: { _eq: eventId } } : undefined,
         scopeFilter(scope),
       ),
       fields: FIELDS,

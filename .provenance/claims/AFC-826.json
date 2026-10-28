@@ -1,0 +1,19 @@
+{
+  "issue": "AFC-826",
+  "authorAgentId": "human-operator-board",
+  "authorName": "Board chairman (CLI operator session)",
+  "claimedAt": "2026-10-28T02:40:00+01:00",
+  "scopeOfTheClaim": "R1 only: authorship of the compliance-path files below. Correctness is for CI (R4) and the CTO review (R2).",
+  "whatTheChangeActuallyDoes": "Migration 0050 (+rollback): session_activities register (session FK CASCADE named session_activities_session_fkey, branch/zone route-stamped denorms SET NULL per 0044 choice-8 with no scope trigger so suite 94 is untouched, closed 12-key activity_type set, title/position/duration/notes, unique triple) with SELECT/INSERT(col-list)/UPDATE/DELETE grants to directus_app and PUBLIC revoked; ownership + bootstrap-role preconditions per the 0042 pattern. Suite 50: rerun no-op, shape (write/closed-set-refusal/cascade, branch stamp, named FK exists), grants (SELECT, INSERT+UPDATE+DELETE, PUBLIC-empty), live down/up cycle with restrict_violation refusal while rows exist. Suites 86/88 evolved with rationale: park the 0050 FK around the 0023 empty rollback and re-add after (blessing_recipients 0034 precedent).",
+  "whatThisFileIs": "An R1 authorship claim, and nothing else. It says who wrote the compliance-path files below and on which issue. It asserts nothing about whether they are correct, and it carries no reviews[] entry.",
+  "doesNotClaimR2": "There is no reviews[] entry here and there will not be one from me. R2 wants a named reviewer who is not the author. CTO R2 requested on the AFC-826 thread before landing.",
+  "notClaimedPaths": "Non-compliance paths in the same packet (shared COLLECTIONS + role-matrix sessionActivities entry mirroring attendanceRecords + sessionActivityFormSchema/Patch, four activity API routes, attendance list event filter, ScheduleBuilder.vue, Schedule tab wiring, schedule-builder contract) need no claim and land with the R2 verdict.",
+  "paths": [
+    "services/directus/schema/migrations/20261028_0050_session_activities.sql",
+    "services/directus/schema/migrations/rollback/20261028_0050_session_activities.down.sql",
+    "tests/db/50_session_activities.sql",
+    "tests/db/86_events_registrations.sql",
+    "tests/db/88_attendance_sessions.sql",
+    ".provenance/claims/AFC-826.json"
+  ]
+}
