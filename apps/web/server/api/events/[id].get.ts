@@ -40,6 +40,13 @@ const EVENT_FIELDS = [
   'age_max',
   'visibility',
   'status',
+  'registration_visibility',
+  'speakers_visibility',
+  'resources_visibility',
+  'schedule_visibility',
+  'speakers',
+  'resources',
+  'schedule',
 ]
 
 const REGISTRATION_FIELDS = [
