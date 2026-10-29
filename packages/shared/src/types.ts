@@ -215,6 +215,8 @@ export interface Person {
   consent_media: boolean
   consent_signed_at: string | null
   status: 'active' | 'archived'
+  /** Portrait slot (AFC-864): Directus file id, served proxied. Null when unset. */
+  photo_file: string | null
 }
 
 export interface Household {
@@ -241,6 +243,8 @@ export interface Household {
   /** Couples' wedding date (data-model-expansion §4.1). */
   wedding_date: string | null
   status: 'active' | 'archived'
+  /** Portrait slot (AFC-864): Directus file id, served proxied. Null when unset. */
+  photo_file: string | null
 }
 
 export interface EventRecord {

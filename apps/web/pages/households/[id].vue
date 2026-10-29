@@ -94,6 +94,32 @@ async function unlinkMember(personId: string): Promise<void> {
   }
 }
 
+const photoUrl = computed(() =>
+  household.value?.photo_file ? `/api/households/${household.value.id}/photo` : null,
+)
+
+const photoInput = ref<HTMLInputElement | null>(null)
+
+async function uploadPhoto(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement
+  const picked = input.files?.[0] ?? null
+  input.value = ''
+  if (!picked || !household.value) return
+  saving.value = true
+  actionError.value = ''
+  try {
+    const form = new FormData()
+    form.append('photo', picked)
+    await api.post(`/api/households/${household.value.id}/photo`, form)
+    await refresh()
+  } catch (cause) {
+    actionError.value =
+      (cause as { message?: string }).message ?? 'Could not upload the photo'
+  } finally {
+    saving.value = false
+  }
+}
+
 async function makeHead(personId: string): Promise<void> {
   saving.value = true
   actionError.value = ''
@@ -172,6 +198,46 @@ const sections = computed(() => [
 
       <SectionNav :sections="sections" />
 
+      <UCard class="mb-6">
+        <div class="flex flex-wrap items-center gap-4">
+          <ProfileAvatar
+            :name="household.name || 'Unnamed household'"
+            :photo-url="photoUrl"
+            size="lg"
+          />
+          <div class="min-w-0 flex-1">
+            <h2 class="truncate text-xl font-semibold">
+              {{ household.name || 'Unnamed household' }}
+            </h2>
+            <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
+              {{ household.member_count }} member{{
+                household.member_count === 1 ? '' : 's'
+              }}
+              ·
+              {{ household.branch_name || 'No branch' }}
+            </p>
+          </div>
+          <PermissionGate :collection="COLLECTIONS.households" action="update">
+            <input
+              ref="photoInput"
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              class="hidden"
+              aria-label="Upload household photo"
+              @change="uploadPhoto"
+            />
+            <UButton
+              label="Upload photo"
+              icon="i-lucide-camera"
+              color="neutral"
+              variant="outline"
+              :loading="saving"
+              @click="photoInput?.click()"
+            />
+          </PermissionGate>
+        </div>
+      </UCard>
+
       <section id="overview" class="scroll-mt-28">
         <h2 class="sr-only" tabindex="-1">Overview</h2>
         <UCard>
@@ -213,19 +279,22 @@ const sections = computed(() => [
               :key="member.id"
               class="flex items-center justify-between gap-3 py-3"
             >
-              <div class="min-w-0">
-                <NuxtLink
-                  :to="`/people/${member.id}`"
-                  class="font-medium text-gray-900 hover:text-primary-600 dark:text-white"
-                >
-                  {{ member.display_name }}
-                </NuxtLink>
-                <p class="text-xs text-gray-500 dark:text-gray-400">
-                  {{ member.household_role?.replace(/_/g, ' ') || 'member' }} ·
-                  {{ member.membership_status.replace(/_/g, ' ') }}
-                  <span v-if="member.is_head"> · household head</span>
-                  <span v-if="member.is_minor"> · minor</span>
-                </p>
+              <div class="flex min-w-0 items-center gap-3">
+                <ProfileAvatar :name="member.display_name" size="sm" />
+                <div class="min-w-0">
+                  <NuxtLink
+                    :to="`/people/${member.id}`"
+                    class="font-medium text-gray-900 hover:text-primary-600 dark:text-white"
+                  >
+                    {{ member.display_name }}
+                  </NuxtLink>
+                  <p class="text-xs text-gray-500 dark:text-gray-400">
+                    {{ member.household_role?.replace(/_/g, ' ') || 'member' }} ·
+                    {{ member.membership_status.replace(/_/g, ' ') }}
+                    <span v-if="member.is_head"> · household head</span>
+                    <span v-if="member.is_minor"> · minor</span>
+                  </p>
+                </div>
               </div>
               <div v-if="canEdit" class="flex shrink-0 items-center gap-1">
                 <UButton

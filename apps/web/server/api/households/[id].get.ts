@@ -34,6 +34,7 @@ const HOUSEHOLD_FIELDS = [
   'household_head',
   'primary_contact',
   'notes',
+  'photo_file',
 ]
 
 const MEMBER_FIELDS = [

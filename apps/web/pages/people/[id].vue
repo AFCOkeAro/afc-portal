@@ -45,6 +45,33 @@ function formatDate(value: string | null | undefined): string {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString()
 }
 
+const photoUrl = computed(() =>
+  person.value?.photo_file ? `/api/people/${person.value.id}/photo` : null,
+)
+
+const photoInput = ref<HTMLInputElement | null>(null)
+const photoSaving = ref(false)
+
+async function uploadPhoto(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement
+  const picked = input.files?.[0] ?? null
+  input.value = ''
+  if (!picked || !person.value) return
+  photoSaving.value = true
+  actionError.value = ''
+  try {
+    const form = new FormData()
+    form.append('photo', picked)
+    await api.post(`/api/people/${person.value.id}/photo`, form)
+    await refresh()
+  } catch (cause) {
+    actionError.value =
+      (cause as { message?: string }).message ?? 'Could not upload the photo'
+  } finally {
+    photoSaving.value = false
+  }
+}
+
 const attendanceItems = computed(
   () => person.value?.timeline.filter((item) => item.kind === 'attendance') ?? [],
 )
@@ -166,6 +193,41 @@ async function toggleStatus(): Promise<void> {
       />
 
       <SectionNav :sections="sections" />
+
+      <UCard class="mb-6">
+        <div class="flex flex-wrap items-center gap-4">
+          <ProfileAvatar :name="displayName" :photo-url="photoUrl" size="lg" />
+          <div class="min-w-0 flex-1">
+            <h2 class="truncate text-xl font-semibold">{{ displayName }}</h2>
+            <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
+              {{ person.membership_status.replace(/_/g, ' ') }} ·
+              {{ person.branch_name || 'No branch' }}
+            </p>
+            <div class="mt-2 space-y-0.5 text-sm text-gray-600 dark:text-gray-300">
+              <p v-if="person.phone">{{ person.phone }}</p>
+              <p v-if="person.email" class="break-all">{{ person.email }}</p>
+            </div>
+          </div>
+          <PermissionGate :collection="COLLECTIONS.people" action="update">
+            <input
+              ref="photoInput"
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              class="hidden"
+              aria-label="Upload profile photo"
+              @change="uploadPhoto"
+            />
+            <UButton
+              label="Upload photo"
+              icon="i-lucide-camera"
+              color="neutral"
+              variant="outline"
+              :loading="photoSaving"
+              @click="photoInput?.click()"
+            />
+          </PermissionGate>
+        </div>
+      </UCard>
 
       <section id="overview" class="scroll-mt-28">
         <h2 class="sr-only" tabindex="-1">Overview</h2>
