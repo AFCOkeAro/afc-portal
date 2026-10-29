@@ -22,6 +22,8 @@ const codeOf = (rel) =>
     .replace(/\/\/.*/g, '')
 
 const NAV = 'apps/web/utils/navigation.ts'
+// AFC-898: the pipeline/report menu entries merged into tabs on this hub.
+const MARRIAGE_HUB = 'apps/web/pages/marriage/index.vue'
 
 function groupOf(src, to) {
   // Group headers also carry `to:` — take the item entry (the one whose
@@ -47,11 +49,15 @@ describe('AFC-838 office sections', () => {
     assert.match(src, /key: 'finance'/)
   })
 
-  it('marriage entries live under Family', () => {
+  it('marriage is a single entry under Family (AFC-898 merge)', () => {
     const src = codeOf(NAV)
     assert.equal(groupOf(src, '/marriage'), 'family')
-    assert.equal(groupOf(src, '/marriage-cases'), 'family')
-    assert.equal(groupOf(src, '/marriage-cases/report'), 'family')
+    // Matters, pipeline and report are tabs on /marriage now — the separate
+    // pipeline/report menu entries are gone; their routes stay as deep-link
+    // redirects into the tabs.
+    assert.doesNotMatch(src, /label: 'Marriage pipeline'/)
+    assert.doesNotMatch(src, /label: 'Marriage report'/)
+    assert.doesNotMatch(src, /to: '\/marriage-cases'/)
   })
 
   it('monetary entries live under Finance', () => {
@@ -68,7 +74,15 @@ describe('AFC-838 office sections', () => {
   it('capability gates travel with their entries', () => {
     const src = codeOf(NAV)
     assert.match(src, /requires: \['marriage_matters', 'read'\]/)
-    assert.match(src, /requires: \['marriage_cases', 'read'\]/)
+    // AFC-898: the pipeline/report menu entries merged into /marriage tabs,
+    // so the marriage_cases read gate travels with the tabs (same holders as
+    // marriageMatters per the role matrix — whoever could see an item still
+    // can).
+    assert.match(
+      codeOf(MARRIAGE_HUB),
+      /can\(COLLECTIONS\.marriageCases/,
+      'marriage_cases read gate on the hub tabs',
+    )
     assert.match(src, /requires: \['branch_financial_records', 'read'\]/)
     assert.match(src, /requires: \['transfers', 'read'\]/)
   })

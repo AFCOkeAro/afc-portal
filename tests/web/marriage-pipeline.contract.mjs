@@ -48,7 +48,9 @@ const ROUTES = {
   member: 'apps/web/server/api/member/marriage-cases.get.ts',
 }
 const PAGES = {
-  list: 'apps/web/pages/marriage-cases/index.vue',
+  // AFC-898: the pipeline surface moved into the Pipeline tab of the merged
+  // /marriage page; /marriage-cases/index.vue is a deep-link redirect stub.
+  list: 'apps/web/pages/marriage/index.vue',
   detail: 'apps/web/pages/marriage-cases/[id].vue',
 }
 

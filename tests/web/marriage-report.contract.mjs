@@ -29,8 +29,10 @@ const codeOf = (rel) =>
     .replace(/\/\/.*/g, '')
 
 const ROUTE = 'apps/web/server/api/marriage-cases/report.get.ts'
-const PAGE = 'apps/web/pages/marriage-cases/report.vue'
-const INDEX_PAGE = 'apps/web/pages/marriage-cases/index.vue'
+// AFC-898: the report surface moved into the Report tab of the merged
+// /marriage page; the old report route is a deep-link redirect stub.
+const PAGE = 'apps/web/pages/marriage/index.vue'
+const REDIRECT_PAGE = 'apps/web/pages/marriage-cases/report.vue'
 
 describe('marriage report — conducted filter with scoped reads', () => {
   it('lists only reported cases behind the marriage_cases read gate', () => {
@@ -52,8 +54,16 @@ describe('marriage report — conducted filter with scoped reads', () => {
 
   it('strips restricted fields per the shared matrix (policy withholds, portal strips)', () => {
     const src = codeOf(ROUTE)
-    assert.match(src, /visibleFields\(scope, 'marriage_cases'/, 'field projection via matrix')
-    assert.match(src, /stripHiddenMany\(scope, 'marriage_cases'/, 'rows stripped via matrix')
+    assert.match(
+      src,
+      /visibleFields\(scope, 'marriage_cases'/,
+      'field projection via matrix',
+    )
+    assert.match(
+      src,
+      /stripHiddenMany\(scope, 'marriage_cases'/,
+      'rows stripped via matrix',
+    )
   })
 })
 
@@ -99,17 +109,27 @@ describe('marriage report — conducted-marriage columns', () => {
     assert.match(text, /Presentation photo/, 'presentation photo column named')
   })
 
-  it('the pipeline index links to the report', () => {
-    const text = read(INDEX_PAGE)
-    assert.match(text, /marriage-cases\/report/, 'index links to the report page')
+  it('the old report route redirects into the merged Report tab', () => {
+    const text = read(REDIRECT_PAGE)
+    assert.match(text, /navigateTo/, 'old report route redirects')
+    assert.match(text, /path: '\/marriage'/, 'redirect lands on the merged page')
+    assert.match(text, /tab: 'report'/, 'redirect pre-selects the Report tab')
   })
 })
 
 describe('marriage report — failure shape and language hygiene', () => {
   it('names the failure shape, never a bare 500', () => {
     const src = read(ROUTE)
-    assert.match(src, /code: 'pending_migration_0035'/, 'missing store names migration 0035')
-    assert.doesNotMatch(codeOf(ROUTE), /throw new Error\(/, 'no bare Error (h3 renders 500)')
+    assert.match(
+      src,
+      /code: 'pending_migration_0035'/,
+      'missing store names migration 0035',
+    )
+    assert.doesNotMatch(
+      codeOf(ROUTE),
+      /throw new Error\(/,
+      'no bare Error (h3 renders 500)',
+    )
     const text = read(PAGE)
     assert.match(text, /Could not load the report/, 'page explains report failures')
   })

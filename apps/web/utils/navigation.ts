@@ -136,30 +136,16 @@ export const NAVIGATION: readonly NavigationItem[] = [
     inSidebar: true,
   },
   {
+    // Single Marriage section (AFC-898): matters, the pipeline and the
+    // conducted report are one subject with tabs on /marriage
+    // (?tab=matters|pipeline|report). The old /marriage-cases and
+    // /marriage-cases/report routes stay as deep-link redirects into their
+    // tab. marriage_cases readers reach the pipeline/report tabs through
+    // this entry; the tabs gate themselves per collection.
     label: 'Marriage',
     to: '/marriage',
     icon: 'i-lucide-heart',
     requires: ['marriage_matters', 'read'],
-    group: 'family',
-    inSidebar: true,
-  },
-  {
-    // Pipeline surface (AFC-674 scopes B-F + report): the index links to
-    // the conducted-marriages report, so one entry covers both.
-    label: 'Marriage pipeline',
-    to: '/marriage-cases',
-    icon: 'i-lucide-heart-handshake',
-    requires: ['marriage_cases', 'read'],
-    group: 'family',
-    inSidebar: true,
-  },
-  {
-    // AFC-822: the conducted-marriages report; previously reachable only
-    // from inside the pipeline page.
-    label: 'Marriage report',
-    to: '/marriage-cases/report',
-    icon: 'i-lucide-scroll-text',
-    requires: ['marriage_cases', 'read'],
     group: 'family',
     inSidebar: true,
   },
