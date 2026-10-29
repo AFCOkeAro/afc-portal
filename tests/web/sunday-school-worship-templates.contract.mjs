@@ -47,6 +47,9 @@ const DETAIL_ROUTE = 'apps/web/server/api/sunday-school/[id].get.ts'
 const LIST_PAGE = 'apps/web/pages/sunday-school/index.vue'
 const DETAIL_PAGE = 'apps/web/pages/sunday-school/[id].vue'
 const TEMPLATES_PAGE = 'apps/web/pages/services/templates.vue'
+const TEMPLATES_ROUTE = 'apps/web/server/api/services/templates.get.ts'
+const SERVICE_DETAIL_ROUTE = 'apps/web/server/api/services/[id].get.ts'
+const SERVICE_PATCH_ROUTE = 'apps/web/server/api/services/[id].patch.ts'
 const NAV = 'apps/web/utils/navigation.ts'
 
 const REQUIRED_TEMPLATES = [
@@ -181,5 +184,29 @@ describe('AFC-870 — pages reuse searchable selects and permission gates', () =
       /to:\s*'\/services\/templates'[\s\S]{0,200}sunday_services/,
       'Worship templates entry requires the service read grant',
     )
+  })
+
+  it('templates API serves the in-code catalogue under the service read grant', async () => {
+    const src = codeOf(TEMPLATES_ROUTE)
+    assert.match(src, /requireCan\(scope,\s*'sunday_services',\s*'read'\)/)
+    assert.match(src, /WORSHIP_TEMPLATES/, 'catalogue comes from the shared module')
+    assert.match(src, /worshipTemplateDuration/, 'derived total minutes are served')
+    assert.doesNotMatch(src, /listItems|createItem|updateItem|deleteItem/, 'no store reads or writes')
+    const mod = await import(
+      pathToFileURL(path.join(root, SHARED)).href
+    )
+    assert.equal(mod.WORSHIP_TEMPLATES.length, 10, 'API catalogue is the ten templates')
+  })
+
+  it('service detail routes reject a non-UUID id before the first store read', () => {
+    for (const route of [SERVICE_DETAIL_ROUTE, SERVICE_PATCH_ROUTE]) {
+      const src = codeOf(route)
+      assert.match(src, /assertUuidParam/, `${route} guards the :id param`)
+      const guardAt = src.indexOf('assertUuidParam(')
+      const reads = [src.indexOf('findScopedItem('), src.indexOf('findScopedItem<')]
+        .filter((at) => at !== -1)
+      assert.ok(reads.length > 0, `${route} reads through findScopedItem`)
+      assert.ok(guardAt !== -1 && guardAt < Math.min(...reads), `${route} guards before reading`)
+    }
   })
 })
