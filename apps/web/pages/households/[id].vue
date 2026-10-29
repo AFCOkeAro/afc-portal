@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { COLLECTIONS } from '@afc/shared'
-import type { BranchSummary, HouseholdDetail, Paginated, PersonRow } from '~/types/portal'
+import type {
+  BranchSummary,
+  HouseholdDetail,
+  HouseholdMemberRow,
+  Paginated,
+  PersonRow,
+} from '~/types/portal'
 
 definePageMeta({ middleware: 'staff' })
 
@@ -39,11 +45,24 @@ const memberIds = computed(
 const linkSearch = ref('')
 const linkResults = ref<PersonRow[]>([])
 const linkPending = ref(false)
+const linkSelected = ref<string | undefined>(undefined)
 let linkTimer: ReturnType<typeof setTimeout> | undefined
-watch(linkSearch, (value: string) => {
+
+const linkOptions = computed(() =>
+  linkResults.value.map((person: PersonRow) => ({
+    label:
+      person.preferred_name ||
+      [person.first_name, person.last_name].filter(Boolean).join(' ') ||
+      'Unnamed person',
+    value: person.id,
+  })),
+)
+
+function onLinkSearchTerm(term: string): void {
+  linkSearch.value = term
   clearTimeout(linkTimer)
-  linkTimer = setTimeout(() => void searchPeople(value.trim()), 300)
-})
+  linkTimer = setTimeout(() => void searchPeople(term.trim()), 250)
+}
 
 async function searchPeople(term: string): Promise<void> {
   linkResults.value = []
@@ -68,11 +87,14 @@ async function linkMember(personId: string): Promise<void> {
     await api.post(`/api/households/${householdId}/members`, { person: personId })
     showLink.value = false
     linkSearch.value = ''
+    linkSelected.value = undefined
     linkResults.value = []
     await refresh()
   } catch (cause) {
-    actionError.value =
-      (cause as { message?: string }).message ?? 'Could not link that member'
+    const error = cause as { message?: string; fields?: Record<string, string> }
+    actionError.value = error.message ?? 'Could not link that member'
+    const fieldMessage = error.fields?.person
+    if (fieldMessage) actionError.value = `Person: ${fieldMessage}`
   } finally {
     saving.value = false
   }
@@ -238,135 +260,300 @@ const sections = computed(() => [
         </div>
       </UCard>
 
-      <section id="overview" class="scroll-mt-28">
-        <h2 class="sr-only" tabindex="-1">Overview</h2>
-        <UCard>
-          <dl class="grid gap-4 text-sm sm:grid-cols-2">
-            <div>
-              <dt class="text-gray-500 dark:text-gray-400">Household head</dt>
-              <dd class="mt-1 font-medium">{{ household.head_name || 'Not set' }}</dd>
-            </div>
-            <div>
-              <dt class="text-gray-500 dark:text-gray-400">Wedding date</dt>
-              <dd class="mt-1">{{ formatDate(household.wedding_date) }}</dd>
-            </div>
-          </dl>
-        </UCard>
-      </section>
-
-      <section id="members" class="mt-8 scroll-mt-28">
-        <UCard>
-          <template #header>
-            <div class="flex items-center justify-between">
-              <h2 class="text-base font-semibold" tabindex="-1">Members</h2>
-              <UButton
-                v-if="canEdit"
-                size="sm"
-                icon="i-lucide-user-plus"
-                label="Link member"
-                @click="showLink = true"
+      <!-- ChurchCRM Family Profile parity: main column (members + key
+        people + timeline) with a right rail (status / phone / properties).
+        Every field renders only where data exists; scoping is unchanged. -->
+      <div class="grid gap-8 lg:grid-cols-3">
+        <div class="space-y-8 lg:col-span-2">
+          <section id="overview" class="scroll-mt-28">
+            <h2 class="sr-only" tabindex="-1">Overview</h2>
+            <UCard>
+              <template #header>
+                <h2 class="text-base font-semibold" tabindex="-1">Key people</h2>
+              </template>
+              <EmptyState
+                v-if="household.members.length === 0"
+                title="No key people yet"
+                description="Link people into this household to name the head and household roles."
               />
-            </div>
-          </template>
-          <EmptyState
-            v-if="household.members.length === 0"
-            title="No members linked yet"
-            description="Link people into this household. Linking writes people.household, so it needs both household and person edit rights."
-          />
-          <ul v-else class="divide-y divide-gray-100 dark:divide-gray-800">
-            <li
-              v-for="member in household.members"
-              :key="member.id"
-              class="flex items-center justify-between gap-3 py-3"
-            >
-              <div class="flex min-w-0 items-center gap-3">
-                <ProfileAvatar :name="member.display_name" size="sm" />
-                <div class="min-w-0">
-                  <NuxtLink
-                    :to="`/people/${member.id}`"
-                    class="font-medium text-gray-900 hover:text-primary-600 dark:text-white"
+              <table v-else class="w-full text-sm">
+                <caption class="sr-only">
+                  Key people in this family
+                </caption>
+                <thead>
+                  <tr
+                    class="border-b border-gray-100 text-left text-xs text-gray-500 dark:border-gray-800 dark:text-gray-400"
                   >
-                    {{ member.display_name }}
-                  </NuxtLink>
-                  <p class="text-xs text-gray-500 dark:text-gray-400">
-                    {{ member.household_role?.replace(/_/g, ' ') || 'member' }} ·
-                    {{ member.membership_status.replace(/_/g, ' ') }}
-                    <span v-if="member.is_head"> · household head</span>
-                    <span v-if="member.is_minor"> · minor</span>
-                  </p>
-                </div>
-              </div>
-              <div v-if="canEdit" class="flex shrink-0 items-center gap-1">
-                <UButton
-                  v-if="!member.is_head"
-                  color="neutral"
-                  variant="ghost"
-                  size="xs"
-                  label="Make head"
-                  :disabled="saving"
-                  @click="makeHead(member.id)"
-                />
-                <UButton
-                  color="neutral"
-                  variant="ghost"
-                  size="xs"
-                  icon="i-lucide-unlink"
-                  aria-label="Unlink member"
-                  :disabled="saving"
-                  @click="unlinkMember(member.id)"
-                />
-              </div>
-            </li>
-          </ul>
-        </UCard>
-      </section>
+                    <th scope="col" class="py-2 pr-4 font-medium">Name</th>
+                    <th scope="col" class="py-2 pr-4 font-medium">Role</th>
+                    <th scope="col" class="py-2 font-medium">Status</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                  <tr
+                    v-for="member in household.members.filter(
+                      (row: HouseholdMemberRow) =>
+                        row.is_head || row.household_role === 'spouse',
+                    )"
+                    :key="member.id"
+                  >
+                    <td class="py-2 pr-4">
+                      <span class="flex items-center gap-2">
+                        <ProfileAvatar :name="member.display_name" size="sm" />
+                        <NuxtLink
+                          :to="`/people/${member.id}`"
+                          class="font-medium text-gray-900 hover:text-primary-600 dark:text-white"
+                        >
+                          {{ member.display_name }}
+                        </NuxtLink>
+                      </span>
+                      <span v-if="member.is_minor" class="ml-1 text-xs text-gray-500"
+                        >· minor</span
+                      >
+                    </td>
+                    <td class="py-2 pr-4 text-gray-600 dark:text-gray-300">
+                      {{
+                        member.is_head
+                          ? 'Household head'
+                          : member.household_role?.replace(/_/g, ' ') || 'member'
+                      }}
+                    </td>
+                    <td class="py-2 text-gray-600 dark:text-gray-300">
+                      {{ member.membership_status.replace(/_/g, ' ') }}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              <p
+                v-if="
+                  household.members.length > 0 &&
+                  household.members.filter(
+                    (row: HouseholdMemberRow) =>
+                      row.is_head || row.household_role === 'spouse',
+                  ).length === 0
+                "
+                class="mt-2 text-sm text-gray-500 dark:text-gray-400"
+              >
+                Head: {{ household.head_name || 'Not set' }} — set a head from the members
+                table.
+              </p>
+            </UCard>
+          </section>
 
-      <section id="contact" class="mt-8 scroll-mt-28">
-        <UCard>
-          <template #header>
-            <h2 class="text-base font-semibold" tabindex="-1">Contact</h2>
-          </template>
-          <dl class="grid gap-4 text-sm sm:grid-cols-2">
-            <div>
-              <dt class="text-gray-500 dark:text-gray-400">Phone</dt>
-              <dd class="mt-1">{{ household.phone || '—' }}</dd>
-            </div>
-            <div>
-              <dt class="text-gray-500 dark:text-gray-400">Branch</dt>
-              <dd class="mt-1">{{ household.branch_name || '—' }}</dd>
-            </div>
-          </dl>
-          <div
-            v-if="household.address_1 || household.address"
-            class="mt-4 border-t border-gray-100 pt-4 text-sm dark:border-gray-800"
-          >
-            <p class="text-gray-500 dark:text-gray-400">Address</p>
-            <p class="mt-1 whitespace-pre-line">
-              {{
-                [
-                  household.address_1,
-                  household.address_2,
-                  household.city,
-                  household.state,
-                  household.zip,
-                  household.country,
-                ]
-                  .filter(Boolean)
-                  .join(', ') || household.address
-              }}
+          <section id="members" class="scroll-mt-28">
+            <UCard>
+              <template #header>
+                <div class="flex items-center justify-between">
+                  <h2 class="text-base font-semibold" tabindex="-1">Family members</h2>
+                  <UButton
+                    v-if="canEdit"
+                    size="sm"
+                    icon="i-lucide-user-plus"
+                    label="Link member"
+                    @click="showLink = true"
+                  />
+                </div>
+              </template>
+              <EmptyState
+                v-if="household.members.length === 0"
+                title="No members linked yet"
+                description="Link people into this household. Linking writes people.household, so it needs both household and person edit rights."
+              />
+              <ul v-else class="divide-y divide-gray-100 dark:divide-gray-800">
+                <li
+                  v-for="member in household.members"
+                  :key="member.id"
+                  class="flex items-center justify-between gap-3 py-3"
+                >
+                  <div class="flex min-w-0 items-center gap-3">
+                    <ProfileAvatar :name="member.display_name" size="sm" />
+                    <div class="min-w-0">
+                      <NuxtLink
+                        :to="`/people/${member.id}`"
+                        class="font-medium text-gray-900 hover:text-primary-600 dark:text-white"
+                      >
+                        {{ member.display_name }}
+                      </NuxtLink>
+                      <p class="text-xs text-gray-500 dark:text-gray-400">
+                        {{ member.household_role?.replace(/_/g, ' ') || 'member' }} ·
+                        {{ member.membership_status.replace(/_/g, ' ') }}
+                        <span v-if="member.is_head"> · household head</span>
+                        <span v-if="member.is_minor"> · minor</span>
+                      </p>
+                    </div>
+                  </div>
+                  <div v-if="canEdit" class="flex shrink-0 items-center gap-1">
+                    <UButton
+                      v-if="!member.is_head"
+                      color="neutral"
+                      variant="ghost"
+                      size="xs"
+                      label="Make head"
+                      :disabled="saving"
+                      @click="makeHead(member.id)"
+                    />
+                    <UButton
+                      color="neutral"
+                      variant="ghost"
+                      size="xs"
+                      icon="i-lucide-unlink"
+                      aria-label="Unlink member"
+                      :disabled="saving"
+                      @click="unlinkMember(member.id)"
+                    />
+                  </div>
+                </li>
+              </ul>
+            </UCard>
+          </section>
+
+          <section id="contact" class="scroll-mt-28">
+            <UCard>
+              <template #header>
+                <h2 class="text-base font-semibold" tabindex="-1">
+                  Location and contact
+                </h2>
+              </template>
+              <dl class="grid gap-4 text-sm sm:grid-cols-2">
+                <div>
+                  <dt class="text-gray-500 dark:text-gray-400">Phone</dt>
+                  <dd class="mt-1">{{ household.phone || '—' }}</dd>
+                </div>
+                <div>
+                  <dt class="text-gray-500 dark:text-gray-400">Branch</dt>
+                  <dd class="mt-1">{{ household.branch_name || '—' }}</dd>
+                </div>
+              </dl>
+              <div
+                v-if="household.address_1 || household.address"
+                class="mt-4 border-t border-gray-100 pt-4 text-sm dark:border-gray-800"
+              >
+                <p class="text-gray-500 dark:text-gray-400">Address</p>
+                <p class="mt-1 whitespace-pre-line">
+                  {{
+                    [
+                      household.address_1,
+                      household.address_2,
+                      household.city,
+                      household.state,
+                      household.zip,
+                      household.country,
+                    ]
+                      .filter(Boolean)
+                      .join(', ') || household.address
+                  }}
+                </p>
+                <p
+                  v-if="household.latitude != null && household.longitude != null"
+                  class="mt-1 text-xs text-gray-500 dark:text-gray-400"
+                >
+                  Map pin: {{ household.latitude }}, {{ household.longitude }}
+                </p>
+              </div>
+              <p v-else class="mt-4 text-xs text-gray-500 dark:text-gray-400">
+                Address text only — the map pin is deferred.
+              </p>
+            </UCard>
+          </section>
+
+          <UCard>
+            <template #header>
+              <h2 class="text-base font-semibold" tabindex="-1">Timeline</h2>
+            </template>
+            <p class="text-sm text-gray-500 dark:text-gray-400">
+              Household activity lives on the person timelines — open a member above to
+              see notes, events and system entries. No household-level timeline is stored.
             </p>
-            <p
-              v-if="household.latitude != null && household.longitude != null"
-              class="mt-1 text-xs text-gray-500 dark:text-gray-400"
-            >
-              Map pin: {{ household.latitude }}, {{ household.longitude }}
-            </p>
-          </div>
-          <p v-else class="mt-4 text-xs text-gray-500 dark:text-gray-400">
-            Address text only — the map pin is deferred.
-          </p>
-        </UCard>
-      </section>
+            <ul v-if="household.members.length > 0" class="mt-3 space-y-1 text-sm">
+              <li v-for="member in household.members" :key="`timeline-${member.id}`">
+                <NuxtLink
+                  :to="`/people/${member.id}#timeline`"
+                  class="text-primary-600 hover:underline dark:text-primary-400"
+                >
+                  {{ member.display_name }} timeline
+                </NuxtLink>
+              </li>
+            </ul>
+          </UCard>
+        </div>
+
+        <aside class="space-y-6" aria-label="Household summary">
+          <UCard>
+            <template #header>
+              <h2 class="text-base font-semibold" tabindex="-1">Household</h2>
+            </template>
+            <div class="flex items-center gap-3">
+              <ProfileAvatar
+                :name="household.name || household.head_name || 'H'"
+                :photo-url="photoUrl"
+                size="md"
+              />
+              <div class="min-w-0 text-sm">
+                <p class="truncate font-medium">
+                  {{ household.name || 'Unnamed household' }}
+                </p>
+                <p class="text-gray-500 dark:text-gray-400">
+                  {{ household.member_count }} member{{
+                    household.member_count === 1 ? '' : 's'
+                  }}
+                </p>
+              </div>
+            </div>
+            <dl class="mt-4 space-y-3 text-sm">
+              <div class="flex justify-between gap-4">
+                <dt class="text-gray-500 dark:text-gray-400">Status</dt>
+                <dd><UBadge color="success" variant="subtle">active</UBadge></dd>
+              </div>
+              <div class="flex justify-between gap-4">
+                <dt class="text-gray-500 dark:text-gray-400">Phone</dt>
+                <dd>{{ household.phone || '—' }}</dd>
+              </div>
+              <div class="flex justify-between gap-4">
+                <dt class="text-gray-500 dark:text-gray-400">Head</dt>
+                <dd class="text-right">{{ household.head_name || 'Not set' }}</dd>
+              </div>
+            </dl>
+          </UCard>
+
+          <UCard>
+            <template #header>
+              <h2 class="text-base font-semibold" tabindex="-1">Properties</h2>
+            </template>
+            <dl class="space-y-3 text-sm">
+              <div class="flex justify-between gap-4">
+                <dt class="text-gray-500 dark:text-gray-400">Wedding date</dt>
+                <dd>{{ formatDate(household.wedding_date) }}</dd>
+              </div>
+              <div class="flex justify-between gap-4">
+                <dt class="text-gray-500 dark:text-gray-400">Branch</dt>
+                <dd class="text-right">{{ household.branch_name || '—' }}</dd>
+              </div>
+              <div
+                v-if="household.city || household.state || household.country"
+                class="flex justify-between gap-4"
+              >
+                <dt class="text-gray-500 dark:text-gray-400">Area</dt>
+                <dd class="text-right">
+                  {{
+                    [household.city, household.state, household.country]
+                      .filter(Boolean)
+                      .join(', ')
+                  }}
+                </dd>
+              </div>
+              <div
+                v-if="household.latitude != null && household.longitude != null"
+                class="flex justify-between gap-4"
+              >
+                <dt class="text-gray-500 dark:text-gray-400">Map pin</dt>
+                <dd class="tabular-nums">
+                  {{ household.latitude }}, {{ household.longitude }}
+                </dd>
+              </div>
+            </dl>
+          </UCard>
+        </aside>
+      </div>
 
       <HouseholdFormModal
         v-model:open="showEdit"
@@ -382,47 +569,44 @@ const sections = computed(() => [
         @update:open="showLink = $event"
       >
         <template #body>
-          <UInput
-            v-model="linkSearch"
-            icon="i-lucide-search"
-            placeholder="Type at least two letters of a name"
+          <EntitySelect
+            v-model="linkSelected"
+            :items="linkOptions"
+            placeholder="Type at least two letters of a name…"
+            search-placeholder="Type to filter people…"
+            empty-text="No matching people outside this household."
+            :loading="linkPending"
+            server-search
             aria-label="Search people to link"
+            @update:search-term="onLinkSearchTerm"
           />
-          <div v-if="linkPending" class="mt-4 flex justify-center py-4">
-            <UIcon
-              name="i-lucide-loader-circle"
-              class="size-5 animate-spin text-gray-400"
-            />
-          </div>
-          <ul
-            v-else-if="linkResults.length > 0"
-            class="mt-4 divide-y divide-gray-100 dark:divide-gray-800"
-          >
-            <li
-              v-for="person in linkResults"
-              :key="person.id"
-              class="flex items-center justify-between gap-3 py-2"
-            >
-              <span class="text-sm">
-                {{
-                  person.preferred_name ||
-                  [person.first_name, person.last_name].filter(Boolean).join(' ')
-                }}
-              </span>
-              <UButton
-                size="xs"
-                label="Link"
-                :disabled="saving"
-                @click="linkMember(person.id)"
-              />
-            </li>
-          </ul>
+          <p v-if="linkSelected" class="mt-4 text-sm text-gray-500 dark:text-gray-400">
+            Pick Link below to add the selected person to this household.
+          </p>
           <p
-            v-else-if="linkSearch.trim().length >= 2"
+            v-else-if="
+              linkSearch.trim().length >= 2 && linkResults.length === 0 && !linkPending
+            "
             class="mt-4 text-sm text-gray-500 dark:text-gray-400"
           >
             No matching people outside this household.
           </p>
+        </template>
+        <template #footer>
+          <div class="flex w-full justify-end gap-2">
+            <UButton
+              color="neutral"
+              variant="ghost"
+              label="Cancel"
+              @click="showLink = false"
+            />
+            <UButton
+              label="Link member"
+              :disabled="!linkSelected || saving"
+              :loading="saving"
+              @click="linkSelected && linkMember(linkSelected)"
+            />
+          </div>
         </template>
       </UModal>
     </template>
