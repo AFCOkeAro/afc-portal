@@ -4,6 +4,9 @@
  * One register (requester, inclusive day count stamped server-side,
  * closed type/status sets, decisions ride the same row). The menu lives
  * under Church Office; capabilities travel with the entry.
+ * AFC-896: surfaces merged — the page now lives as the Requests tab of
+ * the Time Off section; /annual-leave redirects there. Registers, math
+ * and flow unchanged.
  *
  * Run: node --test tests/web/annual-leave.contract.mjs
  */
@@ -25,7 +28,7 @@ const MIGRATION = 'services/directus/schema/migrations/20261028_0052_leave_reque
 const DOWN =
   'services/directus/schema/migrations/rollback/20261028_0052_leave_requests.down.sql'
 const NAV = 'apps/web/utils/navigation.ts'
-const PAGE = 'apps/web/pages/annual-leave.vue'
+const PAGE = 'apps/web/pages/time-off.vue'
 
 function groupOf(src, to) {
   const needle = `to: '${to}',`
@@ -64,11 +67,19 @@ describe('AFC-842 leave register', () => {
   })
 })
 
-describe('AFC-842 leave page and nav', () => {
-  it('Annual Leave lives under Church Office', () => {
+describe('AFC-842 leave page and nav (AFC-896 merged tabs)', () => {
+  it('Time Off is the single Church Office entry; Annual Leave is gone', () => {
     const src = codeOf(NAV)
-    assert.equal(groupOf(src, '/annual-leave'), 'office')
-    assert.match(src, /requires: \['leave_requests', 'read'\]/)
+    assert.equal(groupOf(src, '/time-off'), 'office')
+    assert.match(src, /requires: \['leave_balances', 'read'\]/)
+    assert.doesNotMatch(src, /label: 'Annual Leave'/)
+  })
+
+  it('the old /annual-leave route redirects to the Requests tab', () => {
+    const src = codeOf('apps/web/pages/annual-leave.vue')
+    assert.match(src, /\/time-off/)
+    assert.match(src, /requests/)
+    assert.match(src, /navigateTo/)
   })
 
   it('the page files, corrects and decides with transitions', () => {
