@@ -430,13 +430,22 @@ function formatDate(value: string | null | undefined): string {
           <template #header>
             <div class="flex items-center justify-between">
               <h2 class="text-base font-semibold" tabindex="-1">Sunday school</h2>
-              <UButton
-                to="/attendance"
-                color="neutral"
-                variant="ghost"
-                size="xs"
-                label="Sessions"
-              />
+              <div class="flex gap-1">
+                <UButton
+                  to="/sunday-school"
+                  color="neutral"
+                  variant="ghost"
+                  size="xs"
+                  label="Classes"
+                />
+                <UButton
+                  to="/attendance"
+                  color="neutral"
+                  variant="ghost"
+                  size="xs"
+                  label="Sessions"
+                />
+              </div>
             </div>
           </template>
           <dl class="grid grid-cols-2 gap-2 text-center">
@@ -468,7 +477,12 @@ function formatDate(value: string | null | undefined): string {
               class="flex items-center justify-between gap-3 rounded-lg p-2 hover:bg-gray-50 dark:hover:bg-gray-900"
             >
               <div>
-                <p class="text-sm font-medium">{{ sundayClass.class_name }}</p>
+                <NuxtLink
+                  :to="`/sunday-school/${sundayClass.id}`"
+                  class="text-sm font-medium hover:text-primary-600"
+                >
+                  {{ sundayClass.class_name }}
+                </NuxtLink>
                 <p class="text-xs text-gray-500 dark:text-gray-400">
                   {{ sundayClass.branch_name || 'Area class' }}
                 </p>
