@@ -52,6 +52,11 @@ services:
       # on the host, same as every other entry in this block.
       DIRECTUS_ADMIN_EMAIL: ${DIRECTUS_ADMIN_EMAIL:-}
       DIRECTUS_ADMIN_PASSWORD: ${DIRECTUS_ADMIN_PASSWORD:-}
+      # Legal-hold release path (AFC-243): connection string for the
+      # dedicated legal_hold_releaser role. Provisioned out of band in
+      # services/staging/.env (mode 600, git-ignored), never in the repo.
+      # Absent means POST /api/legal-holds/:id/release answers 503.
+      NUXT_LEGAL_HOLD_DATABASE_URL: ${NUXT_LEGAL_HOLD_DATABASE_URL:-}
       NITRO_HOST: 0.0.0.0
       NITRO_PORT: 3000
     expose:
