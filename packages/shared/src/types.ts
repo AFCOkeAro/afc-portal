@@ -269,6 +269,18 @@ export interface EventRecord {
   age_max: number | null
   visibility: 'public' | 'branch' | 'internal'
   status: 'draft' | 'published' | 'closed' | 'cancelled'
+  /**
+   * AFC-871 per-section marks (migration 0045). Fail-closed default
+   * `private`; the public feed serves a section only at `public`.
+   */
+  registration_visibility: 'draft' | 'private' | 'public' | 'login' | 'custom'
+  speakers_visibility: 'draft' | 'private' | 'public' | 'login' | 'custom'
+  resources_visibility: 'draft' | 'private' | 'public' | 'login' | 'custom'
+  schedule_visibility: 'draft' | 'private' | 'public' | 'login' | 'custom'
+  /** AFC-871 programme sections (jsonb arrays, staff-managed). */
+  speakers: Array<Record<string, unknown>>
+  resources: Array<Record<string, unknown>>
+  schedule: Array<Record<string, unknown>>
 }
 
 export type RegistrationStatus =
