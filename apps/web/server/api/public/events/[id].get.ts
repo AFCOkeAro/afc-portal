@@ -1,5 +1,5 @@
 import type { H3Event } from 'h3'
-import { directusFetch } from '../../../utils/directus'
+import { DirectusAuthError, directusFetch } from '../../../utils/directus'
 
 /**
  * GET /api/public/events/:id — signed-out programme detail (AFC-871 slice 2).
@@ -122,19 +122,38 @@ export default defineEventHandler(async (event: H3Event) => {
   if (!id)
     throw createError({ statusCode: 400, statusMessage: 'An event id is required' })
 
-  const row = await directusFetch<{ data: PublicEventRow[] }>(event, '/items/events', {
-    method: 'GET',
-    accessToken: publicToken,
-    query: {
-      filter: {
-        id: { _eq: id },
-        visibility: { _eq: 'public' },
-        status: { _eq: 'published' },
+  // Fail closed on a policy gap: if the public Directus role is not
+  // granted the section fields yet, Directus answers 403 and this route
+  // reports a named 503 (never a bare 500, never a partial row). The
+  // message names the store, not sign-in: this route has no session.
+  let row: PublicEventRow | null
+  try {
+    row = await directusFetch<{ data: PublicEventRow[] }>(event, '/items/events', {
+      method: 'GET',
+      accessToken: publicToken,
+      query: {
+        filter: {
+          id: { _eq: id },
+          visibility: { _eq: 'public' },
+          status: { _eq: 'published' },
+        },
+        limit: 1,
+        fields: PUBLIC_DETAIL_FIELDS,
       },
-      limit: 1,
-      fields: PUBLIC_DETAIL_FIELDS,
-    },
-  }).then((response) => response.data[0] ?? null)
+    }).then((response) => response.data[0] ?? null)
+  } catch (error) {
+    throw createError({
+      statusCode: 503,
+      statusMessage: 'The public programme store is not readable yet',
+      data: {
+        code:
+          error instanceof DirectusAuthError
+            ? 'public_programme_forbidden'
+            : 'public_programme_unavailable',
+        cause: '0059',
+      },
+    })
+  }
 
   if (!row) {
     throw createError({
