@@ -52,7 +52,9 @@ const ROUTES = {
   report: 'apps/web/server/api/marriage-cases/report.get.ts',
   member: 'apps/web/server/api/member/marriage-cases.get.ts',
 }
-const REPORT_PAGE = 'apps/web/pages/marriage-cases/report.vue'
+// AFC-898: the report surface moved into the Report tab of the merged
+// /marriage page; the old report route is a deep-link redirect stub.
+const REPORT_PAGE = 'apps/web/pages/marriage/index.vue'
 
 describe('marriage phase F — the case opens and only moves forward', () => {
   it('create opens at introduction; transition rejects non-forward moves', () => {

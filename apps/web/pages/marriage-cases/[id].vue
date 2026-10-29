@@ -194,7 +194,7 @@ onMounted(async () => {
           size="sm"
           icon="i-lucide-arrow-left"
           label="Pipeline"
-          to="/marriage-cases"
+          to="/marriage?tab=pipeline"
         />
       </template>
     </PageHeader>
