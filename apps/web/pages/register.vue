@@ -16,6 +16,14 @@ import { ApiRequestError } from '~/composables/useApi'
  * Medical and emergency fields are hidden until the registrant states an age
  * group. That mirrors the server rule and it avoids asking a parent to type a
  * child's allergies before we know the form is for a child.
+ *
+ * AFC-871 slice 2: 7-step stepper parity with the YDD register screenshots.
+ * Steps — 1 Event, 2 Name, 3 Contact, 4 Age, 5 Guardian, 6 Health & emergency,
+ * 7 Review & submit. The stepper is presentation-only: the schema validates
+ * the whole form on submit, and the server re-validates. Step order is a
+ * stated choice (spec is silent on field-to-step mapping); guardian consent
+ * stays mandatory for minors at submit regardless of which step it was shown
+ * on. Progress survives per-field edits because all steps share one `form`.
  */
 definePageMeta({ layout: 'public' })
 
@@ -106,6 +114,54 @@ const ageGroup = computed({
 const isMinor = computed(() => ageGroup.value === 'child' || ageGroup.value === 'teen')
 const showChildFields = computed(() => ageGroup.value !== 'unknown')
 
+/* AFC-871 slice 2 stepper: 1 Event · 2 Name · 3 Contact · 4 Age · 5 Guardian · 6 Health · 7 Review. */
+const STEPS = [
+  { id: 1, label: 'Event' },
+  { id: 2, label: 'Name' },
+  { id: 3, label: 'Contact' },
+  { id: 4, label: 'Age' },
+  { id: 5, label: 'Guardian' },
+  { id: 6, label: 'Health' },
+  { id: 7, label: 'Review' },
+] as const
+const step = ref(1)
+const stepError = ref('')
+
+function stepValid(next: number): boolean {
+  if (next === 2 && !form.event) {
+    stepError.value = 'Choose an event to continue.'
+    return false
+  }
+  if (
+    next === 3 &&
+    (!form.registrant_first_name.trim() || !form.registrant_last_name.trim())
+  ) {
+    stepError.value = 'Enter the first and last name to continue.'
+    return false
+  }
+  if (next === 4 && !form.email.trim()) {
+    stepError.value = 'Enter an email address to continue.'
+    return false
+  }
+  if (
+    next === 5 &&
+    form.age_group === 'unknown' &&
+    !String(form.date_of_birth ?? '').trim()
+  ) {
+    stepError.value = 'State the age group or date of birth to continue.'
+    return false
+  }
+  stepError.value = ''
+  return true
+}
+
+function goStep(next: number): void {
+  const clamped = Math.min(7, Math.max(1, next))
+  if (clamped > step.value && !stepValid(clamped)) return
+  stepError.value = ''
+  step.value = clamped
+}
+
 async function submit() {
   submitting.value = true
   errorMessage.value = null
@@ -184,19 +240,44 @@ function collectFieldErrors(error: {
     </UCard>
 
     <UCard v-else>
-      <form class="space-y-5" novalidate @submit.prevent="submit">
-        <UFormField label="Event" name="event" required :error="fieldErrors.event">
-          <EntitySelect
-            v-model="form.event"
-            name="event"
-            :items="eventOptions"
-            placeholder="Type to find your event…"
-            :loading="eventsPending"
-            class="w-full"
-          />
-        </UFormField>
+      <!-- AFC-871 slice 2 stepper -->
+      <ol aria-label="Registration steps" class="mb-5 flex flex-wrap gap-1.5">
+        <li v-for="entry in STEPS" :key="entry.id">
+          <button
+            type="button"
+            :aria-current="step === entry.id ? 'step' : undefined"
+            :class="[
+              'rounded-full px-3 py-1 text-xs font-medium',
+              step === entry.id
+                ? 'bg-primary-950 text-white'
+                : entry.id < step
+                  ? 'bg-green-100 text-green-900 dark:bg-green-900 dark:text-green-100'
+                  : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300',
+            ]"
+            @click="goStep(entry.id)"
+          >
+            {{ entry.id }} · {{ entry.label }}
+          </button>
+        </li>
+      </ol>
 
-        <div class="grid gap-4 sm:grid-cols-2">
+      <form class="space-y-5" novalidate @submit.prevent="submit">
+        <!-- Step 1: event -->
+        <div v-if="step === 1">
+          <UFormField label="Event" name="event" required :error="fieldErrors.event">
+            <EntitySelect
+              v-model="form.event"
+              name="event"
+              :items="eventOptions"
+              placeholder="Type to find your event…"
+              :loading="eventsPending"
+              class="w-full"
+            />
+          </UFormField>
+        </div>
+
+        <!-- Step 2: name -->
+        <div v-if="step === 2" class="grid gap-4 sm:grid-cols-2">
           <UFormField
             label="First name"
             name="registrant_first_name"
@@ -215,7 +296,8 @@ function collectFieldErrors(error: {
           </UFormField>
         </div>
 
-        <div class="grid gap-4 sm:grid-cols-2">
+        <!-- Step 3: contact -->
+        <div v-if="step === 3" class="grid gap-4 sm:grid-cols-2">
           <UFormField label="Email" name="email" required :error="fieldErrors.email">
             <UInput v-model="form.email" type="email" class="w-full" />
           </UFormField>
@@ -229,7 +311,8 @@ function collectFieldErrors(error: {
           </UFormField>
         </div>
 
-        <div class="grid gap-4 sm:grid-cols-2">
+        <!-- Step 4: age -->
+        <div v-if="step === 4" class="grid gap-4 sm:grid-cols-2">
           <UFormField
             label="Age group"
             name="age_group"
@@ -258,79 +341,135 @@ function collectFieldErrors(error: {
           </UFormField>
         </div>
 
-        <template v-if="isMinor">
-          <USeparator label="Guardian consent" />
-          <p class="text-sm text-gray-500 dark:text-gray-400">
-            The registrant is under 18, so a guardian has to consent and be reachable.
-          </p>
+        <!-- Step 5: guardian -->
+        <div v-if="step === 5">
+          <template v-if="isMinor || ageGroup === 'unknown'">
+            <USeparator label="Guardian consent" />
+            <p class="text-sm text-gray-500 dark:text-gray-400">
+              The registrant is under 18 (or the age is unstated), so a guardian has to
+              consent and be reachable.
+            </p>
 
-          <div class="grid gap-4 sm:grid-cols-2">
+            <div class="grid gap-4 sm:grid-cols-2">
+              <UFormField
+                label="Guardian name"
+                name="guardian_name"
+                required
+                :error="fieldErrors.guardian_name"
+              >
+                <UInput v-model="form.guardian_name" class="w-full" />
+              </UFormField>
+              <UFormField
+                label="Guardian phone"
+                name="guardian_phone"
+                :error="fieldErrors.guardian_phone"
+              >
+                <UInput v-model="form.guardian_phone" type="tel" class="w-full" />
+              </UFormField>
+            </div>
+
             <UFormField
-              label="Guardian name"
-              name="guardian_name"
-              required
-              :error="fieldErrors.guardian_name"
+              label="Guardian email"
+              name="guardian_email"
+              :error="fieldErrors.guardian_email"
             >
-              <UInput v-model="form.guardian_name" class="w-full" />
+              <UInput v-model="form.guardian_email" type="email" class="w-full" />
             </UFormField>
-            <UFormField
-              label="Guardian phone"
-              name="guardian_phone"
-              :error="fieldErrors.guardian_phone"
-            >
-              <UInput v-model="form.guardian_phone" type="tel" class="w-full" />
-            </UFormField>
-          </div>
 
-          <UFormField
-            label="Guardian email"
-            name="guardian_email"
-            :error="fieldErrors.guardian_email"
-          >
-            <UInput v-model="form.guardian_email" type="email" class="w-full" />
-          </UFormField>
-
-          <UCheckbox
-            v-model="form.guardian_consent"
-            name="guardian_consent"
-            :error="fieldErrors.guardian_consent"
-            label="I am the parent or guardian and I consent to this registration and to the church storing these details."
+            <UCheckbox
+              v-model="form.guardian_consent"
+              name="guardian_consent"
+              :error="fieldErrors.guardian_consent"
+              label="I am the parent or guardian and I consent to this registration and to the church storing these details."
+            />
+          </template>
+          <UAlert
+            v-else
+            color="success"
+            variant="subtle"
+            title="No guardian needed"
+            description="The registrant is an adult, so this step is informational. Continue to health details."
           />
-        </template>
+        </div>
 
-        <template v-if="showChildFields">
-          <USeparator label="Optional" />
+        <!-- Step 6: health & emergency -->
+        <div v-if="step === 6">
+          <template v-if="showChildFields">
+            <USeparator label="Optional" />
 
-          <UFormField label="Allergies" name="allergies" :error="fieldErrors.allergies">
-            <UTextarea v-model="form.allergies" :rows="2" class="w-full" />
-          </UFormField>
-
-          <UFormField
-            label="Medical notes"
-            name="medical_notes"
-            hint="Only church staff permitted to see this field will read it."
-            :error="fieldErrors.medical_notes"
-          >
-            <UTextarea v-model="form.medical_notes" :rows="3" class="w-full" />
-          </UFormField>
-
-          <div class="grid gap-4 sm:grid-cols-2">
-            <UFormField
-              label="Emergency contact"
-              name="emergency_contact_name"
-              :error="fieldErrors.emergency_contact_name"
-            >
-              <UInput v-model="form.emergency_contact_name" class="w-full" />
+            <UFormField label="Allergies" name="allergies" :error="fieldErrors.allergies">
+              <UTextarea v-model="form.allergies" :rows="2" class="w-full" />
             </UFormField>
+
             <UFormField
-              label="Emergency phone"
-              name="emergency_contact_phone"
-              :error="fieldErrors.emergency_contact_phone"
+              label="Medical notes"
+              name="medical_notes"
+              hint="Only church staff permitted to see this field will read it."
+              :error="fieldErrors.medical_notes"
             >
-              <UInput v-model="form.emergency_contact_phone" type="tel" class="w-full" />
+              <UTextarea v-model="form.medical_notes" :rows="3" class="w-full" />
             </UFormField>
-          </div>
-        </template>
+
+            <div class="grid gap-4 sm:grid-cols-2">
+              <UFormField
+                label="Emergency contact"
+                name="emergency_contact_name"
+                :error="fieldErrors.emergency_contact_name"
+              >
+                <UInput v-model="form.emergency_contact_name" class="w-full" />
+              </UFormField>
+              <UFormField
+                label="Emergency phone"
+                name="emergency_contact_phone"
+                :error="fieldErrors.emergency_contact_phone"
+              >
+                <UInput
+                  v-model="form.emergency_contact_phone"
+                  type="tel"
+                  class="w-full"
+                />
+              </UFormField>
+            </div>
+          </template>
+          <UAlert
+            v-else
+            color="neutral"
+            variant="subtle"
+            title="Nothing to add here"
+            description="State the age group on step 4 before giving medical or emergency details."
+          />
+        </div>
+
+        <!-- Step 7: review -->
+        <div v-if="step === 7">
+          <USeparator label="Review" />
+          <dl class="grid grid-cols-2 gap-3 text-sm">
+            <div>
+              <dt class="text-gray-500">Event</dt>
+              <dd>{{ form.event || '—' }}</dd>
+            </div>
+            <div>
+              <dt class="text-gray-500">Name</dt>
+              <dd>{{ form.registrant_first_name }} {{ form.registrant_last_name }}</dd>
+            </div>
+            <div>
+              <dt class="text-gray-500">Email</dt>
+              <dd>{{ form.email || '—' }}</dd>
+            </div>
+            <div>
+              <dt class="text-gray-500">Phone</dt>
+              <dd>{{ form.phone || '—' }}</dd>
+            </div>
+            <div>
+              <dt class="text-gray-500">Age group</dt>
+              <dd>{{ form.age_group }}</dd>
+            </div>
+            <div>
+              <dt class="text-gray-500">Guardian consent</dt>
+              <dd>{{ form.guardian_consent ? 'Yes' : 'No' }}</dd>
+            </div>
+          </dl>
+        </div>
 
         <UAlert
           v-if="errorMessage"
@@ -340,14 +479,40 @@ function collectFieldErrors(error: {
           :description="errorMessage"
           role="alert"
         />
-
-        <UButton
-          type="submit"
-          block
-          :loading="submitting"
-          label="Submit registration"
-          trailing-icon="i-lucide-arrow-right"
+        <UAlert
+          v-if="stepError"
+          color="warning"
+          variant="subtle"
+          icon="i-lucide-triangle-alert"
+          :description="stepError"
+          role="alert"
         />
+
+        <div class="flex gap-2">
+          <UButton
+            v-if="step > 1"
+            color="neutral"
+            variant="outline"
+            label="Back"
+            icon="i-lucide-arrow-left"
+            @click="goStep(step - 1)"
+          />
+          <UButton
+            v-if="step < 7"
+            block
+            label="Continue"
+            trailing-icon="i-lucide-arrow-right"
+            @click="goStep(step + 1)"
+          />
+          <UButton
+            v-else
+            type="submit"
+            block
+            :loading="submitting"
+            label="Submit registration"
+            trailing-icon="i-lucide-arrow-right"
+          />
+        </div>
       </form>
     </UCard>
   </div>

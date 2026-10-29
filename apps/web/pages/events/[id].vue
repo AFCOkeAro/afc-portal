@@ -1513,6 +1513,11 @@ watch(
             named follow-up with its own scoping decision, not a silent drop.
           </p>
         </UCard>
+
+        <!-- AFC-871 slice 2: per-section visibility + programme content. -->
+        <div v-if="canEdit && event" class="mt-4">
+          <EventSectionEditors :event="event" @refreshed="refresh" />
+        </div>
       </section>
 
       <!-- REGISTRATIONS -->
