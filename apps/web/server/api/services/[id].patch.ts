@@ -1,5 +1,6 @@
 import { sundayServiceFormSchema } from '@afc/shared'
 import {
+  assertUuidParam,
   createItem,
   findScopedItem,
   getPortalScope,
@@ -24,9 +25,7 @@ export default defineEventHandler(async (event) => {
   const scope = await getPortalScope(event)
   requireCan(scope, 'sunday_services', 'update')
 
-  const id = getRouterParam(event, 'id')
-  if (!id)
-    throw createError({ statusCode: 400, statusMessage: 'A service id is required' })
+  const id = assertUuidParam(getRouterParam(event, 'id'), 'service', 'invalid_service_id')
 
   const existing = await findScopedItem<Record<string, unknown>>(
     event,
