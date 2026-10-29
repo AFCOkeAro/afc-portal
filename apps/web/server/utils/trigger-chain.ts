@@ -42,11 +42,19 @@ export interface ChainStepInput {
   template_provider_id: string | null
   is_entry_step: boolean
   active: boolean
+  /** Worker-evaluated gate for this step; empty means the step always runs. */
+  condition: Record<string, unknown> | null
 }
 
 export interface ChainNode {
   sequence: number
   name: string
+  /** Decision question for a conditional step; null means the step always runs. */
+  condition_label: string | null
+  /** Step after YES (this step runs first); null means the workflow ends. */
+  yes_to: string | null
+  /** Step after NO (this step is skipped); null means the workflow ends. */
+  no_to: string | null
   /** Whole days waited before this node; null means event/cron-driven. */
   wait_days: number | null
   wait_label: string
@@ -214,6 +222,44 @@ export function nodeStatusFor(input: {
   return { status: 'sendable', reason: null }
 }
 
+/**
+ * Human question for a worker-evaluated condition (data-model-v4 §4.2
+ * predicates). Unknown shapes degrade to a humanised key question rather
+ * than hiding the gate — the diagram never hides config.
+ */
+export function conditionLabelFor(
+  condition: Record<string, unknown> | null | undefined,
+): string | null {
+  if (!condition || typeof condition !== 'object') return null
+  const entries = Object.entries(condition).filter(
+    (entry) => entry[1] !== null && entry[1] !== undefined && entry[1] !== false,
+  )
+  if (entries.length === 0) return null
+  const pretty = (key: string): string =>
+    key
+      .split('_')
+      .map((part) => part.slice(0, 1).toUpperCase() + part.slice(1))
+      .join(' ')
+  const labels = entries.map(([key, value]) => {
+    if (key === 'whatsapp_registered_no_activity')
+      return 'WhatsApp registered with no activity?'
+    if (key === 'consent_sms') return 'SMS consent given?'
+    if (key === 'not_opted_out') return 'Not opted out?'
+    if (key === 'has_milestone')
+      return typeof value === 'string' && value.trim() !== ''
+        ? `Milestone reached (${value.trim()})?`
+        : 'Milestone reached?'
+    if (key === 'stage_equals')
+      return typeof value === 'string' && value.trim() !== ''
+        ? `Stage equals ${value.trim()}?`
+        : 'Stage equals?'
+    if (typeof value === 'string' && value.trim() !== '')
+      return `${pretty(key)} (${value.trim()})?`
+    return `${pretty(key)}?`
+  })
+  return labels.join(' and ')
+}
+
 export function templateNoteFor(
   channel_key: string,
   approval_status: string | null,
@@ -234,7 +280,7 @@ export function templateNoteFor(
 export function buildTriggerChain(input: BuildTriggerChainInput): TriggerChain {
   const operationalEssential = input.quiet_hours_override === true
   const consent_note = consentNoteFor(input.consent_policy)
-  const nodes: ChainNode[] = input.steps.map((step) => {
+  const nodes: ChainNode[] = input.steps.map((step, index) => {
     const wait_days = waitDaysFromDelay(step.delay_type, step.delay_value)
     let scheduled_at: string | null = null
     let day_pill: string | null = null
@@ -248,6 +294,11 @@ export function buildTriggerChain(input: BuildTriggerChainInput): TriggerChain {
       day_pill = lagosDayPill(shifted)
       quiet_note = quietHoursNoteFor(raw, shifted, operationalEssential)
     }
+    const condition_label = conditionLabelFor(
+      (step.condition ?? null) as Record<string, unknown> | null,
+    )
+    const nextName =
+      index + 1 < input.steps.length ? (input.steps[index + 1]?.name ?? null) : null
     const verdict = nodeStatusFor({
       campaign_status: input.campaign_status,
       channel_key: step.channel_key,
@@ -259,6 +310,9 @@ export function buildTriggerChain(input: BuildTriggerChainInput): TriggerChain {
     return {
       sequence: step.sequence,
       name: step.name,
+      condition_label,
+      yes_to: condition_label === null ? null : nextName,
+      no_to: condition_label === null ? null : nextName,
       wait_days,
       wait_label: waitLabelFor(wait_days, step.delay_type),
       channel_key: step.channel_key,

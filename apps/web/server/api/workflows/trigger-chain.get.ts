@@ -202,6 +202,12 @@ export default defineEventHandler(async (event) => {
           : (templateById.get(templateId)?.provider_template_id ?? null),
       is_entry_step: row.is_entry_step === true,
       active: row.active !== false,
+      condition:
+        row.condition !== null &&
+        typeof row.condition === 'object' &&
+        !Array.isArray(row.condition)
+          ? (row.condition as Record<string, unknown>)
+          : null,
     }
   })
 
