@@ -20,6 +20,10 @@ export const CALENDAR_ITEM_TYPES = [
   'event',
   'programme',
   'celebration',
+  'birthday',
+  'anniversary',
+  'task',
+  'marriage',
 ] as const
 export type CalendarItemType = (typeof CALENDAR_ITEM_TYPES)[number]
 
@@ -83,6 +87,26 @@ export const CALENDAR_TYPE_META: Record<CalendarItemType, CalendarTypeMeta> = {
     pill: 'bg-pink-100 text-pink-900 dark:bg-pink-950 dark:text-pink-200',
     dot: 'bg-pink-500',
   },
+  birthday: {
+    label: 'Birthday',
+    pill: 'bg-rose-100 text-rose-900 dark:bg-rose-950 dark:text-rose-200',
+    dot: 'bg-rose-500',
+  },
+  anniversary: {
+    label: 'Anniversary',
+    pill: 'bg-orange-100 text-orange-900 dark:bg-orange-950 dark:text-orange-200',
+    dot: 'bg-orange-500',
+  },
+  task: {
+    label: 'Task',
+    pill: 'bg-cyan-100 text-cyan-900 dark:bg-cyan-950 dark:text-cyan-200',
+    dot: 'bg-cyan-500',
+  },
+  marriage: {
+    label: 'Marriage',
+    pill: 'bg-teal-100 text-teal-900 dark:bg-teal-950 dark:text-teal-200',
+    dot: 'bg-teal-500',
+  },
 }
 
 /** Pill classes for a feed type; unknown types fall back to neutral. */
@@ -99,12 +123,16 @@ export function calendarDotClass(itemType: string): string {
   return meta ? meta.dot : 'bg-gray-400'
 }
 
-/** Sort key: date, then type order (service, event, programme, celebration). */
+/** Sort key: date, then type order (service, event, programme, celebration, birthday, anniversary, task, marriage). */
 const TYPE_ORDER: Record<CalendarItemType, number> = {
   service: 0,
   event: 1,
   programme: 2,
   celebration: 3,
+  birthday: 4,
+  anniversary: 5,
+  task: 6,
+  marriage: 7,
 }
 
 /**
@@ -122,6 +150,10 @@ export function combineCalendarFeed(
     ...(parts.event ?? []),
     ...(parts.programme ?? []),
     ...(parts.celebration ?? []),
+    ...(parts.birthday ?? []),
+    ...(parts.anniversary ?? []),
+    ...(parts.task ?? []),
+    ...(parts.marriage ?? []),
   ]
   const { dateFrom, dateTo, itemType, limit } = options
   return merged

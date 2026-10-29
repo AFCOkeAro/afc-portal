@@ -202,6 +202,10 @@ export function countByType(
     event: 0,
     programme: 0,
     celebration: 0,
+    birthday: 0,
+    anniversary: 0,
+    task: 0,
+    marriage: 0,
   }
   for (const item of items) {
     if (prefix && !item.date.startsWith(prefix)) continue

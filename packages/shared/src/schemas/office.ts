@@ -704,7 +704,18 @@ export const ANNOUNCEMENT_CSV_COLUMNS = [
 export const calendarQuerySchema = listQuerySchema.extend({
   date_from: dateSchema.optional(),
   date_to: dateSchema.optional(),
-  item_type: z.enum(['service', 'event', 'programme', 'celebration']).optional(),
+  item_type: z
+    .enum([
+      'service',
+      'event',
+      'programme',
+      'celebration',
+      'birthday',
+      'anniversary',
+      'task',
+      'marriage',
+    ])
+    .optional(),
   scope_type: z.enum(['branch', 'zone', 'area']).optional(),
 })
 export type CalendarQuery = z.infer<typeof calendarQuerySchema>
