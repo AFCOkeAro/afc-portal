@@ -125,3 +125,51 @@ describe('calendar colour/year — guards unchanged (failure-shape sentinels)', 
     )
   })
 })
+
+describe('AFC-879 member dates + tasks on the staff calendar', () => {
+  it('the shared feed knows the four new categories', () => {
+    const src = read('packages/shared/src/office-feed.ts')
+    for (const type of ['birthday', 'anniversary', 'task', 'marriage']) {
+      assert.ok(src.includes(`'${type}'`), `feed type ${type}`)
+    }
+    assert.match(src, /birthday: {/, 'birthday meta')
+    assert.match(src, /anniversary: {/, 'anniversary meta')
+    assert.match(src, /task: {/, 'task meta')
+    assert.match(src, /marriage: {/, 'marriage meta')
+  })
+
+  it('the staff route projects recurring greetings and adds tasks + marriages', () => {
+    const src = codeOf(STAFF_ROUTE)
+    assert.match(src, /is_recurring/, 'reads the recurrence mark')
+    assert.match(src, /recurringDates/, 'projects month/day into the window')
+    assert.match(src, /tasks/, 'reads open tasks by due date')
+    assert.match(src, /marriage_cases/, 'reads wedding dates')
+    assert.match(src, /_nin: \['done', 'cancelled'\]/, 'terminal tasks excluded')
+  })
+
+  it('recurring greetings carry no birth year, age, or DOB', () => {
+    const src = codeOf(STAFF_ROUTE)
+    assert.doesNotMatch(src, /date_of_birth/, 'no DOB column read')
+    assert.doesNotMatch(
+      src,
+      /raw\.slice\(0, 4\)/,
+      'the register year is never stamped (projection uses the window year)',
+    )
+    assert.match(src, /slice\(5, 7\)/, 'only month/day feed the projection')
+  })
+
+  it('the checklist hides categories client-side with persistence', () => {
+    const src = codeOf(STAFF_PAGE)
+    assert.match(src, /hiddenTypes/, 'hidden-set state')
+    assert.match(src, /afc-calendar-hidden-types/, 'persisted per staff member')
+    assert.match(src, /shownRows/, 'grid follows the checklist')
+    assert.match(src, /toggleHidden/, 'checkboxes toggle')
+  })
+
+  it('the renderer colours the new categories from the same map', () => {
+    const src = codeOf(RENDERER)
+    for (const type of ['birthday', 'anniversary', 'task', 'marriage']) {
+      assert.ok(src.includes(`'${type}'`), `renderer covers ${type}`)
+    }
+  })
+})

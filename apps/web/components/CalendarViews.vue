@@ -124,9 +124,42 @@ const TYPE_META: Record<
     pill: 'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-200',
     bar: 'border-rose-500',
   },
+  birthday: {
+    label: 'Birthdays',
+    dot: 'bg-rose-500',
+    pill: 'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-200',
+    bar: 'border-rose-500',
+  },
+  anniversary: {
+    label: 'Anniversaries',
+    dot: 'bg-orange-500',
+    pill: 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-200',
+    bar: 'border-orange-500',
+  },
+  task: {
+    label: 'Tasks',
+    dot: 'bg-cyan-500',
+    pill: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-200',
+    bar: 'border-cyan-500',
+  },
+  marriage: {
+    label: 'Marriages',
+    dot: 'bg-teal-500',
+    pill: 'bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-200',
+    bar: 'border-teal-500',
+  },
 }
 
-const TYPE_ORDER = ['service', 'event', 'programme', 'celebration']
+const TYPE_ORDER = [
+  'service',
+  'event',
+  'programme',
+  'celebration',
+  'birthday',
+  'anniversary',
+  'task',
+  'marriage',
+]
 
 function typeMeta(type: string): {
   label: string
