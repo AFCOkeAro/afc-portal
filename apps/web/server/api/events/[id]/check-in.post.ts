@@ -4,10 +4,10 @@ import {
   findScopedItem,
   getPortalScope,
   listItems,
-  requireCan,
   throwStoreUnavailable,
   updateItem,
 } from '../../../utils/portal'
+import { requireEventArea } from '../../../utils/event-access'
 
 const CHECKIN_FIELDS = [
   'id',
@@ -31,11 +31,14 @@ const CHECKIN_FIELDS = [
  */
 export default defineEventHandler(async (event) => {
   const scope = await getPortalScope(event)
-  requireCan(scope, 'event_registrations', 'update')
-
   const id = getRouterParam(event, 'id')
   if (!id)
     throw createError({ statusCode: 400, statusMessage: 'An event id is required' })
+
+  await requireEventArea(event, scope, id, 'registration', {
+    collection: 'event_registrations',
+    action: 'update',
+  })
   // AFC-566: scope-gate + roster read below hit 0021 registers.
   // Unreadable store → named error, never a bare 500; the deliberate
   // check-in 400/404/409s below pass through untouched.

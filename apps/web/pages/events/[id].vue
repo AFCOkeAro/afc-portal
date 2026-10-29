@@ -1497,6 +1497,8 @@ watch(
           </UCard>
         </div>
 
+        <CollaboratorsCard :event-id="id" :can-manage="canEdit" class="mt-4" />
+
         <!-- Review item 4: reference panels we cannot fold — named, not silent. -->
         <UCard class="mt-4">
           <template #header

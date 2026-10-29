@@ -30,6 +30,8 @@ export const COLLECTIONS = {
   attendanceRecords: 'attendance_records',
   /** Public testimonies per event, public-submitted (AFC-828 phase 4). */
   eventTestimonies: 'event_testimonies',
+  /** Per-event collaborators with per-area grants (AFC-880). */
+  eventCollaborators: 'event_collaborators',
   /** Annual leave allowances per person per year (AFC-854 Time Off). */
   leaveBalances: 'leave_balances',
   /** Programme items inside a session (AFC-826 schedule builder). */

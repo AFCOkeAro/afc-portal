@@ -4,10 +4,10 @@ import {
   findScopedItem,
   getPortalScope,
   listItems,
-  requireCan,
   throwStoreUnavailable,
   throwValidation,
 } from '../../../utils/portal'
+import { requireEventArea } from '../../../utils/event-access'
 
 /**
  * POST /api/events/:id/speakers — book a speaker (AFC-843). Branch/zone
@@ -16,11 +16,14 @@ import {
  */
 export default defineEventHandler(async (event) => {
   const scope = await getPortalScope(event)
-  requireCan(scope, 'event_speakers', 'create')
-
   const id = getRouterParam(event, 'id')
   if (!id)
     throw createError({ statusCode: 400, statusMessage: 'An event id is required' })
+
+  await requireEventArea(event, scope, id, 'speakers', {
+    collection: 'event_speakers',
+    action: 'create',
+  })
   try {
     const parent = await findScopedItem<Record<string, unknown>>(
       event,

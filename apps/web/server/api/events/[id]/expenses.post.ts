@@ -9,6 +9,7 @@ import {
   throwStoreUnavailable,
   throwValidation,
 } from '../../../utils/portal'
+import { collaboratorHasArea } from '../../../utils/event-access'
 
 /**
  * POST /api/events/:id/expenses — record spend against an event (AFC-801).
@@ -22,12 +23,17 @@ import {
  */
 export default defineEventHandler(async (event) => {
   const scope = await getPortalScope(event)
+  const collaboratorEvent = getRouterParam(event, 'id')
+  const collaboratorOk = collaboratorEvent
+    ? await collaboratorHasArea(event, scope, collaboratorEvent, 'budget')
+    : false
   if (!can(scope, 'events', 'update') && !can(scope, 'event_expenses', 'create')) {
-    throw createError({
-      statusCode: 403,
-      statusMessage: 'Your role cannot record expenses on this event',
-      data: { code: 'forbidden' },
-    })
+    if (!collaboratorOk)
+      throw createError({
+        statusCode: 403,
+        statusMessage: 'Your role cannot record expenses on this event',
+        data: { code: 'forbidden' },
+      })
   }
 
   const id = getRouterParam(event, 'id')

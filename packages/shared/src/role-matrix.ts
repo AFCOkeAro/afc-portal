@@ -152,6 +152,18 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
   // Event testimonies (AFC-828 phase 4): public-submitted words, scoped
   // staff reads. Same hands as the other event registers. No finance
   // amounts, no FIELD_RESTRICTIONS entry.
+  // Event collaborators (AFC-880): delegations are managed by the same
+  // hands as the other event registers. The areas inside a row are
+  // enforced by the routes, not by the matrix.
+  [COLLECTIONS.eventCollaborators]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [ALL, 'all'],
+    branch_admin: [ALL, 'own_branch'],
+    department_leader: [CRU, 'assigned_branches'],
+    volunteer: [CU, 'own_branch'],
+    none: [NONE, 'none'],
+    zone_admin: [ALL, 'own_zone'],
+  },
   [COLLECTIONS.eventTestimonies]: {
     super_admin: [ALL, 'all'],
     area_admin: [ALL, 'all'],

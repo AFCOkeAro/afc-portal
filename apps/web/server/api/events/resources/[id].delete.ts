@@ -2,9 +2,9 @@ import {
   deleteItem,
   findScopedItem,
   getPortalScope,
-  requireCan,
   throwStoreUnavailable,
 } from '../../../utils/portal'
+import { requireEventArea } from '../../../utils/event-access'
 
 /**
  * DELETE /api/events/resources/:id — remove a resource (0054 grants
@@ -13,7 +13,6 @@ import {
  */
 export default defineEventHandler(async (event) => {
   const scope = await getPortalScope(event)
-  requireCan(scope, 'event_resources', 'delete')
 
   const id = getRouterParam(event, 'id')
   if (!id)
@@ -28,6 +27,10 @@ export default defineEventHandler(async (event) => {
     )
     await findScopedItem(event, scope, 'events', String(existing.event), {
       fields: ['id'],
+    })
+    await requireEventArea(event, scope, String(existing.event), 'resources', {
+      collection: 'event_resources',
+      action: 'delete',
     })
     await deleteItem(event, scope, 'event_resources', id)
     return { data: { deleted: true } }
