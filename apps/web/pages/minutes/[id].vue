@@ -37,6 +37,15 @@ async function addAttendee() {
 const title = computed(() => String(data.value?.data?.title ?? 'Minutes'))
 const attendees = computed(() => data.value?.attendees ?? [])
 
+// R2 (Peak-End / error recovery): the create page navigates here with
+// ?attendeesFailed=<names> when some staged attendees failed to attach.
+// The query flag is the only channel that survives the navigation.
+const attendeesWarning = computed(() => {
+  const raw = route.query.attendeesFailed
+  const text = Array.isArray(raw) ? raw.join(' | ') : String(raw ?? '')
+  return text.trim()
+})
+
 /**
  * The body is stored as Markdown and rendered through the shared XSS-safe
  * renderer: raw HTML in the source is escaped before any Markdown construct
@@ -125,6 +134,18 @@ function timeRange(row: Record<string, unknown>): string {
         <template #header>
           <h2 class="font-semibold">Attendees ({{ attendees.length }})</h2>
         </template>
+        <!-- R2: partial-attendee failure carried across the post-save
+          navigation. Rendered here because the create page unmounts. -->
+        <UAlert
+          v-if="attendeesWarning"
+          class="mb-3"
+          color="warning"
+          variant="subtle"
+          role="alert"
+          aria-live="assertive"
+          title="Minutes saved, but some attendees were not added"
+          :description="`${attendeesWarning}. Add them again below.`"
+        />
         <ul
           v-if="attendees.length > 0"
           class="divide-y divide-gray-100 text-sm dark:divide-gray-800"
@@ -191,67 +212,3 @@ function timeRange(row: Record<string, unknown>): string {
     />
   </div>
 </template>
-
-<style scoped>
-.markdown-body :deep(h1),
-.markdown-body :deep(h2),
-.markdown-body :deep(h3) {
-  font-weight: 700;
-  margin: 0.75rem 0 0.375rem;
-}
-.markdown-body :deep(h1) {
-  font-size: 1.25rem;
-}
-.markdown-body :deep(h2) {
-  font-size: 1.125rem;
-}
-.markdown-body :deep(h3) {
-  font-size: 1rem;
-}
-.markdown-body :deep(p) {
-  margin: 0.375rem 0;
-}
-.markdown-body :deep(ul),
-.markdown-body :deep(ol) {
-  margin: 0.375rem 0 0.375rem 1.25rem;
-}
-.markdown-body :deep(ul) {
-  list-style: disc;
-}
-.markdown-body :deep(ol) {
-  list-style: decimal;
-}
-.markdown-body :deep(blockquote) {
-  border-left: 3px solid var(--ui-border-accented);
-  padding-left: 0.75rem;
-  color: var(--ui-text-muted);
-  margin: 0.5rem 0;
-}
-.markdown-body :deep(table) {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 0.5rem 0;
-  font-size: 0.875rem;
-}
-.markdown-body :deep(th),
-.markdown-body :deep(td) {
-  border: 1px solid var(--ui-border);
-  padding: 0.375rem 0.625rem;
-  text-align: left;
-}
-.markdown-body :deep(th) {
-  font-weight: 600;
-}
-.markdown-body :deep(code) {
-  font-family: ui-monospace, monospace;
-  font-size: 0.875em;
-}
-.markdown-body :deep(pre) {
-  overflow-x: auto;
-  padding: 0.625rem;
-  border-radius: 0.375rem;
-}
-.markdown-body :deep(a) {
-  text-decoration: underline;
-}
-</style>

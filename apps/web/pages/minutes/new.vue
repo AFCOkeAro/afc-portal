@@ -8,6 +8,7 @@ definePageMeta({ middleware: 'staff' })
 const api = useApi()
 const { personOptions, personPending, onPersonSearch } = usePersonSearch()
 const { branchOptions, branchesPending } = useBranchOptions()
+const permissions = usePermissions()
 
 const form = ref({
   title: '',
@@ -26,6 +27,43 @@ const error = ref('')
 const fieldErrors = ref<Record<string, string>>({})
 
 const previewHtml = computed(() => renderMarkdownSafe(form.value.body))
+const isBodyEmpty = computed(() => form.value.body.trim().length === 0)
+
+// R1 (Forgiveness): loading a sample replaces the body. Keep the previous
+// body so the destructive write is undoable.
+const sampleBackup = ref('')
+const sampleNotice = ref('')
+const justSaved = ref(false)
+
+// R3 (permission usability): staging gates on update, saving gates on
+// create. A creator without update must still see the section — otherwise
+// the attendee step silently disappears.
+const canCreateMinutes = computed(() =>
+  permissions.can(COLLECTIONS.officeMinutes, 'create'),
+)
+const canUpdateMinutes = computed(() =>
+  permissions.can(COLLECTIONS.officeMinutes, 'update'),
+)
+const canStageAttendees = computed(() => canCreateMinutes.value || canUpdateMinutes.value)
+
+// R6 (dirty-navigation guard): the form holds unsaved user work. Warn on
+// route leave while dirty; skip once the save has navigated away.
+const isDirty = computed(
+  () =>
+    form.value.title.trim().length > 0 ||
+    form.value.meeting_date.trim().length > 0 ||
+    form.value.start_time.trim().length > 0 ||
+    form.value.end_time.trim().length > 0 ||
+    form.value.location.trim().length > 0 ||
+    form.value.branch.trim().length > 0 ||
+    form.value.body.trim().length > 0 ||
+    stagedAttendees.value.length > 0,
+)
+
+onBeforeRouteLeave(() => {
+  if (justSaved.value || !isDirty.value) return true
+  return window.confirm('Leave without saving these minutes? Your changes will be lost.')
+})
 
 function stageAttendee() {
   error.value = ''
@@ -51,7 +89,26 @@ function unstageAttendee(id: string) {
 
 function loadSample(sampleId: string) {
   const sample = MINUTES_SAMPLES.find((row: MinutesSample) => row.id === sampleId)
-  if (sample) form.value.body = sample.body
+  if (!sample) return
+  // R1: confirm before clobbering user-authored content, and always keep an
+  // undo copy. Cognitive lens: Forgiveness — destructive actions need undo.
+  if (!isBodyEmpty.value) {
+    const ok = window.confirm(
+      `Load the “${sample.title}” sample? This replaces the current body. You can undo right after.`,
+    )
+    if (!ok) return
+    sampleBackup.value = form.value.body
+  } else {
+    sampleBackup.value = ''
+  }
+  form.value.body = sample.body
+  sampleNotice.value = sample.title
+}
+
+function undoSampleLoad() {
+  form.value.body = sampleBackup.value
+  sampleBackup.value = ''
+  sampleNotice.value = ''
 }
 
 const editor = ref<HTMLTextAreaElement | null>(null)
@@ -137,9 +194,16 @@ async function save() {
         failed.push(row.label)
       }
     }
+    // R2 (Peak-End / error recovery): error.value set just before
+    // navigateTo never renders — the create page unmounts. Carry the
+    // partial-attendee failure across navigation as a query flag the detail
+    // page consumes and renders as a warning.
+    justSaved.value = true
     if (failed.length > 0) {
-      error.value = `Minutes saved, but these attendees could not be added: ${failed.join(', ')}. Add them again on the detail page.`
-      await navigateTo(`/minutes/${id}`)
+      await navigateTo({
+        path: `/minutes/${id}`,
+        query: { attendeesFailed: failed.join(' | ') },
+      })
       return
     }
     await navigateTo(`/minutes/${id}`)
@@ -185,11 +249,17 @@ async function save() {
           <UInput
             v-model="form.title"
             class="w-full"
+            :disabled="saving"
             placeholder="e.g. Branch council meeting"
           />
         </UFormField>
         <UFormField label="Meeting date" required :error="fieldErrors.meeting_date">
-          <UInput v-model="form.meeting_date" type="date" class="w-full" />
+          <UInput
+            v-model="form.meeting_date"
+            type="date"
+            class="w-full"
+            :disabled="saving"
+          />
         </UFormField>
         <UFormField label="Branch" :error="fieldErrors.branch">
           <EntitySelect
@@ -197,19 +267,26 @@ async function save() {
             :items="branchOptions"
             placeholder="Select branch…"
             :loading="branchesPending"
+            :disabled="saving"
             class="w-full"
           />
         </UFormField>
         <UFormField label="Start time" :error="fieldErrors.start_time">
-          <UInput v-model="form.start_time" type="time" class="w-full" />
+          <UInput
+            v-model="form.start_time"
+            type="time"
+            class="w-full"
+            :disabled="saving"
+          />
         </UFormField>
         <UFormField label="End time" :error="fieldErrors.end_time">
-          <UInput v-model="form.end_time" type="time" class="w-full" />
+          <UInput v-model="form.end_time" type="time" class="w-full" :disabled="saving" />
         </UFormField>
         <UFormField label="Location" class="sm:col-span-2" :error="fieldErrors.location">
           <UInput
             v-model="form.location"
             class="w-full"
+            :disabled="saving"
             placeholder="e.g. Anthony Village Tabernacle, Main Hall"
           />
         </UFormField>
@@ -237,108 +314,136 @@ async function save() {
             role="toolbar"
             aria-label="Markdown formatting"
           >
+            <!-- R4 (motor accessibility): sm targets + visible title tooltips.
+              xs icon buttons sit below comfortable touch size. -->
             <UButton
-              size="xs"
+              size="sm"
               color="neutral"
               variant="ghost"
               icon="i-lucide-bold"
               aria-label="Bold"
+              title="Bold"
+              :disabled="saving"
               @click="surround('**', '**')"
             />
             <UButton
-              size="xs"
+              size="sm"
               color="neutral"
               variant="ghost"
               icon="i-lucide-italic"
               aria-label="Italic"
+              title="Italic"
+              :disabled="saving"
               @click="surround('*', '*')"
             />
             <UButton
-              size="xs"
+              size="sm"
               color="neutral"
               variant="ghost"
               icon="i-lucide-underline"
               aria-label="Underline"
+              title="Underline"
+              :disabled="saving"
               @click="surround('++', '++')"
             />
             <UButton
-              size="xs"
+              size="sm"
               color="neutral"
               variant="ghost"
               icon="i-lucide-strikethrough"
               aria-label="Strikethrough"
+              title="Strikethrough"
+              :disabled="saving"
               @click="surround('~~', '~~')"
             />
             <UButton
-              size="xs"
+              size="sm"
               color="neutral"
               variant="ghost"
               icon="i-lucide-heading-1"
               aria-label="Heading 1"
+              title="Heading 1"
+              :disabled="saving"
               @click="prefixLines('# ')"
             />
             <UButton
-              size="xs"
+              size="sm"
               color="neutral"
               variant="ghost"
               icon="i-lucide-heading-2"
               aria-label="Heading 2"
+              title="Heading 2"
+              :disabled="saving"
               @click="prefixLines('## ')"
             />
             <UButton
-              size="xs"
+              size="sm"
               color="neutral"
               variant="ghost"
               icon="i-lucide-heading-3"
               aria-label="Heading 3"
+              title="Heading 3"
+              :disabled="saving"
               @click="prefixLines('### ')"
             />
             <UButton
-              size="xs"
+              size="sm"
               color="neutral"
               variant="ghost"
               icon="i-lucide-list"
               aria-label="Bulleted list"
+              title="Bulleted list"
+              :disabled="saving"
               @click="prefixLines('- ')"
             />
             <UButton
-              size="xs"
+              size="sm"
               color="neutral"
               variant="ghost"
               icon="i-lucide-list-ordered"
               aria-label="Numbered list"
+              title="Numbered list"
+              :disabled="saving"
               @click="prefixLines('1. ')"
             />
             <UButton
-              size="xs"
+              size="sm"
               color="neutral"
               variant="ghost"
               icon="i-lucide-quote"
               aria-label="Quote"
+              title="Quote"
+              :disabled="saving"
               @click="prefixLines('> ')"
             />
             <UButton
-              size="xs"
+              size="sm"
               color="neutral"
               variant="ghost"
               icon="i-lucide-code"
               aria-label="Code"
+              title="Code"
+              :disabled="saving"
               @click="surround('`', '`')"
             />
             <UButton
-              size="xs"
+              size="sm"
               color="neutral"
               variant="ghost"
               icon="i-lucide-table"
               aria-label="Table"
+              title="Table"
+              :disabled="saving"
               @click="insertTable"
             />
             <UButton
-              size="xs"
+              size="sm"
               color="neutral"
               variant="ghost"
               icon="i-lucide-link"
               aria-label="Link"
+              title="Link"
+              :disabled="saving"
               @click="insertLink"
             />
           </div>
@@ -350,6 +455,7 @@ async function save() {
             ref="editor"
             v-model="form.body"
             rows="14"
+            :disabled="saving"
             class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 font-mono text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
             placeholder="Write the minutes in Markdown — select text and use the toolbar to style it."
           />
@@ -357,11 +463,38 @@ async function save() {
             (escape-first, allowlisted tags), never from raw user HTML. -->
           <!-- eslint-disable vue/no-v-html -->
           <div
-            v-else
+            v-else-if="!isBodyEmpty"
             class="markdown-body min-h-56 rounded-md border border-gray-200 p-4 text-sm dark:border-gray-800"
             v-html="previewHtml"
           />
           <!-- eslint-enable vue/no-v-html -->
+          <!-- R5: empty-preview hint — a blank preview panel reads as broken. -->
+          <p
+            v-else
+            class="min-h-56 rounded-md border border-dashed border-gray-300 p-4 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400"
+          >
+            Nothing to preview yet — write Markdown above or load a sample below.
+          </p>
+          <!-- R1 undo: the sample load replaced body content; one tap restores it. -->
+          <UAlert
+            v-if="sampleNotice"
+            class="mt-2"
+            color="neutral"
+            variant="subtle"
+            :title="`Sample “${sampleNotice}” loaded`"
+            description="The previous body was replaced."
+          >
+            <template #actions>
+              <UButton
+                size="sm"
+                color="neutral"
+                variant="outline"
+                label="Undo"
+                icon="i-lucide-undo-2"
+                @click="undoSampleLoad"
+              />
+            </template>
+          </UAlert>
           <p v-if="fieldErrors.body" class="mt-1 text-sm text-red-600">
             {{ fieldErrors.body }}
           </p>
@@ -375,69 +508,87 @@ async function save() {
               variant="outline"
               :label="sample.title"
               :title="sample.description"
+              :disabled="saving"
               @click="loadSample(sample.id)"
             />
           </div>
         </div>
 
-        <PermissionGate :collection="COLLECTIONS.officeMinutes" action="update">
-          <div class="sm:col-span-2">
-            <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-200">
-              Attendees
-            </span>
-            <ul
-              v-if="stagedAttendees.length > 0"
-              class="mb-2 divide-y divide-gray-100 rounded-md border border-gray-200 text-sm dark:divide-gray-800 dark:border-gray-800"
+        <!-- R3: creators without update must still see this section. Staging
+          gates on update server-side would silently drop it; surfacing it
+          here with a note keeps the loss visible. Server route still owns
+          the real permission (update on office_minutes). -->
+        <div v-if="canStageAttendees" class="sm:col-span-2">
+          <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-200">
+            Attendees
+          </span>
+          <UAlert
+            v-if="!canUpdateMinutes"
+            class="mb-2"
+            color="warning"
+            variant="subtle"
+            title="Attendee attach needs update permission"
+            description="You can stage attendees, but they attach after save through an update-gated route. Any that fail will be flagged on the detail page."
+          />
+          <ul
+            v-if="stagedAttendees.length > 0"
+            class="mb-2 divide-y divide-gray-100 rounded-md border border-gray-200 text-sm dark:divide-gray-800 dark:border-gray-800"
+          >
+            <li
+              v-for="row in stagedAttendees"
+              :key="row.id"
+              class="flex items-center justify-between gap-2 px-3 py-1.5"
             >
-              <li
-                v-for="row in stagedAttendees"
-                :key="row.id"
-                class="flex items-center justify-between gap-2 px-3 py-1.5"
-              >
-                <span class="text-gray-700 dark:text-gray-200">{{ row.label }}</span>
-                <UButton
-                  size="xs"
-                  color="neutral"
-                  variant="ghost"
-                  icon="i-lucide-x"
-                  :aria-label="`Remove ${row.label}`"
-                  @click="unstageAttendee(row.id)"
-                />
-              </li>
-            </ul>
-            <div class="grid gap-3 sm:grid-cols-[1fr_auto]">
-              <EntitySelect
-                v-model="attendeePerson"
-                :items="personOptions"
-                placeholder="Type a name to search…"
-                :loading="personPending"
-                server-search
-                class="w-full"
-                aria-label="Person to add as attendee"
-                @update:search-term="onPersonSearch"
-              />
+              <span class="text-gray-700 dark:text-gray-200">{{ row.label }}</span>
               <UButton
-                label="Add attendee"
+                size="sm"
                 color="neutral"
-                variant="outline"
-                icon="i-lucide-user-plus"
-                @click="stageAttendee"
+                variant="ghost"
+                icon="i-lucide-x"
+                :aria-label="`Remove ${row.label}`"
+                :title="`Remove ${row.label}`"
+                :disabled="saving"
+                @click="unstageAttendee(row.id)"
               />
-            </div>
-            <p class="mt-1 text-xs text-gray-500">
-              People are searched from the directory — no manual IDs. Staff-user attendees
-              stay API-supported and are attached from the detail page once a scoped staff
-              directory exists.
-            </p>
+            </li>
+          </ul>
+          <div class="grid gap-3 sm:grid-cols-[1fr_auto]">
+            <EntitySelect
+              v-model="attendeePerson"
+              :items="personOptions"
+              placeholder="Type a name to search…"
+              :loading="personPending"
+              :disabled="saving"
+              server-search
+              class="w-full"
+              aria-label="Person to add as attendee"
+              @update:search-term="onPersonSearch"
+            />
+            <UButton
+              label="Add attendee"
+              color="neutral"
+              variant="outline"
+              icon="i-lucide-user-plus"
+              :disabled="saving"
+              @click="stageAttendee"
+            />
           </div>
-        </PermissionGate>
+          <p class="mt-1 text-xs text-gray-500">
+            People are searched from the directory — no manual IDs. Staff-user attendees
+            stay API-supported and are attached from the detail page once a scoped staff
+            directory exists.
+          </p>
+        </div>
       </div>
 
+      <!-- R6: save errors are announced to assistive tech. -->
       <UAlert
         v-if="error"
         class="mt-4"
         color="error"
         variant="subtle"
+        role="alert"
+        aria-live="assertive"
         title="Could not save the minutes"
         :description="error"
       />
@@ -455,67 +606,3 @@ async function save() {
     </UCard>
   </div>
 </template>
-
-<style scoped>
-.markdown-body :deep(h1),
-.markdown-body :deep(h2),
-.markdown-body :deep(h3) {
-  font-weight: 700;
-  margin: 0.75rem 0 0.375rem;
-}
-.markdown-body :deep(h1) {
-  font-size: 1.25rem;
-}
-.markdown-body :deep(h2) {
-  font-size: 1.125rem;
-}
-.markdown-body :deep(h3) {
-  font-size: 1rem;
-}
-.markdown-body :deep(p) {
-  margin: 0.375rem 0;
-}
-.markdown-body :deep(ul),
-.markdown-body :deep(ol) {
-  margin: 0.375rem 0 0.375rem 1.25rem;
-}
-.markdown-body :deep(ul) {
-  list-style: disc;
-}
-.markdown-body :deep(ol) {
-  list-style: decimal;
-}
-.markdown-body :deep(blockquote) {
-  border-left: 3px solid var(--ui-border-accented);
-  padding-left: 0.75rem;
-  color: var(--ui-text-muted);
-  margin: 0.5rem 0;
-}
-.markdown-body :deep(table) {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 0.5rem 0;
-  font-size: 0.875rem;
-}
-.markdown-body :deep(th),
-.markdown-body :deep(td) {
-  border: 1px solid var(--ui-border);
-  padding: 0.375rem 0.625rem;
-  text-align: left;
-}
-.markdown-body :deep(th) {
-  font-weight: 600;
-}
-.markdown-body :deep(code) {
-  font-family: ui-monospace, monospace;
-  font-size: 0.875em;
-}
-.markdown-body :deep(pre) {
-  overflow-x: auto;
-  padding: 0.625rem;
-  border-radius: 0.375rem;
-}
-.markdown-body :deep(a) {
-  text-decoration: underline;
-}
-</style>

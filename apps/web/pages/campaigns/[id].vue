@@ -260,9 +260,19 @@ function statusColor(status: string): 'success' | 'warning' | 'neutral' | 'error
         <h2 class="sr-only" tabindex="-1">Steps</h2>
         <UCard>
           <template #header>
-            <h2 class="text-base font-semibold" tabindex="-1">
-              Steps ({{ campaign.steps.length }})
-            </h2>
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <h2 class="text-base font-semibold" tabindex="-1">
+                Steps ({{ campaign.steps.length }})
+              </h2>
+              <UButton
+                color="neutral"
+                variant="ghost"
+                size="xs"
+                icon="i-lucide-git-branch"
+                label="Trigger-chain preview"
+                :to="`/workflows?key=${campaign.key}`"
+              />
+            </div>
           </template>
           <p
             v-if="campaign.steps.length === 0"
