@@ -1,0 +1,12 @@
+{
+  "authorAgentId": "afc-900-subagent",
+  "authorName": "Subagent AFC-900 worktree session via pct on CT102",
+  "claimedAt": "2026-10-29T22:22:18Z",
+  "doesNotClaimR2": "There is no reviews[] entry here and there will not be one from me. R2 wants a named reviewer who is not the author.",
+  "issue": "AFC-900",
+  "notClaimedPaths": "Non-compliance paths in the same packet: apps/web/pages/avs.vue tab rework moving the secretary assignment surface into a Secretaries tab beside the Outreach List tab with unchanged data paths, plus apps/web/utils/navigation.ts removing the departments-routed Secretaries entry and repointing Outreach List to /avs. These need no claim and land with the R2 verdict.",
+  "paths": ["tests/web/avs-tabs.contract.mjs", ".provenance/claims/AFC-900.json"],
+  "scopeOfTheClaim": "R1 only: authorship of the compliance-path files below. Correctness is for CI R4 and the CTO review R2.",
+  "whatTheChangeActuallyDoes": "Contract 9/9: AVS page carries Outreach List plus Secretaries tabs deep-linked through ?tab=; Outreach List tab stays the outreach_locations register with no link to /visitors; assign and unassign secretary logic unchanged on the scoped junction endpoints; nav drops the departments-routed Secretaries entry, routes Outreach List to /avs on the outreach_locations grant, and keeps Visitors, Departments and Groups on their own registers.",
+  "whatThisFileIs": "An R1 authorship claim, and nothing else. It says who wrote the compliance-path files below and on which issue. It asserts nothing about whether they are correct, and it carries no reviews[] entry."
+}

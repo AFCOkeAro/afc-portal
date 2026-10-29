@@ -262,6 +262,8 @@ export const NAVIGATION: readonly NavigationItem[] = [
   {
     // AFC-841: AVS is the outreach mission-fields surface (schools,
     // prisons, skills centres, hospitals) — not Bible Study Centres.
+    // AFC-900: the page carries Outreach List + Secretaries tabs; the
+    // Outreach List entry below resolves to the same page.
     label: 'AVS',
     to: '/avs',
     icon: 'i-lucide-school',
@@ -269,21 +271,16 @@ export const NAVIGATION: readonly NavigationItem[] = [
     group: 'outreach',
     inSidebar: true,
   },
+  // AFC-900: no standalone Secretaries entry — secretaries are the
+  // Secretaries tab inside AVS (outreach_locations register), not the
+  // departments register.
   {
-    // Secretaries sit inside the departments register.
-    label: 'Secretaries',
-    to: '/departments',
-    icon: 'i-lucide-clipboard-list',
-    requires: ['departments', 'read'],
-    group: 'outreach',
-    inSidebar: true,
-  },
-  {
-    // Outreach prospects are tracked as visitors.
+    // AFC-900: Outreach List is the visited-locations register on the AVS
+    // page — not the /visitors newcomer route, which stays owned by Welfare.
     label: 'Outreach List',
-    to: '/visitors',
+    to: '/avs',
     icon: 'i-lucide-list-plus',
-    requires: ['visitors', 'read'],
+    requires: ['outreach_locations', 'read'],
     group: 'outreach',
     inSidebar: true,
   },
