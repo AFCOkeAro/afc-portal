@@ -37,6 +37,7 @@ const PERSON_FIELDS = [
   'status',
   'notes',
   'safeguarding_flag',
+  'photo_file',
 ]
 
 interface AttendanceRecordRow {
