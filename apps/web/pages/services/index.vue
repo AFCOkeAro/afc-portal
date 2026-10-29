@@ -148,6 +148,13 @@ function formatDate(value: string): string {
       description="Planned and completed services with their rosters."
     >
       <template #actions>
+        <UButton
+          to="/services/templates"
+          color="neutral"
+          variant="ghost"
+          label="Templates"
+          icon="i-lucide-list-music"
+        />
         <PermissionGate :collection="COLLECTIONS.sundayServices" action="create">
           <UButton label="Plan a service" icon="i-lucide-plus" @click="showForm = true" />
         </PermissionGate>

@@ -237,11 +237,12 @@ export const NAVIGATION: readonly NavigationItem[] = [
 
   // Worship
   {
-    // Sunday School classes are modelled as departments today.
+    // AFC-870: dedicated class pages backed by sunday_school_classes;
+    // departments stay for groups/management teams only.
     label: 'Sunday School',
-    to: '/departments',
+    to: '/sunday-school',
     icon: 'i-lucide-book-open',
-    requires: ['departments', 'read'],
+    requires: ['sunday_school_classes', 'read'],
     group: 'worship',
     inSidebar: true,
   },
@@ -350,6 +351,16 @@ export const NAVIGATION: readonly NavigationItem[] = [
     label: 'Services',
     to: '/services',
     icon: 'i-lucide-church',
+    requires: ['sunday_services', 'read'],
+    group: 'events',
+    inSidebar: true,
+  },
+  {
+    // AFC-870: in-code worship planner templates; planning reuses POST
+    // /api/services, so the same read grant reveals the entry.
+    label: 'Worship templates',
+    to: '/services/templates',
+    icon: 'i-lucide-list-music',
     requires: ['sunday_services', 'read'],
     group: 'events',
     inSidebar: true,
