@@ -145,3 +145,23 @@ describe('configure page: Rock-solid step with gates unchanged', () => {
     assert.doesNotMatch(src, /createItem/)
   })
 })
+
+describe('AFC-902 whatsapp medium (own consent lane)', () => {
+  const src = codeOf('apps/web/server/api/communications/reachable.get.ts')
+  it('counts whatsapp grants separately from SMS grants', () => {
+    assert.match(src, /grantedWhatsapp/, 'whatsapp grant set exists')
+    assert.match(src, /whatsappReachable/, 'whatsapp leg counted')
+  })
+  it('bulk whatsapp needs a whatsapp grant, never an SMS grant', () => {
+    assert.match(src, /whatsappGrant/, 'bulk whatsapp gates on its own grant')
+  })
+  it('the configure UI offers WhatsApp with a reachable badge', () => {
+    const page = codeOf('apps/web/pages/communications/new.vue')
+    assert.match(
+      page,
+      /Medium = 'email' \| 'sms' \| 'whatsapp' \| 'personal'/,
+      'medium union extended',
+    )
+    assert.match(page, /badgeFor\('whatsapp'\)/, 'whatsapp badge wired')
+  })
+})

@@ -140,15 +140,28 @@ function formatDate(value: string | null | undefined): string {
               class="hover:bg-gray-50 dark:hover:bg-gray-900/60"
             >
               <td class="px-3 py-3">
-                <NuxtLink
-                  :to="`/households/${household.id}`"
-                  class="font-medium text-gray-900 hover:text-primary-600 dark:text-white"
-                >
-                  {{ household.name || 'Unnamed household' }}
-                </NuxtLink>
-                <p class="text-xs text-gray-500 dark:text-gray-400">
-                  {{ household.phone || 'No phone' }}
-                </p>
+                <div class="flex items-center gap-2">
+                  <ProfileAvatar
+                    :name="household.name || 'Unnamed household'"
+                    :photo-url="
+                      household.photo_file
+                        ? `/api/households/${household.id}/photo`
+                        : null
+                    "
+                    size="sm"
+                  />
+                  <div class="min-w-0">
+                    <NuxtLink
+                      :to="`/households/${household.id}`"
+                      class="font-medium text-gray-900 hover:text-primary-600 dark:text-white"
+                    >
+                      {{ household.name || 'Unnamed household' }}
+                    </NuxtLink>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">
+                      {{ household.phone || 'No phone' }}
+                    </p>
+                  </div>
+                </div>
               </td>
               <td class="px-3 py-3 text-gray-600 dark:text-gray-300">
                 {{ household.branch_name || '—' }}

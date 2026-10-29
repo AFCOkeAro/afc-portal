@@ -19,6 +19,7 @@ const HOUSEHOLD_FIELDS = [
   'household_head',
   'primary_contact',
   'notes',
+  'photo_file',
 ]
 
 export interface HouseholdRow extends Household {

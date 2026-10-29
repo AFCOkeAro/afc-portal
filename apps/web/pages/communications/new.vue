@@ -43,7 +43,7 @@ const topicOptions = [
   { label: 'Youth', value: 'youth' },
 ]
 
-type Medium = 'email' | 'sms' | 'personal'
+type Medium = 'email' | 'sms' | 'whatsapp' | 'personal'
 const medium = ref<Medium>('email')
 
 type Classification = 'personal' | 'bulk'
@@ -58,6 +58,7 @@ interface ReachablePreview {
   branch: string | null
   total_in_scope: number
   sms: { reachable: number; excluded_reasons: Record<string, number> }
+  whatsapp: { reachable: number; excluded_reasons: Record<string, number> }
   email: { reachable: number; excluded_reasons: Record<string, number> }
   personal_preference: { reachable: number; via_sms: number; via_email: number }
   suppressions_verified: boolean
@@ -101,10 +102,11 @@ function badgeFor(kind: Medium): string {
   const data = preview.value.data
   if (kind === 'email') return String(data.email.reachable)
   if (kind === 'sms') return String(data.sms.reachable)
+  if (kind === 'whatsapp') return String(data.whatsapp.reachable)
   return String(data.personal_preference.reachable)
 }
 
-function excludedSummary(kind: 'email' | 'sms'): string {
+function excludedSummary(kind: 'email' | 'sms' | 'whatsapp'): string {
   const reasons = preview.value?.data[kind].excluded_reasons ?? {}
   const entries = Object.entries(reasons)
   if (entries.length === 0) return 'Everyone in scope is reachable.'
@@ -207,7 +209,7 @@ const laterError = computed(() => {
           <section aria-label="Medium">
             <h3 class="text-sm font-semibold">Medium</h3>
             <div
-              class="mt-2 grid gap-3 sm:grid-cols-3"
+              class="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
               role="radiogroup"
               aria-label="Medium"
             >
@@ -254,6 +256,29 @@ const laterError = computed(() => {
                 <p class="mt-2">
                   <UBadge color="primary" variant="subtle"
                     >Reachable Audience: {{ badgeFor('sms') }}</UBadge
+                  >
+                </p>
+              </button>
+              <button
+                type="button"
+                role="radio"
+                :aria-checked="medium === 'whatsapp'"
+                class="rounded-xl border p-4 text-center transition"
+                :class="
+                  medium === 'whatsapp'
+                    ? 'border-orange-500 ring-1 ring-orange-500'
+                    : 'border-gray-200 dark:border-gray-800'
+                "
+                @click="medium = 'whatsapp'"
+              >
+                <UIcon name="i-lucide-message-circle" class="mx-auto size-6" />
+                <p class="mt-1 font-semibold">WhatsApp</p>
+                <p class="mt-1 text-xs text-gray-500">
+                  Send a WhatsApp message to consented contacts.
+                </p>
+                <p class="mt-2">
+                  <UBadge color="primary" variant="subtle"
+                    >Reachable Audience: {{ badgeFor('whatsapp') }}</UBadge
                   >
                 </p>
               </button>
