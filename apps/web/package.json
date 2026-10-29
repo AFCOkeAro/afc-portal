@@ -18,11 +18,13 @@
     "@nuxt/ui": "3.3.7",
     "@paulmillr/qr": "^0.3.0",
     "nuxt": "3.21.11",
+    "pg": "8.23.1",
     "zod": "^3.25.76"
   },
   "devDependencies": {
     "@nuxt/eslint": "1.17.0",
     "@tailwindcss/vite": "^4.3.3",
+    "@types/pg": "^8.11.0",
     "eslint": "^10.12.0",
     "eslint-config-prettier": "^10.1.8",
     "tailwindcss": "^4.3.3",

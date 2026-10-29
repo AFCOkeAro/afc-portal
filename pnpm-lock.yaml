@@ -32,6 +32,9 @@ importers:
       nuxt:
         specifier: 3.21.11
         version: 3.21.11(@electric-sql/pglite@0.2.17)(@oxc-project/types@0.143.0)(@types/node@26.6.4)(@vue/compiler-sfc@3.5.43)(cac@7.0.0)(db0@0.3.4(@electric-sql/pglite@0.2.17))(esbuild@0.28.2)(eslint@10.12.0(jiti@2.7.0))(ioredis@5.11.1)(lightningcss@1.32.0)(magicast@0.5.5)(optionator@0.9.4)(rollup-plugin-visualizer@7.1.1(rollup@4.64.0))(rollup@4.64.0)(srvx@0.11.22)(terser@5.51.2)(typescript@5.9.3)(vite@7.3.6(@types/node@26.6.4)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.51.2)(yaml@2.9.1))(vue-tsc@2.2.12(typescript@5.9.3))(yaml@2.9.1)
+      pg:
+        specifier: 8.23.1
+        version: 8.23.1
       zod:
         specifier: ^3.25.76
         version: 3.25.76
@@ -42,6 +45,9 @@ importers:
       '@tailwindcss/vite':
         specifier: ^4.3.3
         version: 4.3.3(vite@7.3.6(@types/node@26.6.4)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.51.2)(yaml@2.9.1))
+      '@types/pg':
+        specifier: ^8.11.0
+        version: 8.23.1
       eslint:
         specifier: ^10.12.0
         version: 10.12.0(jiti@2.7.0)
@@ -1707,6 +1713,9 @@ packages:
 
   '@types/node@26.6.4':
     resolution: {integrity: sha512-ldVPDCzj7fsaGZrLB0NuHuTvJcsNasysBAqMolr/cgxrLd1xbqxIr3XJiPnHHJUCxj5sNF1vnRj9aWnrVh5Jcg==}
+
+  '@types/pg@8.23.1':
+    resolution: {integrity: sha512-fKVHpikPdg4GKks3JuLEhvwSyvwzF23hnabPy6DD8ljVbC7+6J5dQzdv4arV6jqq57djnMgs1HKBxX4P8aBI3A==}
 
   '@types/resolve@1.20.2':
     resolution: {integrity: sha512-60BCwRFOZCQhDncwQdxxeOEEkbc5dIMccYLwbxsS4TUNeVECQ/pBJ0j09mrHOl/JJvpRPGwO9SvE4nR2Nb/a4Q==}
@@ -6913,6 +6922,12 @@ snapshots:
   '@types/node@26.6.4':
     dependencies:
       undici-types: 8.9.0
+
+  '@types/pg@8.23.1':
+    dependencies:
+      '@types/node': 26.6.4
+      pg-protocol: 1.16.1
+      pg-types: 2.2.0
 
   '@types/resolve@1.20.2': {}
 

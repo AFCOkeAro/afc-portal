@@ -7,13 +7,13 @@ artefacts, approvals, run logs — for credential material, and proves each
 detector by firing it on a real designated record. The git-tree arm stays
 with AFC-251; this covers the arms that had nothing.
 
-| | |
-| --- | --- |
-| **Built** | AFC-312 (spec), rebuilt AFC-429 after the original was lost |
-| **Reviewed** | AFC-319 (SecurityEngineer, independent of the provisioning path) |
-| **Owner** | CTO — accountable for rotation when a finding is a real credential |
-| **Script** | `scripts/credential-surface-scan.mjs` (Node, no dependencies) |
-| **Schedule** | Routine *AFC-312 credential-surface scan* (`abc1261f-b914-4319-ae78-f318c56704e7`), cron `0 3 * * *` UTC, activity-gated; plus on-demand runs |
+|              |                                                                                                                                               |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Built**    | AFC-312 (spec), rebuilt AFC-429 after the original was lost                                                                                   |
+| **Reviewed** | AFC-319 (SecurityEngineer, independent of the provisioning path)                                                                              |
+| **Owner**    | CTO — accountable for rotation when a finding is a real credential                                                                            |
+| **Script**   | `scripts/credential-surface-scan.mjs` (Node, no dependencies)                                                                                 |
+| **Schedule** | Routine _AFC-312 credential-surface scan_ (`abc1261f-b914-4319-ae78-f318c56704e7`), cron `0 3 * * *` UTC, activity-gated; plus on-demand runs |
 
 ## 1. Detectors
 
@@ -23,28 +23,37 @@ measured false-positive rate. Reporting only one would either miss the
 threat model (opaque pastes) or claim zero false positives it cannot
 support.
 
-**Assignment-shape detection** (`findAssignments`, script :333; names:
-`isKeywordName` :247, `looksHighEntropy` :292, `classifyAssignment` :270).
+**Assignment-shape detection** (`findAssignments`, script :357; names:
+`isKeywordName` :247, `classifyAssignment` :293 with the `url-assignment`
+URL arm, `looksHighEntropy` :316).
 Three shapes, in order: `export NAME=value`, `NAME=value`, `name: value`.
 Per (line, name) the keyword arm fires first — a compound credential name
 (`POSTGRES_PASSWORD`, `YOUTUBE_CLIENT_SECRET`, ...) reports
-`keyword-assignment` — else the entropy arm reports `entropy-assignment`
-when the right-hand side looks generated (≥ 20 token-ish chars, not a UUID,
-Shannon ≥ 4.5 bits/char over ≥ 12 distinct characters). At most one finding
-per (line, name). The finding carries the candidate NAME only
-(`reportableKey`, :220, truncates at 128 chars); the matched value is
-classified and dropped inside the detector and never leaves it.
+`keyword-assignment` — else the URL arm reports `url-assignment` for a
+`*_DATABASE_URL` name whose value carries `scheme://...@...` with a
+non-template password side (AFC-243 F1: neither the keyword arm nor the
+entropy arm fires on a pasted connection string, and that is exactly the
+release path's `LEGAL_HOLD_DATABASE_URL` shape) — else the entropy arm
+reports `entropy-assignment` when the right-hand side looks generated
+(≥ 20 token-ish chars, not a UUID, Shannon ≥ 4.5 bits/char over
+≥ 12 distinct characters). At most one finding per (line, name). The
+finding carries the candidate NAME only (`reportableKey`, truncates at 128
+chars); the matched value is classified and dropped inside the detector and
+never leaves it.
 
 Two deliberate blind spots, stated so they read as decisions, not gaps.
 Bare generic names (`key`, `token`, `secret`, ...) fire only with a
-high-entropy right-hand side (`classifyAssignment`, :270-279) — otherwise
-every prior scan report's own `key=NAME` echoes would bury triage. And
-`SECRET=hunter2`-class short plaintext beside a bare generic is missed by
-this arm; provisioned secrets are covered exactly by the second arm.
+high-entropy right-hand side — otherwise every prior scan report's own
+`key=NAME` echoes would bury triage. And `SECRET=hunter2`-class short
+plaintext beside a bare generic is missed by this arm; provisioned secrets
+are covered exactly by the second arm. Template connection strings
+(examples, `changeme`, `<...>`/`${...}` interpolations, redaction markers,
+loopback hosts, literal USER/PASSWORD stand-ins) are not findings by design:
+triage confirmed the tree holds only that class (AFC-815).
 
-**Exact known-value detection** (`findKnownValues`, :409). Substring match
+**Exact known-value detection** (`findKnownValues`, :433). Substring match
 against values held in memory only: the scanning identity's Paperclip
-secret grants (`loadKnownValues`, :931; list :938, fetch :944), an
+secret grants (`loadKnownValues`, :955; list :962, fetch :968), an
 operator-supplied `--known-values-file`, and the synthetic demo canary
 (`demoCanary`, :169). Values shorter than 8 chars are ignored. Findings
 name surface, record, line, column only (`renderFinding`, :1110); which
@@ -91,21 +100,21 @@ operator-supplied `--known-values-file` (:931-990) and, in `--self-test`
 only, the script's own source; the only write is `--out`. There are no
 tree reads.
 
-| Surface (report spelling) | Endpoint(s) | Script |
-| --- | --- | --- |
-| `issue` (title+description, one record per issue, from the compact list) | `GET /api/companies/{id}/issues?view=compact` | :563 |
-| `comment` | `GET /api/issues/{id}/comments` | :618 |
-| `queued_comment` | `GET /api/issues/{id}/queued-comments` | :630 |
-| `document` | `GET /api/issues/{id}/documents` | :643 |
-| `document_revision` | `GET …/documents/{key}/revisions` | :651 |
-| `annotation` (+ thread comments) | `GET …/documents/{key}/annotations`, `GET …/annotations/{threadId}/comments` | :663, :671 |
-| `work_product` (title+summary) | `GET /api/issues/{id}/work-products` | :694 |
-| `attachment` (via work-product `contentPath` + issue attachments, deduped; text only, 2 MB cap, binaries noted) | `GET {contentPath}`, `GET /api/issues/{id}/attachments` | :707-744, `fetchAttachmentText` :789 |
-| `approval` | `GET /api/issues/{id}/approvals` | :747 |
-| `approval_comment` | `GET /api/approvals/{id}/comments` | :757 |
-| `skill_comment` | `GET /api/companies/{id}/skills`, `GET …/skills/{skillId}/comments` | :821, :830 |
-| `routine` (title+description) | `GET /api/companies/{id}/routines` | :851 |
-| `run_log` (exact known-value match; assignment suppressed by default, `--assignments-on-run-logs` re-enables) | `GET /api/companies/{id}/heartbeat-runs`, `GET /api/heartbeat-runs/{id}/log` | :877, :895 |
+| Surface (report spelling)                                                                                       | Endpoint(s)                                                                  | Script                               |
+| --------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------ |
+| `issue` (title+description, one record per issue, from the compact list)                                        | `GET /api/companies/{id}/issues?view=compact`                                | :563                                 |
+| `comment`                                                                                                       | `GET /api/issues/{id}/comments`                                              | :618                                 |
+| `queued_comment`                                                                                                | `GET /api/issues/{id}/queued-comments`                                       | :630                                 |
+| `document`                                                                                                      | `GET /api/issues/{id}/documents`                                             | :643                                 |
+| `document_revision`                                                                                             | `GET …/documents/{key}/revisions`                                            | :651                                 |
+| `annotation` (+ thread comments)                                                                                | `GET …/documents/{key}/annotations`, `GET …/annotations/{threadId}/comments` | :663, :671                           |
+| `work_product` (title+summary)                                                                                  | `GET /api/issues/{id}/work-products`                                         | :694                                 |
+| `attachment` (via work-product `contentPath` + issue attachments, deduped; text only, 2 MB cap, binaries noted) | `GET {contentPath}`, `GET /api/issues/{id}/attachments`                      | :707-744, `fetchAttachmentText` :789 |
+| `approval`                                                                                                      | `GET /api/issues/{id}/approvals`                                             | :747                                 |
+| `approval_comment`                                                                                              | `GET /api/approvals/{id}/comments`                                           | :757                                 |
+| `skill_comment`                                                                                                 | `GET /api/companies/{id}/skills`, `GET …/skills/{skillId}/comments`          | :821, :830                           |
+| `routine` (title+description)                                                                                   | `GET /api/companies/{id}/routines`                                           | :851                                 |
+| `run_log` (exact known-value match; assignment suppressed by default, `--assignments-on-run-logs` re-enables)   | `GET /api/companies/{id}/heartbeat-runs`, `GET /api/heartbeat-runs/{id}/log` | :877, :895                           |
 
 Company-scoped findings (`skill_comment`, `routine`, `run_log`) put a
 stable scope locator (`skill:<id>`, `routine:<id>`, `run:<id>`) in the
@@ -121,7 +130,7 @@ clean.
 - **2026-10-08 full run (prior script):** 3034 records / 175.98 MB.
   Known-value: **0** findings (clean-corpus negative control).
   Assignment: **32** unexpected over the record corpus — documentation
-  showing config *shape* (infra-spec placeholder tables, a `NUXT_STUB_AUTH`
+  showing config _shape_ (infra-spec placeholder tables, a `NUXT_STUB_AUTH`
   dev stub, `YOUTUBE_*` setup templates), triage material, not silent
   passes. Run logs then: assignment suppressed by default on the measured
   1901-hits-over-1197-runs evidence, dominated by environment metadata.
@@ -189,15 +198,16 @@ live API with a run-scoped identity); it runs inside a Paperclip agent
 run and on the routine above.
 
 ## 8. Hardening note (AFC-319 O1, owner: CTO)
+
 Any record carrying `CONTROL_MARKER` classifies `expected`, so a marker
 planted beside a real paste would keep exit 0 — the finding still prints
 with its record id, so a reader sees it. The scanner warns on every
 expected finding outside the two designated record ids
 (`DESIGNATED_CONTROL_RECORDS`, :97; `o1Warnings`, :1054) and
 `--strict-controls` turns that warning into exit 2. Recommended standing
- posture: run the scheduled scan with `--strict-controls` once the
- designated set is stable, so a novel marker placement pages instead of
- printing.
+posture: run the scheduled scan with `--strict-controls` once the
+designated set is stable, so a novel marker placement pages instead of
+printing.
 
 ## 9. Run-log hygiene (AFC-810, owner: Coder; verification: CTO)
 

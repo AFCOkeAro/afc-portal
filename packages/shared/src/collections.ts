@@ -79,6 +79,13 @@ export const COLLECTIONS = {
   welfareCaseEvents: 'welfare_case_events',
   users: 'directus_users',
   /**
+   * Retention legal holds (AFC-243). Not a navigable collection: the portal
+   * never lists holds as content. It exists in the matrix so the release
+   * route gates on a named Directus permission (`legal_holds` update) held
+   * by the DPO roles, and so the admin permission editor accepts it.
+   */
+  legalHolds: 'legal_holds',
+  /**
    * Delivery log + consent (AFC-479, data-model-v4 §4.6-§4.7, ADR-0009
    * decisions 1-2). One log for every message: `communications` is the
    * header, `communication_recipients` the per-recipient rows carrying the

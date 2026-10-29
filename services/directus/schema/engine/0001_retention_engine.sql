@@ -829,6 +829,72 @@ COMMENT ON FUNCTION retention.release_hold(uuid) IS
   'Releases a legal hold. BOTH actor and time are stamped by the database: released_at is now() and released_by is the principal retention_principals maps this session role to. The row survives: a release is history. There is no parameter for a caller to name a releaser, and a role with no provisioned principal is refused rather than recorded as unattributed.';
 
 -- ===========================================================================
+-- 6b. THE AUDITED APPLICATION RELEASE PATH. AFC-243.
+--
+-- WHAT THIS IS. The caller the revoke in section 7 waited for: the portal
+-- server route POST /api/legal-holds/:id/release resolves the authenticated
+-- user at the Directus layer (401 with no session), gates on the legal_holds
+-- update grant (super_admin + area_admin, the DPO roles that already carry
+-- hold-placing authority), and calls this function as legal_hold_releaser
+-- with the session user's id. The grant in section 7 arrives in the same
+-- commit as that route.
+--
+-- WHY p_releaser IS NOT THE ORIGINAL DEFECT. The defect AFC-208 revoked was a
+-- caller-chosen uuid arriving over the pooled application connection: any
+-- holder of the application credential could name anyone. On this path the
+-- HTTP caller names nothing -- the route ignores the request body and passes
+-- the session user's id -- and the database caller is the dedicated release
+-- identity, reached only with a credential the application tier never holds.
+-- A directus_app compromise cannot call this function (no grant: pinned empty
+-- by 64.1b and the 99.1x suite) and cannot connect as the service role (no
+-- credential), so the forged-release chain stays broken exactly as measured.
+--
+-- WHAT WOULD REOPEN IT, NAMED SO REVIEW CATCHES IT. Granting this function to
+-- directus_app, or reading the releaser from the request body in the route,
+-- restores a caller-chosen releaser on a pooled connection. Either change must
+-- fail suite 99.1x the day it lands; if it does not, the suite is what broke.
+-- ===========================================================================
+CREATE OR REPLACE FUNCTION retention.release_hold_as(
+  p_hold_id uuid,
+  p_releaser uuid
+) RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public, retention, pg_temp AS $$
+DECLARE
+BEGIN
+  -- The grant list in section 7 is the first layer; this is the second, for a
+  -- grant widened by accident. Only the dedicated release identity may call
+  -- this: the portal server connects as it with a credential directus_app
+  -- never holds, so an application-side compromise cannot reach this function
+  -- at all, and a widened grant to the application role still refuses here.
+  IF session_user <> 'legal_hold_releaser' THEN
+    RAISE EXCEPTION
+      'legal hold release refused: this path is reached only as legal_hold_releaser, not as %',
+      session_user
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+
+  -- Argument validation first, matching the convention of release_hold(uuid)
+  -- above: 22023 names what was passed wrong, 23001 is reserved for a control
+  -- refusing an operation.
+  IF p_hold_id IS NULL OR p_releaser IS NULL THEN
+    RAISE EXCEPTION 'a legal hold release must name the hold and the releaser'
+      USING ERRCODE = 'invalid_parameter_value';
+  END IF;
+
+  UPDATE legal_holds
+     SET released_by = p_releaser, released_at = now()
+   WHERE id = p_hold_id AND released_at IS NULL;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'no active legal hold % to release', p_hold_id
+      USING ERRCODE = 'invalid_parameter_value';
+  END IF;
+END $$;
+
+COMMENT ON FUNCTION retention.release_hold_as(uuid, uuid) IS
+  'Releases a legal hold on the audited application path (AFC-243). The releaser is the authenticated portal user the server route resolved at the Directus layer and carried in behind a Directus permission -- never a uuid the HTTP caller supplied, and never the pooled connection identity. Callable only as legal_hold_releaser; directus_app is refused by the grant list first and by the session check second. The row survives: a release is history.';
+
+-- ===========================================================================
 -- 7. Grants. Default deny, then the minimum.
 --
 --   retention_worker  EXECUTE on run/sync_clocks only. It holds no DELETE on
@@ -836,10 +902,16 @@ COMMENT ON FUNCTION retention.release_hold(uuid) IS
 --                     so that "the job is the only deletion path" is enforced
 --                     by the grant list rather than by discipline.
 --   directus_app      SELECT on the config and clocks, INSERT on legal_holds,
---                     EXECUTE on release_hold(uuid). No UPDATE on legal_holds: a
---                     release goes through the function because the function is
---                     what stamps the releaser from the session, and there is no
---                     parameter left to stamp it with. No DELETE anywhere.
+--                     EXECUTE on nothing. A release goes through
+--                     retention.release_hold_as(uuid, uuid), which the
+--                     application role cannot call: it is granted only to
+--                     legal_hold_releaser (section 6b). No UPDATE and no
+--                     DELETE anywhere for the application role.
+--   legal_hold_releaser
+--                     EXECUTE on release_hold_as(uuid, uuid) only. The portal
+--                     server connects as this identity with a credential the
+--                     application tier never holds; the function stamps the
+--                     releaser the server carried in from the Directus session.
 --
 --   The two-argument release_hold(uuid, uuid) is dropped above rather than
 --   revoked, because a CREATE OR REPLACE cannot change a function's identity
@@ -948,8 +1020,23 @@ GRANT EXECUTE ON FUNCTION retention.sync_clocks(timestamptz) TO retention_worker
 -- grant added here fails the suite the day it lands.
 REVOKE EXECUTE ON FUNCTION retention.release_hold(uuid) FROM directus_app;
 
+-- SHIPPED (AFC-243): the caller the paragraph above waited for now exists. It
+-- is retention.release_hold_as(uuid, uuid) (section 6b): the portal server
+-- route POST /api/legal-holds/:id/release resolves the authenticated user at
+-- the Directus layer (401 with no session), gates on the legal_holds update
+-- grant (super_admin + area_admin), and calls the function as
+-- legal_hold_releaser with the session user's id. The HTTP caller names no
+-- releaser -- the route ignores the body -- so there is no caller-chosen uuid
+-- on this path, and the pooled application connection cannot call the function
+-- at all: no grant (pinned empty by 64.1b and the 99.1x suite) and a
+-- session_user check inside that refuses it with the same 42501. The grant
+-- below arrives in the same commit as the route, as that paragraph required.
+REVOKE ALL ON FUNCTION retention.release_hold_as(uuid, uuid) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION retention.release_hold_as(uuid, uuid) FROM directus_app;
+GRANT EXECUTE ON FUNCTION retention.release_hold_as(uuid, uuid) TO legal_hold_releaser;
+
 -- USAGE on the schema is the minimum to resolve these names at all. Only the
--- two roles above get it.
+-- three roles above get it.
 --
 -- THIS GRANT ALSO CONVERGES, and it is the second silent-repair site. Revoking
 -- USAGE from either role here leaves a cluster where every catalog check reads
@@ -969,7 +1056,7 @@ DECLARE
   v_missing text;
 BEGIN
   SELECT string_agg(r.rolname, ', ' ORDER BY r.rolname) INTO v_missing
-    FROM unnest(ARRAY['retention_worker','directus_app']) AS want(rolname)
+    FROM unnest(ARRAY['retention_worker','directus_app','legal_hold_releaser']) AS want(rolname)
     JOIN pg_roles r ON r.rolname = want.rolname
    WHERE NOT has_schema_privilege(r.oid, 'retention', 'USAGE');
 
@@ -982,7 +1069,7 @@ BEGIN
 END
 $$;
 
-GRANT USAGE ON SCHEMA retention TO retention_worker, directus_app;
+GRANT USAGE ON SCHEMA retention TO retention_worker, directus_app, legal_hold_releaser;
 
 -- Directus may read the schedule so an operator can answer a data subject's
 -- question about it. The date is not a secret; the fact that we cannot honour

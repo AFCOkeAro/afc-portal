@@ -339,6 +339,21 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     none: [NONE, 'none'],
     zone_admin: [R, 'own_zone'],
   },
+  // Legal-hold release (AFC-243). DPO function, not an admin-everything
+  // grant: super_admin + area_admin hold update (release) because those are
+  // the roles that already carry hold-placing authority. Every other role
+  // holds nothing here, so requireCan(scope, 'legal_holds', 'update') admits
+  // exactly the DPO seats. The Directus policy must mirror this: update on
+  // legal_holds for the corresponding Directus roles, and no broader grant.
+  [COLLECTIONS.legalHolds]: {
+    super_admin: [U, 'all', 'DPO release authority'],
+    area_admin: [U, 'all', 'DPO release authority'],
+    branch_admin: [NONE, 'none'],
+    department_leader: [NONE, 'none'],
+    volunteer: [NONE, 'none'],
+    none: [NONE, 'none'],
+    zone_admin: [NONE, 'none'],
+  },
   [COLLECTIONS.users]: {
     super_admin: [ALL, 'all'],
     area_admin: [NONE, 'none'],
