@@ -46,8 +46,14 @@ BEGIN
       ('directus_migrator', 'NOLOGIN'),  -- owns every table; SET ROLE only
       ('directus_app',      'LOGIN'),    -- the one identity Directus uses
       ('retention_worker',  'NOLOGIN'),  -- sole erasure executor; holds no DELETE
-      ('retention_job',     'LOGIN')     -- the one login that may reach the worker;
+      ('retention_job',     'LOGIN'),    -- the one login that may reach the worker;
                                          -- rolvaliduntil deliberately NOT set, see 4.1 below
+      ('legal_hold_releaser', 'LOGIN')  -- AFC-243: the one login that may release a
+                                         -- legal hold via retention.release_hold_as. The
+                                         -- portal server connects as it, never as
+                                         -- directus_app, so an application-side compromise
+                                         -- cannot forge a release. Password provisioned
+                                         -- out of band by the cluster owner, never in repo
     ) AS t(name, login)
   LOOP
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = v_rec.name) THEN
@@ -113,6 +119,13 @@ $$;
 -- durations in this file, so the retention-literal gate stays green: the
 -- intervals live in the inventory, never here.
 ALTER ROLE retention_job WITH CONNECTION LIMIT 1;
+
+-- AFC-243: one release path, one session. A legal-hold release is a rare DPO
+-- action, not a pooled workload: a second concurrent session is either a second
+-- operator (who should wait for the first release to land and re-read the hold)
+-- or a session nobody expects. Same rationale as retention_job above (AFC-244
+-- 4.2): a refused second connection is loud, a silent extra session is not.
+ALTER ROLE legal_hold_releaser WITH CONNECTION LIMIT 1;
 
 -- The application role reads and writes and creates nothing. PostgreSQL 15+
 -- already gives PUBLIC no CREATE on the public schema; the migrator is granted
@@ -231,7 +244,7 @@ CREATE SCHEMA IF NOT EXISTS retention AUTHORIZATION directus_migrator;
 REVOKE ALL ON SCHEMA retention FROM PUBLIC;
 
 -- Belt and braces: assert the boundary this directory exists to protect. If any
--- of these four has picked up cluster-level authority, this file fails rather
+-- of these five has picked up cluster-level authority, this file fails rather
 -- than proceeding, because every migration runs under one of them.
 DO $$
 DECLARE
@@ -240,7 +253,7 @@ DECLARE
 BEGIN
   SELECT string_agg(rolname, ', ') INTO v_bad
     FROM pg_roles
-   WHERE rolname IN ('directus_migrator', 'directus_app', 'retention_worker', 'retention_job')
+   WHERE rolname IN ('directus_migrator', 'directus_app', 'retention_worker', 'retention_job', 'legal_hold_releaser')
      AND (rolsuper OR rolcreaterole OR rolcreatedb OR rolreplication OR rolbypassrls);
 
   IF v_bad IS NOT NULL THEN
@@ -299,8 +312,8 @@ BEGIN
   -- whose mutual exclusion is asserted rather than proven, or a session nobody
   -- expects, and neither should be able to arrive without a deploy failing.
   --
-  -- Only retention_job is asserted, and that is deliberate. The other three
-  -- keep the server default on purpose (see the ALTER ROLE above): directus_app
+  -- retention_job and legal_hold_releaser are asserted, and that is deliberate.
+  -- The other three keep the server default on purpose (see the ALTER ROLE above): directus_app
   -- pools connections as the application tier, and the two NOLOGIN roles cannot
   -- open one at all. Pinning their defaults here would convert a legitimate
   -- operational change into a failed deploy, and asserting a default is not the
@@ -317,6 +330,24 @@ BEGIN
       'section 4.2), not a server default, so drift here is an unreviewed '
       'change to the erasure boundary. Run: '
       'ALTER ROLE retention_job WITH CONNECTION LIMIT 1',
+      v_connlimit
+      USING ERRCODE = 'restrict_violation';
+  END IF;
+
+  -- AFC-243. The release path is a rare DPO action: one session, like the
+  -- erasure scheduler above. A widened limit here is either two operators
+  -- releasing against the same hold without re-reading it, or a session nobody
+  -- expects -- neither may arrive without a deploy failing loudly.
+  SELECT rolconnlimit INTO v_connlimit
+    FROM pg_roles
+   WHERE rolname = 'legal_hold_releaser';
+
+  IF v_connlimit IS DISTINCT FROM 1 THEN
+    RAISE EXCEPTION
+      'legal_hold_releaser has rolconnlimit %, and it must be 1: one release '
+      'path, one session. A second concurrent release session must fail '
+      'loudly instead of being invisible. Run: '
+      'ALTER ROLE legal_hold_releaser WITH CONNECTION LIMIT 1',
       v_connlimit
       USING ERRCODE = 'restrict_violation';
   END IF;

@@ -4,7 +4,7 @@
 **Supersedes:** nothing. **Extends:** [ADR-0004](ADR-0004-erasure-capability-is-a-membership-not-a-login.md), [ADR-0003](ADR-0003-control-suite-real-engine.md)
 **Origin:** [AFC-206](/AFC/issues/AFC-206) security review of F2, split out as [AFC-208](/AFC/issues/AFC-208).
 **Amended 2026-10-06** after [AFC-249](/AFC/issues/AFC-249) landed a competing design for the same
-function — see *Amendment* below, which changes the reasoning and not the decision. **Affects:**
+function — see _Amendment_ below, which changes the reasoning and not the decision. **Affects:**
 `services/directus/schema/engine/0001_retention_engine.sql`, `tests/db/63_retention_privileges.sql`,
 `tests/db/64_retention_worker_surface.sql`
 
@@ -16,17 +16,17 @@ function — see *Amendment* below, which changes the reasoning and not the deci
 revoked from it, and `release_hold` is granted to nobody.**
 
 The releaser is still derived by the database, never supplied by a caller. That half of AFC-249 is
-kept; only the grant is revoked. See *Amendment*.
+kept; only the grant is revoked. See _Amendment_.
 
 The application role keeps what it needs for the records it owns and nothing from the engine:
 
-| `directus_app` holds | On | Not on |
-| --- | --- | --- |
-| `SELECT` | `retention_policies`, `retention_clocks`, `retention_metrics`, `legal_holds` | — |
-| `INSERT` | `legal_holds` | — |
-| `USAGE` | schema `retention` (to resolve the names it is denied) | — |
-| `EXECUTE` | **nothing** | `run`, `sync_clocks`, `release_hold`, every helper |
-| `UPDATE` / `DELETE` | **nothing** | `legal_holds`, every collection |
+| `directus_app` holds | On                                                                           | Not on                                             |
+| -------------------- | ---------------------------------------------------------------------------- | -------------------------------------------------- |
+| `SELECT`             | `retention_policies`, `retention_clocks`, `retention_metrics`, `legal_holds` | —                                                  |
+| `INSERT`             | `legal_holds`                                                                | —                                                  |
+| `USAGE`              | schema `retention` (to resolve the names it is denied)                       | —                                                  |
+| `EXECUTE`            | **nothing**                                                                  | `run`, `sync_clocks`, `release_hold`, every helper |
+| `UPDATE` / `DELETE`  | **nothing**                                                                  | `legal_holds`, every collection                    |
 
 ## Context
 
@@ -60,13 +60,13 @@ Removing the hold was sufficient, because the erasure follows the hold, not the 
 
 ## The ordering constraint, and the fact that it was violated
 
-The AFC-206 review recorded a hard sequencing requirement: *"F2 must be merged before AFC-205, or
-the ordering guarantees nothing."* That was correct, and it has since been violated in the tree.
+The AFC-206 review recorded a hard sequencing requirement: _"F2 must be merged before AFC-205, or
+the ordering guarantees nothing."_ That was correct, and it has since been violated in the tree.
 
 AFC-206's stated blast radius was wrong in one direction, and correcting it is what produced the
-requirement. It said `retention_worker` was `NOLOGIN` and a member of no role, so *"no production
-identity can execute `retention.run` today"* and *"a forged hold release cannot currently reach
-erasure — the eraser has no key."* That was true when it was written. ADR-0004 then landed, and
+requirement. It said `retention_worker` was `NOLOGIN` and a member of no role, so _"no production
+identity can execute `retention.run` today"_ and _"a forged hold release cannot currently reach
+erasure — the eraser has no key."_ That was true when it was written. ADR-0004 then landed, and
 with it `GRANT retention_worker TO retention_job` at
 `services/directus/schema/bootstrap/0001_roles.sql:78`. The eraser now has a key. **The precondition
 went in and the fix did not**, and the chain above went from latent to live on that commit.
@@ -82,21 +82,21 @@ function to the application role fails the same day it lands, whoever lands it a
 
 ## Alternatives considered
 
-| Option | Verdict |
-| --- | --- |
-| **Revoke, and pin the application role's surface to empty** (**chosen**) | Removes the only route from a compromised application session to an erasable child record, and leaves a mechanical control that survives reordering. |
-| **Keep the grant and derive `released_by` from `session_user`** | **Load-bearing rejection.** `release_hold` is `SECURITY DEFINER`, so `current_user` inside it is the owner and `session_user` is the connected identity. Directus authenticates in the application layer and pools all traffic under one database identity, so `session_user` is *always* `directus_app` whatever authenticated user is on the other end of the HTTP request. The fix would trade "an arbitrary uuid the caller chose" for "one constant value that is not a person" — a different false record in the same audit trail, which is the exact failure mode the actor stamp exists to prevent. It also does not typecheck: `session_user::uuid` is not `released_by uuid`. |
-| **Keep the grant and check entitlement inside the function** | Rejected on the same fact, stated independently: the only identities the function can observe are a constant and its own owner. No check over that input can distinguish an entitled user from an arbitrary one. There is no third option, because the identity that would carry the entitlement is not in the database. |
-| **Grant it to a narrower application role** | Rejected as unshippable, not as wrong. Directus pools one connection identity per instance, so a "narrower app role" is a role nobody connects as; the grant would be decorative while the broad role keeps the capability it is meant not to have. Revisit if Directus is ever fronted by a proxy that terminates per-user database sessions. |
-| **Keep the grant and rely on the audit trail to detect forgery** | Rejected. Detection after the record is gone is not a control, and the forged release is written *as* a valid release with a plausible actor, so it does not read as an anomaly. |
-| **Move the release to a separate credential and expose it as an operator action** | Not rejected — it is what the revoke produces today, and it is tracked as a follow-up rather than a rejection. See the accepted costs. |
+| Option                                                                            | Verdict                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Revoke, and pin the application role's surface to empty** (**chosen**)          | Removes the only route from a compromised application session to an erasable child record, and leaves a mechanical control that survives reordering.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| **Keep the grant and derive `released_by` from `session_user`**                   | **Load-bearing rejection.** `release_hold` is `SECURITY DEFINER`, so `current_user` inside it is the owner and `session_user` is the connected identity. Directus authenticates in the application layer and pools all traffic under one database identity, so `session_user` is _always_ `directus_app` whatever authenticated user is on the other end of the HTTP request. The fix would trade "an arbitrary uuid the caller chose" for "one constant value that is not a person" — a different false record in the same audit trail, which is the exact failure mode the actor stamp exists to prevent. It also does not typecheck: `session_user::uuid` is not `released_by uuid`. |
+| **Keep the grant and check entitlement inside the function**                      | Rejected on the same fact, stated independently: the only identities the function can observe are a constant and its own owner. No check over that input can distinguish an entitled user from an arbitrary one. There is no third option, because the identity that would carry the entitlement is not in the database.                                                                                                                                                                                                                                                                                                                                                                |
+| **Grant it to a narrower application role**                                       | Rejected as unshippable, not as wrong. Directus pools one connection identity per instance, so a "narrower app role" is a role nobody connects as; the grant would be decorative while the broad role keeps the capability it is meant not to have. Revisit if Directus is ever fronted by a proxy that terminates per-user database sessions.                                                                                                                                                                                                                                                                                                                                          |
+| **Keep the grant and rely on the audit trail to detect forgery**                  | Rejected. Detection after the record is gone is not a control, and the forged release is written _as_ a valid release with a plausible actor, so it does not read as an anomaly.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| **Move the release to a separate credential and expose it as an operator action** | Not rejected — it is what the revoke produces today, and it is tracked as a follow-up rather than a rejection. See the accepted costs.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 
 ## Consequences
 
 **Accepted costs**
 
 - **A hold placed in production can no longer be released through the application.** This is a real
-  operational gap and it is the correct trade *today*: there is no caller to grant the function to.
+  operational gap and it is the correct trade _today_: there is no caller to grant the function to.
   `release_hold` appears nowhere outside the engine file and the test suites — `services/directus/extensions/`
   is empty, there is no Directus flow, and `apps/web/server/api/` has no legal-hold route. Revoking
   costs no function that exists; a hold released today could only have been released by an identity
@@ -110,7 +110,7 @@ function to the application role fails the same day it lands, whoever lands it a
 
 **What this buys**
 
-- The application role's surface on the engine is empty *and asserted to be empty*, which no
+- The application role's surface on the engine is empty _and asserted to be empty_, which no
   previous statement in the suite was. 64.1 pinned the worker; 65.2 pinned `directus_app` away from
   `retention.run` by name; nothing anywhere pinned it away from the schema.
 - 63.4's release half was asserting the opposite of the control. It now asserts the refusal, that
@@ -159,16 +159,16 @@ narrower than "another agent got it wrong" and wider than "two designs disagree"
 `session_user` is a sound source of attribution **when the connected database role is a
 per-credential login**, and not otherwise. That distinction is the whole adjudication.
 
-| Function | Connecting role | What `session_user` names | Verdict |
-| --- | --- | --- | --- |
-| `retention.run` | `retention_job` | the scheduler credential that performed the erasure | **Keep.** An accountable identity. |
-| `release_hold` | `directus_app` | *always* `directus_app`, whatever authenticated user made the HTTP request | **Revoke.** A constant. |
+| Function        | Connecting role | What `session_user` names                                                  | Verdict                            |
+| --------------- | --------------- | -------------------------------------------------------------------------- | ---------------------------------- |
+| `retention.run` | `retention_job` | the scheduler credential that performed the erasure                        | **Keep.** An accountable identity. |
+| `release_hold`  | `directus_app`  | _always_ `directus_app`, whatever authenticated user made the HTTP request | **Revoke.** A constant.            |
 
 Directus authenticates in the application layer and pools every request under one database identity.
 So on the release path, resolving `session_user` through `retention_principals` does not attribute a
 release to the person who made it — it attributes **every** release by the application to **one**
 constant, pre-named principal, and the stored row then says that person made the decision. That is a
-*more* credible false record than a random uuid, which makes it a worse one.
+_more_ credible false record than a random uuid, which makes it a worse one.
 
 ### Measured on `main` at `cc8396d`
 
@@ -186,17 +186,17 @@ constant, pre-named principal, and the stored row then says that person made the
 
 **The tree is safe today only because a table is empty.** `retention_principals` has no seed rows and
 no migration provisions `directus_app`, so the refusal at step 3 is structural by accident. It is
-closed by provisioning state, not by a control — and the row that makes the feature *work* is the same
+closed by provisioning state, not by a control — and the row that makes the feature _work_ is the same
 row that reopens the chain. A deploy that inserts it, for any reason, without reading the engine
 comment hands a pooled connection the capability to release every legal hold in the system.
 
 ### The decision is unchanged; the reasoning got sharper
 
-1. **The revoke stands**, with a stronger justification than "no caller exists": *the grant's safety
-   depends on a row nobody has inserted yet, and that row is the feature's own enable step.*
+1. **The revoke stands**, with a stronger justification than "no caller exists": _the grant's safety
+   depends on a row nobody has inserted yet, and that row is the feature's own enable step._
 2. **The mechanism travels to AFC-243; the grant does not.** `retention_principals` is a good
    attribution design and belongs on the release path that lands with it — where the connected
-   database role *is* the person, because the authenticated user is resolved at the Directus layer and
+   database role _is_ the person, because the authenticated user is resolved at the Directus layer and
    carried in behind a Directus permission. Not behind a pooled connection.
 3. **`retention.run`'s attribution is explicitly endorsed**, so AFC-249 does not need reverting. The
    engineer found the right primitive and applied it to one function where it holds and one where it
@@ -204,7 +204,7 @@ comment hands a pooled connection the capability to release every legal hold in 
 
 ### What the suite now asserts, and why it had to move
 
-`63.4` previously asserted that provisioning a principal *makes the release succeed*. That was a true
+`63.4` previously asserted that provisioning a principal _makes the release succeed_. That was a true
 statement about the tree it was written against, and it encoded the defect as a requirement. It is
 inverted: with the principal provisioned, the application role is still refused, and the refusal is
 `42501` from the grant list rather than `23001` from the attribution check — each is now asserted
@@ -215,3 +215,94 @@ nobody attributed.
 64.1b pins this role's `EXECUTE` surface on the schema to the empty set, with the positive control that
 the identical query reports the worker's surface in full. Measured in both directions: with the grant
 restored, `63` and `64` both fail. A pin that cannot fail is a comment.
+
+---
+
+## Amendment 2, 2026-10-25 — AFC-243 shipped the audited release path
+
+The caller the Amendment-1 paragraph waited for now exists. This amendment
+records what landed, where, and what remains open. It changes no decision
+above: `directus_app` still holds `EXECUTE` on nothing in the `retention`
+schema, and 64.1b still pins that empty surface.
+
+### What shipped
+
+- `retention.release_hold_as(uuid, uuid)` (`engine`, section 6b): stamps
+  `released_by` with the releaser the caller passes and `released_at` with
+  `now()`; refuses `NULL` arguments, unknown or already-released holds
+  (`22023`); refuses any session other than `legal_hold_releaser` (`42501`,
+  the same refusal the grant list gives, so an operator reading a log sees
+  one refusal either way).
+- `legal_hold_releaser`, a LOGIN role (`bootstrap`), with `CONNECTION LIMIT 1`
+  asserted in the belt-and-braces block like `retention_job`. Password
+  provisioned out of band by the cluster owner; the value never enters the
+  repo (see the credential inventory).
+- `GRANT EXECUTE ON FUNCTION retention.release_hold_as(uuid, uuid) TO
+legal_hold_releaser`, in the same commit as the route below, with
+  `REVOKE ALL ... FROM PUBLIC` and an explicit `REVOKE ... FROM directus_app`.
+  `USAGE ON SCHEMA retention` extended to the new role with the same
+  converging NOTICE as the existing two.
+- `POST /api/legal-holds/:id/release` (portal server): `getPortalScope`
+  first (401 with no session), `requireCan(scope, 'legal_holds', 'update')`
+  second (403 unless super_admin or area_admin, the DPO seats in the code
+  matrix, fed by custom Directus grants for custom roles), then calls the
+  function as `legal_hold_releaser` with the session user's id. The request
+  body is ignored: there is no caller-supplied releaser on this path.
+- `legal_holds` in the shared collections and matrix (`update` for
+  super_admin + area_admin only); the Directus policy must mirror it (update
+  on `legal_holds` for the corresponding Directus roles, no broader grant).
+- `tests/db/99_legal_hold_release_path.sql`: the service path releases and
+  stamps the carried identity (two users, two holds, cross-checked), the
+  application role is refused `42501` with the hold still standing, even the
+  owner is refused on this path, and the service identity is least privilege
+  (exactly one function, no row UPDATE, no `run`). `tests/web/…contract.mjs`:
+  the route gate, the parameterised call, the matrix shape, and the grant
+  lines, including the test that fails if the permission is removed.
+
+### Why the issue's four conditions hold
+
+1. The authenticated user is captured at the Directus layer (the session)
+   and a call without one is refused before any database statement.
+2. The identity passed to the function is that authenticated user, never a
+   uuid the caller supplies (the body is not read).
+3. A Directus permission gates it (the matrix grant, fed by Directus policy
+   for custom roles; the required policy mirror is documented in the route).
+4. The grant arrived in the same commit as the caller (this change).
+
+### What is still open (preconditions of landing, per the issue)
+
+- **SecurityEngineer review is a precondition of landing, not a follow-up.**
+  Route this amendment, the engine section 6b, and suite 99.1x to
+  [SecurityEngineer](/AFC/agents/securityengineer) for verdict.
+- **UXDesigner loop before any hold-release affordance.** There is
+  deliberately no browser surface yet; a DPO releasing a hold decides the
+  fate of a child's record and the surface must make the consequence
+  obvious. Do not build it without [UXDesigner](/AFC/agents/uxdesigner).
+- **QA browser verification** of the route once a surface exists.
+- **Staging Directus policy mirror**: the `legal_holds` update grant for the
+  DPO roles must exist in the staging (then production) Directus policy; the
+  code matrix alone does not enforce. Tracked as the staging step of this
+  issue, not as a later issue. Verified 2026-10-26 on staging: zero
+  `legal_holds` permission rows exist; roles `Administrator` and `Area Admin`
+  reach policies `Administrator` and `Area Admin Policy` respectively. The
+  required diff is exactly two `directus_permissions` rows: (`Administrator`,
+  `legal_holds`, `update`) and (`Area Admin Policy`, `legal_holds`, `update`),
+  fields `*`, no row filter -- the DPO function is area-wide, attribution is
+  enforced by `release_hold_as`, and a direct row UPDATE is refused `23001`
+  by the trigger regardless. Custom DPO roles are granted through the admin
+  permission editor (`legal_holds` accepted there since this change). Apply
+  AFTER the code lands: before that the grant is inert (direct API UPDATE is
+  refused by the trigger), and staging changes ride the normal deploy, never
+  ahead of it.
+- **Review question set**: §3.2 of the credential inventory asks which
+  credentials can _delete_; a future review should ask which can _release_,
+  with the standing answer `legal_hold_releaser, alone`. Left to the CTO
+  and reviewer as a procedure change, not made here.
+
+### Note on the issue text
+
+The issue says "Read ADR-0006 before starting" and "ADR-0006 amended or
+superseded". That reference predates the ADR renumbering: the operative
+record for the revoke was always this file (first accepted as the F2
+decision, amended after AFC-249). This amendment is the "what actually
+shipped" record the issue asked for.

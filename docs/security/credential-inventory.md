@@ -6,14 +6,14 @@ broad database access — the rule for rotating them, and the cadence and owners
 of the review that reads the list.
 It is the artefact a reviewer opens, not only a decision sitting on an issue thread.
 
-| | |
-| --- | --- |
-| **Decision of record** | [AFC-244 decision document](/AFC/issues/AFC-244#document-decision), recorded by Operations (CEO) 2026-10-06 |
-| **Landed by** | [AFC-250](/AFC/issues/AFC-250) — CTO review of the policy, this artefact, `repo-plan` §6, and the `rolconnlimit` ruling |
-| **Owner** | CTO ([mediatech](/AFC/agents/mediatech)) — accountable for this list's accuracy, for rotation actually happening, and for escalating when it does not |
-| **Reviewer** | SecurityEngineer ([securityengineer](/AFC/agents/securityengineer)) — independent of the provisioning path |
-| **Escalation** | Operations ([operations](/AFC/agents/operations)) — approves any interval exception and any closed-without-agreement finding |
-| **Where the obligation came from** | [ADR-0004](../adr/ADR-0004-erasure-capability-is-a-membership-not-a-login.md), **Accepted costs** — *"it belongs in the secret inventory, in the credential-rotation policy, and in the periodic access review."* |
+|                                    |                                                                                                                                                                                                                   |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Decision of record**             | [AFC-244 decision document](/AFC/issues/AFC-244#document-decision), recorded by Operations (CEO) 2026-10-06                                                                                                       |
+| **Landed by**                      | [AFC-250](/AFC/issues/AFC-250) — CTO review of the policy, this artefact, `repo-plan` §6, and the `rolconnlimit` ruling                                                                                           |
+| **Owner**                          | CTO ([mediatech](/AFC/agents/mediatech)) — accountable for this list's accuracy, for rotation actually happening, and for escalating when it does not                                                             |
+| **Reviewer**                       | SecurityEngineer ([securityengineer](/AFC/agents/securityengineer)) — independent of the provisioning path                                                                                                        |
+| **Escalation**                     | Operations ([operations](/AFC/agents/operations)) — approves any interval exception and any closed-without-agreement finding                                                                                      |
+| **Where the obligation came from** | [ADR-0004](../adr/ADR-0004-erasure-capability-is-a-membership-not-a-login.md), **Accepted costs** — _"it belongs in the secret inventory, in the credential-rotation policy, and in the periodic access review."_ |
 
 **What this is not.** Not provisioning, not a scheduler, not a rotation run. No secret
 is created, set or moved by this document, and none may be added to the tree by it.
@@ -35,22 +35,23 @@ and behaves like a credential.
 Every entry carries the same six fields, and an entry missing any of them is not an
 entry:
 
-| Field | Why it is mandatory |
-| --- | --- |
-| Credential | The value is never written here. Only its name. |
-| Holder | Who authenticates as it. "The system" is not a holder. |
+| Field             | Why it is mandatory                                              |
+| ----------------- | ---------------------------------------------------------------- |
+| Credential        | The value is never written here. Only its name.                  |
+| Holder            | Who authenticates as it. "The system" is not a holder.           |
 | Privilege ceiling | What it can do at the top of its grant surface, in one sentence. |
-| Stored where | The vault/binding that holds the value. Never the repository. |
-| Provisioned by | Which identity or human performs out-of-band provisioning. |
-| Rotation | Interval + trigger, from §2. |
+| Stored where      | The vault/binding that holds the value. Never the repository.    |
+| Provisioned by    | Which identity or human performs out-of-band provisioning.       |
+| Rotation          | Interval + trigger, from §2.                                     |
 
 ### The list
 
-| Credential | Holder | Privilege ceiling | Stored where | Provisioned by | Rotation |
-| --- | --- | --- | --- | --- | --- |
-| `retention_job` | the retention scheduler (not yet wired) | **Execute live record erasure.** The only identity in this system that can delete a person's data. | Paperclip secret binding + prod `pgpass`-equivalent, never the repo | cluster owner, out of band, after the §0.10.5 evidence run | **90 days**, and immediately on trigger |
-| `DIRECTUS_KEY` | the Directus application | Full application read/write on the application database. No erasure. | GitHub Actions Environment secret (`staging`, `production`), with required reviewers on production | repo admin via the Actions environment | **180 days**, and immediately on trigger |
-| `DIRECTUS_SECRET` | the Directus application | As `DIRECTUS_KEY`. | as above | as above | **180 days**, and immediately on trigger |
+| Credential            | Holder                                               | Privilege ceiling                                                                                                     | Stored where                                                                                       | Provisioned by                                             | Rotation                                 |
+| --------------------- | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- | ---------------------------------------- |
+| `retention_job`       | the retention scheduler (not yet wired)              | **Execute live record erasure.** The only identity in this system that can delete a person's data.                    | Paperclip secret binding + prod `pgpass`-equivalent, never the repo                                | cluster owner, out of band, after the §0.10.5 evidence run | **90 days**, and immediately on trigger  |
+| `legal_hold_releaser` | the portal server legal-hold release route (AFC-243) | **Execute legal-hold release only.** Stamps `released_by` with the carried session user; no erasure, no table writes. | Server env (`LEGAL_HOLD_DATABASE_URL`), value never in repo                                        | cluster owner, out of band                                 | **90 days**, and immediately on trigger  |
+| `DIRECTUS_KEY`        | the Directus application                             | Full application read/write on the application database. No erasure.                                                  | GitHub Actions Environment secret (`staging`, `production`), with required reviewers on production | repo admin via the Actions environment                     | **180 days**, and immediately on trigger |
+| `DIRECTUS_SECRET`     | the Directus application                             | As `DIRECTUS_KEY`.                                                                                                    | as above                                                                                           | as above                                                   | **180 days**, and immediately on trigger |
 
 ### Two deliberate exclusions, so the list cannot be read as incomplete by accident
 
@@ -89,10 +90,10 @@ rotating everything on one schedule is tidier and worse — it makes a single
 provisioning mistake a single point of failure for the whole estate, and it makes it
 impossible to see which credential was rotated when a failure appears.
 
-| Credential | Interval | Why this number |
-| --- | --- | --- |
-| `retention_job` | **90 days** | Quarterly. Long enough that the provisioning path is operable by a small team, short enough that a credential with erasure power is never long-lived. Erases are irreversible; a 180-day window on this credential is 180 days of exposure. |
-| `DIRECTUS_KEY` / `DIRECTUS_SECRET` | **180 days** | Half the exposure window of the erase-capable credential, because the thing protected is availability and confidentiality of registration data, not its destruction, and rotation touches every running application instance. |
+| Credential                         | Interval     | Why this number                                                                                                                                                                                                                             |
+| ---------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `retention_job`                    | **90 days**  | Quarterly. Long enough that the provisioning path is operable by a small team, short enough that a credential with erasure power is never long-lived. Erases are irreversible; a 180-day window on this credential is 180 days of exposure. |
+| `DIRECTUS_KEY` / `DIRECTUS_SECRET` | **180 days** | Half the exposure window of the erase-capable credential, because the thing protected is availability and confidentiality of registration data, not its destruction, and rotation touches every running application instance.               |
 
 An interval exception needs Operations' approval (§3.1 escalation row).
 
@@ -127,7 +128,7 @@ follows, and the coverage is stated per arm rather than implied:
   document revisions and annotations, work-product artefacts and attachments,
   approvals, skill comments and routine descriptions** — enforced by the
   credential-surface scanner built in [AFC-312](/AFC/issues/AFC-312). It runs on the
-  routine *AFC-312 credential-surface scan* (`abc1261f-b914-4319-ae78-f318c56704e7`,
+  routine _AFC-312 credential-surface scan_ (`abc1261f-b914-4319-ae78-f318c56704e7`,
   cron `0 3 * * *` UTC, activity-gated) and on demand. Its exact known-value detector
   holds values in memory only and never prints, logs or persists a match; its
   assignment detector's false-positive rate is measured and printed on every run, not
@@ -174,12 +175,12 @@ unbounded-liability case `retention_metrics.retention_last_run_at` exists to cat
 
 ### 3.1 Cadence, owner, reviewer, escalation
 
-| | |
-| --- | --- |
-| **Cadence** | Every **90 days**, and additionally within **24 hours** of any §2.2 trigger firing. A trigger suspends the calendar; it does not queue behind it. |
-| **Owner** | **CTO** ([mediatech](/AFC/agents/mediatech)) — accountable for the inventory's accuracy, the rotation actually happening, and the escalation when it does not. The CTO holds the cluster-admin provisioning path, so the CTO is the only role that can perform step 2 of §2.3. Naming anyone else would name a person who cannot execute the procedure. |
-| **Reviewer** | **SecurityEngineer** ([securityengineer](/AFC/agents/securityengineer)) — independent of the provisioning path and of the implementation. A reviewer who shares the provisioning path is auditing their own work. |
-| **Escalation** | **Operations** ([operations](/AFC/agents/operations)) — approves any exception to a §2.1 interval, and any §3.3 finding that the CTO and reviewer disagree is closed. |
+|                |                                                                                                                                                                                                                                                                                                                                                         |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Cadence**    | Every **90 days**, and additionally within **24 hours** of any §2.2 trigger firing. A trigger suspends the calendar; it does not queue behind it.                                                                                                                                                                                                       |
+| **Owner**      | **CTO** ([mediatech](/AFC/agents/mediatech)) — accountable for the inventory's accuracy, the rotation actually happening, and the escalation when it does not. The CTO holds the cluster-admin provisioning path, so the CTO is the only role that can perform step 2 of §2.3. Naming anyone else would name a person who cannot execute the procedure. |
+| **Reviewer**   | **SecurityEngineer** ([securityengineer](/AFC/agents/securityengineer)) — independent of the provisioning path and of the implementation. A reviewer who shares the provisioning path is auditing their own work.                                                                                                                                       |
+| **Escalation** | **Operations** ([operations](/AFC/agents/operations)) — approves any exception to a §2.1 interval, and any §3.3 finding that the CTO and reviewer disagree is closed.                                                                                                                                                                                   |
 
 Who writes policy and who holds the credential are different statements: Operations
 authored the decision this artefact records; the CTO reviews it. That is about policy
@@ -190,14 +191,14 @@ authorship, not about who holds the credential.
 The review is a fixed question set, not a vibe. A review that does not answer these is
 not a review:
 
-1. **Which credentials can delete a record?** The answer must be a *name from §1*,
+1. **Which credentials can delete a record?** The answer must be a _name from §1_,
    not a description.
-   *Standing answer, taken from the decision of record and **not** from a completed
-   review: **`retention_job`, alone.*** If a future review answers "one, probably",
+   _Standing answer, taken from the decision of record and **not** from a completed
+   review: **`retention_job`, alone.**_ If a future review answers "one, probably",
    the review has failed.
 2. **Does that match reality?** Query `pg_auth_members` transitively, not one hop —
    `pg_has_role(oid, 'retention_worker', 'MEMBER')` over `rolcanlogin AND NOT
-   rolsuper`. A direct join is the F1 defect ADR-0004 Part 2 already found once.
+rolsuper`. A direct join is the F1 defect ADR-0004 Part 2 already found once.
    Bootstrap asserts this at deploy time; the reviewer confirms the assertion is
    actually running against the actual cluster, rather than trusting that it is.
 3. **Does the membership still confer the capability** — `inherit_option` and
@@ -250,9 +251,9 @@ decision of record and both are landed in
 Dated entries only. An entry with no answers is not a review; it is a record that one
 has not happened.
 
-| Date | Credential(s) | Q1 | Q2 | Q3 | Q4 | Q5 | Q6 | Q7 | Q8 | Run by | Reviewed by | Exceptions |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| — | `retention_job` | *not run* | *not run* | *not run* | *not run* | *not run* | *not run* | *not run* | *not run* | — | — | — |
+| Date | Credential(s)   | Q1        | Q2        | Q3        | Q4        | Q5        | Q6        | Q7        | Q8        | Run by | Reviewed by | Exceptions |
+| ---- | --------------- | --------- | --------- | --------- | --------- | --------- | --------- | --------- | --------- | ------ | ----------- | ---------- |
+| —    | `retention_job` | _not run_ | _not run_ | _not run_ | _not run_ | _not run_ | _not run_ | _not run_ | _not run_ | —      | —           | —          |
 
 **No review has been run; the credential is not provisioned.** `retention_job` has no
 value, no holder process and no scheduler, so Q2–Q7 have nothing to measure and Q8's

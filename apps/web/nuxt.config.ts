@@ -113,6 +113,15 @@ export default defineNuxtConfig({
     /** Scoped, short-lived token used for SSR reads. Never sent to the browser. */
     directusServerToken: '',
     /**
+     * Connection string for the legal-hold release identity (AFC-243).
+     * Server-side only, never sent to the browser. Connects as the dedicated
+     * `legal_hold_releaser` role -- never the pooled application identity --
+     * so an application-side compromise cannot forge a release. Provisioned
+     * out of band by the cluster owner (see the credential inventory); absent
+     * means the release route answers 503.
+     */
+    legalHoldDatabaseUrl: '',
+    /**
      * Token whose Directus policy is the *public* role's. Used only by the
      * unauthenticated registration proxy: an anonymous write must be constrained
      * by a public policy, not merely by the field allowlist in application code.
