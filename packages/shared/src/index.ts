@@ -21,6 +21,7 @@ export * from './types'
 export * from './office-feed'
 export * from './leave'
 export * from './markdown'
+export * from './message-tokens'
 export * from './minutes-samples'
 export * from './impersonation'
 

@@ -1,5 +1,10 @@
 <script setup lang="ts">
-import { COLLECTIONS } from '@afc/shared'
+import {
+  COLLECTIONS,
+  extractTokens,
+  renderMessageTemplate,
+  whatsappTemplateReady,
+} from '@afc/shared'
 
 /**
  * New Communication — configure step (AFC-869, Rock-solid reference).
@@ -51,6 +56,82 @@ const classification = ref<Classification>('personal')
 
 const scheduleMode = ref<'now' | 'later'>('now')
 const scheduledAt = ref('')
+const message = ref('Dear {{invitee_name}}, how are you doing?')
+const templateId = ref<string | null>(null)
+const messageBox = ref<HTMLTextAreaElement | null>(null)
+
+interface TemplateRow {
+  id: string
+  key: string
+  channel: string
+  category: string
+  approval_status: string
+  provider_template_id: string | null
+  body: string
+  variables: string[]
+}
+
+const { data: templates } = await useAsyncData(
+  'communication-templates',
+  () =>
+    api.get<{ data: TemplateRow[] }>('/api/communications/templates', {
+      query: { channel: medium.value },
+    }),
+  { watch: [medium] },
+)
+
+const selectedTemplate = computed(
+  () => templates.value?.data.find((t) => t.id === templateId.value) ?? null,
+)
+
+function pickTemplate(id: string | null) {
+  templateId.value = id
+  const found = templates.value?.data.find((t) => t.id === id) ?? null
+  if (found) message.value = found.body
+}
+
+function insertToken(token: string) {
+  const snippet = `{{${token}}}`
+  const el = messageBox.value
+  if (!el) {
+    message.value += (message.value && !message.value.endsWith(' ') ? ' ' : '') + snippet
+    return
+  }
+  const start = el.selectionStart ?? message.value.length
+  const end = el.selectionEnd ?? message.value.length
+  message.value = message.value.slice(0, start) + snippet + message.value.slice(end)
+  nextTick(() => {
+    el.focus()
+    const pos = start + snippet.length
+    el.setSelectionRange(pos, pos)
+  })
+}
+
+const SAMPLE_VALUES: Record<string, string> = {
+  invitee_name: 'Adaeze Okafor',
+  first_name: 'Adaeze',
+  branch_name: 'Ikeja',
+}
+
+const draftPreview = computed(() => renderMessageTemplate(message.value, SAMPLE_VALUES))
+
+const draftUnknown = computed(() => {
+  const allowed = new Set(selectedTemplate.value?.variables ?? [])
+  if (allowed.size === 0) return [] as string[]
+  return extractTokens(message.value).filter((name) => !allowed.has(name))
+})
+
+const whatsappCheck = computed(() =>
+  medium.value !== 'whatsapp'
+    ? null
+    : whatsappTemplateReady({
+        templateBody: selectedTemplate.value?.body ?? null,
+        approvalStatus: selectedTemplate.value?.approval_status ?? null,
+        providerTemplateId: selectedTemplate.value?.provider_template_id ?? null,
+        allowedVariables: selectedTemplate.value?.variables ?? [],
+        values: SAMPLE_VALUES,
+      }),
+)
 
 interface ReachablePreview {
   channel: string
@@ -323,6 +404,86 @@ const laterError = computed(() => {
                 applies.
               </span>
             </p>
+          </section>
+
+          <section aria-label="Message">
+            <h3 class="text-sm font-semibold">Message &amp; tokens</h3>
+            <p class="mt-1 text-xs text-gray-500">
+              Personalise with <code>{{ token }}</code> placeholders — they fill per
+              recipient at send time. WhatsApp must use an approved template (compulsory),
+              exactly as approved.
+            </p>
+            <div
+              v-if="medium === 'whatsapp'"
+              class="mt-2 rounded-xl border border-gray-200 p-3 dark:border-gray-800"
+            >
+              <UFormField label="WhatsApp template (compulsory)" required>
+                <USelect
+                  :model-value="templateId"
+                  :items="
+                    (templates?.data ?? []).map((t: TemplateRow) => ({
+                      label: `${t.key} — ${t.approval_status}`,
+                      value: t.id,
+                      disabled: t.approval_status !== 'approved',
+                    }))
+                  "
+                  placeholder="Pick an approved template"
+                  class="w-full"
+                  @update:model-value="pickTemplate($event)"
+                />
+              </UFormField>
+              <p
+                v-if="whatsappCheck && !whatsappCheck.ready"
+                class="mt-1 text-xs text-amber-600"
+              >
+                {{ whatsappCheck.detail }}
+              </p>
+              <p v-else-if="whatsappCheck" class="mt-1 text-xs text-green-600">
+                {{ whatsappCheck.detail }}
+              </p>
+            </div>
+            <div class="mt-2 flex flex-wrap gap-1.5" aria-label="Insert token">
+              <UButton
+                v-for="token in ['invitee_name', 'first_name', 'branch_name']"
+                :key="token"
+                color="neutral"
+                variant="outline"
+                size="xs"
+                :icon="'i-lucide-plus'"
+                :label="`{{${token}}}`"
+                :disabled="medium === 'whatsapp'"
+                :title="
+                  medium === 'whatsapp'
+                    ? 'WhatsApp uses the template text exactly as approved'
+                    : `Insert {{${token}}}`
+                "
+                @click="insertToken(token)"
+              />
+            </div>
+            <UFormField label="Message text" class="mt-2">
+              <UTextarea
+                ref="messageBox"
+                v-model="message"
+                :rows="4"
+                :readonly="medium === 'whatsapp'"
+                placeholder="Dear {{invitee_name}}, how are you doing?"
+                class="w-full"
+              />
+            </UFormField>
+            <p v-if="draftUnknown.length > 0" class="mt-1 text-xs text-amber-600">
+              Unknown {{ draftUnknown.length === 1 ? 'token' : 'tokens' }} for the chosen
+              template: {{ draftUnknown.join(', ') }}.
+            </p>
+            <div class="mt-2 rounded-xl bg-gray-50 p-3 text-sm dark:bg-gray-900">
+              <p class="text-xs font-semibold text-gray-500">Preview</p>
+              <p class="mt-1 whitespace-pre-wrap">{{ draftPreview.text }}</p>
+              <p
+                v-if="draftPreview.missing.length > 0"
+                class="mt-1 text-xs text-gray-500"
+              >
+                Fills at send time: {{ draftPreview.missing.join(', ') }}.
+              </p>
+            </div>
           </section>
 
           <section aria-label="Message Classification">
