@@ -7,8 +7,8 @@
  *   2. Every date cell renders its number even when empty — no blank
  *      hiding; the global "no entries" gate is gone from month/week/day/
  *      year (list alone keeps the empty state).
- *   3. Year view renders 12 mini-months with counts and colour dots,
- *      deep-linkable via ?view=year.
+ *   3. Year view renders 12 full months (days 1-31, no filler) with counts
+ *      and colourful per-type dots, deep-linkable via ?view=year.
  *   4. Guards kept: staff/public scope, month default, scoped feed (no
  *      leak), server cap 200 unchanged.
  *
@@ -78,13 +78,14 @@ describe('calendar full dates — no blank hiding', () => {
   })
 })
 
-describe('calendar year view — twelve mini-months', () => {
-  it('renders twelve mini-month grids from yearMonths + monthGrid', () => {
+describe('calendar year view — twelve full months', () => {
+  it('renders twelve full-month grids (1-31) from yearMonths + monthDays', () => {
     const src = codeOf(RENDERER)
     assert.match(src, /yearMonths\(focused\)/, 'iterates all twelve months')
-    assert.match(src, /monthGrid\(monthStart\)/, 'each month renders its grid')
-    assert.match(src, /countInMonth\(monthStart\)/, 'each mini-month shows its count')
-    assert.match(src, /typesOn\(iso\)/, 'each day carries colour dots')
+    assert.match(src, /monthDays\(monthStart\)/, 'each month renders its full 1-31 days')
+    assert.match(src, /monthLeadingOffset\(monthStart\)/, 'full months align to Monday-first weeks')
+    assert.match(src, /countInMonth\(monthStart\)/, 'each full month shows its count')
+    assert.match(src, /typesOn\(iso\)/, 'each day carries colourful dots')
   })
 
   it('deep-links year view through the query with month default kept', () => {

@@ -3,7 +3,9 @@ import {
   countByType,
   dayNumber,
   isSameMonth,
+  monthDays,
   monthGrid,
+  monthLeadingOffset,
   monthTitle,
   parseISODate,
   shiftFocused,
@@ -277,7 +279,8 @@ function isToday(iso: string): boolean {
         </span>
       </div>
 
-      <!-- Year: twelve mini-month grids with counts and colour dots. -->
+      <!-- Year: twelve full-month grids (every day 1–31 with its number;
+           event days carry colourful per-type dots). -->
       <div
         v-if="view === 'year'"
         class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
@@ -286,7 +289,7 @@ function isToday(iso: string): boolean {
           v-for="monthStart in yearMonths(focused)"
           :key="monthStart"
           class="rounded-lg border border-gray-200 p-3 dark:border-gray-800"
-          :aria-label="`${monthTitle(monthStart)} mini calendar`"
+          :aria-label="`${monthTitle(monthStart)} full calendar`"
         >
           <div class="flex items-baseline justify-between gap-2">
             <button
@@ -308,49 +311,39 @@ function isToday(iso: string): boolean {
               day.slice(0, 1)
             }}</span>
           </div>
-          <div
-            v-for="(week, weekIndex) in monthGrid(monthStart)"
-            :key="weekIndex"
-            class="grid grid-cols-7 text-center"
-          >
+          <div class="grid grid-cols-7 text-center">
+            <span
+              v-for="blank in monthLeadingOffset(monthStart)"
+              :key="`blank-${blank}`"
+              aria-hidden="true"
+            />
             <button
-              v-for="iso in week"
+              v-for="iso in monthDays(monthStart)"
               :key="iso"
               type="button"
-              :disabled="!isSameMonth(iso, monthStart)"
-              class="flex flex-col items-center py-0.5 text-[11px] leading-tight focus-visible:outline-2 focus-visible:outline-primary-500 disabled:cursor-default"
+              class="flex flex-col items-center py-0.5 text-[11px] leading-tight text-gray-700 hover:text-primary-600 focus-visible:outline-2 focus-visible:outline-primary-500 dark:text-gray-200"
               :class="[
-                isSameMonth(iso, monthStart)
-                  ? isToday(iso)
-                    ? 'font-bold text-primary-600 dark:text-primary-400'
-                    : 'text-gray-700 hover:text-primary-600 dark:text-gray-200'
-                  : 'text-transparent',
-                isToday(iso) && isSameMonth(iso, monthStart)
-                  ? 'rounded bg-primary-50 dark:bg-primary-900/30'
+                isToday(iso)
+                  ? 'rounded bg-primary-50 font-bold text-primary-600 dark:bg-primary-900/30 dark:text-primary-400'
                   : '',
               ]"
-              :aria-label="
-                isSameMonth(iso, monthStart)
-                  ? `Open ${iso} (${itemsOn(iso).length} entries)`
-                  : undefined
-              "
-              @click="isSameMonth(iso, monthStart) && openDay(iso)"
+              :aria-label="`Open ${iso} (${itemsOn(iso).length} entries)`"
+              @click="openDay(iso)"
             >
-              <span v-if="isSameMonth(iso, monthStart)">{{ dayNumber(iso) }}</span>
-              <span v-else aria-hidden="true">&nbsp;</span>
+              <span>{{ dayNumber(iso) }}</span>
               <span
-                v-if="isSameMonth(iso, monthStart) && typesOn(iso).length > 0"
-                class="flex items-center gap-px"
+                v-if="typesOn(iso).length > 0"
+                class="flex items-center gap-0.5"
                 aria-hidden="true"
               >
                 <span
-                  v-for="type in typesOn(iso).slice(0, 3)"
+                  v-for="type in typesOn(iso)"
                   :key="type"
-                  class="inline-block size-1 rounded-full"
+                  class="inline-block size-1.5 rounded-full"
                   :class="typeMeta(type).dot"
                 />
               </span>
-              <span v-else class="h-1" aria-hidden="true" />
+              <span v-else class="h-1.5" aria-hidden="true" />
             </button>
           </div>
           <div

@@ -159,6 +159,22 @@ export function yearMonths(focused: string): string[] {
   return Array.from({ length: 12 }, (_, i) => `${y}-${pad(i + 1)}-01`)
 }
 
+/**
+ * Full month days 1–31 (AFC-865 Year view): every ISO date belonging to the
+ * month of `monthStart`, no adjacent-month filler days. The Year mini-month
+ * renders exactly these days so empty dates still show their number.
+ */
+export function monthDays(monthStart: string): string[] {
+  const [y = 0, m = 1] = monthStart.split('-').map(Number)
+  const lastDay = new Date(y, m, 0).getDate()
+  return Array.from({ length: lastDay }, (_, i) => `${y}-${pad(m)}-${pad(i + 1)}`)
+}
+
+/** Monday-first leading blank count before the 1st of the month (0–6). */
+export function monthLeadingOffset(monthStart: string): number {
+  return (parseISODate(monthStart).getDay() + 6) % 7
+}
+
 const MONTH_NAMES = [
   'January',
   'February',
