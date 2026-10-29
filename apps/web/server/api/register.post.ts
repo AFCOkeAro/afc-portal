@@ -81,6 +81,18 @@ export default defineEventHandler(async (event) => {
     })
   }
 
+  // AFC-871 slice 2: the registration section has its own mark. Only
+  // `public` registers anonymously; `login`/`custom`/`private`/`draft` fail
+  // closed here (404, same as a non-public event — no existence oracle).
+  // `custom` has no audience model, so it never passes this gate.
+  if (eventRow.registration_visibility !== 'public') {
+    throw createError({
+      statusCode: 404,
+      statusMessage: 'That event is not open for registration',
+      data: { code: 'event_not_registerable' },
+    })
+  }
+
   if (eventRow.status !== 'published') {
     throw createError({
       statusCode: 409,
@@ -210,6 +222,7 @@ async function loadPublicEvent(
         'id',
         'status',
         'visibility',
+        'registration_visibility',
         'capacity',
         'waitlist_enabled',
         'requires_guardian_consent',

@@ -74,6 +74,16 @@ export const eventFormSchema = z
     speakers_visibility: z.enum(SECTION_VISIBILITIES).default('private'),
     resources_visibility: z.enum(SECTION_VISIBILITIES).default('private'),
     schedule_visibility: z.enum(SECTION_VISIBILITIES).default('private'),
+    /**
+     * AFC-871 slice 2: programme section content (staff-managed jsonb
+     * arrays). Optional so existing drafts validate and older staff forms
+     * that omit the keys cannot wipe stored sections; toEventPayload only
+     * sends the keys the form actually carries. No relational behaviour
+     * behind these yet — no per-speaker registration, no stock counts.
+     */
+    speakers: z.array(z.record(z.string(), z.unknown())).optional(),
+    resources: z.array(z.record(z.string(), z.unknown())).optional(),
+    schedule: z.array(z.record(z.string(), z.unknown())).optional(),
   })
   .superRefine((form, ctx) => {
     if (Date.parse(form.end_at) <= Date.parse(form.start_at)) {
@@ -171,5 +181,11 @@ export function toEventPayload(form: EventForm): Record<string, unknown> {
     speakers_visibility: form.speakers_visibility,
     resources_visibility: form.resources_visibility,
     schedule_visibility: form.schedule_visibility,
+    // AFC-871 slice 2: only send section arrays the form actually carries,
+    // so an older staff form that knows nothing about sections cannot wipe
+    // them to [] by omitting the keys.
+    ...(form.speakers !== undefined ? { speakers: form.speakers } : {}),
+    ...(form.resources !== undefined ? { resources: form.resources } : {}),
+    ...(form.schedule !== undefined ? { schedule: form.schedule } : {}),
   }
 }
