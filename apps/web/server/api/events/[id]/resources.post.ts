@@ -4,10 +4,10 @@ import {
   findScopedItem,
   getPortalScope,
   listItems,
-  requireCan,
   throwStoreUnavailable,
   throwValidation,
 } from '../../../utils/portal'
+import { requireEventArea } from '../../../utils/event-access'
 
 /**
  * POST /api/events/:id/resources — share a resource (AFC-844). New items
@@ -16,11 +16,14 @@ import {
  */
 export default defineEventHandler(async (event) => {
   const scope = await getPortalScope(event)
-  requireCan(scope, 'event_resources', 'create')
-
   const id = getRouterParam(event, 'id')
   if (!id)
     throw createError({ statusCode: 400, statusMessage: 'An event id is required' })
+
+  await requireEventArea(event, scope, id, 'resources', {
+    collection: 'event_resources',
+    action: 'create',
+  })
   try {
     const parent = await findScopedItem<Record<string, unknown>>(
       event,

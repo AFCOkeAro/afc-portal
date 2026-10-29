@@ -3,10 +3,10 @@ import {
   createItem,
   findScopedItem,
   getPortalScope,
-  requireCan,
   throwStoreUnavailable,
   throwValidation,
 } from '../../../../../utils/portal'
+import { requireEventArea } from '../../../../../utils/event-access'
 
 /**
  * POST /api/attendance/sessions/:id/activities — append a programme item.
@@ -16,7 +16,6 @@ import {
  */
 export default defineEventHandler(async (event) => {
   const scope = await getPortalScope(event)
-  requireCan(scope, 'session_activities', 'create')
 
   const id = getRouterParam(event, 'id')
   if (!id)
@@ -26,7 +25,21 @@ export default defineEventHandler(async (event) => {
       id: string
       branch: string | null
       zone: string | null
-    }>(event, scope, 'attendance_sessions', id, { fields: ['id', 'branch', 'zone'] })
+      event: string | null
+    }>(event, scope, 'attendance_sessions', id, {
+      fields: ['id', 'branch', 'zone', 'event'],
+    })
+    if (typeof session.event !== 'string' || session.event === '') {
+      throw createError({
+        statusCode: 404,
+        statusMessage: 'That session is not linked to an event',
+        data: { code: 'session_without_event' },
+      })
+    }
+    await requireEventArea(event, scope, session.event, 'schedule', {
+      collection: 'session_activities',
+      action: 'create',
+    })
 
     const parsed = sessionActivityFormSchema.safeParse(await readBody(event))
     if (!parsed.success) throwValidation(parsed.error)

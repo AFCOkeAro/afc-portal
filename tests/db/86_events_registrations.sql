@@ -371,6 +371,8 @@ ALTER TABLE event_resources DROP CONSTRAINT IF EXISTS event_resources_event_fkey
 ALTER TABLE event_feedback DROP CONSTRAINT IF EXISTS event_feedback_event_fkey;
 -- AFC-828 phase 4: 0057 links event_testimonies the same way; park its FK too.
 ALTER TABLE event_testimonies DROP CONSTRAINT IF EXISTS event_testimonies_event_fkey;
+-- AFC-880: 0060 links event_collaborators the same way; park its FK too.
+ALTER TABLE event_collaborators DROP CONSTRAINT IF EXISTS event_collaborators_event_fkey;
 \i services/directus/schema/migrations/rollback/20261020_0023_attendance_sessions.down.sql
 
 DO $$
@@ -435,6 +437,9 @@ ALTER TABLE event_feedback ADD CONSTRAINT event_feedback_event_fkey
   FOREIGN KEY (event) REFERENCES events(id) ON DELETE CASCADE;
 -- AFC-828 phase 4: re-add the parked 0057 event FK now events is back.
 ALTER TABLE event_testimonies ADD CONSTRAINT event_testimonies_event_fkey
+  FOREIGN KEY (event) REFERENCES events(id) ON DELETE CASCADE;
+-- AFC-880: re-add the parked 0060 event FK now events is back.
+ALTER TABLE event_collaborators ADD CONSTRAINT event_collaborators_event_fkey
   FOREIGN KEY (event) REFERENCES events(id) ON DELETE CASCADE;
 
 -- The 0023 re-apply above recreates attendance_sessions/attendance_records

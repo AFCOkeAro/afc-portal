@@ -1,4 +1,5 @@
 import { can, getPortalScope, throwStoreUnavailable } from '../../../../utils/portal'
+import { collaboratorHasArea } from '../../../../utils/event-access'
 import { directusBaseUrl } from '../../../../utils/directus'
 
 const MAX_BYTES = 50 * 1024 * 1024
@@ -36,12 +37,17 @@ const ALLOWED_TYPES = new Set([
  */
 export default defineEventHandler(async (event) => {
   const scope = await getPortalScope(event)
+  const collaboratorEvent = getRouterParam(event, 'id')
+  const collaboratorOk = collaboratorEvent
+    ? await collaboratorHasArea(event, scope, collaboratorEvent, 'resources')
+    : false
   if (!can(scope, 'events', 'update') && !can(scope, 'event_resources', 'create')) {
-    throw createError({
-      statusCode: 403,
-      statusMessage: 'Your role cannot share resources on this event',
-      data: { code: 'forbidden' },
-    })
+    if (!collaboratorOk)
+      throw createError({
+        statusCode: 403,
+        statusMessage: 'Your role cannot share resources on this event',
+        data: { code: 'forbidden' },
+      })
   }
 
   const parts = await readMultipartFormData(event).catch(() => null)

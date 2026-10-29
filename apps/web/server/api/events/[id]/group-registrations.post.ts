@@ -10,10 +10,10 @@ import {
   findScopedItem,
   getPortalScope,
   listItems,
-  requireCan,
   resolveBranch,
   throwStoreUnavailable,
 } from '../../../utils/portal'
+import { requireEventArea } from '../../../utils/event-access'
 
 /** Smallest defensible batch cap: keeps one request inside Directus limits. */
 const MAX_GROUP_MEMBERS = 50
@@ -41,11 +41,14 @@ const MAX_GROUP_MEMBERS = 50
  */
 export default defineEventHandler(async (event) => {
   const scope = await getPortalScope(event)
-  requireCan(scope, 'event_registrations', 'create')
-
   const id = getRouterParam(event, 'id')
   if (!id)
     throw createError({ statusCode: 400, statusMessage: 'An event id is required' })
+
+  await requireEventArea(event, scope, id, 'registration', {
+    collection: 'event_registrations',
+    action: 'create',
+  })
   // AFC-566: scope-gate + idempotency read below hit 0021 registers.
   // Unreadable store → named error, never a bare 500; deliberate 4xx
   // (scope 404s, validation) pass through. The create loop below keeps

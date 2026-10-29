@@ -9,6 +9,7 @@ import {
   throwStoreUnavailable,
   throwValidation,
 } from '../../../../utils/portal'
+import { collaboratorHasArea } from '../../../../utils/event-access'
 
 /**
  * POST /api/events/:id/budgets — record a planned line against an event
@@ -23,12 +24,17 @@ import {
  */
 export default defineEventHandler(async (event) => {
   const scope = await getPortalScope(event)
+  const collaboratorEvent = getRouterParam(event, 'id')
+  const collaboratorOk = collaboratorEvent
+    ? await collaboratorHasArea(event, scope, collaboratorEvent, 'budget')
+    : false
   if (!can(scope, 'events', 'update') && !can(scope, 'event_budgets', 'create')) {
-    throw createError({
-      statusCode: 403,
-      statusMessage: 'Your role cannot plan budgets on this event',
-      data: { code: 'forbidden' },
-    })
+    if (!collaboratorOk)
+      throw createError({
+        statusCode: 403,
+        statusMessage: 'Your role cannot plan budgets on this event',
+        data: { code: 'forbidden' },
+      })
   }
 
   const id = getRouterParam(event, 'id')

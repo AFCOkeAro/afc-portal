@@ -72,6 +72,27 @@ export const testimonyFormSchema = z.object({
 
 export type TestimonyForm = z.infer<typeof testimonyFormSchema>
 
+/**
+ * Event collaborator areas (AFC-880, v1). Tasks are deliberately not an
+ * area: tasks attach to branches/people, not events. The matrix gates the
+ * register; the routes enforce the areas inside a row.
+ */
+export const COLLABORATOR_AREAS = [
+  'details',
+  'schedule',
+  'speakers',
+  'resources',
+  'budget',
+  'registration',
+] as const
+
+export const collaboratorFormSchema = z.object({
+  person: z.string().uuid('Choose a person'),
+  areas: z.array(z.enum(COLLABORATOR_AREAS)).min(1, 'Tick at least one area').max(6),
+})
+
+export type CollaboratorForm = z.infer<typeof collaboratorFormSchema>
+
 const LEAVE_YEAR_MIN = 2000
 const LEAVE_YEAR_MAX = 2100
 
