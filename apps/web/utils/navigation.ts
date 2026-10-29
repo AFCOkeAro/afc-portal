@@ -277,16 +277,9 @@ export const NAVIGATION: readonly NavigationItem[] = [
     group: 'outreach',
     inSidebar: true,
   },
-  {
-    // AFC-822: stage-by-stage visitor funnel; previously unlinked.
-    // AFC-839: the funnel is a welfare working list, not outreach.
-    label: 'Visitor funnel',
-    to: '/visitors/funnel',
-    icon: 'i-lucide-clipboard-list',
-    requires: ['visitors', 'read'],
-    group: 'welfare',
-    inSidebar: true,
-  },
+  // AFC-895: the funnel is a tab on /visitors now (deep-link
+  // /visitors?tab=funnel); no standalone menu entry. The old
+  // /visitors/funnel route redirects to that tab.
 
   // Welfare
   {
@@ -313,15 +306,9 @@ export const NAVIGATION: readonly NavigationItem[] = [
     group: 'welfare',
     inSidebar: true,
   },
-  {
-    // AFC-822: welfare analytics; previously reachable only in-page.
-    label: 'Welfare reports',
-    to: '/welfare/reports',
-    icon: 'i-lucide-heart',
-    requires: ['welfare_cases', 'read'],
-    group: 'welfare',
-    inSidebar: true,
-  },
+  // AFC-895: the welfare report is a tab on /welfare now (deep-link
+  // /welfare?tab=reports); no standalone menu entry. The old
+  // /welfare/reports route redirects to that tab.
 
   // Worship
   {

@@ -6,6 +6,29 @@ definePageMeta({ middleware: 'staff' })
 
 const api = useApi()
 const route = useRoute()
+const router = useRouter()
+
+/**
+ * Tabs (AFC-895): Visitors list | Newcomer funnel. `?tab=` so each tab
+ * deep-links; the old `/visitors/funnel` route redirects to `?tab=funnel`.
+ */
+const TABS = [
+  { id: 'list', label: 'Visitors', icon: 'i-lucide-user-plus' },
+  { id: 'funnel', label: 'Funnel', icon: 'i-lucide-filter' },
+] as const
+
+type TabId = (typeof TABS)[number]['id']
+
+const tab = computed<TabId>(() => {
+  const raw = route.query.tab
+  const value = Array.isArray(raw) ? raw[0] : raw
+  return value === 'funnel' ? 'funnel' : 'list'
+})
+
+function goTab(next: TabId): void {
+  void router.replace({ query: { ...route.query, tab: next } })
+}
+
 const showForm = ref(false)
 const searchInput = ref('')
 const search = ref('')
@@ -150,13 +173,6 @@ const statusColor: Record<string, 'success' | 'warning' | 'neutral' | 'error'> =
       description="First-time attenders, follow-ups and newcomers in the journey."
     >
       <template #actions>
-        <UButton
-          to="/visitors/funnel"
-          color="neutral"
-          variant="outline"
-          icon="i-lucide-filter"
-          label="Funnel"
-        />
         <PermissionGate :collection="COLLECTIONS.visitors" action="create">
           <UButton
             label="Record intake"
@@ -167,155 +183,184 @@ const statusColor: Record<string, 'success' | 'warning' | 'neutral' | 'error'> =
       </template>
     </PageHeader>
 
-    <DashboardStrip :items="stripItems" />
-
-    <UCard>
-      <div class="grid gap-3 sm:grid-cols-3">
-        <UInput
-          v-model="searchInput"
-          icon="i-lucide-search"
-          placeholder="Search visitors"
-          aria-label="Search visitors"
-        />
-        <USelect v-model="status" :items="statusOptions" class="w-full" />
-        <EntitySelect
-          v-model="branch"
-          :items="branchOptions"
-          placeholder="Select branch…"
-          class="w-full"
-        />
+    <nav aria-label="Visitors sections" class="mb-4">
+      <div class="flex gap-1 overflow-x-auto">
+        <button
+          v-for="entry in TABS"
+          :key="entry.id"
+          type="button"
+          :aria-current="tab === entry.id ? 'page' : undefined"
+          :class="[
+            'flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2.5 text-sm',
+            tab === entry.id
+              ? 'bg-primary-950 font-medium text-white'
+              : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800',
+          ]"
+          @click="goTab(entry.id)"
+        >
+          <UIcon :name="entry.icon" class="size-4" />{{ entry.label }}
+        </button>
       </div>
-      <div v-if="eventFilter" class="mt-3">
-        <UBadge color="neutral" variant="subtle">
-          Event: {{ eventFilter }}
-          <UButton
-            size="xs"
-            color="neutral"
-            variant="ghost"
-            icon="i-lucide-x"
-            aria-label="Clear event filter"
-            @click="eventFilter = null"
+    </nav>
+
+    <section v-if="tab === 'list'" aria-label="Visitor list">
+      <DashboardStrip :items="stripItems" />
+
+      <UCard>
+        <div class="grid gap-3 sm:grid-cols-3">
+          <UInput
+            v-model="searchInput"
+            icon="i-lucide-search"
+            placeholder="Search visitors"
+            aria-label="Search visitors"
           />
-        </UBadge>
-      </div>
-
-      <UAlert
-        v-if="error"
-        class="mt-4"
-        color="error"
-        variant="subtle"
-        title="Could not load visitors"
-        :description="error.message"
-      />
-
-      <div v-if="pending" class="mt-8 flex justify-center py-10">
-        <UIcon name="i-lucide-loader-circle" class="size-6 animate-spin text-gray-400" />
-      </div>
-
-      <EmptyState
-        v-else-if="rows.length === 0"
-        title="No visitors match these filters"
-        description="Record an intake after a first visit, or clear the status filter."
-      >
-        <PermissionGate :collection="COLLECTIONS.visitors" action="create">
-          <UButton class="mt-4" label="Record intake" @click="showForm = true" />
-        </PermissionGate>
-      </EmptyState>
-
-      <div v-else class="mt-4 overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
-          <thead>
-            <tr
-              class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400"
-            >
-              <th class="px-3 py-2 font-medium">Visitor</th>
-              <th class="px-3 py-2 font-medium">Visit</th>
-              <th class="px-3 py-2 font-medium">Branch</th>
-              <th class="px-3 py-2 font-medium">Age group</th>
-              <th class="px-3 py-2 font-medium">Follow-up</th>
-              <th class="px-3 py-2 font-medium">Status</th>
-              <th class="px-3 py-2"><span class="sr-only">Open</span></th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-            <tr
-              v-for="visitor in rows"
-              :key="visitor.id"
-              class="hover:bg-gray-50 dark:hover:bg-gray-900/60"
-            >
-              <td class="px-3 py-3">
-                <NuxtLink
-                  :to="`/visitors/${visitor.id}`"
-                  class="font-medium text-gray-900 hover:text-primary-600 dark:text-white"
-                >
-                  {{ name(visitor) }}
-                </NuxtLink>
-                <p class="text-xs text-gray-500 dark:text-gray-400">
-                  {{ visitor.phone || visitor.email || 'No contact' }}
-                </p>
-              </td>
-              <td class="px-3 py-3 text-gray-600 dark:text-gray-300">
-                {{ formatDate(visitor.visit_date) }}
-              </td>
-              <td class="px-3 py-3 text-gray-600 dark:text-gray-300">
-                {{ visitor.branch_name || '—' }}
-              </td>
-              <td class="px-3 py-3 capitalize text-gray-600 dark:text-gray-300">
-                {{ visitor.age_group }}
-              </td>
-              <td class="px-3 py-3 text-gray-600 dark:text-gray-300">
-                <p>{{ formatDate(visitor.next_follow_up_date) }}</p>
-                <p class="text-xs text-gray-500 dark:text-gray-400">
-                  {{ visitor.follow_up_owner || 'Unassigned' }}
-                </p>
-              </td>
-              <td class="px-3 py-3">
-                <UBadge
-                  :color="statusColor[visitor.status] ?? 'neutral'"
-                  variant="subtle"
-                >
-                  {{ visitor.status.replace(/_/g, ' ') }}
-                </UBadge>
-              </td>
-              <td class="px-3 py-3 text-right">
-                <UButton
-                  :to="`/visitors/${visitor.id}`"
-                  color="neutral"
-                  variant="ghost"
-                  size="xs"
-                  icon="i-lucide-arrow-right"
-                  aria-label="Open visitor"
-                />
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div v-if="total > limit" class="mt-4 flex items-center justify-between text-sm">
-        <p class="text-gray-500 dark:text-gray-400">
-          {{ total }} visitors · page {{ page }} of {{ pageCount }}
-        </p>
-        <div class="flex gap-2">
-          <UButton
-            color="neutral"
-            variant="outline"
-            size="sm"
-            label="Previous"
-            :disabled="page <= 1"
-            @click="page -= 1"
-          />
-          <UButton
-            color="neutral"
-            variant="outline"
-            size="sm"
-            label="Next"
-            :disabled="page >= pageCount"
-            @click="page += 1"
+          <USelect v-model="status" :items="statusOptions" class="w-full" />
+          <EntitySelect
+            v-model="branch"
+            :items="branchOptions"
+            placeholder="Select branch…"
+            class="w-full"
           />
         </div>
-      </div>
-    </UCard>
+        <div v-if="eventFilter" class="mt-3">
+          <UBadge color="neutral" variant="subtle">
+            Event: {{ eventFilter }}
+            <UButton
+              size="xs"
+              color="neutral"
+              variant="ghost"
+              icon="i-lucide-x"
+              aria-label="Clear event filter"
+              @click="eventFilter = null"
+            />
+          </UBadge>
+        </div>
+
+        <UAlert
+          v-if="error"
+          class="mt-4"
+          color="error"
+          variant="subtle"
+          title="Could not load visitors"
+          :description="error.message"
+        />
+
+        <div v-if="pending" class="mt-8 flex justify-center py-10">
+          <UIcon
+            name="i-lucide-loader-circle"
+            class="size-6 animate-spin text-gray-400"
+          />
+        </div>
+
+        <EmptyState
+          v-else-if="rows.length === 0"
+          title="No visitors match these filters"
+          description="Record an intake after a first visit, or clear the status filter."
+        >
+          <PermissionGate :collection="COLLECTIONS.visitors" action="create">
+            <UButton class="mt-4" label="Record intake" @click="showForm = true" />
+          </PermissionGate>
+        </EmptyState>
+
+        <div v-else class="mt-4 overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
+            <thead>
+              <tr
+                class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400"
+              >
+                <th class="px-3 py-2 font-medium">Visitor</th>
+                <th class="px-3 py-2 font-medium">Visit</th>
+                <th class="px-3 py-2 font-medium">Branch</th>
+                <th class="px-3 py-2 font-medium">Age group</th>
+                <th class="px-3 py-2 font-medium">Follow-up</th>
+                <th class="px-3 py-2 font-medium">Status</th>
+                <th class="px-3 py-2"><span class="sr-only">Open</span></th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+              <tr
+                v-for="visitor in rows"
+                :key="visitor.id"
+                class="hover:bg-gray-50 dark:hover:bg-gray-900/60"
+              >
+                <td class="px-3 py-3">
+                  <NuxtLink
+                    :to="`/visitors/${visitor.id}`"
+                    class="font-medium text-gray-900 hover:text-primary-600 dark:text-white"
+                  >
+                    {{ name(visitor) }}
+                  </NuxtLink>
+                  <p class="text-xs text-gray-500 dark:text-gray-400">
+                    {{ visitor.phone || visitor.email || 'No contact' }}
+                  </p>
+                </td>
+                <td class="px-3 py-3 text-gray-600 dark:text-gray-300">
+                  {{ formatDate(visitor.visit_date) }}
+                </td>
+                <td class="px-3 py-3 text-gray-600 dark:text-gray-300">
+                  {{ visitor.branch_name || '—' }}
+                </td>
+                <td class="px-3 py-3 capitalize text-gray-600 dark:text-gray-300">
+                  {{ visitor.age_group }}
+                </td>
+                <td class="px-3 py-3 text-gray-600 dark:text-gray-300">
+                  <p>{{ formatDate(visitor.next_follow_up_date) }}</p>
+                  <p class="text-xs text-gray-500 dark:text-gray-400">
+                    {{ visitor.follow_up_owner || 'Unassigned' }}
+                  </p>
+                </td>
+                <td class="px-3 py-3">
+                  <UBadge
+                    :color="statusColor[visitor.status] ?? 'neutral'"
+                    variant="subtle"
+                  >
+                    {{ visitor.status.replace(/_/g, ' ') }}
+                  </UBadge>
+                </td>
+                <td class="px-3 py-3 text-right">
+                  <UButton
+                    :to="`/visitors/${visitor.id}`"
+                    color="neutral"
+                    variant="ghost"
+                    size="xs"
+                    icon="i-lucide-arrow-right"
+                    aria-label="Open visitor"
+                  />
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div v-if="total > limit" class="mt-4 flex items-center justify-between text-sm">
+          <p class="text-gray-500 dark:text-gray-400">
+            {{ total }} visitors · page {{ page }} of {{ pageCount }}
+          </p>
+          <div class="flex gap-2">
+            <UButton
+              color="neutral"
+              variant="outline"
+              size="sm"
+              label="Previous"
+              :disabled="page <= 1"
+              @click="page -= 1"
+            />
+            <UButton
+              color="neutral"
+              variant="outline"
+              size="sm"
+              label="Next"
+              :disabled="page >= pageCount"
+              @click="page += 1"
+            />
+          </div>
+        </div>
+      </UCard>
+    </section>
+
+    <section v-if="tab === 'funnel'" aria-label="Newcomer funnel">
+      <VisitorFunnelPanel />
+    </section>
 
     <VisitorFormModal
       v-model:open="showForm"
