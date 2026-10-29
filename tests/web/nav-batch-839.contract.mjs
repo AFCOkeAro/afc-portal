@@ -44,9 +44,13 @@ describe('AFC-839 nav batch', () => {
     assert.doesNotMatch(src, /tasks\?mine=1/)
   })
 
-  it('the funnel lives under Welfare', () => {
+  // AFC-895 supersedes this pin: the funnel is a tab on /visitors
+  // (deep-link /visitors?tab=funnel), not a nav entry. The old
+  // /visitors/funnel route redirects to that tab.
+  it('the funnel has no standalone entry (it is a tab on /visitors)', () => {
     const src = codeOf(NAV)
-    assert.equal(groupOf(src, '/visitors/funnel'), 'welfare')
+    assert.doesNotMatch(src, /Visitor funnel/)
+    assert.doesNotMatch(src, /visitors\/funnel/)
   })
 
   it('transfers live under Church Office', () => {

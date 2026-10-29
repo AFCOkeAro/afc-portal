@@ -7,6 +7,29 @@ definePageMeta({ middleware: ['staff', 'welfare'] })
 const api = useApi()
 const permissions = usePermissions()
 const route = useRoute()
+const router = useRouter()
+
+/**
+ * Tabs (AFC-895): Welfare cases | Reports. `?tab=` so each tab deep-links;
+ * the old `/welfare/reports` route redirects to `?tab=reports`.
+ */
+const TABS = [
+  { id: 'cases', label: 'Cases', icon: 'i-lucide-heart-handshake' },
+  { id: 'reports', label: 'Reports', icon: 'i-lucide-chart-column' },
+] as const
+
+type TabId = (typeof TABS)[number]['id']
+
+const tab = computed<TabId>(() => {
+  const raw = route.query.tab
+  const value = Array.isArray(raw) ? raw[0] : raw
+  return value === 'reports' ? 'reports' : 'cases'
+})
+
+function goTab(next: TabId): void {
+  void router.replace({ query: { ...route.query, tab: next } })
+}
+
 const showForm = ref(false)
 const searchInput = ref('')
 const search = ref('')
@@ -187,13 +210,6 @@ const priorityColor: Record<string, 'success' | 'warning' | 'neutral' | 'error'>
     >
       <template #actions>
         <div class="flex gap-2">
-          <UButton
-            label="Reports"
-            icon="i-lucide-chart-column"
-            color="neutral"
-            variant="outline"
-            to="/welfare/reports"
-          />
           <PermissionGate :collection="COLLECTIONS.welfareCases" action="create">
             <UButton label="Open case" icon="i-lucide-plus" @click="showForm = true" />
           </PermissionGate>
@@ -201,180 +217,209 @@ const priorityColor: Record<string, 'success' | 'warning' | 'neutral' | 'error'>
       </template>
     </PageHeader>
 
-    <UAlert
-      v-if="restricted.length"
-      class="mb-4"
-      color="warning"
-      variant="subtle"
-      icon="i-lucide-shield-alert"
-      title="Restricted on this account"
-      :description="`Not shown here: ${restricted.join(', ')}. Case details and outcome notes are limited to branch, area and super administrators (data-model §10.1).`"
-    />
-
-    <DashboardStrip :items="stripItems" />
-
-    <UCard>
-      <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        <UInput
-          v-model="searchInput"
-          icon="i-lucide-search"
-          placeholder="Search cases"
-          aria-label="Search welfare cases"
-        />
-        <USelect v-model="status" :items="statusOptions" class="w-full" />
-        <USelect v-model="category" :items="categoryOptions" class="w-full" />
-        <USelect v-model="priority" :items="priorityOptions" class="w-full" />
-        <EntitySelect
-          v-model="branch"
-          :items="branchOptions"
-          placeholder="Select branch…"
-          class="w-full"
-        />
-        <USelect
-          v-model="confidentiality"
-          :items="confidentialityOptions"
-          class="w-full"
-        />
+    <nav aria-label="Welfare sections" class="mb-4">
+      <div class="flex gap-1 overflow-x-auto">
+        <button
+          v-for="entry in TABS"
+          :key="entry.id"
+          type="button"
+          :aria-current="tab === entry.id ? 'page' : undefined"
+          :class="[
+            'flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2.5 text-sm',
+            tab === entry.id
+              ? 'bg-primary-950 font-medium text-white'
+              : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800',
+          ]"
+          @click="goTab(entry.id)"
+        >
+          <UIcon :name="entry.icon" class="size-4" />{{ entry.label }}
+        </button>
       </div>
+    </nav>
 
+    <section v-if="tab === 'cases'" aria-label="Welfare cases">
       <UAlert
-        v-if="error"
-        class="mt-4"
-        color="error"
+        v-if="restricted.length"
+        class="mb-4"
+        color="warning"
         variant="subtle"
-        title="Could not load welfare cases"
-        :description="error.message"
+        icon="i-lucide-shield-alert"
+        title="Restricted on this account"
+        :description="`Not shown here: ${restricted.join(', ')}. Case details and outcome notes are limited to branch, area and super administrators (data-model §10.1).`"
       />
 
-      <div v-if="pending" class="mt-8 flex justify-center py-10">
-        <UIcon name="i-lucide-loader-circle" class="size-6 animate-spin text-gray-400" />
-      </div>
+      <DashboardStrip :items="stripItems" />
 
-      <EmptyState
-        v-else-if="rows.length === 0"
-        title="No welfare cases match these filters"
-        description="Open a case when a member needs practical support."
-      >
-        <PermissionGate :collection="COLLECTIONS.welfareCases" action="create">
-          <UButton class="mt-4" label="Open case" @click="showForm = true" />
-        </PermissionGate>
-      </EmptyState>
-
-      <div v-else class="mt-4 overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
-          <thead>
-            <tr
-              class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400"
-            >
-              <th class="px-3 py-2 font-medium">Case</th>
-              <th class="px-3 py-2 font-medium">Person</th>
-              <th class="px-3 py-2 font-medium">Category</th>
-              <th class="px-3 py-2 font-medium">Priority</th>
-              <th class="px-3 py-2 font-medium">Assistance</th>
-              <th class="px-3 py-2 font-medium">Activity</th>
-              <th class="px-3 py-2 font-medium">Opened</th>
-              <th class="px-3 py-2 font-medium">Status</th>
-              <th class="px-3 py-2"><span class="sr-only">Open</span></th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-            <tr
-              v-for="welfareCase in rows"
-              :key="welfareCase.id"
-              class="hover:bg-gray-50 dark:hover:bg-gray-900/60"
-            >
-              <td class="px-3 py-3">
-                <NuxtLink
-                  :to="`/welfare/${welfareCase.id}`"
-                  class="font-mono text-xs font-medium text-gray-900 hover:text-primary-600 dark:text-white"
-                >
-                  {{ welfareCase.case_ref }}
-                </NuxtLink>
-                <p class="text-xs text-gray-500 dark:text-gray-400">
-                  {{ welfareCase.branch_name || 'No branch' }}
-                </p>
-              </td>
-              <td class="px-3 py-3 text-gray-600 dark:text-gray-300">
-                {{ welfareCase.person_name || '—' }}
-              </td>
-              <td class="px-3 py-3 capitalize text-gray-600 dark:text-gray-300">
-                {{ welfareCase.category }}
-              </td>
-              <td class="px-3 py-3">
-                <UBadge
-                  :color="priorityColor[welfareCase.priority ?? 'normal'] ?? 'neutral'"
-                  variant="subtle"
-                >
-                  {{ welfareCase.priority ?? 'normal' }}
-                </UBadge>
-              </td>
-              <td class="px-3 py-3 tabular-nums text-gray-600 dark:text-gray-300">
-                <p>{{ welfareCase.amount_assisted || '0.00' }} assisted</p>
-                <p class="text-xs text-gray-500 dark:text-gray-400">
-                  {{ welfareCase.contribution_total }} contributed
-                </p>
-              </td>
-              <td class="px-3 py-3 text-gray-600 dark:text-gray-300">
-                {{ welfareCase.event_count }} entries
-              </td>
-              <td class="px-3 py-3 text-gray-600 dark:text-gray-300">
-                {{ formatDate(welfareCase.opened_at) }}
-              </td>
-              <td class="px-3 py-3">
-                <UBadge
-                  :color="statusColor[welfareCase.status ?? 'open'] ?? 'neutral'"
-                  variant="subtle"
-                >
-                  {{ (welfareCase.status ?? 'open').replace(/_/g, ' ') }}
-                </UBadge>
-                <UBadge
-                  v-if="welfareCase.confidentiality === 'area'"
-                  class="ml-1"
-                  color="info"
-                  variant="subtle"
-                >
-                  area
-                </UBadge>
-              </td>
-              <td class="px-3 py-3 text-right">
-                <UButton
-                  :to="`/welfare/${welfareCase.id}`"
-                  color="neutral"
-                  variant="ghost"
-                  size="xs"
-                  icon="i-lucide-arrow-right"
-                  aria-label="Open case"
-                />
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div v-if="total > limit" class="mt-4 flex items-center justify-between text-sm">
-        <p class="text-gray-500 dark:text-gray-400">
-          {{ total }} cases · page {{ page }} of {{ pageCount }}
-        </p>
-        <div class="flex gap-2">
-          <UButton
-            color="neutral"
-            variant="outline"
-            size="sm"
-            label="Previous"
-            :disabled="page <= 1"
-            @click="page -= 1"
+      <UCard>
+        <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <UInput
+            v-model="searchInput"
+            icon="i-lucide-search"
+            placeholder="Search cases"
+            aria-label="Search welfare cases"
           />
-          <UButton
-            color="neutral"
-            variant="outline"
-            size="sm"
-            label="Next"
-            :disabled="page >= pageCount"
-            @click="page += 1"
+          <USelect v-model="status" :items="statusOptions" class="w-full" />
+          <USelect v-model="category" :items="categoryOptions" class="w-full" />
+          <USelect v-model="priority" :items="priorityOptions" class="w-full" />
+          <EntitySelect
+            v-model="branch"
+            :items="branchOptions"
+            placeholder="Select branch…"
+            class="w-full"
+          />
+          <USelect
+            v-model="confidentiality"
+            :items="confidentialityOptions"
+            class="w-full"
           />
         </div>
-      </div>
-    </UCard>
+
+        <UAlert
+          v-if="error"
+          class="mt-4"
+          color="error"
+          variant="subtle"
+          title="Could not load welfare cases"
+          :description="error.message"
+        />
+
+        <div v-if="pending" class="mt-8 flex justify-center py-10">
+          <UIcon
+            name="i-lucide-loader-circle"
+            class="size-6 animate-spin text-gray-400"
+          />
+        </div>
+
+        <EmptyState
+          v-else-if="rows.length === 0"
+          title="No welfare cases match these filters"
+          description="Open a case when a member needs practical support."
+        >
+          <PermissionGate :collection="COLLECTIONS.welfareCases" action="create">
+            <UButton class="mt-4" label="Open case" @click="showForm = true" />
+          </PermissionGate>
+        </EmptyState>
+
+        <div v-else class="mt-4 overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
+            <thead>
+              <tr
+                class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400"
+              >
+                <th class="px-3 py-2 font-medium">Case</th>
+                <th class="px-3 py-2 font-medium">Person</th>
+                <th class="px-3 py-2 font-medium">Category</th>
+                <th class="px-3 py-2 font-medium">Priority</th>
+                <th class="px-3 py-2 font-medium">Assistance</th>
+                <th class="px-3 py-2 font-medium">Activity</th>
+                <th class="px-3 py-2 font-medium">Opened</th>
+                <th class="px-3 py-2 font-medium">Status</th>
+                <th class="px-3 py-2"><span class="sr-only">Open</span></th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+              <tr
+                v-for="welfareCase in rows"
+                :key="welfareCase.id"
+                class="hover:bg-gray-50 dark:hover:bg-gray-900/60"
+              >
+                <td class="px-3 py-3">
+                  <NuxtLink
+                    :to="`/welfare/${welfareCase.id}`"
+                    class="font-mono text-xs font-medium text-gray-900 hover:text-primary-600 dark:text-white"
+                  >
+                    {{ welfareCase.case_ref }}
+                  </NuxtLink>
+                  <p class="text-xs text-gray-500 dark:text-gray-400">
+                    {{ welfareCase.branch_name || 'No branch' }}
+                  </p>
+                </td>
+                <td class="px-3 py-3 text-gray-600 dark:text-gray-300">
+                  {{ welfareCase.person_name || '—' }}
+                </td>
+                <td class="px-3 py-3 capitalize text-gray-600 dark:text-gray-300">
+                  {{ welfareCase.category }}
+                </td>
+                <td class="px-3 py-3">
+                  <UBadge
+                    :color="priorityColor[welfareCase.priority ?? 'normal'] ?? 'neutral'"
+                    variant="subtle"
+                  >
+                    {{ welfareCase.priority ?? 'normal' }}
+                  </UBadge>
+                </td>
+                <td class="px-3 py-3 tabular-nums text-gray-600 dark:text-gray-300">
+                  <p>{{ welfareCase.amount_assisted || '0.00' }} assisted</p>
+                  <p class="text-xs text-gray-500 dark:text-gray-400">
+                    {{ welfareCase.contribution_total }} contributed
+                  </p>
+                </td>
+                <td class="px-3 py-3 text-gray-600 dark:text-gray-300">
+                  {{ welfareCase.event_count }} entries
+                </td>
+                <td class="px-3 py-3 text-gray-600 dark:text-gray-300">
+                  {{ formatDate(welfareCase.opened_at) }}
+                </td>
+                <td class="px-3 py-3">
+                  <UBadge
+                    :color="statusColor[welfareCase.status ?? 'open'] ?? 'neutral'"
+                    variant="subtle"
+                  >
+                    {{ (welfareCase.status ?? 'open').replace(/_/g, ' ') }}
+                  </UBadge>
+                  <UBadge
+                    v-if="welfareCase.confidentiality === 'area'"
+                    class="ml-1"
+                    color="info"
+                    variant="subtle"
+                  >
+                    area
+                  </UBadge>
+                </td>
+                <td class="px-3 py-3 text-right">
+                  <UButton
+                    :to="`/welfare/${welfareCase.id}`"
+                    color="neutral"
+                    variant="ghost"
+                    size="xs"
+                    icon="i-lucide-arrow-right"
+                    aria-label="Open case"
+                  />
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div v-if="total > limit" class="mt-4 flex items-center justify-between text-sm">
+          <p class="text-gray-500 dark:text-gray-400">
+            {{ total }} cases · page {{ page }} of {{ pageCount }}
+          </p>
+          <div class="flex gap-2">
+            <UButton
+              color="neutral"
+              variant="outline"
+              size="sm"
+              label="Previous"
+              :disabled="page <= 1"
+              @click="page -= 1"
+            />
+            <UButton
+              color="neutral"
+              variant="outline"
+              size="sm"
+              label="Next"
+              :disabled="page >= pageCount"
+              @click="page += 1"
+            />
+          </div>
+        </div>
+      </UCard>
+    </section>
+
+    <section v-if="tab === 'reports'" aria-label="Welfare reports">
+      <WelfareReportsPanel />
+    </section>
 
     <WelfareFormModal
       v-model:open="showForm"
