@@ -218,10 +218,15 @@ export function countByType(
     event: 0,
     programme: 0,
     celebration: 0,
+    birthday: 0,
+    anniversary: 0,
+    task: 0,
+    meeting: 0,
   }
   for (const item of items) {
     if (prefix && !item.date.startsWith(prefix)) continue
-    if (item.item_type in counts) counts[item.item_type] = (counts[item.item_type] ?? 0) + 1
+    if (item.item_type in counts)
+      counts[item.item_type] = (counts[item.item_type] ?? 0) + 1
   }
   return counts
 }

@@ -20,6 +20,10 @@ export const CALENDAR_ITEM_TYPES = [
   'event',
   'programme',
   'celebration',
+  'birthday',
+  'anniversary',
+  'task',
+  'meeting',
 ] as const
 export type CalendarItemType = (typeof CALENDAR_ITEM_TYPES)[number]
 
@@ -48,12 +52,16 @@ export interface CalendarFeedOptions {
   limit?: number
 }
 
-/** Sort key: date, then type order (service, event, programme, celebration). */
+/** Sort key: date, then type order (service, event, programme, celebration, birthday, anniversary, task, meeting). */
 const TYPE_ORDER: Record<CalendarItemType, number> = {
   service: 0,
   event: 1,
   programme: 2,
   celebration: 3,
+  birthday: 4,
+  anniversary: 5,
+  task: 6,
+  meeting: 7,
 }
 
 /**
@@ -71,6 +79,10 @@ export function combineCalendarFeed(
     ...(parts.event ?? []),
     ...(parts.programme ?? []),
     ...(parts.celebration ?? []),
+    ...(parts.birthday ?? []),
+    ...(parts.anniversary ?? []),
+    ...(parts.task ?? []),
+    ...(parts.meeting ?? []),
   ]
   const { dateFrom, dateTo, itemType, limit } = options
   return merged

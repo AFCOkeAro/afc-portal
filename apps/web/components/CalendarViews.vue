@@ -97,7 +97,10 @@ function countInMonth(monthStart: string): number {
  * month blocks, week pills, day badges and year mini-month dots — so the
  * legend can never drift from the grid.
  */
-const TYPE_META: Record<string, { label: string; dot: string; pill: string; bar: string }> = {
+const TYPE_META: Record<
+  string,
+  { label: string; dot: string; pill: string; bar: string }
+> = {
   service: {
     label: 'Services',
     dot: 'bg-blue-500',
@@ -122,11 +125,49 @@ const TYPE_META: Record<string, { label: string; dot: string; pill: string; bar:
     pill: 'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-200',
     bar: 'border-rose-500',
   },
+  birthday: {
+    label: 'Birthdays',
+    dot: 'bg-pink-500',
+    pill: 'bg-pink-100 text-pink-800 dark:bg-pink-900/40 dark:text-pink-200',
+    bar: 'border-pink-500',
+  },
+  anniversary: {
+    label: 'Anniversaries',
+    dot: 'bg-violet-500',
+    pill: 'bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-200',
+    bar: 'border-violet-500',
+  },
+  task: {
+    label: 'Tasks',
+    dot: 'bg-orange-500',
+    pill: 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-200',
+    bar: 'border-orange-500',
+  },
+  meeting: {
+    label: 'Meetings',
+    dot: 'bg-cyan-500',
+    pill: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-200',
+    bar: 'border-cyan-500',
+  },
 }
 
-const TYPE_ORDER = ['service', 'event', 'programme', 'celebration']
+const TYPE_ORDER = [
+  'service',
+  'event',
+  'programme',
+  'celebration',
+  'birthday',
+  'anniversary',
+  'task',
+  'meeting',
+]
 
-function typeMeta(type: string): { label: string; dot: string; pill: string; bar: string } {
+function typeMeta(type: string): {
+  label: string
+  dot: string
+  pill: string
+  bar: string
+} {
   return (
     TYPE_META[type] ?? {
       label: type,
