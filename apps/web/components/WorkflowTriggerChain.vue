@@ -3,7 +3,9 @@
  * WorkflowTriggerChain (AFC-868): read-only trigger-chain renderer matching
  * the "Upon Joining a Group" sample — a purple trigger pill with a vertical
  * dotted spine, then one wait-then-send card per node (wait label, channel
- * icon, day pill, status dot).
+ * icon, day pill, status dot). A conditional step renders a decision
+ * diamond above its card with diverging YES (green, step runs) and NO
+ * (red, step skipped) edges that rejoin at the next step.
  *
  * Purely presentational: every figure comes from the `chain` prop (the
  * GET /api/workflows/trigger-chain shape). No fetch, no write, no builder
@@ -13,6 +15,9 @@
 export interface TriggerChainNodeView {
   sequence: number
   name: string
+  condition_label: string | null
+  yes_to: string | null
+  no_to: string | null
   wait_days: number | null
   wait_label: string
   channel_key: string
@@ -88,9 +93,51 @@ function statusText(node: TriggerChainNodeView): string {
           :class="statusDotClass(node.status)"
           :title="statusText(node)"
         />
+        <div
+          v-if="node.condition_label"
+          data-testid="trigger-chain-decision"
+          :aria-label="`Decision: ${node.condition_label}`"
+          class="mb-2 flex items-start gap-3"
+        >
+          <span
+            aria-hidden="true"
+            class="mt-0.5 inline-flex size-8 shrink-0 rotate-45 items-center justify-center rounded-[6px] bg-purple-600 text-white"
+          >
+            <span class="-rotate-45 text-sm font-bold">?</span>
+          </span>
+          <div class="min-w-0">
+            <p class="text-sm font-semibold text-gray-900 dark:text-white">
+              {{ node.condition_label }}
+            </p>
+            <div class="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+              <span
+                class="inline-flex items-center gap-1 font-medium text-green-700 dark:text-green-300"
+              >
+                <span class="inline-block h-px w-4 bg-green-500" aria-hidden="true" />
+                Yes → runs this step{{
+                  node.yes_to ? `, then ${node.yes_to}` : ', then the workflow ends'
+                }}
+              </span>
+              <span
+                class="inline-flex items-center gap-1 font-medium text-red-700 dark:text-red-300"
+              >
+                <span class="inline-block h-px w-4 bg-red-500" aria-hidden="true" />
+                No → skips to {{ node.no_to ?? 'the end of the workflow' }}
+              </span>
+            </div>
+          </div>
+        </div>
         <UCard>
           <div class="flex flex-wrap items-center gap-2">
             <span class="text-sm font-semibold">{{ node.wait_label }}</span>
+            <UBadge
+              v-if="node.condition_label"
+              color="warning"
+              variant="subtle"
+              title="This step runs only when the decision above answers yes"
+            >
+              Runs on YES
+            </UBadge>
             <UBadge
               v-if="node.day_pill"
               color="neutral"

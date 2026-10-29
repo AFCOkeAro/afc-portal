@@ -49,6 +49,7 @@ const {
   waitDaysFromDelay,
   waitLabelFor,
   nodeStatusFor,
+  conditionLabelFor,
   TRIGGER_UPON_JOINING_GROUP,
 } = await import('../../apps/web/server/utils/trigger-chain.ts')
 
@@ -348,5 +349,90 @@ describe('page + navigation: read-only surface, builder deferred', () => {
     assert.match(nav, /label: 'Workflows'/)
     assert.match(nav, /to: '\/workflows'/)
     assert.match(nav, /group: 'communications'/)
+  })
+})
+
+describe('builder: conditional steps diverge YES / NO', () => {
+  it('labels the documented predicates as questions', () => {
+    assert.equal(
+      conditionLabelFor({ whatsapp_registered_no_activity: true }),
+      'WhatsApp registered with no activity?',
+    )
+    assert.equal(conditionLabelFor({ consent_sms: true }), 'SMS consent given?')
+    assert.equal(conditionLabelFor({ not_opted_out: true }), 'Not opted out?')
+    assert.equal(conditionLabelFor({ stage_equals: 'member' }), 'Stage equals member?')
+    assert.equal(
+      conditionLabelFor({ has_milestone: 'first_visit' }),
+      'Milestone reached (first_visit)?',
+    )
+  })
+
+  it('empty, absent or false-only conditions mean the step always runs', () => {
+    assert.equal(conditionLabelFor(null), null)
+    assert.equal(conditionLabelFor(undefined), null)
+    assert.equal(conditionLabelFor({}), null)
+    assert.equal(conditionLabelFor({ consent_sms: false }), null)
+  })
+
+  it('unknown predicates degrade to a humanised question, never hidden', () => {
+    assert.equal(conditionLabelFor({ invited_by_friend: true }), 'Invited By Friend?')
+  })
+
+  it('YES runs the step and NO skips to the same next step', () => {
+    const chain = buildTriggerChain(
+      chainInput({
+        steps: [
+          stepRow({ sequence: 1, name: 'Welcome message' }),
+          stepRow({
+            sequence: 2,
+            name: 'WhatsApp nudge',
+            channel_key: 'whatsapp',
+            condition: { whatsapp_registered_no_activity: true },
+          }),
+          stepRow({ sequence: 3, name: 'Service reminder' }),
+        ],
+      }),
+    )
+    assert.equal(chain.nodes[0].condition_label, null)
+    assert.equal(chain.nodes[0].yes_to, null)
+    assert.equal(chain.nodes[0].no_to, null)
+    assert.equal(chain.nodes[1].condition_label, 'WhatsApp registered with no activity?')
+    assert.equal(chain.nodes[1].yes_to, 'Service reminder')
+    assert.equal(chain.nodes[1].no_to, 'Service reminder')
+  })
+
+  it('a terminal conditional step ends the workflow on both edges', () => {
+    const chain = buildTriggerChain(
+      chainInput({
+        steps: [
+          stepRow({
+            sequence: 1,
+            name: 'Final nudge',
+            condition: { not_opted_out: true },
+          }),
+        ],
+      }),
+    )
+    assert.equal(chain.nodes[0].yes_to, null)
+    assert.equal(chain.nodes[0].no_to, null)
+  })
+})
+
+describe('route + component: branches render as a decision diamond', () => {
+  it('the route passes the stored condition to the builder', () => {
+    const src = codeOf('apps/web/server/api/workflows/trigger-chain.get.ts')
+    assert.match(src, /row\.condition/)
+  })
+
+  it('conditional nodes render a diamond with diverging YES / NO edges', () => {
+    const src = codeOf('apps/web/components/WorkflowTriggerChain.vue')
+    assert.match(src, /trigger-chain-decision/, 'diamond block exists')
+    assert.match(src, /condition_label/, 'question comes from the node')
+    assert.match(src, /Yes → runs this step/, 'green YES edge runs the step')
+    assert.match(src, /No → skips to/, 'red NO edge skips ahead')
+    assert.match(src, /yes_to|node\.yes_to/, 'YES rejoins at the next step')
+    assert.match(src, /no_to|node\.no_to/, 'NO rejoins at the next step')
+    assert.match(src, /Runs on YES/, 'the card states its gate')
+    assert.match(src, /Decision:/, 'the diamond is labelled for assistive tech')
   })
 })
