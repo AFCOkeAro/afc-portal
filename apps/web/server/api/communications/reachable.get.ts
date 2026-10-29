@@ -39,7 +39,7 @@ import { HARDENING_COLLECTIONS } from '../../utils/hardening'
  * surfaces them from the existing hardening + quota endpoints.
  */
 
-const CHANNELS = ['email', 'sms', 'personal'] as const
+const CHANNELS = ['email', 'sms', 'whatsapp', 'personal'] as const
 type Channel = (typeof CHANNELS)[number]
 
 const CLASSIFICATIONS = ['personal', 'bulk'] as const
@@ -92,7 +92,7 @@ export default defineEventHandler(async (event) => {
   ) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Channel must be one of email, sms, personal',
+      statusMessage: 'Channel must be one of email, sms, whatsapp, personal',
       data: { code: 'invalid_channel' },
     })
   }
@@ -152,16 +152,26 @@ export default defineEventHandler(async (event) => {
   }
 
   // Granted / refused lookups per person (SMS-channel rows gate both SMS
-  // and email, mirroring the 0004 resolver; WhatsApp rows are ignored —
-  // the configure step offers email / SMS / preference only).
+  // and email, mirroring the 0004 resolver; WhatsApp has its own
+  // lane (AFC-902): only explicit whatsapp-channel grants count.
   const grantedSms = new Set<string>()
   const guardianSms = new Set<string>()
   const refusedSms = new Set<string>()
+  const grantedWhatsapp = new Set<string>()
+  const guardianWhatsapp = new Set<string>()
+  const refusedWhatsapp = new Set<string>()
   const hashes: string[] = []
   for (const row of consents) {
     const person = row.person ? String(row.person) : null
-    if (!person || row.channel !== 'sms') continue
-    if (row.granted) {
+    if (!person || (row.channel !== 'sms' && row.channel !== 'whatsapp')) continue
+    if (row.channel === 'whatsapp') {
+      if (row.granted) {
+        grantedWhatsapp.add(person)
+        if (row.basis === 'guardian') guardianWhatsapp.add(person)
+      } else {
+        refusedWhatsapp.add(person)
+      }
+    } else if (row.granted) {
       grantedSms.add(person)
       if (row.basis === 'guardian') guardianSms.add(person)
     } else {
@@ -184,7 +194,7 @@ export default defineEventHandler(async (event) => {
         {
           filter: {
             contact_hash: { _in: [...new Set(hashes)] },
-            channel: { _in: ['sms', 'email', 'all'] },
+            channel: { _in: ['sms', 'email', 'whatsapp', 'all'] },
           },
           fields: ['contact_hash', 'channel'],
           limit: -1,
@@ -205,7 +215,7 @@ export default defineEventHandler(async (event) => {
         person &&
         row.contact_hash &&
         suppressedHashes.has(row.contact_hash) &&
-        (row.channel === 'sms' || row.channel === 'email')
+        (row.channel === 'sms' || row.channel === 'email' || row.channel === 'whatsapp')
       ) {
         suppressedPersons.add(person)
       }
@@ -214,8 +224,10 @@ export default defineEventHandler(async (event) => {
 
   const smsReasons: Record<string, number> = {}
   const emailReasons: Record<string, number> = {}
+  const whatsappReasons: Record<string, number> = {}
   let smsReachable = 0
   let emailReachable = 0
+  let whatsappReachable = 0
   let viaSms = 0
   let viaEmail = 0
   const bump = (bucket: Record<string, number>, reason: string) => {
@@ -225,9 +237,12 @@ export default defineEventHandler(async (event) => {
   for (const person of people) {
     const id = String(person.id)
     const minor = person.is_minor === true
-    const optedOut = refusedSms.has(id) || suppressedPersons.has(id)
+    const optedOut =
+      refusedSms.has(id) || refusedWhatsapp.has(id) || suppressedPersons.has(id)
     const guardianGrant = guardianSms.has(id)
     const grant = grantedSms.has(id)
+    const whatsappGrant = grantedWhatsapp.has(id)
+    const whatsappGuardian = guardianWhatsapp.has(id)
 
     // SMS leg.
     if (optedOut) bump(smsReasons, 'opted_out')
@@ -237,6 +252,17 @@ export default defineEventHandler(async (event) => {
       bump(smsReasons, 'no_consent')
     else {
       smsReachable += 1
+    }
+
+    // WhatsApp leg (own lane: explicit whatsapp grants only).
+    if (optedOut) bump(whatsappReasons, 'opted_out')
+    else if (!hasPhone(person.phone)) bump(whatsappReasons, 'invalid_contact')
+    else if (minor && !whatsappGuardian)
+      bump(whatsappReasons, 'minor_no_guardian_consent')
+    else if (classification === 'bulk' && !whatsappGrant && !whatsappGuardian)
+      bump(whatsappReasons, 'no_consent')
+    else {
+      whatsappReachable += 1
     }
 
     // Email leg (SMS-channel grant, mirroring the 0004 resolver).
@@ -281,6 +307,7 @@ export default defineEventHandler(async (event) => {
       branch,
       total_in_scope: people.length,
       sms: { reachable: smsReachable, excluded_reasons: smsReasons },
+      whatsapp: { reachable: whatsappReachable, excluded_reasons: whatsappReasons },
       email: { reachable: emailReachable, excluded_reasons: emailReasons },
       personal_preference: {
         reachable: smsSet.size + emailSet.size,
@@ -306,6 +333,7 @@ function emptyPreview(
     branch,
     total_in_scope: 0,
     sms: { reachable: 0, excluded_reasons: {} },
+    whatsapp: { reachable: 0, excluded_reasons: {} },
     email: { reachable: 0, excluded_reasons: {} },
     personal_preference: { reachable: 0, via_sms: 0, via_email: 0 },
     suppressions_verified: suppressionsVerified,

@@ -615,15 +615,26 @@ function fullName(person: PersonRow): string {
               class="hover:bg-gray-50 dark:hover:bg-gray-900/60"
             >
               <td class="px-3 py-3">
-                <NuxtLink
-                  :to="`/people/${person.id}`"
-                  class="font-medium text-gray-900 hover:text-primary-600 dark:text-white"
-                >
-                  {{ fullName(person) }}
-                </NuxtLink>
-                <p class="text-xs text-gray-500 dark:text-gray-400">
-                  {{ person.gender }}<span v-if="person.is_minor"> · minor</span>
-                </p>
+                <div class="flex items-center gap-2">
+                  <ProfileAvatar
+                    :name="fullName(person)"
+                    :photo-url="
+                      person.photo_file ? `/api/people/${person.id}/photo` : null
+                    "
+                    size="sm"
+                  />
+                  <div class="min-w-0">
+                    <NuxtLink
+                      :to="`/people/${person.id}`"
+                      class="font-medium text-gray-900 hover:text-primary-600 dark:text-white"
+                    >
+                      {{ fullName(person) }}
+                    </NuxtLink>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">
+                      {{ person.gender }}<span v-if="person.is_minor"> · minor</span>
+                    </p>
+                  </div>
+                </div>
               </td>
               <td class="px-3 py-3 text-gray-600 dark:text-gray-300">
                 <p>{{ person.phone || '—' }}</p>
