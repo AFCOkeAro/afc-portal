@@ -20,6 +20,22 @@ const EVENT_TYPES = [
 
 const CURRENCIES = ['NGN', 'USD', 'GBP'] as const
 
+/**
+ * AFC-871 per-section visibility. `login`/`custom` are stored marks that
+ * fail closed on the signed-out surface (the public feed predicate is
+ * `= 'public'` only); `custom` has no audience model behind it yet, so it
+ * never serves publicly until a reviewed slice models the audience.
+ */
+export const SECTION_VISIBILITIES = [
+  'draft',
+  'private',
+  'public',
+  'login',
+  'custom',
+] as const
+
+export type SectionVisibility = (typeof SECTION_VISIBILITIES)[number]
+
 export const eventFormSchema = z
   .object({
     title: z.string().trim().min(1, 'Title is required').max(200),
@@ -53,6 +69,15 @@ export const eventFormSchema = z
     age_max: z.coerce.number().int().min(0).optional(),
     visibility: z.enum(['public', 'branch', 'internal']).default('branch'),
     status: z.enum(['draft', 'published', 'closed', 'cancelled']).default('draft'),
+    /**
+     * AFC-871: per-section marks. Fail-closed default `private`; the 0045
+     * backfill opens them on already-public events. Staff editors set each
+     * section explicitly; the public feed serves a section only at `public`.
+     */
+    registration_visibility: z.enum(SECTION_VISIBILITIES).default('private'),
+    speakers_visibility: z.enum(SECTION_VISIBILITIES).default('private'),
+    resources_visibility: z.enum(SECTION_VISIBILITIES).default('private'),
+    schedule_visibility: z.enum(SECTION_VISIBILITIES).default('private'),
   })
   .superRefine((form, ctx) => {
     if (Date.parse(form.end_at) <= Date.parse(form.start_at)) {
@@ -147,5 +172,9 @@ export function toEventPayload(form: EventForm): Record<string, unknown> {
     age_max: form.age_max ?? null,
     visibility: form.visibility,
     status: form.status,
+    registration_visibility: form.registration_visibility,
+    speakers_visibility: form.speakers_visibility,
+    resources_visibility: form.resources_visibility,
+    schedule_visibility: form.schedule_visibility,
   }
 }
