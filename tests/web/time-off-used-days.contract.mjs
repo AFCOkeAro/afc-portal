@@ -7,6 +7,9 @@
  * AFC-842 registers.
  *
  * Run: node --test tests/web/time-off-used-days.contract.mjs
+ *
+ * AFC-896: the file form moved unchanged to the Requests tab of the
+ * merged Time Off section; the preview assertion follows it there.
  */
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
@@ -33,7 +36,7 @@ describe('AFC-854 phase 2 used days', () => {
   it('unreadable leave requests degrade to null, never a failure', () => {
     const src = codeOf('apps/web/server/api/leave-balances/index.get.ts')
     assert.match(src, /requestsReadable/, 'readability tracked')
-    assert.match(src, /requestsReadable/, 'unknown stays null, never a failure');
+    assert.match(src, /requestsReadable/, 'unknown stays null, never a failure')
   })
 
   it('the Time Off book shows used and remaining', () => {
@@ -43,9 +46,13 @@ describe('AFC-854 phase 2 used days', () => {
   })
 
   it('the file form previews the balance math before filing', () => {
-    const src = codeOf('apps/web/pages/annual-leave.vue')
+    const src = codeOf('apps/web/pages/time-off.vue')
     assert.match(src, /previewBalance/)
     assert.match(src, /previewDays/)
-    assert.match(src, /previewBalance\.allowance - previewBalance\.used - previewDays/, 'remaining-after math shown');
+    assert.match(
+      src,
+      /previewBalance\.allowance - previewBalance\.used - previewDays/,
+      'remaining-after math shown',
+    )
   })
 })

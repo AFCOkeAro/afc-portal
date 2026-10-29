@@ -124,21 +124,14 @@ export const NAVIGATION: readonly NavigationItem[] = [
     inSidebar: true,
   },
   {
-    // AFC-854: Time Off (minimal HR) — annual allowances today; used and
-    // remaining days compute against leave_requests in phase 2.
+    // AFC-896: Time Off + Annual Leave merged — one section with
+    // balances/requests/approvals tabs (AFC-854 allowances + AFC-842
+    // requests, no new registers). The old /annual-leave route redirects
+    // to /time-off?tab=requests so bookmarks keep working.
     label: 'Time Off',
     to: '/time-off',
     icon: 'i-lucide-calendar-range',
     requires: ['leave_balances', 'read'],
-    group: 'office',
-    inSidebar: true,
-  },
-  {
-    // AFC-842: Church Office leave requests — file, correct, decide.
-    label: 'Annual Leave',
-    to: '/annual-leave',
-    icon: 'i-lucide-calendar-range',
-    requires: ['leave_requests', 'read'],
     group: 'office',
     inSidebar: true,
   },
