@@ -14,7 +14,7 @@
  * Anything not listed needs a session. Adding a route to this list is a security
  * decision, not a convenience, so it is a named constant rather than a pattern.
  */
-const PUBLIC_ROUTES = ['/', '/login', '/register'] as const
+const PUBLIC_ROUTES = ['/', '/login', '/register', '/p'] as const
 
 function isPublic(path: string): boolean {
   return PUBLIC_ROUTES.some((route) => path === route || path.startsWith(`${route}/`))
