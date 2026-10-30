@@ -173,6 +173,17 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     none: [NONE, 'none'],
     zone_admin: [ALL, 'own_zone'],
   },
+  // Funeral cases (AFC-884, marriage-cases precedent verbatim):
+  // branch-owned family records; volunteers see nothing.
+  [COLLECTIONS.funeralCases]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [ALL, 'all'],
+    branch_admin: [CRU, 'own_branch'],
+    department_leader: [R, 'assigned_departments'],
+    volunteer: [NONE, 'none'],
+    none: [NONE, 'none'],
+    zone_admin: [CRU, 'own_zone'],
+  },
   // Leave balances (AFC-854 Time Off): same hands as the other staff
   // registers. No finance amounts, no FIELD_RESTRICTIONS entry.
   [COLLECTIONS.leaveBalances]: {
