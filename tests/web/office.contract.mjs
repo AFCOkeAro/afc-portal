@@ -476,6 +476,7 @@ const MINUTES_670 = {
   markdown: 'packages/shared/src/markdown.ts',
   samples: 'packages/shared/src/minutes-samples.ts',
   createPage: 'apps/web/pages/minutes/new.vue',
+  editor: 'apps/web/components/MinutesBodyEditor.vue',
   detailPage: 'apps/web/pages/minutes/[id].vue',
   attendeeRoute: 'apps/web/server/api/minutes/[id]/attendees.post.ts',
   storeMapper: 'apps/web/server/utils/directus.ts',
@@ -699,7 +700,9 @@ describe('minutes create — pages (AFC-670 §D)', () => {
   })
 
   it('the editor toolbar covers the whole renderer set with a preview', () => {
-    const src = codeOf(MINUTES_670.createPage)
+    // AFC-912: the toolbar + preview live in the shared MinutesBodyEditor so
+    // create and edit cannot drift; new.vue embeds it bound to form.body.
+    const src = codeOf(MINUTES_670.editor)
     for (const mark of [
       "'**', '**'",
       "'*', '*'",
@@ -717,11 +720,23 @@ describe('minutes create — pages (AFC-670 §D)', () => {
     }
     assert.match(src, /insertTable/, 'toolbar inserts tables')
     assert.match(src, /insertLink/, 'toolbar inserts links')
-    assert.match(src, /showPreview/, 'preview toggle exists')
+    assert.match(src, /label="Raw"/, 'Raw segment exists')
+    assert.match(src, /label="Preview"/, 'Preview segment exists')
+    assert.match(src, /role="group"/, 'segments grouped as one control')
     assert.match(
       src,
-      /renderMarkdownSafe\(form\.value\.body\)/,
+      /renderMarkdownSafe\(props\.modelValue\)/,
       'preview renders through the safe renderer',
+    )
+    assert.match(
+      codeOf(MINUTES_670.createPage),
+      /MinutesBodyEditor/,
+      'create page embeds the shared editor',
+    )
+    assert.match(
+      codeOf(MINUTES_670.createPage),
+      /v-model="form\.body"/,
+      'create page binds the editor to form.body',
     )
   })
 
