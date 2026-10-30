@@ -1,6 +1,7 @@
 import type { ServiceAssignment, SundayService, SundayServiceEvent } from '@afc/shared'
 import type { BlessingRow } from '../../../types/portal'
 import {
+  assertUuidParam,
   branchNames,
   can,
   findScopedItem,
@@ -83,9 +84,7 @@ export default defineEventHandler(async (event): Promise<ServiceDetail> => {
   const scope = await getPortalScope(event)
   requireCan(scope, 'sunday_services', 'read')
 
-  const id = getRouterParam(event, 'id')
-  if (!id)
-    throw createError({ statusCode: 400, statusMessage: 'A service id is required' })
+  const id = assertUuidParam(getRouterParam(event, 'id'), 'service', 'invalid_service_id')
 
   // Same hierarchy predicate as the list: area all, zone grants by zone,
   // branch staff by branch. A service outside the caller's scope is a 404.
