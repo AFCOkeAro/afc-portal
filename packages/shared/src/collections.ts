@@ -123,6 +123,15 @@ export const COLLECTIONS = {
   officeMinutes: 'office_minutes',
   minutesAttendees: 'minutes_attendees',
   officeMinuteEvents: 'office_minute_events',
+  /**
+   * Time Off leave register (AFC-930, ADR-0012). `leaveRequestEvents` is the
+   * explicit audit trail (created/updated/status_changed/note), following
+   * the welfare_case_events precedent -- the portal route is the writer,
+   * the table is the trail. `leave_balances` is deliberately absent:
+   * accrual is a separate unspecced slice.
+   */
+  leaveRequests: 'leave_requests',
+  leaveRequestEvents: 'leave_request_events',
   tasks: 'tasks',
   taskEvents: 'task_events',
   announcements: 'announcements',

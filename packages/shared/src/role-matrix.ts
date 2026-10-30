@@ -744,6 +744,30 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     none: [NONE, 'none'],
     zone_admin: [R, 'own_zone'],
   },
+  // Time Off leave register (AFC-930, ADR-0012 §Dec.4). Requests tab is an
+  // own-row filter (requester reads/creates own via policy); Approvals tab
+  // is gated on the update grant (branch/zone deciding officers, area).
+  // department_leader holds nothing: leave decisions are not a department
+  // call. The audit trail is append-only in spirit (no D for any role --
+  // corrections are new rows).
+  [COLLECTIONS.leaveRequests]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [ALL, 'all'],
+    branch_admin: [CRU, 'own_branch', 'CRU (own)'],
+    department_leader: [NONE, 'none'],
+    volunteer: [CR, 'own_branch', 'C own + R own via policy'],
+    none: [NONE, 'none'],
+    zone_admin: [CRU, 'own_zone'],
+  },
+  [COLLECTIONS.leaveRequestEvents]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [R, 'all'],
+    branch_admin: [R, 'own_branch'],
+    department_leader: [NONE, 'none'],
+    volunteer: [R, 'own_branch', 'own rows'],
+    none: [NONE, 'none'],
+    zone_admin: [R, 'own_zone'],
+  },
   // "R/C own": volunteers create tasks assigned to themselves and read their
   // own; household reads its own. Assignee-scoped views are route-enforced
   // (assignee_user = session user OR branch scope by role).
@@ -1000,6 +1024,15 @@ const FIELD_RESTRICTIONS: Readonly<
     fields: ['description'],
     roles: ['super_admin', 'area_admin', 'branch_admin'],
     note: 'task description: assignee + scoped admin (record-level in policy); hidden here for roles that never qualify',
+  },
+  // Time Off leave reason (AFC-930, ADR-0012 §Dec.3). Free text that may
+  // hold health-adjacent detail: deciding officers + area only. The
+  // requester's own-row read is record-level and lives in the Directus
+  // policy, which withholds the field for everyone else.
+  [COLLECTIONS.leaveRequests]: {
+    fields: ['reason'],
+    roles: ['super_admin', 'area_admin', 'branch_admin'],
+    note: 'leave reason: deciding officers (own scope, enforced by policy) + area; own-row read is record-level in policy',
   },
 }
 
