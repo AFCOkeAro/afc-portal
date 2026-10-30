@@ -209,4 +209,19 @@ describe('AFC-870 — pages reuse searchable selects and permission gates', () =
       assert.ok(guardAt !== -1 && guardAt < Math.min(...reads), `${route} guards before reading`)
     }
   })
+
+  it('sunday-school detail rejects a non-UUID id before the first store read (AFC-917)', () => {
+    const src = codeOf(DETAIL_ROUTE)
+    assert.match(
+      src,
+      /assertUuidParam\(getRouterParam\(event, 'id'\), 'class', 'invalid_class_id'\)/,
+      'non-UUID id answers 400 with a named code before any store read',
+    )
+    assert.doesNotMatch(src, /A class id is required/, 'manual empty-id check is gone')
+    const guardAt = src.indexOf('assertUuidParam(')
+    const reads = [src.indexOf('findScopedItem('), src.indexOf('findScopedItem<')]
+      .filter((at) => at !== -1)
+    assert.ok(reads.length > 0, 'detail reads through findScopedItem (unknown UUID is a 404)')
+    assert.ok(guardAt !== -1 && guardAt < Math.min(...reads), 'guard runs before the scoped read')
+  })
 })

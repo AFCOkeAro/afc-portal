@@ -1,5 +1,6 @@
 import type { SundaySchoolClass } from '@afc/shared'
 import {
+  assertUuidParam,
   branchNames,
   can,
   findScopedItem,
@@ -73,9 +74,7 @@ export default defineEventHandler(
     const scope = await getPortalScope(event)
     requireCan(scope, 'sunday_school_classes', 'read')
 
-    const id = getRouterParam(event, 'id')
-    if (!id)
-      throw createError({ statusCode: 400, statusMessage: 'A class id is required' })
+    const id = assertUuidParam(getRouterParam(event, 'id'), 'class', 'invalid_class_id')
 
     const row = await findScopedItem<Record<string, unknown>>(
       event,
