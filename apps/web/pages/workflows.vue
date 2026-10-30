@@ -135,5 +135,11 @@ async function applyTemplate(id: string): Promise<void> {
     </div>
     <p v-if="applyDone !== ''" class="mt-3 text-sm text-green-700">{{ applyDone }}</p>
     <p v-if="applyError !== ''" class="mt-3 text-sm text-red-600">{{ applyError }}</p>
+    <!-- Trigger-chain preview (AFC-894): the workflows/index.vue child route
+      renders here. Without this outlet the trigger-chain view existed but
+      was unreachable from /workflows. -->
+    <section aria-label="Trigger chain preview" class="mt-8">
+      <NuxtPage />
+    </section>
   </div>
 </template>
