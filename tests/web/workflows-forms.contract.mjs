@@ -60,3 +60,19 @@ describe('AFC-840 workflows and forms', () => {
     assert.match(src, /\/register/)
   })
 })
+
+describe('AFC-894 workflow child outlet', () => {
+  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
+  const page = readFileSync(path.join(root, 'apps/web/pages/workflows.vue'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\/\/.*/g, '')
+
+  it('the parent renders the trigger-chain child route', () => {
+    assert.match(
+      page,
+      /<NuxtPage\s*\/>/,
+      'outlet present so workflows/index.vue is reachable',
+    )
+    assert.match(page, /Trigger chain preview/, 'outlet section is labelled')
+  })
+})
