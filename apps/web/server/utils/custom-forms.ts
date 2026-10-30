@@ -68,7 +68,7 @@ export async function readModuleColumns(
     // stays behind requireCan on the module routes.
     body = await directusFetch<{ data: DirectusFieldRow[] }>(event, `/fields/${module}`)
   } catch (error) {
-    throwStoreUnavailable(error, `${module}_store`, '0061')
+    throwStoreUnavailable(error, `${module}_store`, '0065')
   }
   const columns: ModuleColumn[] = []
   for (const row of body.data ?? []) {
