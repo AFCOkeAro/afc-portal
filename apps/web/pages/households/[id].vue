@@ -130,6 +130,17 @@ function formatDate(value: string | null | undefined): string {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString()
 }
 
+/** 40px roster dots (AFC-929): first + last initial, mirrors PersonAvatar. */
+function memberInitials(name: string | null | undefined): string {
+  if (!name) return '?'
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return '?'
+  if (parts.length === 1) return (parts[0] ?? '').slice(0, 2).toUpperCase()
+  const first = parts[0] ?? ''
+  const last = parts[parts.length - 1] ?? ''
+  return (first.charAt(0) + last.charAt(0)).toUpperCase() || '?'
+}
+
 const sections = computed(() => [
   { id: 'overview', label: 'Overview' },
   { id: 'members', label: 'Members' },
@@ -188,9 +199,11 @@ const sections = computed(() => [
 
       <SectionNav :sections="sections" />
 
-      <!-- ChurchCRM Family Profile parity: main column (members + key
-        people + timeline) with a right rail (status / phone / properties).
-        Every field renders only where data exists; scoping is unchanged. -->
+      <!-- AFC-929 (approved mockup AFC-928 v3): right rail stays sticky
+        while the roster scrolls; member rows carry 40px initial dots in
+        the mockup's household language. Full names + roles stay on this
+        page (it is the full roster — the person page shows first names
+        only). -->
       <div class="grid gap-8 lg:grid-cols-3">
         <div class="space-y-8 lg:col-span-2">
           <section id="overview" class="scroll-mt-28">
@@ -267,19 +280,24 @@ const sections = computed(() => [
                   :key="member.id"
                   class="flex items-center justify-between gap-3 py-3"
                 >
-                  <div class="min-w-0">
-                    <NuxtLink
-                      :to="`/people/${member.id}`"
-                      class="font-medium text-gray-900 hover:text-primary-600 dark:text-white"
-                    >
-                      {{ member.display_name }}
-                    </NuxtLink>
-                    <p class="text-xs text-gray-500 dark:text-gray-400">
-                      {{ member.household_role?.replace(/_/g, ' ') || 'member' }} ·
-                      {{ member.membership_status.replace(/_/g, ' ') }}
-                      <span v-if="member.is_head"> · household head</span>
-                      <span v-if="member.is_minor"> · minor</span>
-                    </p>
+                  <div class="flex min-w-0 items-center gap-3">
+                    <span class="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary-100 text-sm font-bold text-primary-700 dark:bg-primary-950 dark:text-primary-300" aria-hidden="true">
+                      {{ memberInitials(member.display_name) }}
+                    </span>
+                    <div class="min-w-0">
+                      <NuxtLink
+                        :to="`/people/${member.id}`"
+                        class="font-medium text-gray-900 hover:text-primary-600 dark:text-white"
+                      >
+                        {{ member.display_name }}
+                      </NuxtLink>
+                      <p class="text-xs text-gray-500 dark:text-gray-400">
+                        {{ member.household_role?.replace(/_/g, ' ') || 'member' }} ·
+                        {{ member.membership_status.replace(/_/g, ' ') }}
+                        <span v-if="member.is_head"> · household head</span>
+                        <span v-if="member.is_minor"> · minor</span>
+                      </p>
+                    </div>
                   </div>
                   <div v-if="canEdit" class="flex shrink-0 items-center gap-1">
                     <UButton
@@ -369,7 +387,7 @@ const sections = computed(() => [
           </UCard>
         </div>
 
-        <aside class="space-y-6" aria-label="Household summary">
+        <aside class="space-y-6 lg:sticky lg:top-20 lg:self-start" aria-label="Household summary">
           <UCard>
             <template #header>
               <h2 class="text-base font-semibold" tabindex="-1">Household</h2>

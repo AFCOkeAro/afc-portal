@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { COLLECTIONS } from '@afc/shared'
-import type { BranchSummary, PersonDetail } from '~/types/portal'
+import type { BranchSummary, HouseholdDetail, PersonDetail } from '~/types/portal'
 
 definePageMeta({ middleware: 'staff' })
 
@@ -23,6 +23,32 @@ const branches = await useAsyncData('people-branches', () =>
   api.get<BranchSummary[]>('/api/branches'),
 )
 
+/**
+ * Static household preview (AFC-929, approved mockup v3). The person
+ * detail route returns only the household id + name, so the panel reads
+ * the existing GET /api/households/:id — a scoped pure read behind
+ * households:read, no migration. Any failure (403 outside scope, 404,
+ * offline) resolves to null and the panel falls back to a name link or
+ * hides; the route stays fail-closed and nothing is widened.
+ */
+const canHouseholds = computed(() =>
+  permissions.can(COLLECTIONS.households, 'read'),
+)
+
+const householdPreview = ref<HouseholdDetail | null>(null)
+if (person.value?.household && canHouseholds.value) {
+  try {
+    householdPreview.value = await api.get<HouseholdDetail>(
+      `/api/households/${person.value.household}`,
+    )
+  } catch {
+    householdPreview.value = null
+  }
+}
+
+/** Compact attendance chart state (AFC-929): collapsed 120px, enlarged 190px + counts. */
+const attendanceExpanded = ref(false)
+
 const showDob = computed(() =>
   permissions.isFieldVisible(COLLECTIONS.people, 'date_of_birth'),
 )
@@ -39,10 +65,70 @@ const displayName = computed(() => {
   return row.preferred_name || [row.first_name, row.last_name].filter(Boolean).join(' ')
 })
 
-function formatDate(value: string | null | undefined): string {
+/**
+ * AFC-929 icon-panel helpers. Initials mirror PersonAvatar (first + last
+ * initial, never raw ids); first names are the display-name head token
+ * (data minimisation — the full roster lives on the household page).
+ */
+function initialsFor(name: string | null | undefined): string {
+  if (!name) return '?'
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return '?'
+  if (parts.length === 1) return (parts[0] ?? '').slice(0, 2).toUpperCase()
+  const first = parts[0] ?? ''
+  const last = parts[parts.length - 1] ?? ''
+  return (first.charAt(0) + last.charAt(0)).toUpperCase() || '?'
+}
+
+function firstNameOf(name: string | null | undefined): string {
+  const head = (name ?? '').trim().split(/\s+/).filter(Boolean)[0]
+  return head || '—'
+}
+
+function formatMonthYear(value: string | null | undefined): string {
   if (!value) return '—'
   const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString()
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleDateString(undefined, { month: 'short', year: 'numeric' })
+}
+
+function tenureSince(value: string | null | undefined): string | null {
+  if (!value) return null
+  const start = new Date(value)
+  if (Number.isNaN(start.getTime())) return null
+  const now = new Date()
+  const months =
+    (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth())
+  if (months < 0) return null
+  const years = Math.floor(months / 12)
+  const rest = months % 12
+  if (years === 0) return `${rest} mo${rest === 1 ? '' : 's'}`
+  return `${years} yr${years === 1 ? '' : 's'} ${rest} mo${rest === 1 ? '' : 's'}`
+}
+
+/** Birthday renders day + month only; the birth year is withheld on this surface. */
+function birthdayDayMonth(value: string | null | undefined): string {
+  if (!value) return '—'
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value)
+  const monthNames = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ]
+  if (match) {
+    const month = monthNames[Number(match[2]) - 1] ?? match[2]
+    return `${Number(match[3])} ${month}`
+  }
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
+}
+
+function householdRoleLabel(member: {
+  is_head: boolean
+  household_role: string | null
+}): string {
+  if (member.is_head) return 'Head'
+  return member.household_role?.replace(/_/g, ' ') || 'member'
 }
 
 const attendanceItems = computed(
@@ -200,138 +286,89 @@ async function toggleStatus(): Promise<void> {
 
       <section id="overview" class="scroll-mt-28">
         <h2 class="sr-only" tabindex="-1">Overview</h2>
-        <!-- ChurchCRM profile parity: main column (profile + household)
-          with a right rail (photo placeholder / status / phone /
-          newsletter + properties). Fields render only where data exists;
-          minors/confidentiality and least-privilege scoping are unchanged. -->
-        <div class="grid gap-6 lg:grid-cols-3">
-          <div class="space-y-6 lg:col-span-2">
-          <UCard>
-            <template #header>
-              <h2 class="text-base font-semibold" tabindex="-1">Profile</h2>
-            </template>
-            <dl class="space-y-3 text-sm">
-              <div class="flex justify-between gap-4">
-                <dt class="text-gray-500 dark:text-gray-400">Status</dt>
-                <dd>
+        <!-- AFC-929 (approved mockup AFC-928 v3): sticky left rail — profile
+          hero with icon contact rows + static household panel; the right
+          column starts with the compact attendance chart. Deliberate
+          deviations from the mockup: the status menu (Active / Under
+          Discipline / Left / Deceased) is not built — the data model only
+          carries active/archived, so the Archive/Restore toggle in the page
+          header stands; no address mini-map — there is no geodata on this
+          surface (map pin deferred, as on the household page). -->
+        <div class="grid gap-6 lg:grid-cols-[340px_minmax(0,1fr)]">
+          <aside class="space-y-6 lg:sticky lg:top-20 lg:self-start" aria-label="Member summary">
+            <UCard>
+              <div class="flex items-start gap-3">
+                <div class="relative shrink-0">
+                  <PersonAvatar :name="displayName" :photo="null" size="md" />
+                  <button
+                    type="button"
+                    disabled
+                    title="Photo upload arrives with AFC-864 photo storage"
+                    aria-label="Change or upload photo (coming with photo storage)"
+                    class="absolute -bottom-1 -right-1 flex size-11 items-center justify-center rounded-full border-2 border-white bg-gray-900 text-white dark:border-gray-900"
+                  >
+                    <UIcon name="i-lucide-camera" class="size-4" />
+                  </button>
+                </div>
+                <div class="min-w-0">
+                  <h2 class="text-lg font-semibold leading-snug">{{ displayName }}</h2>
+                  <p class="text-sm text-gray-500 capitalize dark:text-gray-400">
+                    {{ person.membership_status.replace(/_/g, ' ') }} · {{ person.branch_name || 'No branch' }}
+                  </p>
                   <UBadge
                     :color="person.status === 'active' ? 'success' : 'neutral'"
                     variant="subtle"
+                    class="mt-1"
                   >
                     {{ person.status }}
                   </UBadge>
-                </dd>
-              </div>
-              <div class="flex justify-between gap-4">
-                <dt class="text-gray-500 dark:text-gray-400">Gender</dt>
-                <dd class="capitalize">{{ person.gender }}</dd>
-              </div>
-              <div v-if="showDob" class="flex justify-between gap-4">
-                <dt class="text-gray-500 dark:text-gray-400">Age</dt>
-                <dd class="tabular-nums">{{ person.age ?? '—' }}</dd>
-              </div>
-              <div class="flex justify-between gap-4">
-                <dt class="text-gray-500 dark:text-gray-400">Phone</dt>
-                <dd>{{ person.phone || '—' }}</dd>
-              </div>
-              <div class="flex justify-between gap-4">
-                <dt class="text-gray-500 dark:text-gray-400">Email</dt>
-                <dd class="break-all text-right">{{ person.email || '—' }}</dd>
-              </div>
-              <div class="flex justify-between gap-4">
-                <dt class="text-gray-500 dark:text-gray-400">Member since</dt>
-                <dd>{{ formatDate(person.member_since) }}</dd>
-              </div>
-            </dl>
-          </UCard>
-
-          <UCard>
-            <template #header>
-              <h2 class="text-base font-semibold" tabindex="-1">Household and consent</h2>
-            </template>
-            <dl class="space-y-3 text-sm">
-              <div class="flex justify-between gap-4">
-                <dt class="text-gray-500 dark:text-gray-400">Household</dt>
-                <dd class="text-right">
-                  <NuxtLink
-                    v-if="person.household"
-                    :to="`/households/${person.household}`"
-                    class="text-primary-600 hover:underline dark:text-primary-400"
-                  >
-                    {{ person.household_name || 'Open household' }}
-                  </NuxtLink>
-                  <span v-else>—</span>
-                </dd>
-              </div>
-              <div class="flex justify-between gap-4">
-                <dt class="text-gray-500 dark:text-gray-400">Guardian</dt>
-                <dd class="text-right">{{ person.guardian || '—' }}</dd>
-              </div>
-              <div class="flex justify-between gap-4">
-                <dt class="text-gray-500 dark:text-gray-400">Data consent</dt>
-                <dd>{{ person.consent_data ? 'Yes' : 'No' }}</dd>
-              </div>
-              <div class="flex justify-between gap-4">
-                <dt class="text-gray-500 dark:text-gray-400">Media consent</dt>
-                <dd>{{ person.consent_media ? 'Yes' : 'No' }}</dd>
-              </div>
-            </dl>
-            <div
-              v-if="person.safeguarding_flag"
-              class="mt-4 flex items-center gap-2 rounded-lg bg-amber-50 p-3 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
-            >
-              <UIcon name="i-lucide-shield-alert" class="size-4" />
-              Safeguarding flag is set
-            </div>
-            <div
-              v-if="person.address"
-              class="mt-4 border-t border-gray-100 pt-4 text-sm dark:border-gray-800"
-            >
-              <p class="text-gray-500 dark:text-gray-400">Address</p>
-              <p class="mt-1 whitespace-pre-line">{{ person.address }}</p>
-            </div>
-            <div
-              v-if="person.notes"
-              class="mt-4 border-t border-gray-100 pt-4 text-sm dark:border-gray-800"
-            >
-              <p class="text-gray-500 dark:text-gray-400">Notes</p>
-              <p class="mt-1 whitespace-pre-line">{{ person.notes }}</p>
-            </div>
-          </UCard>
-          </div>
-
-          <aside class="space-y-6" aria-label="Person summary">
-            <UCard>
-              <template #header>
-                <h2 class="text-base font-semibold" tabindex="-1">Person</h2>
-              </template>
-              <div class="flex items-center gap-3">
-                <div class="flex size-12 shrink-0 items-center justify-center rounded-full bg-primary-100 text-lg font-semibold text-primary-700 dark:bg-primary-950 dark:text-primary-300" aria-hidden="true">
-                  {{ displayName.slice(0, 1).toUpperCase() }}
-                </div>
-                <div class="min-w-0 text-sm">
-                  <p class="truncate font-medium">{{ displayName }}</p>
-                  <p class="capitalize text-gray-500 dark:text-gray-400">{{ person.membership_status.replace(/_/g, ' ') }}</p>
                 </div>
               </div>
-              <dl class="mt-4 space-y-3 text-sm">
-                <div class="flex justify-between gap-4">
-                  <dt class="text-gray-500 dark:text-gray-400">Status</dt>
-                  <dd>
-                    <UBadge :color="person.status === 'active' ? 'success' : 'neutral'" variant="subtle">
-                      {{ person.status }}
-                    </UBadge>
-                  </dd>
-                </div>
-                <div class="flex justify-between gap-4">
-                  <dt class="text-gray-500 dark:text-gray-400">Phone</dt>
-                  <dd>{{ person.phone || '—' }}</dd>
-                </div>
-                <div class="flex justify-between gap-4">
-                  <dt class="text-gray-500 dark:text-gray-400">Newsletter</dt>
-                  <dd>{{ person.consent_data ? 'Subscribed' : 'Not subscribed' }}</dd>
-                </div>
-              </dl>
+              <ul class="mt-4 space-y-1 border-t border-gray-100 pt-2 text-sm dark:border-gray-800" aria-label="Contact details">
+                <li class="flex min-h-11 items-start gap-3 rounded-md px-1 py-1.5" title="Email">
+                  <UIcon name="i-lucide-mail" class="mt-0.5 size-5 shrink-0 text-gray-400" />
+                  <span class="min-w-0 break-all"><span class="sr-only">Email: </span>{{ person.email || '—' }}</span>
+                </li>
+                <li class="flex min-h-11 items-start gap-3 rounded-md px-1 py-1.5" title="Phone">
+                  <UIcon name="i-lucide-phone" class="mt-0.5 size-5 shrink-0 text-gray-400" />
+                  <span class="min-w-0"><span class="sr-only">Phone: </span>{{ person.phone || '—' }}</span>
+                </li>
+                <li class="flex min-h-11 items-start gap-3 rounded-md px-1 py-1.5" title="Address">
+                  <UIcon name="i-lucide-map-pin" class="mt-0.5 size-5 shrink-0 text-gray-400" />
+                  <span class="min-w-0 whitespace-pre-line"><span class="sr-only">Address: </span>{{ person.address || '—' }}</span>
+                </li>
+                <li class="flex min-h-11 items-start gap-3 rounded-md px-1 py-1.5" title="Membership date — the month membership started">
+                  <UIcon name="i-lucide-id-card" class="mt-0.5 size-5 shrink-0 text-gray-400" />
+                  <span class="min-w-0">
+                    <span class="sr-only">Membership date: </span>{{ formatMonthYear(person.member_since) }}
+                    <span v-if="tenureSince(person.member_since)" class="block text-xs text-gray-500 dark:text-gray-400">
+                      Membership started {{ formatMonthYear(person.member_since) }} · {{ tenureSince(person.member_since) }}
+                    </span>
+                  </span>
+                </li>
+                <li v-if="showDob" class="flex min-h-11 items-start gap-3 rounded-md px-1 py-1.5" title="Birthday — day and month only, birth year withheld">
+                  <UIcon name="i-lucide-cake" class="mt-0.5 size-5 shrink-0 text-gray-400" />
+                  <span class="min-w-0">
+                    <span class="sr-only">Birthday: </span>{{ birthdayDayMonth(person.date_of_birth) }}
+                    <span class="block text-xs text-gray-500 dark:text-gray-400">
+                      Day + month only · birth year not shown on this surface
+                    </span>
+                  </span>
+                </li>
+                <li v-if="showDob" class="flex min-h-11 items-start gap-3 rounded-md px-1 py-1.5" title="Age">
+                  <UIcon name="i-lucide-circle-user-round" class="mt-0.5 size-5 shrink-0 text-gray-400" />
+                  <span class="min-w-0 tabular-nums">
+                    <span class="sr-only">Age: </span>{{ person.age ?? '—' }}{{ person.age == null ? '' : ' years' }}
+                    <span class="block text-xs text-gray-500 dark:text-gray-400">
+                      Computed · shown separately from birthday
+                    </span>
+                  </span>
+                </li>
+                <li class="flex min-h-11 items-start gap-3 rounded-md px-1 py-1.5" title="Gender">
+                  <UIcon name="i-lucide-user" class="mt-0.5 size-5 shrink-0 text-gray-400" />
+                  <span class="min-w-0 capitalize"><span class="sr-only">Gender: </span>{{ person.gender }}</span>
+                </li>
+              </ul>
               <div
                 v-if="person.safeguarding_flag"
                 class="mt-4 flex items-center gap-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
@@ -341,50 +378,125 @@ async function toggleStatus(): Promise<void> {
               </div>
             </UCard>
 
+            <UCard v-if="person.household">
+              <template #header>
+                <div>
+                  <h2 class="text-base font-semibold" tabindex="-1">Household</h2>
+                  <p class="text-xs text-gray-500 dark:text-gray-400">Static · limited info</p>
+                </div>
+              </template>
+              <div v-if="householdPreview" class="text-sm">
+                <div class="flex items-center gap-3">
+                  <span class="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary-100 text-base font-semibold text-primary-700 dark:bg-primary-950 dark:text-primary-300" aria-hidden="true">
+                    {{ initialsFor(householdPreview.name || person.household_name).slice(0, 1) }}
+                  </span>
+                  <div class="min-w-0">
+                    <p class="truncate font-medium">{{ householdPreview.name || person.household_name || 'Unnamed household' }}</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">
+                      {{ householdPreview.member_count }} member{{ householdPreview.member_count === 1 ? '' : 's' }}
+                    </p>
+                  </div>
+                </div>
+                <dl class="mt-3 space-y-3">
+                  <div class="flex justify-between gap-4">
+                    <dt class="text-gray-500 dark:text-gray-400">Head</dt>
+                    <dd class="text-right">{{ householdPreview.head_name || 'Not set' }}</dd>
+                  </div>
+                  <div class="flex justify-between gap-4">
+                    <dt class="text-gray-500 dark:text-gray-400">Phone</dt>
+                    <dd>{{ householdPreview.phone || '—' }}</dd>
+                  </div>
+                </dl>
+                <ul class="mt-3 grid grid-cols-4 gap-2 border-t border-gray-100 pt-3 text-center dark:border-gray-800" aria-label="Household members and family roles">
+                  <li
+                    v-for="member in householdPreview.members"
+                    :key="member.id"
+                    class="flex min-h-11 flex-col items-center gap-1"
+                  >
+                    <span class="flex size-10 items-center justify-center rounded-full border border-gray-100 bg-primary-100 text-sm font-bold text-primary-700 dark:border-gray-800 dark:bg-primary-950 dark:text-primary-300" aria-hidden="true">
+                      {{ initialsFor(member.display_name).slice(0, 1) }}
+                    </span>
+                    <span class="text-xs font-semibold leading-tight">{{ firstNameOf(member.display_name) }}<span v-if="member.is_minor" class="font-normal text-gray-500"> · minor</span></span>
+                    <span class="text-[11px] leading-tight text-gray-500 capitalize dark:text-gray-400">{{ householdRoleLabel(member) }}</span>
+                  </li>
+                </ul>
+                <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">
+                  Full roster lives on the
+                  <NuxtLink :to="`/households/${person.household}`" class="text-primary-600 hover:underline dark:text-primary-400">household page</NuxtLink>
+                  (data minimisation).
+                </p>
+              </div>
+              <p v-else class="text-sm">
+                <NuxtLink
+                  :to="`/households/${person.household}`"
+                  class="text-primary-600 hover:underline dark:text-primary-400"
+                >
+                  {{ person.household_name || 'Open household' }}
+                </NuxtLink>
+              </p>
+            </UCard>
+          </aside>
+
+          <div class="min-w-0 space-y-6">
+            <section v-if="canAttendance" id="attendance" class="scroll-mt-28">
+              <UCard>
+                <template #header>
+                  <div class="flex items-center justify-between gap-2">
+                    <div>
+                      <h2 class="text-base font-semibold" tabindex="-1">Attendance</h2>
+                      <p class="text-xs text-gray-500 dark:text-gray-400">
+                        {{ attendanceItems.length }} sessions
+                      </p>
+                    </div>
+                    <UButton
+                      :label="attendanceExpanded ? 'Collapse' : 'Enlarge'"
+                      :icon="attendanceExpanded ? 'i-lucide-minimize-2' : 'i-lucide-maximize-2'"
+                      color="neutral"
+                      variant="outline"
+                      class="min-h-11 rounded-full"
+                      :aria-expanded="attendanceExpanded"
+                      aria-controls="person-attendance-chart"
+                      @click="attendanceExpanded = !attendanceExpanded"
+                    />
+                  </div>
+                </template>
+                <PersonAttendanceChart :person-id="id" :expanded="attendanceExpanded" class="mb-4" />
+                <ActivityList
+                  :items="attendanceItems"
+                  empty-title="No attendance recorded"
+                  empty-description="Named check-ins for this person will appear here."
+                />
+              </UCard>
+            </section>
+
             <UCard>
               <template #header>
-                <h2 class="text-base font-semibold" tabindex="-1">Properties</h2>
+                <h2 class="text-base font-semibold" tabindex="-1">Household and consent</h2>
               </template>
               <dl class="space-y-3 text-sm">
                 <div class="flex justify-between gap-4">
-                  <dt class="text-gray-500 dark:text-gray-400">Branch</dt>
-                  <dd class="text-right">{{ person.branch_name || 'No branch' }}</dd>
-                </div>
-                <div v-if="showDob" class="flex justify-between gap-4">
-                  <dt class="text-gray-500 dark:text-gray-400">Age</dt>
-                  <dd class="tabular-nums">{{ person.age ?? '—' }}</dd>
+                  <dt class="text-gray-500 dark:text-gray-400">Guardian</dt>
+                  <dd class="text-right">{{ person.guardian || '—' }}</dd>
                 </div>
                 <div class="flex justify-between gap-4">
-                  <dt class="text-gray-500 dark:text-gray-400">Member since</dt>
-                  <dd>{{ formatDate(person.member_since) }}</dd>
+                  <dt class="text-gray-500 dark:text-gray-400">Data consent</dt>
+                  <dd>{{ person.consent_data ? 'Yes' : 'No' }}</dd>
                 </div>
                 <div class="flex justify-between gap-4">
                   <dt class="text-gray-500 dark:text-gray-400">Media consent</dt>
                   <dd>{{ person.consent_media ? 'Yes' : 'No' }}</dd>
                 </div>
               </dl>
+              <div
+                v-if="person.notes"
+                class="mt-4 border-t border-gray-100 pt-4 text-sm dark:border-gray-800"
+              >
+                <p class="text-gray-500 dark:text-gray-400">Notes</p>
+                <p class="mt-1 whitespace-pre-line">{{ person.notes }}</p>
+              </div>
             </UCard>
-          </aside>
+          </div>
         </div>
-      </section>
-
-      <section v-if="canAttendance" id="attendance" class="mt-8 scroll-mt-28">
-        <UCard>
-          <template #header>
-            <div class="flex items-center justify-between">
-              <h2 class="text-base font-semibold" tabindex="-1">Attendance</h2>
-              <span class="text-xs text-gray-500 dark:text-gray-400">
-                {{ attendanceItems.length }} sessions
-              </span>
-            </div>
-          </template>
-          <PersonAttendanceChart :person-id="id" class="mb-4" />
-          <ActivityList
-            :items="attendanceItems"
-            empty-title="No attendance recorded"
-            empty-description="Named check-ins for this person will appear here."
-          />
-        </UCard>
       </section>
 
       <section v-if="canRegistrations" id="registrations" class="mt-8 scroll-mt-28">

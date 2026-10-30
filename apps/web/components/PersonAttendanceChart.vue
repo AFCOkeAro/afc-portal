@@ -13,6 +13,13 @@ import type { PersonAttendanceHistory } from '~/types/portal'
  */
 const props = defineProps<{
   personId: string
+  /**
+   * Compact chart with an external Enlarge affordance (AFC-929, approved
+   * mockup v3). False keeps the 120px compact bar chart; true grows it to
+   * 190px and reveals the per-week present/absent counts. Owned by the
+   * profile page header button so the control sits beside the card title.
+   */
+  expanded?: boolean
 }>()
 
 const api = useApi()
@@ -102,7 +109,7 @@ const summary = computed(() => {
 </script>
 
 <template>
-  <div>
+  <div id="person-attendance-chart">
     <div class="mb-3 flex flex-wrap items-center gap-2">
       <USelect
         v-model="filter"
@@ -145,6 +152,7 @@ const summary = computed(() => {
         <svg
           viewBox="0 0 360 120"
           class="w-full"
+          :style="{ height: props.expanded ? '190px' : '120px' }"
           role="presentation"
           data-testid="person-attendance-chart"
         >
@@ -198,6 +206,28 @@ const summary = computed(() => {
           }}</span>
         </figcaption>
       </figure>
+
+      <ul
+        v-if="props.expanded && data.totals.sessions_held > 0"
+        aria-label="Per-week detail (expanded view)"
+        class="mt-3 divide-y divide-gray-100 text-sm dark:divide-gray-800"
+      >
+        <li
+          v-for="bucket in data.buckets"
+          :key="`count-${bucket.week_start}`"
+          class="flex items-center justify-between gap-3 py-1.5"
+        >
+          <span class="text-gray-600 dark:text-gray-300">
+            Week of {{ bucket.week_start }}
+          </span>
+          <span
+            class="text-xs font-medium tabular-nums"
+            :class="bucket.present ? 'text-green-700 dark:text-green-300' : 'text-gray-500 dark:text-gray-400'"
+          >
+            {{ bucket.present ? 'Present' : 'Absent' }}
+          </span>
+        </li>
+      </ul>
 
       <ul v-if="data.sessions.length > 0" class="mt-3 space-y-1">
         <li
