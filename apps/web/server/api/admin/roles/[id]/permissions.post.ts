@@ -25,10 +25,21 @@ export default defineEventHandler(async (event) => {
   const action = typeof body?.action === 'string' ? body.action : ''
   const knownCollections = new Set<string>(Object.values(COLLECTIONS))
   // `users:read` (usually with an own-row filter) is the session bootstrap:
-  // login reads /users/me with the user's own token, so a custom role
+// login reads /users/me with the user's own token, so a custom role
   // without it fails closed to zero grants.
   const selfRead = collection === 'users' && action === 'read'
   const storedCollection = selfRead ? 'directus_users' : collection
+  // Audit trail is system-managed (AFC-925 F2): the start/exit routes write
+  // `impersonation_events` with the server token, and no custom role may
+  // gain it through the permission editor. Mirrors the built-in-role
+  // refusal below (400 + validation_error, never silent).
+  if (collection === COLLECTIONS.impersonationEvents) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'impersonation_events is system-managed and cannot be granted to custom roles',
+      data: { code: 'validation_error', fields: { collection: 'impersonation_events is system-managed' } },
+    })
+  }
   if (
     (!knownCollections.has(collection) && !selfRead) ||
     !ACTIONS.includes(action as never)

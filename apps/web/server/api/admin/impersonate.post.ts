@@ -4,7 +4,7 @@ import { readSession, writeSession } from '../../utils/session'
 import {
   buildImpersonatedSession,
   resolveImpersonationTarget,
-  writeImpersonationAudit,
+  writeImpersonationAuditAsServer,
 } from '../../utils/impersonation'
 
 /**
@@ -91,7 +91,12 @@ export default defineEventHandler(async (event) => {
   }
 
   const targetKind = resolved.kind
-  await writeImpersonationAudit(event, scope, {
+  // System write with the explicit server token (AFC-925 F1): the audit row
+  // is not an actor-scoped write, so a zone_admin with zero role write
+  // grants still starts OK. Actor/target/reason are all server-derived
+  // (session user, resolved target, validated body) after the scope gates
+  // above — the token swap grants no new targeting power.
+  await writeImpersonationAuditAsServer(event, {
     actor: actor.id,
     target_user: targetKind === 'user' ? resolved.id : null,
     target_branch: targetKind === 'branch' ? resolved.id : null,
