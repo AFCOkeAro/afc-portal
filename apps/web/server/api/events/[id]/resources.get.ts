@@ -19,6 +19,7 @@ const FIELDS = [
   'kind',
   'url',
   'file_id',
+  'session_id',
   'status',
   'decided_by',
   'decided_at',
@@ -43,6 +44,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'An event id is required' })
   const query = getQuery(event)
   const status = typeof query.status === 'string' ? query.status : ''
+  const session = typeof query.session === 'string' ? query.session : ''
   try {
     await findScopedItem(event, scope, 'events', id, { fields: ['id'] })
     if (status !== '' && status !== 'approved') {
@@ -56,6 +58,11 @@ export default defineEventHandler(async (event) => {
         filter: mergeFilters(
           { event: { _eq: id } },
           status === '' ? { status: { _eq: 'approved' } } : { status: { _eq: status } },
+          session === ''
+            ? undefined
+            : session === 'none'
+              ? { session_id: { _is_null: true } }
+              : { session_id: { _eq: session } },
           scopeFilter(scope),
         ),
         fields: FIELDS,
@@ -63,6 +70,28 @@ export default defineEventHandler(async (event) => {
         limit: 100,
       },
     )
+    const sessionIds = [
+      ...new Set(result.data.map((row) => row.session_id).filter(Boolean)),
+    ]
+    let sessionNames = new Map<string, string>()
+    if (sessionIds.length > 0) {
+      const sessions = await listItems<Record<string, unknown>>(
+        event,
+        scope,
+        'attendance_sessions',
+        {
+          filter: { id: { _in: sessionIds } },
+          fields: ['id', 'session_name', 'session_date'],
+          limit: 100,
+        },
+      ).catch(() => ({ data: [] as Record<string, unknown>[] }))
+      sessionNames = new Map(
+        sessions.data.map((row: Record<string, unknown>) => [
+          String(row.id),
+          String(row.session_name ?? '') || String(row.session_date ?? 'Session'),
+        ]),
+      )
+    }
     const speakerIds = [...new Set(result.data.map((row) => row.speaker).filter(Boolean))]
     let names = new Map<string, string>()
     if (speakerIds.length > 0) {
@@ -110,6 +139,9 @@ export default defineEventHandler(async (event) => {
       data: result.data.map((row) => ({
         ...row,
         speaker_name: row.speaker ? (names.get(String(row.speaker)) ?? 'Unknown') : null,
+        session_name: row.session_id
+          ? (sessionNames.get(String(row.session_id)) ?? 'Session')
+          : null,
       })),
     }
   } catch (error) {

@@ -268,6 +268,7 @@ export const RESOURCE_STATUSES = ['pending', 'approved', 'rejected'] as const
 export const resourceFormSchema = z
   .object({
     speaker: z.string().trim().max(36).optional(),
+    session: z.string().uuid('Choose a session').optional(),
     title: z.string().trim().min(1, 'Name the resource').max(200),
     source_type: z.enum(RESOURCE_SOURCE_TYPES),
     kind: z.enum(RESOURCE_KINDS),
@@ -288,6 +289,7 @@ export type ResourceForm = z.infer<typeof resourceFormSchema>
 
 export const resourcePatchSchema = z.object({
   speaker: optionalText(36),
+  session: z.string().uuid('Choose a session').nullable().optional(),
   title: z.string().trim().min(1).max(200).optional(),
   kind: z.enum(RESOURCE_KINDS).optional(),
   url: optionalText(2000),

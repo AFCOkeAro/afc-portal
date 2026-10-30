@@ -22,12 +22,19 @@ interface LibraryItem {
   id: string
   speaker: string | null
   speaker_name: string | null
+  session_id: string | null
+  session_name: string | null
   title: string
   source_type: string
   kind: string
   url: string | null
   file_id: string | null
   status: string
+}
+
+interface SessionOption {
+  id: string
+  name: string
 }
 
 interface SpeakerOption {
@@ -56,7 +63,10 @@ const newItem = ref({
   source_type: 'link',
   url: '',
   speaker: '',
+  session: '',
 })
+const sessionOptions = ref<SessionOption[]>([])
+const sessionFilter = ref('')
 const pickedFile = ref<File | null>(null)
 const pickedName = ref('')
 const itemSaving = ref(false)
@@ -112,6 +122,33 @@ function pickFile(target: EventTarget | null): void {
   pickedName.value = first?.name ?? ''
 }
 
+async function loadSessions(): Promise<void> {
+  try {
+    const res = await api.get<{ data: Array<Record<string, unknown>> }>(
+      '/api/attendance',
+      {
+        query: { event: props.eventId, limit: -1 },
+      },
+    )
+    sessionOptions.value = (res.data ?? []).map((row) => ({
+      id: String(row.id),
+      name: String(row.session_name ?? row.session_date ?? 'Session'),
+    }))
+  } catch {
+    sessionOptions.value = []
+  }
+}
+
+const visibleLibrary = computed(() =>
+  sessionFilter.value === ''
+    ? library.value
+    : sessionFilter.value === 'none'
+      ? library.value.filter((item: LibraryItem) => !item.session_id)
+      : library.value.filter(
+          (item: LibraryItem) => item.session_id === sessionFilter.value,
+        ),
+)
+
 async function addItem(): Promise<void> {
   if (newItem.value.title.trim() === '') {
     itemError.value = 'Name the resource.'
@@ -150,6 +187,7 @@ async function addItem(): Promise<void> {
       ...(newItem.value.source_type === 'link' ? { url: newItem.value.url.trim() } : {}),
       ...(fileId ? { file_id: fileId } : {}),
       ...(newItem.value.speaker === '' ? {} : { speaker: newItem.value.speaker }),
+      ...(newItem.value.session === '' ? {} : { session: newItem.value.session }),
     })
     newItem.value = {
       title: '',
@@ -157,6 +195,7 @@ async function addItem(): Promise<void> {
       source_type: 'link',
       url: '',
       speaker: '',
+      session: '',
     }
     pickedFile.value = null
     pickedName.value = ''
@@ -193,6 +232,7 @@ async function removeItem(id: string): Promise<void> {
 
 onMounted(() => {
   void loadLibrary()
+  void loadSessions()
 })
 </script>
 
@@ -200,45 +240,65 @@ onMounted(() => {
   <div>
     <p v-if="libraryPending" class="text-sm text-gray-500">Loading resources…</p>
     <p v-else-if="libraryError !== ''" class="text-sm text-red-600">{{ libraryError }}</p>
-    <div v-else-if="library.length === 0">
-      <UCard>
-        <EmptyState
-          title="No resources yet"
-          description="Guidelines, handbooks, slides and media appear here once they're shared and approved."
+    <div v-else>
+      <div class="mb-2">
+        <USelect
+          v-model="sessionFilter"
+          :items="[
+            { label: 'All resources', value: '' },
+            { label: 'Event-wide', value: 'none' },
+            ...sessionOptions.map((row: SessionOption) => ({
+              label: row.name,
+              value: row.id,
+            })),
+          ]"
+          class="w-full sm:w-64"
+          aria-label="Filter by session"
         />
-      </UCard>
+      </div>
+      <div v-if="visibleLibrary.length === 0">
+        <UCard>
+          <EmptyState
+            title="No resources yet"
+            description="Guidelines, handbooks, slides and media appear here once they're shared and approved."
+          />
+        </UCard>
+      </div>
+      <ul v-else class="space-y-2">
+        <li
+          v-for="item in visibleLibrary"
+          :key="item.id"
+          class="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-800"
+        >
+          <UBadge color="neutral" variant="subtle">{{ kindLabel(item.kind) }}</UBadge>
+          <UBadge v-if="item.session_name" color="info" variant="subtle">{{
+            item.session_name
+          }}</UBadge>
+          <span class="min-w-0 flex-1 truncate font-medium">{{ item.title }}</span>
+          <span v-if="item.speaker_name" class="hidden text-xs text-gray-500 sm:inline">
+            {{ item.speaker_name }}
+          </span>
+          <UButton
+            size="xs"
+            color="neutral"
+            variant="outline"
+            icon="i-lucide-external-link"
+            label="Open"
+            :to="itemHref(item)"
+            target="_blank"
+          />
+          <UButton
+            v-if="props.canManage"
+            size="xs"
+            color="neutral"
+            variant="ghost"
+            icon="i-lucide-x"
+            :aria-label="`Remove ${item.title}`"
+            @click="removeItem(item.id)"
+          />
+        </li>
+      </ul>
     </div>
-    <ul v-else class="space-y-2">
-      <li
-        v-for="item in library"
-        :key="item.id"
-        class="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-800"
-      >
-        <UBadge color="neutral" variant="subtle">{{ kindLabel(item.kind) }}</UBadge>
-        <span class="min-w-0 flex-1 truncate font-medium">{{ item.title }}</span>
-        <span v-if="item.speaker_name" class="hidden text-xs text-gray-500 sm:inline">
-          {{ item.speaker_name }}
-        </span>
-        <UButton
-          size="xs"
-          color="neutral"
-          variant="outline"
-          icon="i-lucide-external-link"
-          label="Open"
-          :to="itemHref(item)"
-          target="_blank"
-        />
-        <UButton
-          v-if="props.canManage"
-          size="xs"
-          color="neutral"
-          variant="ghost"
-          icon="i-lucide-x"
-          :aria-label="`Remove ${item.title}`"
-          @click="removeItem(item.id)"
-        />
-      </li>
-    </ul>
     <div v-if="props.canManage && queue.length > 0" class="mt-4">
       <h3 class="font-semibold">Awaiting approval ({{ queue.length }})</h3>
       <ul class="mt-2 space-y-2">
