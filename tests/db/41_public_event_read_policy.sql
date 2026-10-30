@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS directus_permissions (
   role        uuid,
   collection  text NOT NULL,
   action      text NOT NULL,
-  fields      text[] NOT NULL DEFAULT '{}',
+  fields      text NOT NULL DEFAULT '',
   permissions jsonb
 );
 
@@ -47,17 +47,17 @@ BEGIN
   -- Legacy row, deliberately unsorted: the migration matches as a SET.
   INSERT INTO directus_permissions (collection, action, fields)
   VALUES ('events', 'read',
-    ARRAY['visibility','title','status','start_at','id','branch']);
+    'visibility,title,status,start_at,id,branch');
 
   -- Decoys the migration must not touch.
   INSERT INTO directus_permissions (collection, action, fields)
   VALUES ('events', 'create',
-    ARRAY['visibility','title','status','start_at','id','branch']);
+    'visibility,title,status,start_at,id,branch');
   INSERT INTO directus_permissions (collection, action, fields)
   VALUES ('celebrations', 'read',
-    ARRAY['visibility','title','status','start_at','id','branch']);
+    'visibility,title,status,start_at,id,branch');
   INSERT INTO directus_permissions (collection, action, fields)
-  VALUES ('events', 'read', ARRAY['id','title']);
+  VALUES ('events', 'read', 'id,title');
 END $$;
 
 \i services/directus/schema/migrations/20261030_0064_public_event_read_policy.sql
@@ -67,11 +67,11 @@ DECLARE
   v_allow text := 'address,age_max,age_min,branch,capacity,collect_medical,currency,description,end_at,event_type,fee_amount,id,location,registration_closes_at,registration_opens_at,registration_visibility,requires_guardian_consent,resources,resources_visibility,schedule,schedule_visibility,speakers,speakers_visibility,start_at,status,summary,title,visibility,waitlist_enabled';
   v_got text;
 BEGIN
-  SELECT array_to_string((SELECT array_agg(f ORDER BY f) FROM unnest(p.fields) AS f), ',')
+  SELECT array_to_string((SELECT array_agg(f ORDER BY f) FROM unnest(string_to_array(p.fields, ',')) AS f), ',')
     INTO v_got
     FROM directus_permissions p
    WHERE p.collection = 'events' AND p.action = 'read'
-     AND array_length(p.fields, 1) = 29;
+     AND array_length(string_to_array(p.fields, ','), 1) = 29;
 
   PERFORM test_support.assert_equals(v_got, v_allow, 'public-policy',
     'the legacy events/read row now carries exactly the 29-field allowlist');
@@ -79,15 +79,15 @@ BEGIN
   PERFORM test_support.assert_equals(
     (SELECT count(*)::text FROM directus_permissions p
       WHERE p.collection = 'events' AND p.action = 'read'
-        AND (SELECT array_agg(f ORDER BY f) FROM unnest(p.fields) AS f)
+        AND (SELECT array_agg(f ORDER BY f) FROM unnest(string_to_array(p.fields, ',')) AS f)
           = string_to_array(v_allow, ',')), '1', 'public-policy',
     'exactly one events/read row holds the allowlist (no duplicates)');
 
   PERFORM test_support.assert_equals(
     (SELECT count(*)::text FROM directus_permissions p
       WHERE p.collection = 'events' AND p.action = 'create'
-        AND (SELECT array_agg(f ORDER BY f) FROM unnest(p.fields) AS f)
-          = ARRAY['branch','id','start_at','status','title','visibility']), '1', 'public-policy',
+        AND (SELECT array_agg(f ORDER BY f) FROM unnest(string_to_array(p.fields, ',')) AS f)
+          = string_to_array('branch,id,start_at,status,title,visibility', ',')), '1', 'public-policy',
     'the events/create permission is untouched (action scoping)');
 
   PERFORM test_support.assert_equals(
@@ -98,18 +98,14 @@ BEGIN
   PERFORM test_support.assert_equals(
     (SELECT count(*)::text FROM directus_permissions p
       WHERE p.collection = 'events' AND p.action = 'read'
-        AND p.fields && ARRAY['email','phone','guardian_name','guardian_phone',
-          'guardian_email','medical_notes','allergies','emergency_contact_name',
-          'emergency_contact_phone','date_of_birth','registrant_first_name',
-          'registrant_last_name','ticket_code','registration_status',
-          'amount_paid','contact','awareness_at']::text[]), '0', 'public-policy',
+        AND string_to_array(p.fields, ',') && string_to_array('email,phone,guardian_name,guardian_phone,guardian_email,medical_notes,allergies,emergency_contact_name,emergency_contact_phone,date_of_birth,registrant_first_name,registrant_last_name,ticket_code,registration_status,amount_paid,contact,awareness_at', ',')::text[]), '0', 'public-policy',
     'the allowlist carries no PII and no registration write columns');
 
   PERFORM test_support.assert_equals(
     (SELECT count(*)::text FROM directus_permissions p
       WHERE p.collection = 'events' AND p.action = 'read'
-        AND (SELECT array_agg(f ORDER BY f) FROM unnest(p.fields) AS f)
-          = ARRAY['id','title']), '1', 'public-policy',
+        AND (SELECT array_agg(f ORDER BY f) FROM unnest(string_to_array(p.fields, ',')) AS f)
+          = string_to_array('id,title', ',')), '1', 'public-policy',
     'an events/read row in an unknown field set is left alone (no invented grant)');
 END $$;
 
@@ -123,7 +119,7 @@ BEGIN
   PERFORM test_support.assert_equals(
     (SELECT count(*)::text FROM directus_permissions p
       WHERE p.collection = 'events' AND p.action = 'read'
-        AND array_length(p.fields, 1) = 29), '1', 'public-policy',
+        AND array_length(string_to_array(p.fields, ','), 1) = 29), '1', 'public-policy',
     'rerun: still exactly one allowlist row (already-applied path, no duplicate)');
 END $$;
 
@@ -138,15 +134,15 @@ DO $$
 BEGIN
   INSERT INTO directus_permissions (collection, action, fields)
   VALUES ('events', 'read',
-    ARRAY['branch','id','start_at','status','title','visibility']),
+    'branch,id,start_at,status,title,visibility'),
          ('events', 'read',
-    ARRAY['visibility','title','status','start_at','id','branch']);
+    'visibility,title,status,start_at,id,branch');
 
   PERFORM test_support.assert_raises(NULL,
     'DO $rb$ BEGIN IF (SELECT count(*) FROM directus_permissions p
         WHERE p.collection = ''events'' AND p.action = ''read''
-          AND (SELECT array_agg(f ORDER BY f) FROM unnest(p.fields) AS f)
-            = ARRAY[''branch'',''id'',''start_at'',''status'',''title'',''visibility'']) > 1
+          AND (SELECT array_agg(f ORDER BY f) FROM unnest(string_to_array(p.fields, '','')) AS f)
+            = string_to_array(''branch,id,start_at,status,title,visibility'', '','')) > 1
       THEN RAISE EXCEPTION ''refusing 20261030_0064: test probe'' USING ERRCODE = ''restrict_violation'';
       END IF; END $rb$;',
     '23001', 'public-policy',
@@ -154,8 +150,8 @@ BEGIN
 
   DELETE FROM directus_permissions AS p
    WHERE p.collection = 'events' AND p.action = 'read'
-     AND (SELECT array_agg(f ORDER BY f) FROM unnest(p.fields) AS f)
-       = ARRAY['branch','id','start_at','status','title','visibility'];
+     AND (SELECT array_agg(f ORDER BY f) FROM unnest(string_to_array(p.fields, ',')) AS f)
+       = string_to_array('branch,id,start_at,status,title,visibility', ',');
 END $$;
 
 -- ---------------------------------------------------------------------------
@@ -164,9 +160,9 @@ END $$;
 DO $$
 BEGIN
   UPDATE directus_permissions p
-     SET fields = ARRAY['id','title']
+     SET fields = 'id,title'
    WHERE p.collection = 'events' AND p.action = 'read'
-     AND array_length(p.fields, 1) = 29;
+     AND array_length(string_to_array(p.fields, ','), 1) = 29;
 END $$;
 
 \i services/directus/schema/migrations/20261030_0064_public_event_read_policy.sql
@@ -176,14 +172,14 @@ BEGIN
   PERFORM test_support.assert_equals(
     (SELECT count(*)::text FROM directus_permissions p
       WHERE p.collection = 'events' AND p.action = 'read'
-        AND (SELECT array_agg(f ORDER BY f) FROM unnest(p.fields) AS f)
-          = ARRAY['id','title']), '2', 'public-policy',
+        AND (SELECT array_agg(f ORDER BY f) FROM unnest(string_to_array(p.fields, ',')) AS f)
+          = string_to_array('id,title', ',')), '2', 'public-policy',
     'unknown state: both non-allowlist rows keep their fields (operator step, no invented grant)');
 
   PERFORM test_support.assert_equals(
     (SELECT count(*)::text FROM directus_permissions p
       WHERE p.collection = 'events' AND p.action = 'read'
-        AND array_length(p.fields, 1) = 29), '0', 'public-policy',
+        AND array_length(string_to_array(p.fields, ','), 1) = 29), '0', 'public-policy',
     'unknown state: nothing was widened to the allowlist');
 END $$;
 

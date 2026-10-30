@@ -87,13 +87,13 @@ BEGIN
     FROM directus_permissions p
    WHERE p.collection = 'events'
      AND p.action = 'read'
-     AND (SELECT array_agg(f ORDER BY f) FROM unnest(p.fields) AS f) = v_legacy;
+     AND (SELECT array_agg(f ORDER BY f) FROM unnest(string_to_array(p.fields, ',')) AS f) = v_legacy;
 
   SELECT count(*) INTO v_allow_hits
     FROM directus_permissions p
    WHERE p.collection = 'events'
      AND p.action = 'read'
-     AND (SELECT array_agg(f ORDER BY f) FROM unnest(p.fields) AS f) = v_allow;
+     AND (SELECT array_agg(f ORDER BY f) FROM unnest(string_to_array(p.fields, ',')) AS f) = v_allow;
 
   IF v_allow_hits > 0 AND v_legacy_hits = 0 THEN
     RAISE NOTICE
@@ -116,10 +116,10 @@ BEGIN
   END IF;
 
   UPDATE directus_permissions p
-     SET fields = v_allow
+     SET fields = array_to_string(v_allow, ',')
    WHERE p.collection = 'events'
      AND p.action = 'read'
-     AND (SELECT array_agg(f ORDER BY f) FROM unnest(p.fields) AS f) = v_legacy;
+     AND (SELECT array_agg(f ORDER BY f) FROM unnest(string_to_array(p.fields, ',')) AS f) = v_legacy;
 
   RAISE NOTICE
     '20261030_0064 applied: public events-read permission widened from the 6 calendar fields to the 29-field public-surface allowlist (detail 28 + branch). No PII, no role/policy change, 404-never-403 preserved.';
