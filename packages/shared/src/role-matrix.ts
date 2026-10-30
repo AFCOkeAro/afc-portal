@@ -1025,13 +1025,15 @@ const FIELD_RESTRICTIONS: Readonly<
     roles: ['super_admin', 'area_admin', 'branch_admin'],
     note: 'task description: assignee + scoped admin (record-level in policy); hidden here for roles that never qualify',
   },
-  // Time Off leave reason (AFC-930, ADR-0012 §Dec.3). Free text that may
-  // hold health-adjacent detail: deciding officers + area only. The
-  // requester's own-row read is record-level and lives in the Directus
-  // policy, which withholds the field for everyone else.
+  // Time Off leave reason (AFC-930, ADR-0012 §Dec.3; AFC-934 F2 fix).
+  // Free text that may hold health-adjacent detail: deciding officers +
+  // area only. zone_admin is a deciding officer (MATRIX CRU own_zone), so
+  // it reads reason; omitting it stripped the Approvals-queue reader the
+  // matrix empowers. The requester's own-row read is record-level and
+  // lives in the Directus policy, which withholds the field for others.
   [COLLECTIONS.leaveRequests]: {
     fields: ['reason'],
-    roles: ['super_admin', 'area_admin', 'branch_admin'],
+    roles: ['super_admin', 'area_admin', 'branch_admin', 'zone_admin'],
     note: 'leave reason: deciding officers (own scope, enforced by policy) + area; own-row read is record-level in policy',
   },
 }
