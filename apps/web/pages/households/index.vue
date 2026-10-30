@@ -6,6 +6,10 @@ definePageMeta({ middleware: 'staff' })
 const api = useApi()
 const route = useRoute()
 const showForm = ref(false)
+/** AFC-897: the Forms hub links here with ?new=1 to open the create form directly. */
+onMounted(() => {
+  if (route.query.new !== undefined) showForm.value = true
+})
 const searchInput = ref('')
 const search = ref('')
 
@@ -80,6 +84,8 @@ function formatDate(value: string | null | undefined): string {
         </PermissionGate>
       </template>
     </PageHeader>
+
+    <CustomFormRenderer module="households" class="mt-4" />
 
     <UCard>
       <div class="grid gap-3 sm:grid-cols-2">

@@ -24,6 +24,10 @@ const mine = ref(queryParam('mine') === '1')
 /** Branch drill-down (AFC-666): event Tasks tab links here with ?branch=. */
 const branch = ref(queryParam('branch') ?? '')
 const showForm = ref(false)
+/** AFC-897: the Forms hub links here with ?new=1 to open the create form directly. */
+onMounted(() => {
+  if (route.query.new !== undefined) showForm.value = true
+})
 const form = ref({
   title: '',
   assignee_user: '',
@@ -250,6 +254,8 @@ function isOverdue(row: Record<string, unknown>): boolean {
         </PermissionGate>
       </template>
     </PageHeader>
+
+    <CustomFormRenderer module="tasks" class="mt-4" />
 
     <DashboardStrip :items="stripItems" />
 

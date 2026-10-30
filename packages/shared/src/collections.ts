@@ -34,6 +34,8 @@ export const COLLECTIONS = {
   eventCollaborators: 'event_collaborators',
   /** Funeral cases under Family (AFC-884). */
   funeralCases: 'funeral_cases',
+  /** Staff-built form definitions linked to a module (AFC-897). */
+  customForms: 'custom_forms',
   /** Annual leave allowances per person per year (AFC-854 Time Off). */
   leaveBalances: 'leave_balances',
   /** Programme items inside a session (AFC-826 schedule builder). */

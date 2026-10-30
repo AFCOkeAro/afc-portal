@@ -7,6 +7,7 @@ import type {
   Branch,
   Celebration,
   CelebrationEvent,
+  CustomFormFieldDef,
   Department,
   EventRecord,
   EventRegistration,
@@ -560,4 +561,16 @@ export interface AttendanceReport {
     group_by: AttendanceReportGroup
     period: AttendanceReportPeriod
   }
+}
+
+/** A staff-built form definition (AFC-897). Schema fields are the ordered inputs. */
+export interface CustomFormRow {
+  id: string
+  name: string
+  module: string
+  schema: {
+    version: number
+    fields: CustomFormFieldDef[]
+  }
+  created_at: string
 }

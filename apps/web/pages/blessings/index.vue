@@ -7,6 +7,10 @@ definePageMeta({ middleware: 'staff' })
 const api = useApi()
 const route = useRoute()
 const showForm = ref(false)
+/** AFC-897: the Forms hub links here with ?new=1 to open the create form directly. */
+onMounted(() => {
+  if (route.query.new !== undefined) showForm.value = true
+})
 
 function queryParam(name: string): string | null {
   const value = route.query[name]
@@ -187,6 +191,8 @@ function formatDate(value: string): string {
         </PermissionGate>
       </template>
     </PageHeader>
+
+    <CustomFormRenderer module="blessings" class="mt-4" />
 
     <div
       v-if="breakdown.length > 0"
