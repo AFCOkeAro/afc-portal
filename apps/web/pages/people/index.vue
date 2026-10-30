@@ -8,6 +8,10 @@ const api = useApi()
 const permissions = usePermissions()
 const route = useRoute()
 const showForm = ref(false)
+/** AFC-897: the Forms hub links here with ?new=1 to open the create form directly. */
+onMounted(() => {
+  if (route.query.new !== undefined) showForm.value = true
+})
 const searchInput = ref('')
 const search = ref('')
 /** Drill-down contract: branch/profile pages link here with ?branch=&status=. */
@@ -260,6 +264,8 @@ function fullName(person: PersonRow): string {
         </PermissionGate>
       </template>
     </PageHeader>
+
+    <CustomFormRenderer module="people" class="mt-4" />
 
     <UAlert
       v-if="restricted.length"

@@ -31,6 +31,10 @@ function goTab(next: TabId): void {
 }
 
 const showForm = ref(false)
+/** AFC-897: the Forms hub links here with ?new=1 to open the create form directly. */
+onMounted(() => {
+  if (route.query.new !== undefined) showForm.value = true
+})
 const searchInput = ref('')
 const search = ref('')
 /** Drill-down contract: dashboard/branch pages link here with ?status=&branch=. */
@@ -216,6 +220,8 @@ const priorityColor: Record<string, 'success' | 'warning' | 'neutral' | 'error'>
         </div>
       </template>
     </PageHeader>
+
+    <CustomFormRenderer module="welfare_cases" class="mt-4" />
 
     <nav aria-label="Welfare sections" class="mb-4">
       <div class="flex gap-1 overflow-x-auto">

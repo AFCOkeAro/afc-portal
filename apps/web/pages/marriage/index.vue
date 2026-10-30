@@ -49,6 +49,10 @@ function goTab(next: MarriageTab): void {
 
 /* Matters surface (moved verbatim from the standalone matters page). */
 const matterShowForm = ref(false)
+/** AFC-897: the Forms hub links here with ?new=1 to open the create form directly. */
+onMounted(() => {
+  if (route.query.new !== undefined) matterShowForm.value = true
+})
 const matterForm = ref({
   person: '',
   branch: '',

@@ -5,7 +5,12 @@ definePageMeta({ middleware: 'staff' })
 
 const api = useApi()
 const { branchOptions, branchesPending } = useBranchOptions()
+const route = useRoute()
 const showForm = ref(false)
+/** AFC-897: the Forms hub links here with ?new=1 to open the create form directly. */
+onMounted(() => {
+  if (route.query.new !== undefined) showForm.value = true
+})
 const form = ref({ title: '', body: '', publish_from: '', publish_to: '', branch: '' })
 const error = ref('')
 
@@ -65,6 +70,8 @@ const stripItems = computed(() => [
         </PermissionGate>
       </template>
     </PageHeader>
+
+    <CustomFormRenderer module="announcements" class="mt-4" />
 
     <DashboardStrip :items="stripItems" />
 

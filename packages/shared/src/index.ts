@@ -22,6 +22,7 @@ export * from './office-feed'
 export * from './leave'
 export * from './markdown'
 export * from './message-tokens'
+export * from './custom-form-definition'
 export * from './minutes-samples'
 export * from './impersonation'
 

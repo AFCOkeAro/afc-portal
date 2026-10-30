@@ -164,6 +164,19 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     none: [NONE, 'none'],
     zone_admin: [ALL, 'own_zone'],
   },
+  // Custom form definitions (AFC-897): global taxonomy, not branch data
+  // (the expense-categories precedent). Reads for all staff (fillers list
+  // forms on their module); writes ride the area-only routes, so the
+  // matrix only needs to open them for the area pair.
+  [COLLECTIONS.customForms]: {
+    super_admin: [ALL, 'all'],
+    area_admin: [ALL, 'all'],
+    branch_admin: [R, 'all'],
+    department_leader: [R, 'all'],
+    volunteer: [R, 'all'],
+    none: [NONE, 'none'],
+    zone_admin: [R, 'all'],
+  },
   [COLLECTIONS.eventTestimonies]: {
     super_admin: [ALL, 'all'],
     area_admin: [ALL, 'all'],

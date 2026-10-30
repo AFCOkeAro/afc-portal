@@ -3,12 +3,14 @@ import { COLLECTIONS } from '@afc/shared'
 import type { CollectionName, PermissionAction } from '@afc/shared'
 
 /**
- * Forms hub (AFC-840 phase 1): every data-entry point in one directory.
+ * Forms hub (AFC-840 phase 1, AFC-897): every data-entry point in one directory.
  *
- * Each card links to the page that hosts the form and renders only when
- * the session holds the matching create grant (the public registration
- * card renders for everyone). A custom form builder is an explicit
- * non-goal for phase 1 (recorded on AFC-840).
+ * Each card links to the page that hosts the form WITH `?new=1`, so the
+ * entry opens the create form itself, not the parent list (chairman ask
+ * 2026-10-29). The pages honour the query by opening their create
+ * affordance on mount; `/register` is already the form, so it links bare.
+ * The Custom forms card opens the builder register, whose fills write
+ * through each linked module's own create grant.
  */
 definePageMeta({ middleware: 'staff' })
 
@@ -25,7 +27,7 @@ const CARDS: FormCard[] = [
   {
     title: 'Visitor intake',
     description: 'Record a first-time visitor and start the follow-up journey.',
-    to: '/visitors',
+    to: '/visitors?new=1',
     requires: [COLLECTIONS.visitors, 'create'],
   },
   {
@@ -37,44 +39,50 @@ const CARDS: FormCard[] = [
   {
     title: 'Person record',
     description: 'Add a person to the directory.',
-    to: '/people',
+    to: '/people?new=1',
     requires: [COLLECTIONS.people, 'create'],
   },
   {
     title: 'Household',
     description: 'Register a family household.',
-    to: '/households',
+    to: '/households?new=1',
     requires: [COLLECTIONS.households, 'create'],
   },
   {
     title: 'Marriage matter',
     description: 'Open a marriage file.',
-    to: '/marriage',
+    to: '/marriage?new=1',
     requires: [COLLECTIONS.marriageMatters, 'create'],
   },
   {
     title: 'Welfare case',
     description: 'Open a welfare case.',
-    to: '/welfare',
+    to: '/welfare?new=1',
     requires: [COLLECTIONS.welfareCases, 'create'],
   },
   {
     title: 'Blessing',
     description: 'Record a blessing.',
-    to: '/blessings',
+    to: '/blessings?new=1',
     requires: [COLLECTIONS.blessings, 'create'],
   },
   {
     title: 'Announcement',
     description: 'Publish an announcement.',
-    to: '/announcements',
+    to: '/announcements?new=1',
     requires: [COLLECTIONS.announcements, 'create'],
   },
   {
     title: 'Task',
     description: 'Create a task directly.',
-    to: '/tasks',
+    to: '/tasks?new=1',
     requires: [COLLECTIONS.tasks, 'create'],
+  },
+  {
+    title: 'Custom forms',
+    description: 'Build module-linked forms from live database columns, and fill them.',
+    to: '/custom-forms',
+    requires: [COLLECTIONS.customForms, 'read'],
   },
 ]
 
@@ -90,7 +98,7 @@ const visibleCards = computed(() =>
   <div>
     <PageHeader
       title="Forms"
-      description="Every form in the portal, in one place. Each card opens the page that hosts the form."
+      description="Every form in the portal, in one place. Each card opens the new form itself."
     />
     <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
       <UCard v-for="card in visibleCards" :key="card.to">

@@ -30,6 +30,10 @@ function goTab(next: TabId): void {
 }
 
 const showForm = ref(false)
+/** AFC-897: the Forms hub links here with ?new=1 to open the create form directly. */
+onMounted(() => {
+  if (route.query.new !== undefined) showForm.value = true
+})
 const searchInput = ref('')
 const search = ref('')
 /** Drill-down contract: dashboard/branch pages link here with ?status=&branch=. */
@@ -182,6 +186,8 @@ const statusColor: Record<string, 'success' | 'warning' | 'neutral' | 'error'> =
         </PermissionGate>
       </template>
     </PageHeader>
+
+    <CustomFormRenderer module="visitors" class="mt-4" />
 
     <nav aria-label="Visitors sections" class="mb-4">
       <div class="flex gap-1 overflow-x-auto">
