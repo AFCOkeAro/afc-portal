@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { COLLECTIONS, renderMarkdownSafe } from '@afc/shared'
+import { ApiRequestError } from '~/composables/useApi'
 
 definePageMeta({ middleware: 'staff' })
 
@@ -8,6 +9,7 @@ const route = useRoute()
 const id = String(route.params.id)
 const person = ref('')
 const { personOptions, personPending, onPersonSearch } = usePersonSearch()
+const { branchOptions, branchesPending } = useBranchOptions()
 const error = ref('')
 
 const {
@@ -50,6 +52,85 @@ function timeRange(row: Record<string, unknown>): string {
   if (start && end) return `${start}–${end}`
   return start || end || '—'
 }
+
+/**
+ * Edit form (AFC-912): same fields as minutes/new.vue, validated by the same
+ * minutesFormSchema (partial) on PATCH /api/minutes/:id. The body editor is
+ * the shared MinutesBodyEditor, so the Raw | Preview toggle and the toolbar
+ * cannot drift from the create page.
+ */
+const editing = ref(false)
+const editForm = ref({
+  title: '',
+  meeting_date: '',
+  start_time: '',
+  end_time: '',
+  location: '',
+  branch: '',
+  body: '',
+})
+const editSaving = ref(false)
+const editError = ref('')
+const editFieldErrors = ref<Record<string, string>>({})
+
+function startEdit() {
+  const row = data.value?.data
+  if (!row) return
+  editError.value = ''
+  editFieldErrors.value = {}
+  editForm.value = {
+    title: String(row.title ?? ''),
+    meeting_date: String(row.meeting_date ?? '').slice(0, 10),
+    start_time: typeof row.start_time === 'string' ? row.start_time.slice(0, 5) : '',
+    end_time: typeof row.end_time === 'string' ? row.end_time.slice(0, 5) : '',
+    location: String(row.location ?? ''),
+    branch: typeof row.branch === 'string' ? row.branch : '',
+    body: String(row.body ?? ''),
+  }
+  editing.value = true
+}
+
+function cancelEdit() {
+  editing.value = false
+  editError.value = ''
+  editFieldErrors.value = {}
+}
+
+async function saveEdit() {
+  editError.value = ''
+  editFieldErrors.value = {}
+  if (
+    editForm.value.start_time &&
+    editForm.value.end_time &&
+    editForm.value.end_time <= editForm.value.start_time
+  ) {
+    editFieldErrors.value = { end_time: 'The end time must be after the start time' }
+    return
+  }
+  editSaving.value = true
+  try {
+    await api.patch(`/api/minutes/${id}`, {
+      title: editForm.value.title,
+      meeting_date: editForm.value.meeting_date,
+      start_time: editForm.value.start_time || null,
+      end_time: editForm.value.end_time || null,
+      location: editForm.value.location.trim() || null,
+      body: editForm.value.body || null,
+      ...(editForm.value.branch ? { branch: editForm.value.branch } : {}),
+    })
+    editing.value = false
+    await refresh()
+  } catch (cause) {
+    if (cause instanceof ApiRequestError) {
+      editFieldErrors.value = cause.fields
+      editError.value = cause.message
+    } else {
+      editError.value = 'Could not save the minutes. Try again.'
+    }
+  } finally {
+    editSaving.value = false
+  }
+}
 </script>
 
 <template>
@@ -59,6 +140,17 @@ function timeRange(row: Record<string, unknown>): string {
       description="File, attendees and audit trail. Writes are area-scoped per the matrix."
     >
       <template #actions>
+        <PermissionGate :collection="COLLECTIONS.officeMinutes" action="update">
+          <UButton
+            v-if="!editing"
+            color="neutral"
+            variant="outline"
+            size="sm"
+            icon="i-lucide-pencil"
+            label="Edit"
+            @click="startEdit"
+          />
+        </PermissionGate>
         <UButton
           color="neutral"
           variant="ghost"
@@ -83,6 +175,84 @@ function timeRange(row: Record<string, unknown>): string {
     </div>
 
     <div v-else-if="data?.data" class="grid gap-4">
+      <PermissionGate :collection="COLLECTIONS.officeMinutes" action="update">
+        <UCard v-if="editing">
+          <template #header>
+            <h2 class="font-semibold">Edit minutes</h2>
+          </template>
+          <div class="grid gap-4 sm:grid-cols-2">
+            <UFormField
+              label="Title"
+              required
+              class="sm:col-span-2"
+              :error="editFieldErrors.title"
+            >
+              <UInput v-model="editForm.title" class="w-full" />
+            </UFormField>
+            <UFormField
+              label="Meeting date"
+              required
+              :error="editFieldErrors.meeting_date"
+            >
+              <UInput v-model="editForm.meeting_date" type="date" class="w-full" />
+            </UFormField>
+            <UFormField label="Branch" :error="editFieldErrors.branch">
+              <EntitySelect
+                v-model="editForm.branch"
+                :items="branchOptions"
+                placeholder="Select branch…"
+                :loading="branchesPending"
+                class="w-full"
+              />
+            </UFormField>
+            <UFormField label="Start time" :error="editFieldErrors.start_time">
+              <UInput v-model="editForm.start_time" type="time" class="w-full" />
+            </UFormField>
+            <UFormField label="End time" :error="editFieldErrors.end_time">
+              <UInput v-model="editForm.end_time" type="time" class="w-full" />
+            </UFormField>
+            <UFormField
+              label="Location"
+              class="sm:col-span-2"
+              :error="editFieldErrors.location"
+            >
+              <UInput v-model="editForm.location" class="w-full" />
+            </UFormField>
+            <div class="sm:col-span-2">
+              <MinutesBodyEditor
+                v-model="editForm.body"
+                textarea-id="minutes-edit-body"
+                :field-error="editFieldErrors.body"
+              />
+            </div>
+          </div>
+          <UAlert
+            v-if="editError"
+            class="mt-4"
+            color="error"
+            variant="subtle"
+            title="Could not save the minutes"
+            :description="editError"
+          />
+          <div class="mt-4 flex gap-2">
+            <UButton
+              label="Save changes"
+              icon="i-lucide-check"
+              :loading="editSaving"
+              :disabled="editSaving"
+              @click="saveEdit"
+            />
+            <UButton
+              label="Cancel"
+              color="neutral"
+              variant="ghost"
+              :disabled="editSaving"
+              @click="cancelEdit"
+            />
+          </div>
+        </UCard>
+      </PermissionGate>
+
       <UCard>
         <template #header>
           <h2 class="font-semibold">Meeting</h2>

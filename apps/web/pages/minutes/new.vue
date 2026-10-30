@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { COLLECTIONS, MINUTES_SAMPLES, renderMarkdownSafe } from '@afc/shared'
+import { COLLECTIONS, MINUTES_SAMPLES } from '@afc/shared'
 import type { MinutesSample } from '@afc/shared'
 import { ApiRequestError } from '~/composables/useApi'
 
@@ -20,12 +20,9 @@ const form = ref({
 })
 const attendeePerson = ref('')
 const stagedAttendees = ref<Array<{ id: string; label: string }>>([])
-const showPreview = ref(false)
 const saving = ref(false)
 const error = ref('')
 const fieldErrors = ref<Record<string, string>>({})
-
-const previewHtml = computed(() => renderMarkdownSafe(form.value.body))
 
 function stageAttendee() {
   error.value = ''
@@ -52,58 +49,6 @@ function unstageAttendee(id: string) {
 function loadSample(sampleId: string) {
   const sample = MINUTES_SAMPLES.find((row: MinutesSample) => row.id === sampleId)
   if (sample) form.value.body = sample.body
-}
-
-const editor = ref<HTMLTextAreaElement | null>(null)
-
-/** Wrap (or insert at) the textarea selection with a Markdown affix pair. */
-function surround(before: string, after = '') {
-  const area = editor.value
-  if (!area) return
-  const { selectionStart: start, selectionEnd: end, value } = area
-  const selected = value.slice(start, end) || 'text'
-  form.value.body = `${value.slice(0, start)}${before}${selected}${after}${value.slice(end)}`
-  nextTick(() => {
-    area.focus()
-    const caret = start + before.length + selected.length + after.length
-    area.setSelectionRange(caret, caret)
-  })
-}
-
-/** Prefix every selected line (line-prefix constructs: headings, lists, quote). */
-function prefixLines(prefix: string) {
-  const area = editor.value
-  if (!area) return
-  const { selectionStart: start, selectionEnd: end, value } = area
-  const selected = value.slice(start, end) || 'text'
-  const prefixed = selected
-    .split('\n')
-    .map((line: string) => `${prefix}${line}`)
-    .join('\n')
-  form.value.body = `${value.slice(0, start)}${prefixed}${value.slice(end)}`
-  nextTick(() => {
-    area.focus()
-    area.setSelectionRange(start, start + prefixed.length)
-  })
-}
-
-function insertTable() {
-  const area = editor.value
-  const table = '\n| Name | Role | Present |\n| ---- | ---- | ------- |\n|  |  |  |\n'
-  if (!area) {
-    form.value.body += table
-    return
-  }
-  const { selectionStart: start, value } = area
-  form.value.body = `${value.slice(0, start)}${table}${value.slice(start)}`
-  nextTick(() => {
-    area.focus()
-    area.setSelectionRange(start + table.length, start + table.length)
-  })
-}
-
-function insertLink() {
-  surround('[', '](https://)')
 }
 
 async function save() {
@@ -215,156 +160,11 @@ async function save() {
         </UFormField>
 
         <div class="sm:col-span-2">
-          <div class="mb-1 flex items-center justify-between gap-2">
-            <label
-              class="text-sm font-medium text-gray-700 dark:text-gray-200"
-              for="minutes-body"
-            >
-              Body (Markdown)
-            </label>
-            <UButton
-              size="xs"
-              color="neutral"
-              variant="ghost"
-              :icon="showPreview ? 'i-lucide-pencil' : 'i-lucide-eye'"
-              :label="showPreview ? 'Edit' : 'Preview'"
-              @click="showPreview = !showPreview"
-            />
-          </div>
-          <div
-            v-if="!showPreview"
-            class="mb-2 flex flex-wrap gap-1"
-            role="toolbar"
-            aria-label="Markdown formatting"
-          >
-            <UButton
-              size="xs"
-              color="neutral"
-              variant="ghost"
-              icon="i-lucide-bold"
-              aria-label="Bold"
-              @click="surround('**', '**')"
-            />
-            <UButton
-              size="xs"
-              color="neutral"
-              variant="ghost"
-              icon="i-lucide-italic"
-              aria-label="Italic"
-              @click="surround('*', '*')"
-            />
-            <UButton
-              size="xs"
-              color="neutral"
-              variant="ghost"
-              icon="i-lucide-underline"
-              aria-label="Underline"
-              @click="surround('++', '++')"
-            />
-            <UButton
-              size="xs"
-              color="neutral"
-              variant="ghost"
-              icon="i-lucide-strikethrough"
-              aria-label="Strikethrough"
-              @click="surround('~~', '~~')"
-            />
-            <UButton
-              size="xs"
-              color="neutral"
-              variant="ghost"
-              icon="i-lucide-heading-1"
-              aria-label="Heading 1"
-              @click="prefixLines('# ')"
-            />
-            <UButton
-              size="xs"
-              color="neutral"
-              variant="ghost"
-              icon="i-lucide-heading-2"
-              aria-label="Heading 2"
-              @click="prefixLines('## ')"
-            />
-            <UButton
-              size="xs"
-              color="neutral"
-              variant="ghost"
-              icon="i-lucide-heading-3"
-              aria-label="Heading 3"
-              @click="prefixLines('### ')"
-            />
-            <UButton
-              size="xs"
-              color="neutral"
-              variant="ghost"
-              icon="i-lucide-list"
-              aria-label="Bulleted list"
-              @click="prefixLines('- ')"
-            />
-            <UButton
-              size="xs"
-              color="neutral"
-              variant="ghost"
-              icon="i-lucide-list-ordered"
-              aria-label="Numbered list"
-              @click="prefixLines('1. ')"
-            />
-            <UButton
-              size="xs"
-              color="neutral"
-              variant="ghost"
-              icon="i-lucide-quote"
-              aria-label="Quote"
-              @click="prefixLines('> ')"
-            />
-            <UButton
-              size="xs"
-              color="neutral"
-              variant="ghost"
-              icon="i-lucide-code"
-              aria-label="Code"
-              @click="surround('`', '`')"
-            />
-            <UButton
-              size="xs"
-              color="neutral"
-              variant="ghost"
-              icon="i-lucide-table"
-              aria-label="Table"
-              @click="insertTable"
-            />
-            <UButton
-              size="xs"
-              color="neutral"
-              variant="ghost"
-              icon="i-lucide-link"
-              aria-label="Link"
-              @click="insertLink"
-            />
-          </div>
-          <!-- Native textarea: the toolbar needs selectionStart/End, which a
-            wrapped component ref cannot promise. -->
-          <textarea
-            v-if="!showPreview"
-            id="minutes-body"
-            ref="editor"
+          <MinutesBodyEditor
             v-model="form.body"
-            rows="14"
-            class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 font-mono text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
-            placeholder="Write the minutes in Markdown — select text and use the toolbar to style it."
+            textarea-id="minutes-body"
+            :field-error="fieldErrors.body"
           />
-          <!-- previewHtml comes from the shared XSS-safe renderer
-            (escape-first, allowlisted tags), never from raw user HTML. -->
-          <!-- eslint-disable vue/no-v-html -->
-          <div
-            v-else
-            class="markdown-body min-h-56 rounded-md border border-gray-200 p-4 text-sm dark:border-gray-800"
-            v-html="previewHtml"
-          />
-          <!-- eslint-enable vue/no-v-html -->
-          <p v-if="fieldErrors.body" class="mt-1 text-sm text-red-600">
-            {{ fieldErrors.body }}
-          </p>
           <div class="mt-2 flex flex-wrap items-center gap-2 text-xs text-gray-500">
             <span>Samples (replace the body):</span>
             <UButton
@@ -455,67 +255,3 @@ async function save() {
     </UCard>
   </div>
 </template>
-
-<style scoped>
-.markdown-body :deep(h1),
-.markdown-body :deep(h2),
-.markdown-body :deep(h3) {
-  font-weight: 700;
-  margin: 0.75rem 0 0.375rem;
-}
-.markdown-body :deep(h1) {
-  font-size: 1.25rem;
-}
-.markdown-body :deep(h2) {
-  font-size: 1.125rem;
-}
-.markdown-body :deep(h3) {
-  font-size: 1rem;
-}
-.markdown-body :deep(p) {
-  margin: 0.375rem 0;
-}
-.markdown-body :deep(ul),
-.markdown-body :deep(ol) {
-  margin: 0.375rem 0 0.375rem 1.25rem;
-}
-.markdown-body :deep(ul) {
-  list-style: disc;
-}
-.markdown-body :deep(ol) {
-  list-style: decimal;
-}
-.markdown-body :deep(blockquote) {
-  border-left: 3px solid var(--ui-border-accented);
-  padding-left: 0.75rem;
-  color: var(--ui-text-muted);
-  margin: 0.5rem 0;
-}
-.markdown-body :deep(table) {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 0.5rem 0;
-  font-size: 0.875rem;
-}
-.markdown-body :deep(th),
-.markdown-body :deep(td) {
-  border: 1px solid var(--ui-border);
-  padding: 0.375rem 0.625rem;
-  text-align: left;
-}
-.markdown-body :deep(th) {
-  font-weight: 600;
-}
-.markdown-body :deep(code) {
-  font-family: ui-monospace, monospace;
-  font-size: 0.875em;
-}
-.markdown-body :deep(pre) {
-  overflow-x: auto;
-  padding: 0.625rem;
-  border-radius: 0.375rem;
-}
-.markdown-body :deep(a) {
-  text-decoration: underline;
-}
-</style>

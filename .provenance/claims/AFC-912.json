@@ -1,0 +1,16 @@
+{
+  "authorAgentId": "human-operator-board",
+  "authorName": "Board chairman (CLI operator session)",
+  "claimedAt": "2026-10-30T10:30:00+01:00",
+  "doesNotClaimR2": "There is no reviews[] entry here and there will not be one from me. R2 wants a named reviewer who is not the author. CTO R2 requested on the AFC-912 thread before landing.",
+  "issue": "AFC-912",
+  "notClaimedPaths": "Non-compliance apps/** paths in the same packet need no claim and land with the R2 verdict: PATCH /api/minutes/:id route (apps/web/server/api/minutes/[id].patch.ts), the shared body editor (apps/web/components/MinutesBodyEditor.vue), and the create/detail page wiring (apps/web/pages/minutes/new.vue, apps/web/pages/minutes/[id].vue).",
+  "paths": [
+    "tests/web/minutes-edit.contract.mjs",
+    "tests/web/office.contract.mjs",
+    ".provenance/claims/AFC-912.json"
+  ],
+  "scopeOfTheClaim": "R1 only: authorship of the compliance-path files below (chairman ask 2026-10-30: minutes detail page gets an edit form; PATCH /api/minutes/:id branch-scoped like other minutes routes with the same POST validation via a partial plus an audit row; detail Edit form reuses the new.vue markdown toolbar/preview pattern through a shared component with an explicit Raw | Preview segmented toggle, new.vue upgraded to the same control). Correctness is for CI (R4) and the CTO review (R2).",
+  "whatTheChangeActuallyDoes": "Contract 18/18 in the new minutes-edit suite plus the repointed AFC-670 toolbar assertions: PATCH route matrix-gated on office_minutes update with boundary uuid validation, branch-scoped load (cross-scope id is a 404), minutesFormSchema.partial validation, per-field patch with branch re-scope, and an updated audit row after the write; shared MinutesBodyEditor (full toolbar set, Raw | Preview segmented group with aria-pressed, XSS-safe preview of the bound value, v-model only, no store access); both pages embed it with no forked toolbar; detail edit form binds every editable field with client-side time order, PATCHes the scoped row and reloads; attendee slash-path and safe read display kept; role matrix untouched.",
+  "whatThisFileIs": "An R1 authorship claim, and nothing else. It says who wrote the compliance-path files below and on which issue. It asserts nothing about whether they are correct, and it carries no reviews[] entry."
+}
