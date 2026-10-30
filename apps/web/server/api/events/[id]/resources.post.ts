@@ -45,6 +45,31 @@ export default defineEventHandler(async (event) => {
       })
     }
 
+    // AFC-883: an optional session handout. The session must belong to
+    // this same event — a cross-programme link is refused, not silently
+    // stored.
+    let sessionId: string | null = null
+    if (form.session) {
+      const sessionRow = await findScopedItem<Record<string, unknown>>(
+        event,
+        scope,
+        'attendance_sessions',
+        form.session,
+        { fields: ['id', 'event'] },
+      ).catch(() => null)
+      if (!sessionRow || String(sessionRow.event) !== id) {
+        throw createError({
+          statusCode: 400,
+          statusMessage: 'That session is not part of this event',
+          data: {
+            code: 'validation_error',
+            fields: { session: 'Choose a session from this event' },
+          },
+        })
+      }
+      sessionId = String(sessionRow.id)
+    }
+
     const branch =
       typeof parent.branch === 'string' && parent.branch !== '' ? parent.branch : null
     let zone: string | null = null
@@ -72,6 +97,7 @@ export default defineEventHandler(async (event) => {
         kind: form.kind,
         url: form.source_type === 'link' ? (form.url?.trim() ?? null) : null,
         file_id: form.source_type === 'upload' ? (form.file_id ?? null) : null,
+        session_id: sessionId,
         status: 'pending',
         created_by: scope.session.user.id,
       },

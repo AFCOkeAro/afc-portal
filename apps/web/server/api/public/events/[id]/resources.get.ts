@@ -9,7 +9,15 @@ import { directusFetch } from '../../../../utils/directus'
  * allowlisted fields, approved rows only. Speaker names are omitted —
  * resolving them would read the people directory with the public token.
  */
-const FIELDS = ['id', 'title', 'source_type', 'kind', 'url', 'file_id'].join(',')
+const FIELDS = [
+  'id',
+  'title',
+  'source_type',
+  'kind',
+  'url',
+  'file_id',
+  'session_id',
+].join(',')
 
 export default defineEventHandler(async (event) => {
   const config = useRuntimeConfig(event)
@@ -25,6 +33,8 @@ export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
   if (!id)
     throw createError({ statusCode: 400, statusMessage: 'An event id is required' })
+  const query = getQuery(event)
+  const session = typeof query.session === 'string' ? query.session : ''
 
   const rows = await directusFetch<{ data: Record<string, unknown>[] }>(
     event,
@@ -36,6 +46,7 @@ export default defineEventHandler(async (event) => {
         filter: {
           event: { _eq: id },
           status: { _eq: 'approved' },
+          ...(session === '' ? {} : { session_id: { _eq: session } }),
         },
         fields: FIELDS,
         sort: 'created_at',
@@ -76,6 +87,34 @@ export default defineEventHandler(async (event) => {
       data: { code: 'not_found' },
     })
   }
+  // Session names for the handout shelf. Best-effort: without the
+  // sessions read the ids still serve, just unnamed.
+  const sessionIds = [
+    ...new Set(
+      rows.map((row) => row.session_id).filter((v) => typeof v === 'string' && v !== ''),
+    ),
+  ]
+  let sessionNames = new Map<string, string>()
+  if (sessionIds.length > 0) {
+    const sessions = await directusFetch<{ data: Array<Record<string, unknown>> }>(
+      event,
+      '/items/attendance_sessions',
+      {
+        method: 'GET',
+        accessToken: publicToken,
+        query: {
+          filter: { id: { _in: sessionIds } },
+          fields: 'id,session_name',
+          limit: 100,
+        },
+      },
+    )
+      .then((response) => response.data ?? [])
+      .catch(() => [] as Array<Record<string, unknown>>)
+    sessionNames = new Map(
+      sessions.map((row) => [String(row.id), String(row.session_name ?? 'Session')]),
+    )
+  }
   return {
     data: rows.map((row: Record<string, unknown>) => ({
       id: String(row.id),
@@ -84,6 +123,11 @@ export default defineEventHandler(async (event) => {
       source_type: String(row.source_type ?? 'link'),
       url: row.source_type === 'link' && row.url ? String(row.url) : null,
       file_id: row.source_type === 'upload' && row.file_id ? String(row.file_id) : null,
+      session_id: typeof row.session_id === 'string' ? row.session_id : null,
+      session_name:
+        typeof row.session_id === 'string' && row.session_id !== ''
+          ? (sessionNames.get(row.session_id) ?? 'Session')
+          : null,
     })),
   }
 })

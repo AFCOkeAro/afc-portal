@@ -92,6 +92,31 @@ export default defineEventHandler(async (event) => {
         fields: ['id', 'event'],
       })
     }
+    let nextSession: string | null | undefined
+    if (parsed.data.session !== undefined) {
+      if (parsed.data.session === null || parsed.data.session === '') {
+        nextSession = null
+      } else {
+        const sessionRow = await findScopedItem<Record<string, unknown>>(
+          event,
+          scope,
+          'attendance_sessions',
+          parsed.data.session,
+          { fields: ['id', 'event'] },
+        ).catch(() => null)
+        if (!sessionRow || String(sessionRow.event) !== String(existing.event)) {
+          throw createError({
+            statusCode: 400,
+            statusMessage: 'That session is not part of this event',
+            data: {
+              code: 'validation_error',
+              fields: { session: 'Choose a session from this event' },
+            },
+          })
+        }
+        nextSession = String(sessionRow.id)
+      }
+    }
     const sourceType = String(existing.source_type ?? 'link')
     const nextUrl =
       parsed.data.url !== undefined ? parsed.data.url?.trim() || null : undefined
@@ -120,6 +145,7 @@ export default defineEventHandler(async (event) => {
         ...(parsed.data.kind !== undefined ? { kind: parsed.data.kind } : {}),
         ...(nextUrl !== undefined ? { url: nextUrl } : {}),
         ...(nextFile !== undefined ? { file_id: nextFile } : {}),
+        ...(nextSession !== undefined ? { session_id: nextSession } : {}),
       },
     )
     return { data: updated }

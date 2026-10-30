@@ -324,6 +324,8 @@ END $$;
 ALTER TABLE blessing_recipients DROP CONSTRAINT IF EXISTS blessing_recipients_session_fkey;
 ALTER TABLE blessing_recipients DROP CONSTRAINT IF EXISTS blessing_recipients_event_fkey;
 ALTER TABLE session_activities DROP CONSTRAINT IF EXISTS session_activities_session_fkey;
+-- AFC-883: 0061 links event_resources to sessions the same way; park its FK too.
+ALTER TABLE event_resources DROP CONSTRAINT IF EXISTS event_resources_session_fkey;
 \i services/directus/schema/migrations/rollback/20261020_0023_attendance_sessions.down.sql
 
 DO $$
@@ -348,6 +350,9 @@ END $$;
 -- AFC-826: re-add the parked 0050 FK now the sessions register is back.
 ALTER TABLE session_activities ADD CONSTRAINT session_activities_session_fkey
   FOREIGN KEY (session) REFERENCES attendance_sessions(id) ON DELETE CASCADE;
+-- AFC-883: re-add the parked 0061 session FK now sessions are back.
+ALTER TABLE event_resources ADD CONSTRAINT event_resources_session_fkey
+  FOREIGN KEY (session_id) REFERENCES attendance_sessions(id) ON DELETE SET NULL;
 
 -- The register rollback above drops the 0030/0031 scope triggers; re-apply
 -- them (rebased idempotent forwards from AFC-698) plus the 0034 links parked

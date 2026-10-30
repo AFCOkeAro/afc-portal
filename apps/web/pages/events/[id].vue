@@ -76,6 +76,42 @@ const checkinMessage = ref('')
 const checkinIsError = ref(false)
 /** People checked in on this device, this session (client-side only). */
 const deviceCheckins = ref<Array<{ name: string; at: string }>>([])
+
+interface HandoutItem {
+  id: string
+  title: string
+  kind: string
+  source_type: string
+  url: string | null
+  file_id: string | null
+  session_id: string | null
+  session_name: string | null
+}
+
+const handouts = ref<HandoutItem[]>([])
+const handoutsPending = ref(false)
+
+async function loadHandouts(): Promise<void> {
+  handoutsPending.value = true
+  try {
+    const res = await api.get<{ data: HandoutItem[] }>(`/api/events/${id}/resources`)
+    handouts.value = (res.data ?? []).filter(
+      (row) => row.session_id !== null && row.session_id !== '',
+    )
+  } catch {
+    handouts.value = []
+  } finally {
+    handoutsPending.value = false
+  }
+}
+
+function handoutHref(item: HandoutItem): string {
+  if (item.source_type === 'link' && item.url) return item.url
+  if (item.source_type === 'upload' && item.file_id)
+    return `/api/events/${id}/resources/file?file=${item.file_id}`
+  return '#'
+}
+
 const rollups = ref<RegistrationRollups | null>(null)
 const reportSubtab = ref<(typeof REPORT_SUBTABS)[number]>('Unit reports')
 
@@ -95,6 +131,14 @@ const tab = computed<TabId>(() => {
     ? (value as TabId)
     : 'overview'
 })
+
+watch(
+  tab,
+  (next: TabId) => {
+    if (next === 'checkin') void loadHandouts()
+  },
+  { immediate: true },
+)
 
 function goTab(next: TabId): void {
   void router.replace({ query: { ...route.query, tab: next } })
@@ -1863,6 +1907,45 @@ watch(
               >
                 <span class="font-medium">{{ entry.name }}</span>
                 <span class="text-xs text-gray-500">{{ entry.at }}</span>
+              </li>
+            </ul>
+          </UCard>
+          <UCard>
+            <template #header
+              ><h2 class="text-sm font-semibold">Session handouts</h2>
+              <p class="text-xs text-gray-500">
+                Materials linked to sessions — share these with checked-in participants.
+              </p></template
+            >
+            <p v-if="handoutsPending" class="py-4 text-center text-sm text-gray-500">
+              Loading handouts…
+            </p>
+            <EmptyState
+              v-else-if="handouts.length === 0"
+              title="No session handouts"
+              description="Link a resource to a session on the Resources tab and it appears here for handout."
+            />
+            <ul v-else class="divide-y divide-gray-100 text-sm dark:divide-gray-800">
+              <li
+                v-for="item in handouts"
+                :key="item.id"
+                class="flex items-center gap-2 py-2"
+              >
+                <span class="min-w-0 flex-1 truncate font-medium" :title="item.title">{{
+                  item.title
+                }}</span>
+                <span class="hidden text-xs text-gray-500 sm:inline">{{
+                  item.session_name ?? 'Session'
+                }}</span>
+                <UButton
+                  size="xs"
+                  color="neutral"
+                  variant="outline"
+                  icon="i-lucide-external-link"
+                  label="Open"
+                  :to="handoutHref(item)"
+                  target="_blank"
+                />
               </li>
             </ul>
           </UCard>
