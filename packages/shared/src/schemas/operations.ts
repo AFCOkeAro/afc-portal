@@ -316,6 +316,17 @@ export const feedbackFormSchema = z.object({
 export type FeedbackForm = z.infer<typeof feedbackFormSchema>
 const VISITOR_STATUSES = ['new', 'follow_up', 'converted', 'closed', 'declined'] as const
 
+/** Where a visitor came from (AFC-907). Mirrors the 0063 CHECK exactly. */
+export const VISITOR_SOURCES = [
+  'outreach',
+  'referral',
+  'social_media',
+  'event',
+  'walk_in',
+  'website',
+  'other',
+] as const
+
 export const visitorFormSchema = z.object({
   branch: optionalText(36),
   visitor_first_name: z.string().trim().min(1, 'First name is required').max(120),
@@ -339,6 +350,9 @@ export const visitorFormSchema = z.object({
   age_group: z.enum(['adult', 'youth', 'teen', 'child', 'unknown']).default('unknown'),
   invited_by: optionalText(36),
   follow_up_owner: optionalText(36),
+  address: optionalText(500),
+  campaign: optionalText(36),
+  source: z.enum(VISITOR_SOURCES).optional(),
   next_follow_up_date: dateSchema
     .optional()
     .transform((value) => (value === '' ? undefined : value)),

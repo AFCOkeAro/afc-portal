@@ -13,6 +13,7 @@ export default defineEventHandler(
     event,
   ): Promise<
     VisitorRow & {
+      campaign_name: string | null
       journey_stage_key: string | null
       journey_stages: Array<{
         key: string
@@ -44,6 +45,27 @@ export default defineEventHandler(
       throwStoreUnavailable(error, 'visitor_store', '0025')
     }
     const names = await branchNames(event, scope)
+    // Resolve the source campaign server-side so the UI renders names,
+    // never bare uuids. A missing campaign fails the label, never the page.
+    let campaignName: string | null = null
+    const campaignId = row.campaign
+    if (typeof campaignId === 'string' && campaignId !== '') {
+      try {
+        const found = await listItems<Record<string, unknown>>(
+          event,
+          scope,
+          'campaigns',
+          {
+            filter: { id: { _eq: campaignId } },
+            fields: ['id', 'name'],
+            limit: 1,
+          },
+        )
+        campaignName = String(found.data[0]?.name ?? '') || null
+      } catch {
+        campaignName = null
+      }
+    }
     // Resolve the journey vocabulary server-side so the UI renders stage keys,
     // never bare uuids. A missing stages collection fails the journey cards,
     // not the whole page.
@@ -79,6 +101,7 @@ export default defineEventHandler(
       id: String(row.id),
       branch_name: row.branch ? (names.get(String(row.branch)) ?? null) : null,
       person_name: null,
+      campaign_name: campaignName,
       journey_stage_key: journeyStageKey,
       journey_stages: journeyStages,
     }

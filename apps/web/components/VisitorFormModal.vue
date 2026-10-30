@@ -34,6 +34,11 @@ function empty() {
     age_group: 'unknown',
     invited_by: '',
     follow_up_owner: '',
+    invited_by_name: '',
+    follow_up_owner_name: '',
+    address: '',
+    campaign: '',
+    source: '',
     next_follow_up_date: '',
     notes: '',
     status: 'new',
@@ -62,6 +67,81 @@ const branchOptions = computed(() =>
   props.branches.map((branch) => ({ label: branch.name, value: branch.id })),
 )
 
+const sourceOptions = [
+  { label: 'No source recorded', value: '' },
+  { label: 'Outreach', value: 'outreach' },
+  { label: 'Referral', value: 'referral' },
+  { label: 'Social media', value: 'social_media' },
+  { label: 'Event', value: 'event' },
+  { label: 'Walk-in', value: 'walk_in' },
+  { label: 'Website', value: 'website' },
+  { label: 'Other', value: 'other' },
+]
+
+interface CampaignOption {
+  id: string
+  key: string
+  name: string
+}
+const campaignOptions = ref<Array<{ label: string; value: string }>>([
+  { label: 'No campaign', value: '' },
+])
+const campaignsUnavailable = ref(false)
+
+async function loadCampaigns(): Promise<void> {
+  try {
+    const res = await api.get<{ data: CampaignOption[] }>(
+      '/api/visitors/campaign-options',
+    )
+    campaignOptions.value = [
+      { label: 'No campaign', value: '' },
+      ...(res.data ?? []).map((row) => ({ label: row.name, value: row.id })),
+    ]
+    campaignsUnavailable.value = false
+  } catch {
+    campaignsUnavailable.value = true
+  }
+}
+
+const crossBranch = ref<{ branchName: string } | null>(null)
+const crossBranchChecking = ref(false)
+let crossBranchTimer: ReturnType<typeof setTimeout> | undefined
+
+async function probeCrossBranch(): Promise<void> {
+  crossBranch.value = null
+  const phone = form.phone.trim()
+  const email = form.email.trim()
+  if (phone === '' && email === '') return
+  crossBranchChecking.value = true
+  try {
+    const res = await api.get<{
+      data: { is_cross_branch: boolean; branch_name: string | null }
+    }>('/api/visitors/member-check', {
+      query: {
+        ...(phone ? { phone } : {}),
+        ...(email ? { email } : {}),
+        ...(form.branch ? { branch: form.branch } : {}),
+      },
+    })
+    if (res.data?.is_cross_branch) {
+      crossBranch.value = { branchName: res.data.branch_name ?? 'another branch' }
+    }
+  } catch {
+    crossBranch.value = null
+  } finally {
+    crossBranchChecking.value = false
+  }
+}
+
+function scheduleCrossBranchProbe(): void {
+  clearTimeout(crossBranchTimer)
+  crossBranchTimer = setTimeout(() => void probeCrossBranch(), 500)
+}
+
+watch([() => form.phone, () => form.email, () => form.branch], () =>
+  scheduleCrossBranchProbe(),
+)
+
 watch(
   () => props.open,
   (open: boolean) => {
@@ -69,6 +149,8 @@ watch(
     formError.value = ''
     fieldErrors.value = {}
     Object.assign(form, empty())
+    crossBranch.value = null
+    void loadCampaigns()
     const row = props.visitor
     if (row) {
       Object.assign(form, {
@@ -82,6 +164,11 @@ watch(
         age_group: row.age_group,
         invited_by: row.invited_by ?? '',
         follow_up_owner: row.follow_up_owner ?? '',
+        invited_by_name: '',
+        follow_up_owner_name: '',
+        address: row.address ?? '',
+        campaign: row.campaign ?? '',
+        source: row.source ?? '',
         next_follow_up_date: row.next_follow_up_date ?? '',
         notes: row.notes ?? '',
         status: row.status,
@@ -105,6 +192,9 @@ async function submit(): Promise<void> {
     event: form.event || undefined,
     invited_by: form.invited_by || undefined,
     follow_up_owner: form.follow_up_owner || undefined,
+    address: form.address || undefined,
+    campaign: form.campaign || undefined,
+    source: form.source || undefined,
     next_follow_up_date: form.next_follow_up_date || undefined,
     notes: form.notes || undefined,
   }
@@ -200,17 +290,54 @@ async function submit(): Promise<void> {
           </UFormField>
         </div>
 
+        <UAlert
+          v-if="crossBranch"
+          color="warning"
+          variant="subtle"
+          title="Member of another branch visiting for the first time"
+          :description="`${crossBranch.branchName} member — this visit will be flagged on follow-up.`"
+        />
+
         <div class="grid gap-4 sm:grid-cols-2">
           <UFormField label="Invited by" :error="fieldErrors.invited_by">
-            <UInput v-model="form.invited_by" class="w-full" placeholder="Optional" />
-          </UFormField>
-          <UFormField label="Follow-up owner" :error="fieldErrors.follow_up_owner">
-            <UInput
-              v-model="form.follow_up_owner"
-              class="w-full"
-              placeholder="Optional"
+            <UserPicker
+              v-model="form.invited_by"
+              v-model:display-name="form.invited_by_name"
+              aria-label="Invited by"
+              allow-create-person
+              :branch="form.branch"
             />
           </UFormField>
+          <UFormField label="Follow-up owner" :error="fieldErrors.follow_up_owner">
+            <UserPicker
+              v-model="form.follow_up_owner"
+              v-model:display-name="form.follow_up_owner_name"
+              aria-label="Follow-up owner"
+              :branch="form.branch"
+            />
+          </UFormField>
+        </div>
+
+        <div class="grid gap-4 sm:grid-cols-2">
+          <UFormField label="Address" :error="fieldErrors.address">
+            <UTextarea
+              v-model="form.address"
+              :rows="2"
+              class="w-full"
+              placeholder="Home address (optional)"
+            />
+          </UFormField>
+          <div class="space-y-4">
+            <UFormField label="Campaign" :error="fieldErrors.campaign">
+              <USelect v-model="form.campaign" :items="campaignOptions" class="w-full" />
+              <p v-if="campaignsUnavailable" class="mt-1 text-xs text-gray-500">
+                Campaign list unavailable — the visitor will be recorded without one.
+              </p>
+            </UFormField>
+            <UFormField label="Source" :error="fieldErrors.source">
+              <USelect v-model="form.source" :items="sourceOptions" class="w-full" />
+            </UFormField>
+          </div>
         </div>
 
         <UFormField label="Next follow-up" :error="fieldErrors.next_follow_up_date">

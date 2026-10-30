@@ -506,6 +506,10 @@ export interface Visitor extends Partial<VisitorJourney> {
   follow_up_owner: string | null
   next_follow_up_date: string | null
   notes: string | null
+  address: string | null
+  campaign: string | null
+  source: string | null
+  is_cross_branch_visit: boolean | null
 }
 
 export interface WelfareCase {
