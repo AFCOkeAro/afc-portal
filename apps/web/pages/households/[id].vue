@@ -162,6 +162,17 @@ function formatDate(value: string | null | undefined): string {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString()
 }
 
+/** 40px roster dots (AFC-929): first + last initial, mirrors PersonAvatar. */
+function memberInitials(name: string | null | undefined): string {
+  if (!name) return '?'
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return '?'
+  if (parts.length === 1) return (parts[0] ?? '').slice(0, 2).toUpperCase()
+  const first = parts[0] ?? ''
+  const last = parts[parts.length - 1] ?? ''
+  return (first.charAt(0) + last.charAt(0)).toUpperCase() || '?'
+}
+
 const sections = computed(() => [
   { id: 'overview', label: 'Overview' },
   { id: 'members', label: 'Members' },
@@ -263,6 +274,11 @@ const sections = computed(() => [
       <!-- ChurchCRM Family Profile parity: main column (members + key
         people + timeline) with a right rail (status / phone / properties).
         Every field renders only where data exists; scoping is unchanged. -->
+      <!-- AFC-929 (approved mockup AFC-928 v3): right rail stays sticky
+        while the roster scrolls; member rows carry 40px initial dots in
+        the mockup's household language. Full names + roles stay on this
+        page (it is the full roster — the person page shows first names
+        only). -->
       <div class="grid gap-8 lg:grid-cols-3">
         <div class="space-y-8 lg:col-span-2">
           <section id="overview" class="scroll-mt-28">
@@ -366,7 +382,12 @@ const sections = computed(() => [
                   class="flex items-center justify-between gap-3 py-3"
                 >
                   <div class="flex min-w-0 items-center gap-3">
-                    <ProfileAvatar :name="member.display_name" size="sm" />
+                    <span
+                      class="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary-100 text-sm font-bold text-primary-700 dark:bg-primary-950 dark:text-primary-300"
+                      aria-hidden="true"
+                    >
+                      {{ memberInitials(member.display_name) }}
+                    </span>
                     <div class="min-w-0">
                       <NuxtLink
                         :to="`/people/${member.id}`"
@@ -477,7 +498,10 @@ const sections = computed(() => [
           </UCard>
         </div>
 
-        <aside class="space-y-6" aria-label="Household summary">
+        <aside
+          class="space-y-6 lg:sticky lg:top-20 lg:self-start"
+          aria-label="Household summary"
+        >
           <UCard>
             <template #header>
               <h2 class="text-base font-semibold" tabindex="-1">Household</h2>
