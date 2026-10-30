@@ -645,6 +645,7 @@ DECLARE
   v_cols  text[];
   v_target uuid;
   v_before text;
+  v_clocks integer;
 BEGIN
   SELECT array_agg(attname ORDER BY attname) INTO v_cols
     FROM pg_attribute
@@ -698,13 +699,29 @@ BEGIN
   PERFORM test_support.assert_equals(v_before, 'active',
     'priv', 'precondition: the named target person is active');
 
-  PERFORM test_support.assert_raises(NULL,
-    format($q$UPDATE people SET status = 'deceased' WHERE id = %L::uuid$q$, v_target),
-    '23514', 'priv', 'people.status is a closed enum: archived is not a third spelling of deleted');
+  -- AFC-884 widens the set: deceased is a named lifecycle state for the
+  -- funeral register, not a spelling of deleted. The anti-smuggling
+  -- property moves with it: flipping the flag must change no history and
+  -- trigger no erasure.
+  SELECT count(*) INTO v_clocks FROM retention_clocks WHERE person_id = v_target;
+  PERFORM test_support.as_role(NULL,
+    format($q$UPDATE people SET status = 'deceased' WHERE id = %L::uuid$q$, v_target));
 
   PERFORM test_support.assert_equals(
+    (SELECT status::text FROM people WHERE id = v_target), 'deceased',
+    'priv', 'deceased is a storable status since AFC-884');
+  PERFORM test_support.assert_true(
+    NOT EXISTS (SELECT 1 FROM people WHERE id = v_target AND status = 'deleted'),
+    'priv', 'deceased is not a third spelling of deleted');
+  PERFORM test_support.assert_equals(
+    (SELECT count(*) FROM retention_clocks WHERE person_id = v_target)::text, v_clocks::text,
+    'priv', 'the deceased flip sweeps no history into deletion');
+
+  PERFORM test_support.as_role(NULL,
+    format($q$UPDATE people SET status = %L WHERE id = %L::uuid$q$, v_before, v_target));
+  PERFORM test_support.assert_equals(
     (SELECT status::text FROM people WHERE id = v_target), v_before,
-    'priv', 'the refused UPDATE changed nothing');
+    'priv', 'the probe person is restored for the tests below');
 
   -- And the flag does what it says. An archived person is excluded from new
   -- clocks: "no longer an operational record" means no new retention clock is

@@ -374,12 +374,11 @@ END $$;
 --
 -- CONTESTED (escalated to the CTO on AFC-476, migration 0012 header): the
 -- issue orders the §4.2 status expansion (transferred/retired/maternity/
--- student/unidentified/discipline/deceased), but suite 63 pins the
--- (active, archived) closure as a retention control and asserts
--- status = 'deceased' is refused. The migration withholds the widening,
--- so this suite pins the CLOSED behaviour -- transferred/maternity/
--- deceased are REFUSED here -- until the CTO decides. If the CTO approves
--- the expansion, this block and suite 63 change together on that ticket.
+-- student/unidentified/discipline/deceased), but suite 63 pinned the
+-- (active, archived) closure as a retention control. AFC-884 decides the
+-- deceased slice: funerals need it, so deceased is ACCEPTED here (and in
+-- suite 63, changed on the same ticket). transferred/maternity stay
+-- REFUSED until the CTO decides the rest of the expansion.
 -- ---------------------------------------------------------------------------
 DO $$
 BEGIN
@@ -392,9 +391,9 @@ BEGIN
   PERFORM test_support.assert_raises('directus_migrator',
     $q$INSERT INTO people (status) VALUES ('maternity')$q$,
     '23514', 'youth', 'CONTESTED: maternity is refused while the retention-closed status set holds (CTO decision pending)');
-  PERFORM test_support.assert_raises('directus_migrator',
+  PERFORM test_support.assert_not_raises('directus_migrator',
     $q$INSERT INTO people (status) VALUES ('deceased')$q$,
-    '23514', 'youth', 'CONTESTED: deceased is refused while the retention-closed status set holds (suite 63 control)');
+    'youth', 'AFC-884: deceased is accepted (funeral register); the set is (active, archived, deceased)');
   PERFORM test_support.assert_raises('directus_migrator',
     $q$INSERT INTO people (status) VALUES ('suspended')$q$,
     '23514', 'youth', 'a status outside both sets is rejected');

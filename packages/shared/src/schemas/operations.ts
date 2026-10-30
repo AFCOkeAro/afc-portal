@@ -93,6 +93,57 @@ export const collaboratorFormSchema = z.object({
 
 export type CollaboratorForm = z.infer<typeof collaboratorFormSchema>
 
+/**
+ * Funeral case (AFC-884). Person XOR name: the dead may not be in the
+ * register; linking a person flips their status to deceased (route-owned
+ * write). Dates are plain days; attendance is a staff-recorded headcount
+ * per day. Songs ride a JSON array; approval needs both documents plus at
+ * least one song (enforced on the approve route, mirrored here for forms).
+ */
+export const funeralStages = [
+  'reported',
+  'approved',
+  'scheduled',
+  'held',
+  'cancelled',
+] as const
+
+export const funeralFormSchema = z
+  .object({
+    branch: optionalText(36),
+    deceased_person: z.string().uuid('Choose a person').nullish(),
+    deceased_name: optionalText(200),
+    death_certificate_file: z.string().uuid().nullish(),
+    consent_letter_file: z.string().uuid().nullish(),
+    songs: z.array(z.string().trim().min(1).max(200)).max(60).default([]),
+    service_of_songs_date: z.string().date().nullish(),
+    funeral_date: z.string().date().nullish(),
+    service_of_songs_attendance: z.coerce.number().int().min(0).max(100000).nullish(),
+    funeral_attendance: z.coerce.number().int().min(0).max(100000).nullish(),
+    notes: optionalText(2000),
+  })
+  .refine((form) => form.deceased_person ?? form.deceased_name?.trim(), {
+    message: 'Name the deceased or link a person',
+    path: ['deceased_name'],
+  })
+
+export type FuneralForm = z.infer<typeof funeralFormSchema>
+
+export const funeralPatchSchema = z.object({
+  branch: optionalText(36),
+  deceased_person: z.string().uuid().nullish(),
+  deceased_name: optionalText(200),
+  service_of_songs_date: z.string().date().nullish(),
+  funeral_date: z.string().date().nullish(),
+  service_of_songs_attendance: z.coerce.number().int().min(0).max(100000).nullish(),
+  funeral_attendance: z.coerce.number().int().min(0).max(100000).nullish(),
+  songs: z.array(z.string().trim().min(1).max(200)).max(60).optional(),
+  notes: optionalText(2000),
+  stage: z.enum(['reported', 'approved', 'scheduled', 'held', 'cancelled']).optional(),
+})
+
+export type FuneralPatch = z.infer<typeof funeralPatchSchema>
+
 const LEAVE_YEAR_MIN = 2000
 const LEAVE_YEAR_MAX = 2100
 

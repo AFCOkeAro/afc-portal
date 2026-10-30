@@ -150,6 +150,14 @@ export const NAVIGATION: readonly NavigationItem[] = [
     inSidebar: true,
   },
   {
+    label: 'Funerals',
+    to: '/funerals',
+    icon: 'i-lucide-cross',
+    requires: ['funeral_cases', 'read'],
+    group: 'family',
+    inSidebar: true,
+  },
+  {
     // Departments as their own section (AFC-758): ministries plus HQ
     // groups. Group creation lives on the section page itself.
     label: 'Departments',
