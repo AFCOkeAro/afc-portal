@@ -14,10 +14,12 @@ import {
  * hospitals and other fields — each with its contact person and visiting
  * days. Two tabs share the one page: Outreach List (the visited-locations
  * register — not the /visitors newcomer route) and Secretaries (the AVS
- * secretary assignment surface — not the departments register). Tab is
+ * secretary table — one row per assigned secretary with their visited
+ * schools, AFC-913 — not the departments register). Tab is
  * `?tab=` so each tab deep-links (events detail precedent). Data paths
  * are unchanged: GET /api/outreach-locations plus the scoped secretary
- * junction endpoints.
+ * junction endpoints, now including GET /api/outreach-secretaries for the
+ * whole-table read.
  */
 definePageMeta({ middleware: 'staff' })
 
@@ -64,6 +66,17 @@ interface SecretaryAssignment {
   name: string | null
 }
 
+interface SecretarySchool {
+  id: string
+  name: string
+}
+
+interface SecretaryRow {
+  person: string
+  name: string
+  schools: SecretarySchool[]
+}
+
 const canManage = computed(() => permissions.can(COLLECTIONS.outreachLocations, 'create'))
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -96,7 +109,11 @@ const locationError = ref('')
 const assignPerson = ref<Record<string, string>>({})
 const assignSaving = ref(false)
 const assignError = ref('')
-const secretaryLocationId = ref('')
+const secretaryLocationId = ref('all')
+const newSecretaryLocation = ref('')
+const secretaryTable = ref<SecretaryRow[]>([])
+const secretaryTablePending = ref(false)
+const rowSchool = ref<Record<string, string>>({})
 
 const categoryItems = computed(() => [
   { label: 'All categories', value: 'all' },
@@ -106,7 +123,15 @@ const categoryItems = computed(() => [
   })),
 ])
 
-const secretaryLocationOptions = computed(() =>
+const secretaryLocationOptions = computed(() => [
+  { label: 'All secretaries', value: 'all' },
+  ...locations.value.map((location: OutreachLocation) => ({
+    label: location.name,
+    value: location.id,
+  })),
+])
+
+const assignLocationOptions = computed(() =>
   locations.value.map((location: OutreachLocation) => ({
     label: location.name,
     value: location.id,
@@ -120,7 +145,27 @@ const secretaryLocation = computed(
     ) ?? null,
 )
 
-const secretaryRows = computed(() => assignments.value[secretaryLocationId.value] ?? [])
+const secretaryTableRows = computed(() =>
+  secretaryLocationId.value === 'all'
+    ? secretaryTable.value
+    : secretaryTable.value.filter((row: SecretaryRow) =>
+        row.schools.some(
+          (school: SecretarySchool) => school.id === secretaryLocationId.value,
+        ),
+      ),
+)
+
+function unassignedLocations(row: SecretaryRow): { label: string; value: string }[] {
+  return locations.value
+    .filter(
+      (location: OutreachLocation) =>
+        !row.schools.some((school: SecretarySchool) => school.id === location.id),
+    )
+    .map((location: OutreachLocation) => ({
+      label: location.name,
+      value: location.id,
+    }))
+}
 
 async function loadLocations(): Promise<void> {
   locationsPending.value = true
@@ -135,6 +180,19 @@ async function loadLocations(): Promise<void> {
       (cause as { message?: string }).message ?? 'Could not load locations'
   } finally {
     locationsPending.value = false
+  }
+}
+
+async function loadSecretaryTable(): Promise<void> {
+  secretaryTablePending.value = true
+  try {
+    const res = await api.get<{ data: SecretaryRow[] }>('/api/outreach-secretaries')
+    secretaryTable.value = res.data ?? []
+  } catch (cause) {
+    assignError.value =
+      (cause as { message?: string }).message ?? 'Could not load secretaries'
+  } finally {
+    secretaryTablePending.value = false
   }
 }
 
@@ -206,12 +264,38 @@ async function assignSecretary(locationId: string): Promise<void> {
     assignError.value = 'Choose the secretary to assign.'
     return
   }
+  if (locationId === '' || locationId === 'all') {
+    assignError.value = 'Choose the location to assign to.'
+    return
+  }
   assignSaving.value = true
   assignError.value = ''
   try {
     await api.post(`/api/outreach-locations/${locationId}/secretaries`, { person })
     assignPerson.value = { ...assignPerson.value, [locationId]: '' }
     await loadAssignments(locationId)
+    await loadSecretaryTable()
+  } catch (cause) {
+    assignError.value =
+      (cause as { message?: string }).message ?? 'Could not assign the secretary'
+  } finally {
+    assignSaving.value = false
+  }
+}
+
+async function assignSchoolToPerson(person: string): Promise<void> {
+  const locationId = rowSchool.value[person] ?? ''
+  if (locationId === '') {
+    assignError.value = 'Choose the school to add.'
+    return
+  }
+  assignSaving.value = true
+  assignError.value = ''
+  try {
+    await api.post(`/api/outreach-locations/${locationId}/secretaries`, { person })
+    rowSchool.value = { ...rowSchool.value, [person]: '' }
+    await loadAssignments(locationId)
+    await loadSecretaryTable()
   } catch (cause) {
     assignError.value =
       (cause as { message?: string }).message ?? 'Could not assign the secretary'
@@ -231,6 +315,7 @@ async function unassignSecretary(
       query: { person },
     })
     await loadAssignments(locationId)
+    await loadSecretaryTable()
   } catch (cause) {
     assignError.value =
       (cause as { message?: string }).message ?? 'Could not unassign the secretary'
@@ -239,6 +324,7 @@ async function unassignSecretary(
 
 function manageSecretaries(id: string): void {
   secretaryLocationId.value = id
+  newSecretaryLocation.value = id
   goTab('secretaries')
 }
 
@@ -254,6 +340,7 @@ function secretaryNames(id: string): string {
 
 onMounted(() => {
   void loadLocations()
+  void loadSecretaryTable()
 })
 
 watch(categoryFilter, () => {
@@ -263,21 +350,27 @@ watch(categoryFilter, () => {
 watch(
   locations,
   (rows: OutreachLocation[]) => {
-    if (secretaryLocationId.value === '' && rows.length > 0) {
-      secretaryLocationId.value = rows[0]?.id ?? ''
+    if (newSecretaryLocation.value === '' && rows.length > 0) {
+      newSecretaryLocation.value = rows[0]?.id ?? ''
     }
     if (
-      secretaryLocationId.value !== '' &&
+      newSecretaryLocation.value !== '' &&
+      !rows.some((row: OutreachLocation) => row.id === newSecretaryLocation.value)
+    ) {
+      newSecretaryLocation.value = rows[0]?.id ?? ''
+    }
+    if (
+      secretaryLocationId.value !== 'all' &&
       !rows.some((row: OutreachLocation) => row.id === secretaryLocationId.value)
     ) {
-      secretaryLocationId.value = rows[0]?.id ?? ''
+      secretaryLocationId.value = 'all'
     }
   },
   { immediate: true },
 )
 
 watch(secretaryLocationId, (id: string) => {
-  if (id !== '' && !assignments.value[id]) void loadAssignments(id)
+  if (id !== '' && id !== 'all' && !assignments.value[id]) void loadAssignments(id)
 })
 </script>
 
@@ -463,13 +556,15 @@ watch(secretaryLocationId, (id: string) => {
       </UCard>
     </section>
 
-    <!-- SECRETARIES: AVS secretary assignment (not the departments register). -->
+    <!-- SECRETARIES: AVS secretary table (AFC-913, not the departments register). -->
     <section v-else aria-label="Secretaries" class="mt-4">
       <UCard>
         <template #header>
           <h3 class="font-semibold">Secretaries</h3>
         </template>
-        <p v-if="locationsPending" class="text-sm text-gray-500">Loading locations…</p>
+        <p v-if="locationsPending || secretaryTablePending" class="text-sm text-gray-500">
+          Loading secretaries…
+        </p>
         <p v-else-if="locations.length === 0" class="text-sm text-gray-500">
           Add a location on the Outreach List tab first, then assign its secretaries here.
         </p>
@@ -491,29 +586,89 @@ watch(secretaryLocationId, (id: string) => {
             <p v-if="secretaryLocation.visiting_days" class="mt-1 text-gray-600">
               Visiting days: {{ secretaryLocation.visiting_days }}
             </p>
-            <ul v-if="secretaryRows.length > 0" class="mt-3 space-y-1.5">
-              <li
-                v-for="row in secretaryRows"
-                :key="row.id"
-                class="flex items-center gap-2 rounded-lg bg-gray-50 px-2 py-1.5 dark:bg-gray-900"
-              >
-                <span class="min-w-0 flex-1 truncate">{{ row.name ?? 'Unknown' }}</span>
-                <UButton
-                  v-if="canManage"
-                  size="xs"
-                  color="neutral"
-                  variant="ghost"
-                  icon="i-lucide-x"
-                  :aria-label="`Unassign ${row.name}`"
-                  @click="unassignSecretary(secretaryLocationId, row.person)"
-                />
-              </li>
-            </ul>
-            <p v-else class="mt-3 text-gray-500">No secretary assigned yet.</p>
-            <div v-if="canManage" class="mt-2 flex max-w-xl flex-wrap items-end gap-2">
+          </div>
+          <p v-if="secretaryTableRows.length === 0" class="mt-3 text-sm text-gray-500">
+            {{
+              secretaryTable.length === 0
+                ? 'No secretary assigned yet — add the first one below.'
+                : 'No secretaries assigned to this location yet.'
+            }}
+          </p>
+          <div v-else class="mt-3 overflow-x-auto">
+            <table class="w-full text-left text-sm">
+              <thead>
+                <tr
+                  class="border-b border-gray-200 text-xs uppercase tracking-wide text-gray-500 dark:border-gray-800"
+                >
+                  <th scope="col" class="py-2 pr-3 font-medium">Secretary</th>
+                  <th scope="col" class="py-2 pr-3 font-medium">Schools visited</th>
+                  <th v-if="canManage" scope="col" class="py-2 font-medium">
+                    Add a school
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="row in secretaryTableRows"
+                  :key="row.person"
+                  class="border-b border-gray-100 align-top last:border-0 dark:border-gray-800"
+                >
+                  <td class="py-2 pr-3 font-medium">{{ row.name }}</td>
+                  <td class="py-2 pr-3">
+                    <ul class="flex flex-wrap gap-1.5">
+                      <li
+                        v-for="school in row.schools"
+                        :key="school.id"
+                        class="flex items-center gap-1 rounded-full bg-gray-100 py-0.5 pl-2.5 pr-1 dark:bg-gray-900"
+                      >
+                        <span>{{ school.name }}</span>
+                        <UButton
+                          v-if="canManage"
+                          size="xs"
+                          color="neutral"
+                          variant="ghost"
+                          icon="i-lucide-x"
+                          class="rounded-full"
+                          :aria-label="`Unassign ${row.name} from ${school.name}`"
+                          @click="unassignSecretary(school.id, row.person)"
+                        />
+                      </li>
+                    </ul>
+                  </td>
+                  <td v-if="canManage" class="py-2">
+                    <div class="flex min-w-52 flex-wrap items-end gap-2">
+                      <USelect
+                        v-model="rowSchool[row.person]"
+                        :items="unassignedLocations(row)"
+                        placeholder="Choose a school…"
+                        class="min-w-40 flex-1"
+                      />
+                      <UButton
+                        size="sm"
+                        label="Add"
+                        icon="i-lucide-plus"
+                        :loading="assignSaving"
+                        @click="assignSchoolToPerson(row.person)"
+                      />
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div
+            v-if="canManage"
+            class="mt-4 border-t border-gray-200 pt-3 dark:border-gray-800"
+          >
+            <h4 class="text-sm font-semibold">Add a secretary</h4>
+            <p class="mt-0.5 text-xs text-gray-500">
+              Anyone in the directory can be assigned — people with no school yet are
+              added here.
+            </p>
+            <div class="mt-2 flex max-w-2xl flex-wrap items-end gap-2">
               <UFormField label="Secretary" class="min-w-52 flex-1">
                 <EntitySelect
-                  v-model="assignPerson[secretaryLocationId]"
+                  v-model="assignPerson[newSecretaryLocation]"
                   :items="personOptions"
                   placeholder="Type a name to search…"
                   :loading="personPending"
@@ -522,11 +677,19 @@ watch(secretaryLocationId, (id: string) => {
                   @update:search-term="onPersonSearch"
                 />
               </UFormField>
+              <UFormField label="Location" class="min-w-52 flex-1">
+                <USelect
+                  v-model="newSecretaryLocation"
+                  :items="assignLocationOptions"
+                  placeholder="Choose a location…"
+                  class="w-full"
+                />
+              </UFormField>
               <UButton
                 label="Assign"
                 icon="i-lucide-user-plus"
                 :loading="assignSaving"
-                @click="assignSecretary(secretaryLocationId)"
+                @click="assignSecretary(newSecretaryLocation)"
               />
             </div>
           </div>
