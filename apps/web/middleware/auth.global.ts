@@ -7,14 +7,23 @@
  * lands where they were going after signing in.
  *
  * `PUBLIC_ROUTES` is the public surface of the portal: the landing route, the
- * sign-in page and the registration form. `/` is listed because it is the
+ * sign-in page, the registration form, the public event page under `/p`,
+ * and the signed-out programme detail pages under `/programmes`. `/` is listed because it is the
  * router's own redirect stub — if it were guarded, an anonymous visitor would be
  * sent to `/login` with a `redirect` of `/`, which is `/login` again, forever.
+ *
+ * `/programmes` is listed because the signed-out programme detail
+ * (`pages/programmes/[id].vue`, AFC-871 slice 2) must render without a
+ * session; its data comes from the session-free public detail endpoint, which
+ * serves a section only at exactly `public` and fails everything else closed.
+ * The `/programmes` prefix carries no staff surface — staff editors live under
+ * `/events/[id].vue`, which stays guarded — so this widens the anonymous
+ * surface by exactly one prefix.
  *
  * Anything not listed needs a session. Adding a route to this list is a security
  * decision, not a convenience, so it is a named constant rather than a pattern.
  */
-const PUBLIC_ROUTES = ['/', '/login', '/register', '/p'] as const
+const PUBLIC_ROUTES = ['/', '/login', '/register', '/p', '/programmes'] as const
 
 function isPublic(path: string): boolean {
   return PUBLIC_ROUTES.some((route) => path === route || path.startsWith(`${route}/`))
