@@ -10,7 +10,10 @@
  * - Roles: Directus roles; custom roles can be created and given
  *   collection+action permissions here. Built-ins are read-only — their
  *   grants live in role-matrix.ts in code.
- * - People: search staff, set staff role plus branch/zone/area scope links.
+ * - People: every holder of a system role out of the box, search to narrow,
+ *   set staff role plus branch/zone/area scope links, and add a new person
+ *   with a permission level and coverage (area/zone/branch/AVS/BSC; modules
+ *   are derived from the role and previewed read-only).
  *
  * Data paths are area-admin-only server routes; the page itself stays behind
  * the staff middleware like every other staff page.
@@ -81,6 +84,22 @@ interface AdminUser {
 interface ZoneRow {
   id: string
   name: string
+}
+interface AreaRow {
+  id: string
+  name: string
+  code: string
+}
+interface AvsRow {
+  id: string
+  name: string
+  branch: string | null
+}
+interface BscRow {
+  id: string
+  name: string
+  parent_branch: string | null
+  zone: string | null
 }
 interface BranchRow {
   id: string
@@ -286,6 +305,26 @@ const editError = ref('')
 const savingUser = ref(false)
 const zones = ref<ZoneRow[]>([])
 const branchesFull = ref<BranchRow[]>([])
+/* AFC-914: coverage lookups loaded lazily on first People visit. */
+const areas = ref<AreaRow[]>([])
+const avsLocations = ref<AvsRow[]>([])
+const bscs = ref<BscRow[]>([])
+const peopleLookupsPending = ref(false)
+const holdersLoaded = ref(false)
+const adding = ref(false)
+const savingNewUser = ref(false)
+const addError = ref('')
+const addForm = ref({
+  first_name: '',
+  last_name: '',
+  email: '',
+  staff_role: '',
+  area: '',
+  zone: '',
+  branch: '',
+  avs_location: '',
+  bsc: '',
+})
 
 const branchItems = computed(() => [
   { label: 'None', value: '' },
@@ -294,6 +333,30 @@ const branchItems = computed(() => [
 const zoneItems = computed(() => [
   { label: 'None', value: '' },
   ...zones.value.map((row: ZoneRow) => ({ label: row.name, value: row.id })),
+])
+const areaItems = computed(() => [
+  { label: 'None', value: '' },
+  ...areas.value.map((row: AreaRow) => ({ label: row.name, value: row.id })),
+])
+const avsItems = computed(() => [
+  { label: 'None', value: '' },
+  ...avsLocations.value.map((row: AvsRow) => {
+    const branch = branchesFull.value.find((b: BranchRow) => b.id === row.branch)
+    return {
+      label: branch ? `${row.name} (${branch.name})` : row.name,
+      value: row.id,
+    }
+  }),
+])
+const bscItems = computed(() => [
+  { label: 'None', value: '' },
+  ...bscs.value.map((row: BscRow) => {
+    const branch = branchesFull.value.find((b: BranchRow) => b.id === row.parent_branch)
+    return {
+      label: branch ? `${row.name} (${branch.name})` : row.name,
+      value: row.id,
+    }
+  }),
 ])
 const editAreaPreview = computed(() => {
   const branch = branchesFull.value.find(
@@ -320,6 +383,157 @@ async function searchUsers(): Promise<void> {
 function displayName(user: AdminUser): string {
   const full = `${user.first_name ?? ''} ${user.last_name ?? ''}`.trim()
   return full === '' ? user.email : full
+}
+
+/** AFC-914: human-readable coverage for the holders table. */
+function coverageLabel(user: AdminUser): string {
+  const branch = branchesFull.value.find((row: BranchRow) => row.id === user.branch)
+  if (branch) return branch.name
+  const zone = zones.value.find((row: ZoneRow) => row.id === user.zone)
+  if (zone) return zone.name
+  const area = areas.value.find((row: AreaRow) => row.id === user.area)
+  if (area) return area.name
+  return '—'
+}
+
+/* AFC-914: AVS/BSC coverage resolves to the parent branch scope — both
+ * collections hang off a branch — so the branches derived here must agree
+ * with each other and with any explicit branch pick. */
+const addDerivedBranches = computed(() => {
+  const found: string[] = []
+  const avs = avsLocations.value.find(
+    (row: AvsRow) => row.id === addForm.value.avs_location,
+  )
+  if (avs?.branch) found.push(avs.branch)
+  const bsc = bscs.value.find((row: BscRow) => row.id === addForm.value.bsc)
+  if (bsc?.parent_branch) found.push(bsc.parent_branch)
+  return [...new Set(found)]
+})
+const addCoverageConflict = computed(
+  () =>
+    (addForm.value.branch !== '' &&
+      addDerivedBranches.value.length > 0 &&
+      !addDerivedBranches.value.includes(addForm.value.branch)) ||
+    addDerivedBranches.value.length > 1,
+)
+const addBranchPreview = computed(() => {
+  const id =
+    addForm.value.branch !== ''
+      ? addForm.value.branch
+      : (addDerivedBranches.value[0] ?? '')
+  return branchesFull.value.find((row: BranchRow) => row.id === id)?.name ?? null
+})
+/* AFC-914: modules are derived from the permission level, never stored —
+ * preview which modules the picked role can see. */
+const addModules = computed(() => {
+  const role = addForm.value.staff_role
+  if (role === '') return []
+  const bundle = bundles.value.find((row: BundleRow) => row.staffRole === role)
+  if (bundle) return bundle.modules
+  return modules.value.filter((module: ModuleRow) => module.roles.includes(role))
+})
+
+/* AFC-914: first People visit lists every role holder plus the coverage
+ * pickers (areas, AVS locations, BSCs). Zones/branches load at page setup
+ * as before; search narrows afterwards without refetching lookups. */
+async function ensurePeopleLookups(): Promise<void> {
+  if (peopleLookupsPending.value) return
+  peopleLookupsPending.value = true
+  try {
+    const jobs: Array<Promise<void>> = []
+    if (!holdersLoaded.value) {
+      jobs.push(
+        (async () => {
+          await searchUsers()
+          holdersLoaded.value = true
+        })(),
+      )
+    }
+    if (areas.value.length === 0) {
+      jobs.push(
+        (async () => {
+          const res = await api.get<AreaRow[]>('/api/areas')
+          areas.value = Array.isArray(res) ? res : []
+        })(),
+      )
+    }
+    if (avsLocations.value.length === 0) {
+      jobs.push(
+        (async () => {
+          const res = await api.get<{ data: AvsRow[] }>('/api/outreach-locations')
+          avsLocations.value = Array.isArray(res)
+            ? res
+            : ((res as unknown as { data: AvsRow[] }).data ?? [])
+        })(),
+      )
+    }
+    if (bscs.value.length === 0) {
+      jobs.push(
+        (async () => {
+          const res = await api.get<BscRow[]>('/api/bscs')
+          bscs.value = Array.isArray(res) ? res : []
+        })(),
+      )
+    }
+    await Promise.all(jobs)
+  } catch (cause) {
+    actionError.value =
+      (cause as { message?: string }).message ?? 'Could not load people lookups'
+  } finally {
+    peopleLookupsPending.value = false
+  }
+}
+
+watch(tab, (next: TabId) => {
+  if (next === 'people') void ensurePeopleLookups()
+})
+
+function openAdder(): void {
+  addError.value = ''
+  addForm.value = {
+    first_name: '',
+    last_name: '',
+    email: '',
+    staff_role: pendingBundle.value?.staffRole ?? '',
+    area: '',
+    zone: '',
+    branch: '',
+    avs_location: '',
+    bsc: '',
+  }
+  adding.value = true
+}
+
+async function createUser(): Promise<void> {
+  addError.value = ''
+  if (addCoverageConflict.value) {
+    addError.value = 'Coverage branches disagree — pick one branch'
+    return
+  }
+  savingNewUser.value = true
+  try {
+    await api.post('/api/admin/users', {
+      first_name:
+        addForm.value.first_name.trim() === '' ? null : addForm.value.first_name.trim(),
+      last_name:
+        addForm.value.last_name.trim() === '' ? null : addForm.value.last_name.trim(),
+      email: addForm.value.email.trim(),
+      staff_role: addForm.value.staff_role,
+      branch: addForm.value.branch === '' ? null : addForm.value.branch,
+      zone: addForm.value.zone === '' ? null : addForm.value.zone,
+      area: addForm.value.area === '' ? null : addForm.value.area,
+      avs_location: addForm.value.avs_location === '' ? null : addForm.value.avs_location,
+      bsc: addForm.value.bsc === '' ? null : addForm.value.bsc,
+    })
+    adding.value = false
+    holdersLoaded.value = true
+    userSearch.value = ''
+    await searchUsers()
+  } catch (cause) {
+    addError.value = (cause as { message?: string }).message ?? 'Could not add the person'
+  } finally {
+    savingNewUser.value = false
+  }
 }
 
 function openEditor(user: AdminUser): void {
@@ -706,10 +920,20 @@ await useAsyncData('admin-zones-branches', async () => {
       <!-- PEOPLE -->
       <UCard v-if="tab === 'people'">
         <template #header>
-          <h2 class="font-semibold">People</h2>
+          <div class="flex flex-wrap items-center gap-2">
+            <h2 class="font-semibold">People</h2>
+            <UButton
+              label="Add person"
+              icon="i-lucide-user-plus"
+              size="xs"
+              class="ml-auto"
+              @click="openAdder()"
+            />
+          </div>
           <p class="mt-1 text-sm text-gray-500">
-            Assign a role bundle to a group of people. Scope links (branch / zone) decide
-            which rows they see.
+            Everyone holding a system role, plus an option to add a new person with a
+            permission level and coverage. Scope links (area / zone / branch) decide which
+            rows they see.
           </p>
         </template>
         <div
@@ -741,18 +965,30 @@ await useAsyncData('admin-zones-branches', async () => {
           />
           <UButton label="Search" icon="i-lucide-search" @click="searchUsers()" />
         </div>
-        <div v-if="usersPending" class="flex justify-center py-8">
+        <div v-if="usersPending || peopleLookupsPending" class="flex justify-center py-8">
           <UIcon
             name="i-lucide-loader-circle"
             class="size-6 animate-spin text-gray-400"
           />
         </div>
-        <div v-else-if="users.length > 0" class="mt-4 overflow-x-auto">
+        <p
+          v-else-if="users.length > 0 && userSearch.trim() === ''"
+          class="mt-3 text-xs text-gray-500"
+        >
+          Showing all {{ users.length }}
+          {{ users.length === 1 ? 'person' : 'people' }} with a system role — search
+          narrows by name or email.
+        </p>
+        <div
+          v-if="!usersPending && !peopleLookupsPending && users.length > 0"
+          class="mt-4 overflow-x-auto"
+        >
           <table class="min-w-full text-sm">
             <thead>
               <tr class="text-left text-xs uppercase tracking-wide text-gray-500">
                 <th class="px-3 py-2 font-medium">Person</th>
                 <th class="px-3 py-2 font-medium">Role</th>
+                <th class="px-3 py-2 font-medium">Coverage</th>
                 <th class="px-3 py-2 font-medium">Status</th>
                 <th class="px-3 py-2"><span class="sr-only">Edit</span></th>
               </tr>
@@ -770,6 +1006,7 @@ await useAsyncData('admin-zones-branches', async () => {
                     user.staff_role ?? '—'
                   }}</UBadge>
                 </td>
+                <td class="px-3 py-2 text-gray-500">{{ coverageLabel(user) }}</td>
                 <td class="px-3 py-2 text-gray-500">{{ user.status }}</td>
                 <td class="px-3 py-2 text-right">
                   <UButton
@@ -835,6 +1072,123 @@ await useAsyncData('admin-zones-branches', async () => {
                 icon="i-lucide-check"
                 :loading="savingUser"
                 @click="saveUser()"
+              />
+            </div>
+          </div>
+        </template>
+      </UModal>
+
+      <UModal
+        :open="adding"
+        title="Add person"
+        description="Invite a new person and decide their permission level and coverage. They receive a set-password email."
+        @update:open="adding = $event"
+      >
+        <template #body>
+          <div class="grid gap-3">
+            <div class="grid gap-3 sm:grid-cols-2">
+              <UFormField label="First name">
+                <UInput v-model="addForm.first_name" placeholder="Ada" class="w-full" />
+              </UFormField>
+              <UFormField label="Last name">
+                <UInput v-model="addForm.last_name" placeholder="Okafor" class="w-full" />
+              </UFormField>
+            </div>
+            <UFormField label="Email">
+              <UInput
+                v-model="addForm.email"
+                type="email"
+                placeholder="ada@example.org"
+                class="w-full"
+              />
+            </UFormField>
+            <UFormField label="Permission level (staff role)">
+              <USelect v-model="addForm.staff_role" :items="roleOptions" class="w-full" />
+            </UFormField>
+            <div class="grid gap-3 sm:grid-cols-2">
+              <UFormField label="Area coverage">
+                <EntitySelect
+                  v-model="addForm.area"
+                  :items="areaItems"
+                  placeholder="No area"
+                  class="w-full"
+                />
+              </UFormField>
+              <UFormField label="Zone coverage">
+                <EntitySelect
+                  v-model="addForm.zone"
+                  :items="zoneItems"
+                  placeholder="No zone"
+                  class="w-full"
+                />
+              </UFormField>
+            </div>
+            <UFormField label="Branch coverage">
+              <EntitySelect
+                v-model="addForm.branch"
+                :items="branchItems"
+                placeholder="No branch"
+                class="w-full"
+              />
+            </UFormField>
+            <div class="grid gap-3 sm:grid-cols-2">
+              <UFormField label="AVS coverage">
+                <EntitySelect
+                  v-model="addForm.avs_location"
+                  :items="avsItems"
+                  placeholder="No AVS centre"
+                  class="w-full"
+                />
+              </UFormField>
+              <UFormField label="BSC coverage">
+                <EntitySelect
+                  v-model="addForm.bsc"
+                  :items="bscItems"
+                  placeholder="No BSC"
+                  class="w-full"
+                />
+              </UFormField>
+            </div>
+            <p class="text-xs text-gray-500">
+              AVS and BSC coverage resolve to the parent branch scope
+              <span v-if="addBranchPreview" class="font-mono"
+                >({{ addBranchPreview }})</span
+              >. Area link follows the branch automatically.
+            </p>
+            <div>
+              <h3 class="text-sm font-semibold">Modules included</h3>
+              <p class="mt-1 text-xs text-gray-500">
+                Derived from the permission level — nothing extra to store.
+              </p>
+              <div v-if="addModules.length > 0" class="mt-2 flex flex-wrap gap-1.5">
+                <UBadge
+                  v-for="module in addModules"
+                  :key="module.key"
+                  color="primary"
+                  variant="subtle"
+                  size="xs"
+                >
+                  {{ module.label }}
+                </UBadge>
+              </div>
+              <p v-else class="mt-1 text-xs text-gray-400">
+                Pick a permission level to preview its modules.
+              </p>
+            </div>
+            <p v-if="addError !== ''" class="text-xs text-red-600">{{ addError }}</p>
+            <div class="flex justify-end gap-2">
+              <UButton
+                label="Cancel"
+                color="neutral"
+                variant="ghost"
+                @click="adding = false"
+              />
+              <UButton
+                label="Send invite"
+                icon="i-lucide-mail-plus"
+                :loading="savingNewUser"
+                :disabled="addCoverageConflict"
+                @click="createUser()"
               />
             </div>
           </div>

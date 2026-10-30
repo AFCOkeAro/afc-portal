@@ -4,8 +4,13 @@ import { directusAdminToken } from '../../../utils/directus-admin'
 
 /**
  * GET /api/admin/users?search= — staff directory for role assignment
- * (AFC-669). Area admins only. Returns identity + current staff role and
- * scope links; never password hashes.
+ * (AFC-669, AFC-914). Area admins only. Returns identity + current staff
+ * role and scope links; never password hashes.
+ *
+ * With no `search`, returns the role holders: every user carrying a system
+ * role (`staff_role` set and not `none`), so the Roles People tab lists all
+ * persons with system roles without typing a query. With `search`, narrows
+ * by name or email as before.
  */
 export default defineEventHandler(async (event) => {
   await requireArea(event)
@@ -26,11 +31,24 @@ export default defineEventHandler(async (event) => {
     }>
   }>(event, '/users', {
     accessToken: adminToken,
-    query: {
-      ...(search === '' ? {} : { search }),
-      fields: 'id,email,first_name,last_name,staff_role,status,branch,zone,area',
-      limit: 25,
-    },
+    // AFC-914: an empty query lists the role holders (system-role carriers),
+    // not an arbitrary first page. Directus `_nin` does not match NULL, so
+    // nulls are excluded with `_nnull` and the `none` placeholder with `_neq`.
+    query:
+      search === ''
+        ? {
+            filter: {
+              _and: [{ staff_role: { _nnull: true } }, { staff_role: { _neq: 'none' } }],
+            },
+            fields: 'id,email,first_name,last_name,staff_role,status,branch,zone,area',
+            sort: 'email',
+            limit: 100,
+          }
+        : {
+            search,
+            fields: 'id,email,first_name,last_name,staff_role,status,branch,zone,area',
+            limit: 25,
+          },
   })
   return { data: users.data ?? [] }
 })
