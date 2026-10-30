@@ -308,6 +308,15 @@ const statusColor: Record<string, 'success' | 'warning' | 'neutral' | 'error'> =
                   <p class="text-xs text-gray-500 dark:text-gray-400">
                     {{ visitor.follow_up_owner || 'Unassigned' }}
                   </p>
+                  <UBadge
+                    v-if="visitor.is_cross_branch_visit"
+                    color="warning"
+                    variant="subtle"
+                    title="Member of another branch visiting for the first time"
+                    class="mt-1"
+                  >
+                    Cross-branch visit
+                  </UBadge>
                 </td>
                 <td class="px-3 py-3">
                   <UBadge

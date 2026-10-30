@@ -9,6 +9,7 @@ import {
   updateItem,
 } from '../../utils/portal'
 import { JOURNEY_FIELDS, validateWelfareOfficer } from '../../utils/visitor-journey'
+import { checkCrossBranchVisit } from '../../utils/member-check'
 
 export default defineEventHandler(async (event) => {
   const scope = await getPortalScope(event)
@@ -63,6 +64,28 @@ export default defineEventHandler(async (event) => {
       }
     }
 
+    // Cross-branch flag: recompute only when the contact or branch moved;
+    // otherwise the stored stamp stands (no extra read on plain edits).
+    const rawBody = body as Record<string, unknown>
+    let crossBranch: boolean | null = null
+    if ('phone' in rawBody || 'email' in rawBody || 'branch' in rawBody) {
+      const current = await findScopedItem<Record<string, unknown>>(
+        event,
+        scope,
+        'visitors',
+        id,
+        { fields: ['phone', 'email', 'branch'] },
+      ).catch(() => null)
+      const phone = form.phone ?? (current?.phone as string | null) ?? null
+      const email = form.email ?? (current?.email as string | null) ?? null
+      const visitBranch = branch ?? (current?.branch as string | null) ?? null
+      crossBranch = (
+        await checkCrossBranchVisit(event, visitBranch, phone, email).catch(() => ({
+          isCrossBranch: false,
+        }))
+      ).isCrossBranch
+    }
+
     const updated = await updateItem<Record<string, unknown>>(
       event,
       scope,
@@ -82,6 +105,10 @@ export default defineEventHandler(async (event) => {
         next_follow_up_date: form.next_follow_up_date ?? null,
         notes: form.notes ?? null,
         status: form.status,
+        address: form.address ?? null,
+        campaign: form.campaign ?? null,
+        source: form.source ?? null,
+        ...(crossBranch === null ? {} : { is_cross_branch_visit: crossBranch }),
       },
     )
     return { data: updated }

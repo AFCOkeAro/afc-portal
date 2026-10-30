@@ -1,4 +1,5 @@
 import { visitorFormSchema } from '@afc/shared'
+import { checkCrossBranchVisit } from '../../utils/member-check'
 import {
   createItem,
   getPortalScope,
@@ -36,6 +37,17 @@ export default defineEventHandler(async (event) => {
       next_follow_up_date: form.next_follow_up_date ?? null,
       notes: form.notes ?? null,
       status: form.status,
+      address: form.address ?? null,
+      campaign: form.campaign ?? null,
+      source: form.source ?? null,
+      is_cross_branch_visit: (
+        await checkCrossBranchVisit(
+          event,
+          branch,
+          form.phone ?? null,
+          form.email ?? null,
+        ).catch(() => ({ isCrossBranch: false }))
+      ).isCrossBranch,
     })
   } catch (error) {
     if ((error as { statusCode?: number })?.statusCode) throw error

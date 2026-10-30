@@ -466,7 +466,17 @@ async function main() {
     // ---------------------------------------------------------------
     // Suites.
     // ---------------------------------------------------------------
-    const testFiles = readdirSync(TESTS).filter((f) => /^\d\d_.*\.sql$/.test(f)).sort();
+    // Two-or-more digits, numeric order (AFC-907): the old two-digit-only
+    // filter silently skipped 100_directus_runtime_grants (landed, never
+    // run). Numeric sort keeps every existing suite in its current relative
+    // order and appends longer numbers last; ties keep filename order.
+    const testFiles = readdirSync(TESTS)
+      .filter((f) => /^\d{2,}_.*\.sql$/.test(f))
+      .sort(
+        (a, b) =>
+          Number.parseInt(a, 10) - Number.parseInt(b, 10) ||
+          (a < b ? -1 : a > b ? 1 : 0),
+      );
     log('\nRunning suites');
     // Drain the bootstrap chatter first, so the ledger below is exactly the
     // assertions the suites attempted and nothing else.

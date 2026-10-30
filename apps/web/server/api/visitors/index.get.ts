@@ -25,6 +25,8 @@ const FIELDS = [
   'follow_up_owner',
   'next_follow_up_date',
   'notes',
+  'source',
+  'is_cross_branch_visit',
 ]
 
 export default defineEventHandler(async (event) => {

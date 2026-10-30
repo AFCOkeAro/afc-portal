@@ -55,6 +55,46 @@ const branches = await useAsyncData('visitors-branches', () =>
 const canUpdate = computed(() => permissions.can(COLLECTIONS.visitors, 'update'))
 const canConvert = computed(() => permissions.can(COLLECTIONS.people, 'create'))
 
+const crossBranchName = ref<string | null>(null)
+
+async function probeCrossBranch(): Promise<void> {
+  crossBranchName.value = null
+  const v = visitor.value as unknown as Record<string, unknown> | null
+  if (!v) return
+  if ((v.is_cross_branch_visit as boolean) !== true) return
+  const phone = typeof v.phone === 'string' ? v.phone : ''
+  const email = typeof v.email === 'string' ? v.email : ''
+  if (phone === '' && email === '') return
+  try {
+    const res = await api.get<{
+      data: { is_cross_branch: boolean; branch_name: string | null }
+    }>('/api/visitors/member-check', {
+      query: {
+        ...(phone ? { phone } : {}),
+        ...(email ? { email } : {}),
+        ...(typeof v.branch === 'string' && v.branch ? { branch: v.branch } : {}),
+      },
+    })
+    if (res.data?.is_cross_branch) {
+      crossBranchName.value = res.data.branch_name ?? 'another branch'
+    }
+  } catch {
+    crossBranchName.value = null
+  }
+}
+
+watch(visitor, () => void probeCrossBranch(), { immediate: true })
+
+const sourceLabels: Record<string, string> = {
+  outreach: 'Outreach',
+  referral: 'Referral',
+  social_media: 'Social media',
+  event: 'Event',
+  walk_in: 'Walk-in',
+  website: 'Website',
+  other: 'Other',
+}
+
 const displayName = computed(() => {
   const row = visitor.value
   if (!row) return 'Visitor'
@@ -367,6 +407,19 @@ async function convert(mode: 'create' | 'link'): Promise<void> {
         :description="actionError"
       />
 
+      <UAlert
+        v-if="(visitor as unknown as Record<string, unknown>).is_cross_branch_visit"
+        class="mb-4"
+        color="warning"
+        variant="subtle"
+        title="Member of another branch visiting for the first time"
+        :description="
+          crossBranchName
+            ? `${crossBranchName} member — follow up with a welcome, not a stranger journey.`
+            : 'Flagged automatically from the contact match.'
+        "
+      />
+
       <div class="grid gap-6 xl:grid-cols-3">
         <UCard>
           <template #header><h2 class="text-base font-semibold">Visit</h2></template>
@@ -396,6 +449,18 @@ async function convert(mode: 'create' | 'link'): Promise<void> {
             <div class="flex justify-between gap-3">
               <dt class="text-gray-500 dark:text-gray-400">Invited by</dt>
               <dd>{{ visitor.invited_by || '—' }}</dd>
+            </div>
+            <div class="flex justify-between gap-3">
+              <dt class="text-gray-500 dark:text-gray-400">Address</dt>
+              <dd class="text-right">{{ visitor.address || '—' }}</dd>
+            </div>
+            <div class="flex justify-between gap-3">
+              <dt class="text-gray-500 dark:text-gray-400">Source</dt>
+              <dd>{{ sourceLabels[String(visitor.source ?? '')] ?? '—' }}</dd>
+            </div>
+            <div class="flex justify-between gap-3">
+              <dt class="text-gray-500 dark:text-gray-400">Campaign</dt>
+              <dd>{{ visitor.campaign_name || '—' }}</dd>
             </div>
           </dl>
         </UCard>
