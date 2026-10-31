@@ -2,6 +2,7 @@ import type { H3Event } from 'h3'
 import type { EventRecord, RegistrationForm } from '@afc/shared'
 import { registrationFormSchema, toRegistrationPayload } from '@afc/shared'
 import { directusFetch } from '../utils/directus'
+import { isEventId } from '../utils/event-ids'
 
 /**
  * POST /api/register — the public event registration proxy.
@@ -207,6 +208,10 @@ async function loadPublicEvent(
   event: H3Event,
   eventId: string,
 ): Promise<EventRecord | null> {
+  // Malformed ids can never match a UUID row: fail closed to the
+  // existing 404 instead of letting Postgres throw (503). Client-side
+  // the picker only offers public events, so this is unreachable anyway.
+  if (!isEventId(eventId)) return null
   const config = useRuntimeConfig(event)
   const publicToken = String(config.directusPublicToken ?? '')
   const response = await directusFetch<{ data: EventRecord[] }>(event, '/items/events', {
