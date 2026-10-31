@@ -280,13 +280,13 @@ const priorityColor: Record<string, 'success' | 'warning' | 'neutral' | 'error'>
           />
         </div>
 
-        <UAlert
+        <AfcErrorCard
           v-if="error"
           class="mt-4"
-          color="error"
-          variant="subtle"
           title="Could not load welfare cases"
-          :description="error.message"
+          :cause="error.message"
+          fix="Check your connection, then retry this panel."
+          @retry="refresh()"
         />
 
         <div v-if="pending" class="mt-8 flex justify-center py-10">
