@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Events — AFC Church Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../../../design-system/tokens/afc-tokens.css" />
+<link rel="stylesheet" href="../../../design-system/components/afc-components.css" />
+<link rel="stylesheet" href="../../../design-system/components/afc-resilient-states.css" />
+</head>
+<body class="afc">
+<a class="afc-skip-link" href="#main">Skip to content</a>
+
+<header class="afc-topbar">
+  <span class="afc-seal" data-seal="jtlw"><span class="afc-seal__text"><span class="afc-seal__name">AFC Church Portal</span><span class="afc-seal__sub">Events</span></span></span>
+  <span class="afc-topbar__spacer"></span>
+  <a class="afc-btn afc-btn--ghost" href="./sync-settings.html">Sync queue</a>
+</header>
+
+<main id="main" class="afc-container" style="max-width:44rem">
+  <p class="afc-label">Events</p>
+  <h1 class="afc-h2">Services and outreaches</h1>
+
+  <!-- P4 first-run empty (AFC-956 P4, verbatim copy). ONE primary CTA. -->
+  <section class="afc-empty" aria-labelledby="events-empty-title">
+    <span class="afc-empty__mark" aria-hidden="true"></span>
+    <p class="afc-empty__title" id="events-empty-title">Plan services and outreaches here — nothing scheduled yet.</p>
+    <div class="afc-empty__actions">
+      <a class="afc-btn afc-btn--primary" href="./attendance-capture.html">Create first event</a>
+      <button class="afc-btn afc-btn--secondary" type="button" data-demo-toggle aria-expanded="false" aria-controls="events-demo">See demo event (synthetic)</button>
+    </div>
+  </section>
+
+  <!-- Synthetic demo only: labelled, never real member data. -->
+  <section class="afc-card" id="events-demo" data-demo-panel hidden aria-label="Synthetic demo event">
+    <div class="afc-card__head">
+      <p class="afc-label" style="margin:0">Demo event (synthetic)</p>
+    </div>
+    <div class="afc-card__body">
+      <p class="afc-empty__title" style="margin-bottom:var(--afc-space-2)">Sunday Service — 9:00, Main auditorium</p>
+      <p class="afc-meta">Expected 200 · Ushers 12 · All figures synthetic</p>
+    </div>
+  </section>
+</main>
+
+<script>
+(function () {
+  var toggle = document.querySelector('[data-demo-toggle]');
+  var panel = document.querySelector('[data-demo-panel]');
+  toggle.addEventListener('click', function () {
+    var open = panel.hasAttribute('hidden');
+    if (open) { panel.removeAttribute('hidden'); }
+    else { panel.setAttribute('hidden', ''); }
+    toggle.setAttribute('aria-expanded', String(open));
+  });
+})();
+</script>
+</body>
+</html>

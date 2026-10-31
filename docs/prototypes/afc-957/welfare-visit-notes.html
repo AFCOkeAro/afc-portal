@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Welfare visit notes — AFC Church Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../../../design-system/tokens/afc-tokens.css" />
+<link rel="stylesheet" href="../../../design-system/components/afc-components.css" />
+<link rel="stylesheet" href="./afc-sync-queue.css" />
+</head>
+<body class="afc">
+<a class="afc-skip-link" href="#main">Skip to content</a>
+
+<div class="afc-offline-banner" data-offline-banner hidden>
+  <span class="afc-offline-banner__dot" aria-hidden="true"></span>
+  <p class="afc-offline-banner__text">You are offline — changes save on this device and sync when reconnected.</p>
+</div>
+
+<header class="afc-topbar">
+  <span class="afc-seal" data-seal="jtlw"><span class="afc-seal__text"><span class="afc-seal__name">AFC Church Portal</span><span class="afc-seal__sub">Welfare</span></span></span>
+  <span class="afc-topbar__spacer"></span>
+  <a class="afc-btn afc-btn--ghost" href="./sync-settings.html">Sync queue</a>
+</header>
+
+<main id="main" class="afc-container" style="max-width:44rem">
+  <p class="afc-label">Welfare visit notes</p>
+  <h1 class="afc-h2">Record a welfare visit</h1>
+  <p class="afc-lede">Only what the welfare team needs. Drafts stay on this device.</p>
+
+  <section class="afc-loading-region" data-loading-region aria-busy="true">
+    <p class="afc-visually-hidden" role="status">Loading welfare visit notes...</p>
+    <div class="afc-skel afc-skel--title" aria-hidden="true"></div>
+    <div class="afc-skel afc-skel--line" style="width:86%" aria-hidden="true"></div>
+    <div class="afc-skel afc-skel--block" aria-hidden="true"></div>
+  </section>
+
+  <form data-visit-form hidden>
+    <div class="afc-field">
+      <label class="afc-field__label" for="wv-household">Household <span class="afc-field__req" aria-hidden="true">*</span></label>
+      <input class="afc-input" id="wv-household" name="household" type="text" autocomplete="off" placeholder="e.g. Household A — Ikeja" required />
+    </div>
+    <div class="afc-field">
+      <label class="afc-field__label" for="wv-outcome">Outcome <span class="afc-field__req" aria-hidden="true">*</span></label>
+      <select class="afc-select" id="wv-outcome" name="outcome" required>
+        <option value="visited">Visited — doing well</option>
+        <option value="follow-up">Visited — needs follow-up</option>
+        <option value="revisit">Could not visit — revisit</option>
+      </select>
+    </div>
+    <div class="afc-field">
+      <label class="afc-field__label" for="wv-note">Note <span class="afc-field__optional">optional</span></label>
+      <textarea class="afc-textarea" id="wv-note" name="note" placeholder="Only what the welfare team needs."></textarea>
+    </div>
+    <div class="afc-row" style="margin-top:var(--afc-space-5)">
+      <button class="afc-btn afc-btn--primary" type="submit">Save visit note</button>
+      <button class="afc-btn afc-btn--ghost" type="button" data-discard>Discard</button>
+    </div>
+  </form>
+
+  <section class="afc-session-card" data-session-card hidden>
+    <h2 class="afc-session-card__title">Session ended — your work is saved on this device.</h2>
+    <p class="afc-session-card__body">Log back in to pick up exactly where you left off.</p>
+    <div class="afc-success__actions">
+      <button class="afc-btn afc-btn--primary" type="button" data-login-again>Log in again</button>
+      <button class="afc-btn afc-btn--ghost" type="button" data-discard-draft>Discard draft</button>
+    </div>
+    <p class="afc-session-card__note">On a shared device? Discard draft after use.</p>
+  </section>
+
+  <!-- P5 state 5: determinate slow-task progress with Cancel. -->
+  <section class="afc-progress--sync" data-progress hidden>
+    <div class="afc-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Saving visit note" data-bar-wrap>
+      <div class="afc-progress__bar" style="width:0%" data-bar></div>
+    </div>
+    <p class="afc-progress__text" role="status" data-step>Saving visit note…</p>
+    <div class="afc-row" style="margin-top:var(--afc-space-3)">
+      <button class="afc-btn afc-btn--secondary" type="button" data-cancel>Cancel</button>
+    </div>
+    <p class="afc-meta afc-slow-fallback" data-slow-fallback hidden>Still trying... Retry or continue offline</p>
+  </section>
+
+  <section class="afc-success" data-success hidden>
+    <h2 class="afc-success__title">Visit note saved</h2>
+    <p class="afc-success__warm">Thank you — the welfare team has what it needs.</p>
+    <div class="afc-success__actions">
+      <a class="afc-btn afc-btn--primary" href="./newcomer-intake.html">Welcome a newcomer</a>
+      <a class="afc-btn afc-btn--ghost" href="./sync-settings.html">Back to dashboard</a>
+    </div>
+  </section>
+
+  <section style="margin-top:var(--afc-space-7)" aria-labelledby="wv-queue-h">
+    <h2 class="afc-h4" id="wv-queue-h">Waiting to sync</h2>
+    <div data-queue-panel></div>
+  </section>
+</main>
+
+<div class="afc-toast-stack" data-toasts aria-live="polite"></div>
+
+<script src="./afc-sync-queue.js"></script>
+<script>
+(function () {
+  var Q = window.AfcSyncQueue;
+  var FORM_ID = 'welfare-visit-notes';
+  var form = document.querySelector('[data-visit-form]');
+  var loading = document.querySelector('[data-loading-region]');
+  var banner = document.querySelector('[data-offline-banner]');
+  var panel = document.querySelector('[data-queue-panel]');
+  var progress = document.querySelector('[data-progress]');
+  var bar = document.querySelector('[data-bar]');
+  var barWrap = document.querySelector('[data-bar-wrap]');
+  var stepEl = document.querySelector('[data-step]');
+  var cancelBtn = document.querySelector('[data-cancel]');
+  var slowFallback = document.querySelector('[data-slow-fallback]');
+  var success = document.querySelector('[data-success]');
+  var sessionCard = document.querySelector('[data-session-card]');
+  var toasts = document.querySelector('[data-toasts]');
+
+  Q.bindOfflineBanner(banner);
+  var outbox = Q.createOutbox({
+    sender: function () {
+      return new Promise(function (resolve, reject) {
+        if (!Q.isOnline()) { reject(new Error('Network unavailable — kept on this device.')); return; }
+        setTimeout(function () { resolve({ ok: true }); }, 120);
+      });
+    }
+  });
+  function toast(text) {
+    var t = document.createElement('div');
+    t.className = 'afc-toast';
+    t.textContent = text;
+    toasts.appendChild(t);
+    setTimeout(function () { t.remove(); }, 4000);
+  }
+  outbox.boot().then(function () { Q.bindQueuePanel(panel, outbox); });
+
+  setTimeout(function () {
+    loading.hidden = true;
+    loading.removeAttribute('aria-busy');
+    form.hidden = false;
+    var draft = Q.drafts.load(FORM_ID);
+    if (draft) { Q.restoreDraftIntoForm(form, draft); toast(Q.COPY.draftRestoredToast); }
+  }, 400);
+
+  var saveTimer = null;
+  form.addEventListener('input', function () {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(function () { Q.drafts.save(FORM_ID, Q.collectForm(form)); }, 300);
+  });
+
+  /* Save: enqueue first (ack is local), then determinate progress.
+     Cancel aborts cleanly — partial work stays queued per P2. */
+  var cancelled = false;
+  cancelBtn.addEventListener('click', function () { cancelled = true; });
+  form.addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    cancelled = false;
+    success.hidden = true;
+    var household = form.elements.namedItem('household').value || 'Household';
+    outbox.enqueue('welfare-visit', 'Welfare visit — ' + household, Q.collectForm(form));
+    progress.hidden = false;
+    slowFallback.hidden = true;
+    bar.style.width = '0%';
+    barWrap.setAttribute('aria-valuenow', '0');
+    var total = 8, done = 0, started = Date.now();
+    var slowTimer = setTimeout(function () {
+      if (!progress.hidden) slowFallback.hidden = false;
+    }, 6000);
+    function tick() {
+      if (cancelled) {
+        clearTimeout(slowTimer);
+        progress.hidden = true;
+        toast('Save cancelled — entry kept in the queue.');
+        return;
+      }
+      done += 1;
+      var pct = Math.round((done / total) * 100);
+      bar.style.width = pct + '%';
+      barWrap.setAttribute('aria-valuenow', String(pct));
+      stepEl.textContent = Q.formatStep('Saving visit note', done, total);
+      if (Date.now() - started > 2000 || Q.shouldShowProgress(Date.now() - started)) {
+        progress.hidden = false;
+      }
+      if (done < total) {
+        setTimeout(tick, 350);
+        return;
+      }
+      clearTimeout(slowTimer);
+      progress.hidden = true;
+      Q.drafts.clear(FORM_ID);
+      outbox.flush().then(function () {
+        success.hidden = false;
+        success.scrollIntoView({ block: 'nearest' });
+        form.reset();
+      });
+    }
+    setTimeout(tick, 350);
+  });
+
+  document.querySelector('[data-discard]').addEventListener('click', function () {
+    Q.drafts.clear(FORM_ID);
+    form.reset();
+  });
+  document.querySelector('[data-login-again]').addEventListener('click', function () {
+    sessionCard.hidden = true;
+    form.hidden = false;
+    var h = document.createElement('h2');
+    h.className = 'afc-h4';
+    h.textContent = Q.COPY.resumeTitle;
+    form.prepend(h);
+    Q.restoreDraftIntoForm(form, Q.drafts.load(FORM_ID) || {});
+    toast(Q.COPY.draftRestoredToast);
+  });
+  document.querySelector('[data-discard-draft]').addEventListener('click', function () {
+    Q.drafts.clear(FORM_ID);
+    sessionCard.hidden = true;
+    form.hidden = false;
+    form.reset();
+  });
+
+  window.addEventListener('online', function () { outbox.retryNow().catch(function () {}); });
+})();
+</script>
+</body>
+</html>

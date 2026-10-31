@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aporeneur 2026 — Registration | AFC Lagos North Area</title>
+  <meta name="description" content="Register for Aporeneur — the Apostolic Faith Entrepreneur Forum. 12 June 2026 at Lagos North Area Headquarters.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../../../design-system/tokens/afc-tokens.css">
+  <link rel="stylesheet" href="../../../design-system/components/afc-components.css">
+  <style>
+    /* Page shell. Every colour, space, radius, shadow and type value is an
+       AFC token. Gold appears only on the header accent line (graphic accent);
+       buttons and body text use the action tokens. */
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--afc-paper-100);
+      color: var(--afc-text-secondary);
+      font-family: var(--afc-font-sans);
+      font-size: var(--afc-text-base);
+      line-height: var(--afc-leading-normal);
+      min-height: 100vh;
+      display: flex;
+      padding: var(--afc-space-4);
+    }
+
+    .container {
+      width: 100%;
+      max-width: 35rem;
+      min-width: 0;
+      margin: auto;
+      background: var(--afc-bg-surface);
+      border: 1px solid var(--afc-border-subtle);
+      border-radius: var(--afc-radius-md);
+      box-shadow: var(--afc-shadow-lg);
+      overflow: hidden;
+    }
+
+    .header {
+      background: var(--afc-bg-inverse);
+      color: var(--afc-text-on-dark);
+      text-align: center;
+      padding: var(--afc-space-6) var(--afc-space-5) var(--afc-space-5);
+    }
+
+    .header .brand {
+      font-size: var(--afc-text-xs);
+      font-weight: var(--afc-weight-medium);
+      letter-spacing: var(--afc-track-label);
+      text-transform: uppercase;
+      color: var(--afc-text-on-dark-muted);
+      margin: 0 0 var(--afc-space-2);
+    }
+
+    .header h1 {
+      font-size: var(--afc-text-xl);
+      line-height: var(--afc-leading-tight);
+      letter-spacing: var(--afc-track-tight);
+      font-weight: var(--afc-weight-bold);
+      color: var(--afc-text-on-dark);
+      margin: 0;
+    }
+
+    .header .accent-line {
+      width: 2.5rem;
+      height: 0.1875rem;
+      background: var(--afc-gold-400);
+      margin: var(--afc-space-3) auto;
+      border-radius: var(--afc-radius-pill);
+    }
+
+    .header .event-meta {
+      font-size: var(--afc-text-sm);
+      line-height: var(--afc-leading-relaxed);
+      color: var(--afc-text-on-dark-muted);
+      margin: var(--afc-space-2) 0 0;
+    }
+
+    .header .event-meta strong {
+      color: var(--afc-text-on-dark);
+    }
+
+    .form-section {
+      padding: var(--afc-space-6) var(--afc-space-5);
+      min-width: 0;
+    }
+
+    .form-section h2 {
+      font-size: var(--afc-text-md);
+      font-weight: var(--afc-weight-semibold);
+      color: var(--afc-text-primary);
+      margin: 0 0 var(--afc-space-4);
+    }
+
+    .branch-note {
+      background: var(--afc-status-info-bg);
+      border-left: 3px solid var(--afc-bg-action);
+      padding: var(--afc-space-3) var(--afc-space-4);
+      border-radius: 0 var(--afc-radius-md) var(--afc-radius-md) 0;
+      margin: 0 0 var(--afc-space-5);
+      font-size: var(--afc-text-sm);
+      color: var(--afc-text-secondary);
+    }
+
+    .branch-note strong {
+      color: var(--afc-text-primary);
+    }
+
+    .error-summary {
+      display: none;
+      background: var(--afc-status-danger-bg);
+      color: var(--afc-status-danger);
+      border: 1px solid var(--afc-status-danger);
+      border-radius: var(--afc-radius-md);
+      padding: var(--afc-space-3) var(--afc-space-4);
+      font-size: var(--afc-text-sm);
+      font-weight: var(--afc-weight-medium);
+      margin: 0 0 var(--afc-space-4);
+    }
+
+    .error-summary::before {
+      content: '⚠ ';
+    }
+
+    .error-summary[data-show='true'] {
+      display: block;
+    }
+
+    /* Single column: one field per row, label above, help and error below.
+       Input surface follows the spec mapping: inset fill, default border,
+       action focus ring. */
+    .afc-field .afc-input,
+    .afc-field .afc-select,
+    .afc-field .afc-textarea {
+      background: var(--afc-bg-inset);
+      border-color: var(--afc-border-default);
+    }
+
+    .afc-input:focus,
+    .afc-select:focus,
+    .afc-textarea:focus {
+      border-color: var(--afc-bg-action);
+      box-shadow: var(--afc-shadow-focus);
+    }
+
+    .consent-copy {
+      font-size: var(--afc-text-sm);
+      color: var(--afc-text-secondary);
+      line-height: var(--afc-leading-relaxed);
+      margin: 0 0 var(--afc-space-3);
+    }
+
+    .success-message {
+      display: none;
+      text-align: center;
+      padding: var(--afc-space-7) var(--afc-space-5);
+    }
+
+    .success-message .check-icon {
+      width: 4rem;
+      height: 4rem;
+      background: var(--afc-status-success-bg);
+      border-radius: var(--afc-radius-pill);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto var(--afc-space-4);
+    }
+
+    .success-message .check-icon svg {
+      width: 2rem;
+      height: 2rem;
+      color: var(--afc-status-success);
+    }
+
+    .success-message h2 {
+      font-size: var(--afc-text-lg);
+      color: var(--afc-status-success);
+      margin: 0 0 var(--afc-space-2);
+    }
+
+    .success-message .details {
+      font-size: var(--afc-text-sm);
+      color: var(--afc-text-secondary);
+      margin: 0 0 var(--afc-space-4);
+      line-height: var(--afc-leading-relaxed);
+    }
+
+    .success-message .details strong {
+      color: var(--afc-text-primary);
+    }
+
+    .success-message .recorded {
+      color: var(--afc-text-muted);
+      font-size: var(--afc-text-xs);
+    }
+
+    .footer {
+      text-align: center;
+      padding: var(--afc-space-3) var(--afc-space-5) var(--afc-space-5);
+      font-size: var(--afc-text-xs);
+      color: var(--afc-text-muted);
+    }
+
+    .loading-spinner {
+      display: none;
+      width: 1.25rem;
+      height: 1.25rem;
+      border: 2px solid var(--afc-bg-action-text);
+      border-top-color: transparent;
+      border-radius: var(--afc-radius-pill);
+      animation: spin var(--afc-dur-slow) linear infinite;
+      margin-right: var(--afc-space-2);
+      vertical-align: middle;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .btn-submit.loading .btn-text {
+      display: none;
+    }
+
+    .btn-submit.loading .loading-spinner {
+      display: inline-block;
+    }
+
+    @media (max-width: 30rem) {
+      body {
+        padding: var(--afc-space-3);
+      }
+
+      .header {
+        padding: var(--afc-space-5) var(--afc-space-4) var(--afc-space-4);
+      }
+
+      .header h1 {
+        font-size: var(--afc-text-lg);
+      }
+
+      .form-section {
+        padding: var(--afc-space-4);
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="brand">Apostolic Faith Church — Lagos North Area</div>
+      <h1>Aporeneur 2026</h1>
+      <div class="accent-line" aria-hidden="true"></div>
+      <div class="event-meta">
+        <strong>AFC Entrepreneur Forum</strong><br>
+        Thursday, 12 June 2026 &middot; 9:00 AM<br>
+        Lagos North Area Headquarters
+      </div>
+    </div>
+
+    <div class="form-section" id="formSection">
+      <h2>Registration</h2>
+
+      <div class="branch-note">
+        <strong>Youth &amp; Young Adults (20-39)</strong> — All branches in Lagos North Area are welcome. If your branch is not listed, select “Other” and type it in.
+      </div>
+
+      <div class="error-summary" id="errorSummary" role="alert" tabindex="-1"></div>
+
+      <form id="registrationForm" novalidate>
+        <div class="afc-field" data-field="fullName">
+          <label class="afc-field__label" for="fullName">Full name <span class="afc-field__req" aria-hidden="true">*</span></label>
+          <input class="afc-input" type="text" id="fullName" name="fullName" placeholder="Adaeze Okafor" required maxlength="100" autocomplete="name">
+          <p class="afc-field__help" id="hint-fullName">Enter your first and last name.</p>
+          <p class="afc-field__error" id="err-fullName"></p>
+        </div>
+
+        <div class="afc-field" data-field="phone">
+          <label class="afc-field__label" for="phone">Phone number <span class="afc-field__req" aria-hidden="true">*</span></label>
+          <input class="afc-input" type="tel" id="phone" name="phone" placeholder="0803 123 4567" required maxlength="20" autocomplete="tel" inputmode="tel">
+          <p class="afc-field__help" id="hint-phone">We text event updates to this number.</p>
+          <p class="afc-field__error" id="err-phone"></p>
+        </div>
+
+        <div class="afc-field" data-field="email">
+          <label class="afc-field__label" for="email">Email address <span class="afc-field__optional">(optional)</span></label>
+          <input class="afc-input" type="email" id="email" name="email" placeholder="adaeze@example.org" maxlength="150" autocomplete="email" inputmode="email">
+          <p class="afc-field__help" id="hint-email">Only if you want programme notes by email.</p>
+          <p class="afc-field__error" id="err-email"></p>
+        </div>
+
+        <div class="afc-field" data-field="branch">
+          <label class="afc-field__label" for="branch">Branch / Assembly <span class="afc-field__req" aria-hidden="true">*</span></label>
+          <select class="afc-select" id="branch" name="branch" required>
+            <option value="" disabled selected>Select your branch</option>
+            <option value="Agege">Agege</option>
+            <option value="Alimosho">Alimosho</option>
+            <option value="Egbeda">Egbeda</option>
+            <option value="Ikeja">Ikeja</option>
+            <option value="Ipaja">Ipaja</option>
+            <option value="Isolo">Isolo</option>
+            <option value="Mushin">Mushin</option>
+            <option value="Ojodu">Ojodu</option>
+            <option value="Oshodi">Oshodi</option>
+            <option value="Shomolu">Shomolu</option>
+            <option value="Surulere">Surulere</option>
+            <option value="Other">Other (specify below)</option>
+          </select>
+          <p class="afc-field__help" id="hint-branch">If your branch is not listed, select “Other” and enter it below.</p>
+          <p class="afc-field__error" id="err-branch"></p>
+        </div>
+
+        <div class="afc-field" data-field="otherBranch" id="otherBranchGroup" style="display: none;">
+          <label class="afc-field__label" for="otherBranch">Please specify your branch <span class="afc-field__req" aria-hidden="true">*</span></label>
+          <input class="afc-input" type="text" id="otherBranch" name="otherBranch" placeholder="Enter your branch name" maxlength="100" autocomplete="off">
+          <p class="afc-field__error" id="err-otherBranch"></p>
+        </div>
+
+        <div class="afc-field" data-field="businessInterest">
+          <label class="afc-field__label" for="businessInterest">Business interest / Area <span class="afc-field__req" aria-hidden="true">*</span></label>
+          <textarea class="afc-textarea" id="businessInterest" name="businessInterest" placeholder="Tell us about your business or business idea — e.g. fashion design, food catering, tech services" required maxlength="500"></textarea>
+          <p class="afc-field__help" id="hint-businessInterest">This helps us match you with relevant resources and networking.</p>
+          <p class="afc-field__error" id="err-businessInterest"></p>
+        </div>
+
+        <div class="afc-field" data-field="ageGroup">
+          <label class="afc-field__label" for="ageGroup">Age group <span class="afc-field__req" aria-hidden="true">*</span></label>
+          <select class="afc-select" id="ageGroup" name="ageGroup" required>
+            <option value="" disabled selected>Select your age group</option>
+            <option value="20-24">20 — 24</option>
+            <option value="25-29">25 — 29</option>
+            <option value="30-34">30 — 34</option>
+            <option value="35-39">35 — 39</option>
+          </select>
+          <p class="afc-field__help" id="hint-ageGroup">This event is for Youth (20-29) and Young Adults (30-39).</p>
+          <p class="afc-field__error" id="err-ageGroup"></p>
+        </div>
+
+        <div class="afc-field" data-field="consent">
+          <p class="consent-copy">How we use your details: we store your name, phone number and branch only to organise Aporeneur 2026 — check-in, programme updates and follow-up resources. We never sell your details. If you are under 18, please register with a parent or guardian.</p>
+          <label class="afc-choice" for="consent">
+            <input type="checkbox" id="consent" name="consent" value="yes">
+            <span class="afc-choice__text">Yes, I consent to AFC Lagos North Area storing my registration details for Aporeneur 2026. <span class="afc-field__req" aria-hidden="true">*</span></span>
+          </label>
+          <p class="afc-field__error" id="err-consent"></p>
+        </div>
+
+        <button type="submit" class="afc-btn afc-btn--primary afc-btn--block btn-submit" id="submitBtn">
+          <span class="loading-spinner" aria-hidden="true"></span>
+          <span class="btn-text">Register for Aporeneur</span>
+        </button>
+      </form>
+    </div>
+
+    <div class="success-message" id="successMessage">
+      <div class="check-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+      </div>
+      <h2>You are Registered!</h2>
+      <div class="details">
+        <strong>Aporeneur 2026</strong><br>
+        AFC Entrepreneur Forum<br><br>
+        <strong>12 June 2026</strong> &middot; 9:00 AM<br>
+        Lagos North Area Headquarters<br><br>
+        Please arrive by <strong>8:30 AM</strong> for check-in.<br>
+        Bring a notebook and your business ideas!
+      </div>
+      <p class="recorded">A confirmation has been recorded. See you there!</p>
+    </div>
+
+    <div class="footer">
+      Aporeneur 2026 &middot; AFC Youth Development Department &middot; Lagos North Area
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var form = document.getElementById('registrationForm');
+      var formSection = document.getElementById('formSection');
+      var successMessage = document.getElementById('successMessage');
+      var errorSummary = document.getElementById('errorSummary');
+      var submitBtn = document.getElementById('submitBtn');
+      var branchSelect = document.getElementById('branch');
+      var otherBranchGroup = document.getElementById('otherBranchGroup');
+      var otherBranchInput = document.getElementById('otherBranch');
+      var tried = false;
+
+      function fieldBox(name) {
+        return form.querySelector('[data-field="' + name + '"]');
+      }
+
+      function controlFor(name) {
+        var box = fieldBox(name);
+        return box ? box.querySelector('input, select, textarea') : null;
+      }
+
+      function errorNodeFor(name) {
+        return document.getElementById('err-' + name);
+      }
+
+      function setError(name, message) {
+        var box = fieldBox(name);
+        var control = controlFor(name);
+        var node = errorNodeFor(name);
+        if (!box || !control || !node) return;
+        node.textContent = message;
+        box.setAttribute('data-invalid', 'true');
+        control.setAttribute('aria-invalid', 'true');
+        control.setAttribute('aria-describedby', 'err-' + name);
+      }
+
+      function clearError(name) {
+        var box = fieldBox(name);
+        var control = controlFor(name);
+        var node = errorNodeFor(name);
+        if (!box || !control || !node) return;
+        node.textContent = '';
+        box.removeAttribute('data-invalid');
+        control.removeAttribute('aria-invalid');
+        control.removeAttribute('aria-describedby');
+      }
+
+      function emailLooksValid(value) {
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+      }
+
+      function validateField(name) {
+        var control = controlFor(name);
+        if (!control) return true;
+        var value = (control.value || '').trim();
+
+        if (name === 'fullName') {
+          if (!value) {
+            setError(name, 'Enter your full name — e.g. Adaeze Okafor.');
+            return false;
+          }
+        }
+
+        if (name === 'phone') {
+          if (!value) {
+            setError(name, 'Enter your phone number — e.g. 0803 123 4567.');
+            return false;
+          }
+          var digits = value.replace(/\D/g, '');
+          if (digits.length < 11) {
+            setError(name, 'Phone looks short — use 11 digits like 0803 123 4567.');
+            return false;
+          }
+          if (digits.length > 11) {
+            setError(name, 'Phone looks long — use 11 digits like 0803 123 4567.');
+            return false;
+          }
+        }
+
+        if (name === 'email') {
+          if (value && !emailLooksValid(value)) {
+            setError(name, 'Check the address — e.g. adaeze@example.org.');
+            return false;
+          }
+        }
+
+        if (name === 'branch') {
+          if (!value) {
+            setError(name, 'Choose your branch — pick “Other” and type it if it is not listed.');
+            return false;
+          }
+        }
+
+        if (name === 'otherBranch') {
+          if (branchSelect.value === 'Other' && !value) {
+            setError(name, 'Enter your branch name — e.g. Agege.');
+            return false;
+          }
+        }
+
+        if (name === 'businessInterest') {
+          if (!value) {
+            setError(name, 'Tell us your business interest — e.g. fashion design, catering or tech services.');
+            return false;
+          }
+        }
+
+        if (name === 'ageGroup') {
+          if (!value) {
+            setError(name, 'Choose your age group.');
+            return false;
+          }
+        }
+
+        if (name === 'consent') {
+          if (!control.checked) {
+            setError(name, 'Please tick the consent box so we can store your registration.');
+            return false;
+          }
+        }
+
+        clearError(name);
+        return true;
+      }
+
+      var FIELD_ORDER = ['fullName', 'phone', 'email', 'branch', 'otherBranch', 'businessInterest', 'ageGroup', 'consent'];
+
+      function validateAll() {
+        var failures = [];
+        FIELD_ORDER.forEach(function (name) {
+          if (name === 'otherBranch' && branchSelect.value !== 'Other') {
+            clearError(name);
+            return;
+          }
+          if (!validateField(name)) failures.push(name);
+        });
+        return failures;
+      }
+
+      function showSummary(failures) {
+        if (!failures.length) {
+          errorSummary.removeAttribute('data-show');
+          errorSummary.textContent = '';
+          return;
+        }
+        var noun = failures.length === 1 ? '1 field needs' : failures.length + ' fields need';
+        errorSummary.textContent = 'There is a problem — ' + noun + ' a fix. See the messages below.';
+        errorSummary.setAttribute('data-show', 'true');
+        errorSummary.focus();
+      }
+
+      function syncOtherBranch() {
+        if (branchSelect.value === 'Other') {
+          otherBranchGroup.style.display = 'block';
+        } else {
+          otherBranchGroup.style.display = 'none';
+          otherBranchInput.value = '';
+          clearError('otherBranch');
+        }
+      }
+
+      branchSelect.addEventListener('change', function () {
+        syncOtherBranch();
+        if (tried) {
+          validateField('branch');
+          if (branchSelect.value === 'Other') validateField('otherBranch');
+          var remaining = validateAllSilent();
+          showSummary(remaining);
+        }
+      });
+
+      function validateAllSilent() {
+        var failures = [];
+        FIELD_ORDER.forEach(function (name) {
+          var box = fieldBox(name);
+          if (box && box.getAttribute('data-invalid') === 'true') failures.push(name);
+        });
+        return failures;
+      }
+
+      FIELD_ORDER.forEach(function (name) {
+        var control = controlFor(name);
+        if (!control) return;
+        var eventName = control.type === 'checkbox' || control.tagName === 'SELECT' ? 'change' : 'input';
+        control.addEventListener(eventName, function () {
+          if (!tried) return;
+          validateField(name);
+          showSummary(validateAllSilent());
+        });
+      });
+
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        tried = true;
+
+        var failures = validateAll();
+        showSummary(failures);
+
+        if (failures.length) {
+          var first = controlFor(failures[0]);
+          if (first) first.focus();
+          return;
+        }
+
+        var branch = branchSelect.value === 'Other'
+          ? otherBranchInput.value.trim()
+          : branchSelect.value;
+
+        submitBtn.classList.add('loading');
+        submitBtn.disabled = true;
+
+        var fullName = document.getElementById('fullName').value.trim();
+        var parts = fullName.split(/\s+/);
+        var firstName = parts.shift() || '';
+        var lastName = parts.join(' ');
+
+        var payload = {
+          firstName: firstName,
+          lastName: lastName,
+          branch: branch,
+          businessInterest: document.getElementById('businessInterest').value.trim(),
+          phone: document.getElementById('phone').value.trim(),
+          email: document.getElementById('email').value.trim() || null,
+          ageGroup: document.getElementById('ageGroup').value,
+          consent: true,
+          submittedAt: new Date().toISOString(),
+          event: 'Aporeneur 2026',
+          eventDate: '2026-06-12'
+        };
+
+        var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx0000000000000000000000000000000/exec';
+
+        fetch(SCRIPT_URL, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        })
+          .then(function () {
+            formSection.style.display = 'none';
+            successMessage.style.display = 'block';
+          })
+          .catch(function () {
+            formSection.style.display = 'none';
+            successMessage.style.display = 'block';
+          })
+          .finally(function () {
+            submitBtn.classList.remove('loading');
+            submitBtn.disabled = false;
+          });
+      });
+
+      syncOtherBranch();
+    })();
+  </script>
+</body>
+</html>

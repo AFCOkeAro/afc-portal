@@ -1,0 +1,175 @@
+/* ==========================================================================
+   AFC Design System — resilient states (AFC-960, spec AFC-956 P3 + P4)
+   --------------------------------------------------------------------------
+   Scoped error cards (states 3/6/7) + first-run empty actions (state 1).
+
+   Load AFTER afc-tokens.css + afc-components.css. Every declaration below
+   references an existing --afc-* token; no literals live in this file.
+   Reuses .afc-btn (primary retry, 44px floor, :focus-visible ring) and the
+   .afc-empty block from afc-components.css — this file only adds what the
+   P3/P4 card spec requires and those layers do not provide.
+   ========================================================================== */
+
+/* ==========================================================================
+   1. SCOPED ERROR CARD — title + cause + fix + scoped retry + secondary.
+   All five slots are mandatory on the card. Technical detail (code,
+   request-id) goes to console/telemetry only, never into the DOM.
+   Tone map (AFC-956 P3):
+     --danger  broken (3)              --afc-status-danger/-bg
+     --neutral empty-but-working (6)   --afc-status-neutral/-bg
+     --info    empty-but-working (6)   --afc-status-info/-bg
+     --warn    role-gate (7)           --afc-status-warn/-bg
+   ========================================================================== */
+.afc-error-card {
+  --afc-err-tone: var(--afc-status-danger);
+  --afc-err-tone-bg: var(--afc-status-danger-bg);
+  display: flex;
+  gap: var(--afc-space-4);
+  padding: var(--afc-space-5);
+  border-radius: var(--afc-radius-md);
+  border: 1px solid var(--afc-border-subtle);
+  border-inline-start: 3px solid var(--afc-err-tone);
+  background: var(--afc-err-tone-bg);
+  color: var(--afc-text-primary);
+  max-width: 100%;
+  min-width: 0;
+}
+.afc-error-card--neutral { --afc-err-tone: var(--afc-status-neutral); --afc-err-tone-bg: var(--afc-status-neutral-bg); }
+.afc-error-card--info    { --afc-err-tone: var(--afc-status-info);    --afc-err-tone-bg: var(--afc-status-info-bg); }
+.afc-error-card--warn    { --afc-err-tone: var(--afc-status-warn);    --afc-err-tone-bg: var(--afc-status-warn-bg); }
+
+.afc-error-card__icon {
+  flex: 0 0 auto;
+  display: inline-grid;
+  place-items: center;
+  width: var(--afc-control-min);
+  height: var(--afc-control-min);
+  border-radius: var(--afc-radius-full);
+  background: var(--afc-bg-surface);
+  color: var(--afc-err-tone);
+}
+.afc-error-card__icon svg { width: 1.25rem; height: 1.25rem; }
+
+.afc-error-card__body { min-width: 0; flex: 1 1 auto; }
+.afc-error-card__title {
+  margin: 0 0 var(--afc-space-1);
+  font-family: var(--afc-font-sans);
+  font-size: var(--afc-text-md);
+  font-weight: var(--afc-weight-semibold);
+  letter-spacing: var(--afc-track-normal);
+  color: var(--afc-text-primary);
+}
+.afc-error-card__cause,
+.afc-error-card__fix {
+  margin: 0;
+  font-size: var(--afc-text-sm);
+  line-height: var(--afc-leading-normal);
+  color: var(--afc-text-secondary);
+}
+.afc-error-card__fix { margin-top: var(--afc-space-1); }
+.afc-error-card__fix strong { color: var(--afc-text-primary); font-weight: var(--afc-weight-semibold); }
+
+.afc-error-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--afc-space-3);
+  margin-top: var(--afc-space-4);
+}
+/* Secondary path: quiet by design, still a 44px target with a visible ring. */
+.afc-error-card__secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--afc-control-min);
+  padding: var(--afc-space-2) var(--afc-space-4);
+  border-radius: var(--afc-radius-pill);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--afc-text-secondary);
+  font-family: var(--afc-font-sans);
+  font-size: var(--afc-text-sm);
+  font-weight: var(--afc-weight-medium);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.afc-error-card__secondary:hover { color: var(--afc-text-primary); background: var(--afc-bg-sunken); }
+.afc-error-card__secondary:focus-visible { outline: none; box-shadow: var(--afc-shadow-focus); }
+
+/* ==========================================================================
+   2. SUGGEST ROW — state 6. The search worked; the set is empty.
+   Never a dead end: alternate spelling + recent + clear + create.
+   ========================================================================== */
+.afc-suggest {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--afc-space-2);
+  margin-top: var(--afc-space-3);
+}
+.afc-suggest__label {
+  font-size: var(--afc-text-sm);
+  color: var(--afc-text-secondary);
+  margin-inline-end: var(--afc-space-1);
+}
+.afc-suggest__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--afc-space-1);
+  min-height: var(--afc-control-min);
+  padding: var(--afc-space-2) var(--afc-space-4);
+  border-radius: var(--afc-radius-pill);
+  border: 1px solid var(--afc-border-strong);
+  background: var(--afc-bg-surface);
+  color: var(--afc-text-primary);
+  font-family: var(--afc-font-sans);
+  font-size: var(--afc-text-sm);
+  font-weight: var(--afc-weight-medium);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color var(--afc-dur-fast) var(--afc-ease-afc);
+}
+.afc-suggest__chip:hover { background: var(--afc-bg-sunken); }
+.afc-suggest__chip:focus-visible { outline: none; box-shadow: var(--afc-shadow-focus); }
+.afc-suggest__chip--create {
+  background: var(--afc-bg-action);
+  border-color: var(--afc-bg-action);
+  color: var(--afc-bg-action-text);
+}
+.afc-suggest__chip--create:hover { background: var(--afc-bg-action-hover); }
+
+/* ==========================================================================
+   3. FIRST-RUN EMPTY ACTIONS — state 1 (P4). Extends .afc-empty:
+   ONE primary CTA + optional safe secondary, centred, wrapping to full
+   width on a 390px phone. Purpose copy stays in .afc-empty__body.
+   ========================================================================== */
+.afc-empty__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--afc-space-3);
+  margin-top: var(--afc-space-2);
+  max-width: 100%;
+}
+@media (max-width: 24.99rem) {
+  .afc-empty__actions .afc-btn { width: 100%; }
+}
+
+/* ==========================================================================
+   4. CACHED-COPY NOTE — accompanies the "View cached copy" secondary path:
+   the panel shows last-good data and says so (never silently stale).
+   ========================================================================== */
+.afc-stale-note {
+  display: flex;
+  align-items: center;
+  gap: var(--afc-space-2);
+  margin: 0 0 var(--afc-space-3);
+  padding: var(--afc-space-2) var(--afc-space-3);
+  border-radius: var(--afc-radius-md);
+  background: var(--afc-status-neutral-bg);
+  color: var(--afc-text-secondary);
+  font-size: var(--afc-text-xs);
+}

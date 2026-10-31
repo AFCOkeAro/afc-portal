@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sync queue — AFC Church Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../../../design-system/tokens/afc-tokens.css" />
+<link rel="stylesheet" href="../../../design-system/components/afc-components.css" />
+<link rel="stylesheet" href="./afc-sync-queue.css" />
+</head>
+<body class="afc">
+<a class="afc-skip-link" href="#main">Skip to content</a>
+
+<div class="afc-offline-banner" data-offline-banner hidden>
+  <span class="afc-offline-banner__dot" aria-hidden="true"></span>
+  <p class="afc-offline-banner__text">You are offline — changes save on this device and sync when reconnected.</p>
+</div>
+
+<header class="afc-topbar">
+  <span class="afc-seal" data-seal="jtlw"><span class="afc-seal__text"><span class="afc-seal__name">AFC Church Portal</span><span class="afc-seal__sub">Settings · Sync</span></span></span>
+  <span class="afc-topbar__spacer"></span>
+  <a class="afc-btn afc-btn--ghost" href="./attendance-capture.html">Attendance</a>
+</header>
+
+<main id="main" class="afc-container" style="max-width:44rem">
+  <p class="afc-label">Settings · Sync</p>
+  <h1 class="afc-h2">Sync queue</h1>
+  <p class="afc-lede">Everything waiting on this device, with per-item retry. The list survives reload — nothing is silently dropped.</p>
+
+  <div class="afc-card" style="margin-top:var(--afc-space-5)">
+    <div data-queue-panel></div>
+  </div>
+
+  <div class="afc-card" style="margin-top:var(--afc-space-5)">
+    <p class="afc-label afc-label--muted">Field screens</p>
+    <div class="afc-row" style="margin-top:var(--afc-space-3)">
+      <a class="afc-btn afc-btn--secondary" href="./attendance-capture.html">Attendance capture</a>
+      <a class="afc-btn afc-btn--secondary" href="./newcomer-intake.html">Newcomer intake</a>
+      <a class="afc-btn afc-btn--secondary" href="./welfare-visit-notes.html">Welfare visit notes</a>
+      <a class="afc-btn afc-btn--secondary" href="./finance-export.html">Finance export</a>
+    </div>
+  </div>
+</main>
+
+<script src="./afc-sync-queue.js"></script>
+<script>
+(function () {
+  var Q = window.AfcSyncQueue;
+  Q.bindOfflineBanner(document.querySelector('[data-offline-banner]'));
+  var outbox = Q.createOutbox({
+    sender: function () {
+      return new Promise(function (resolve, reject) {
+        if (!Q.isOnline()) { reject(new Error('Network unavailable — kept on this device.')); return; }
+        setTimeout(function () { resolve({ ok: true }); }, 120);
+      });
+    }
+  });
+  outbox.boot().then(function () {
+    Q.bindQueuePanel(document.querySelector('[data-queue-panel]'), outbox);
+  });
+  window.addEventListener('online', function () { outbox.retryNow().catch(function () {}); });
+})();
+</script>
+</body>
+</html>
