@@ -32,13 +32,12 @@
  */
 const PUBLIC_ROUTES = ['/', '/login', '/register', '/p', '/programmes'] as const
 
-/** Narrow public leaves under /events/:id — kiosk + badge only, never bare /events/. */
-const KIOSK_PUBLIC_RE = /^\/events\/[^/]+\/(kiosk|badge)(\/|$)/
+import { isPublicKioskLeaf } from '~/utils/kiosk-public'
 
 function isPublic(path: string): boolean {
   return (
     PUBLIC_ROUTES.some((route) => path === route || path.startsWith(`${route}/`)) ||
-    KIOSK_PUBLIC_RE.test(path)
+    isPublicKioskLeaf(path)
   )
 }
 

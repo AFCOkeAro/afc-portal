@@ -10,7 +10,13 @@
  * Named middleware: applied per page with
  * `definePageMeta({ middleware: 'staff' })`.
  */
-export default defineNuxtRouteMiddleware(async () => {
+import { isPublicKioskLeaf } from '~/utils/kiosk-public'
+
+export default defineNuxtRouteMiddleware(async (to) => {
+  /* Public kiosk/badge leaves live under the staff-guarded parent route
+     (events/[id].vue) and must not inherit its redirect (AFC-1003). The
+     global guard already vetted these fetch-less leaves. */
+  if (isPublicKioskLeaf(to.path)) return
   const auth = useAuth()
   const session = await auth.ensureSession()
   if (!session) return navigateTo('/login', { replace: true })
