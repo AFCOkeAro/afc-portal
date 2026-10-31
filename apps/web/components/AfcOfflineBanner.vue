@@ -32,8 +32,7 @@ async function onRetry(): Promise<void> {
       <UIcon name="i-lucide-wifi-off" class="size-4 shrink-0" />
       <p class="min-w-0 flex-1">
         <template v-if="!online">
-          You are offline — changes save on this device and sync when
-          reconnected.
+          You are offline — changes save on this device and sync when reconnected.
         </template>
         <template v-else>
           {{ pending === 1 ? '1 change waiting' : `${pending} changes waiting` }}

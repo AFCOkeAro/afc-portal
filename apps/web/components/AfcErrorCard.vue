@@ -85,10 +85,7 @@ onMounted(() => {
 
 <template>
   <div>
-    <p
-      v-if="staleText"
-      class="mb-2 text-xs text-gray-500 dark:text-gray-400"
-    >
+    <p v-if="staleText" class="mb-2 text-xs text-gray-500 dark:text-gray-400">
       {{ staleText }}
     </p>
     <div
@@ -96,7 +93,10 @@ onMounted(() => {
       class="flex gap-4 rounded-lg border border-gray-200 border-l-4 p-5 dark:border-gray-800"
       :class="tone.ring"
     >
-      <span class="grid size-11 shrink-0 place-items-center rounded-full bg-white dark:bg-gray-900" aria-hidden="true">
+      <span
+        class="grid size-11 shrink-0 place-items-center rounded-full bg-white dark:bg-gray-900"
+        aria-hidden="true"
+      >
         <UIcon :name="tone.icon" class="size-5" :class="tone.iconColor" />
       </span>
       <div class="min-w-0 flex-1">
@@ -107,7 +107,9 @@ onMounted(() => {
           {{ cause }}
         </p>
         <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">
-          <strong class="font-semibold text-gray-900 dark:text-white">What you can do: </strong>{{ fix }}
+          <strong class="font-semibold text-gray-900 dark:text-white"
+            >What you can do: </strong
+          >{{ fix }}
         </p>
         <div class="mt-4 flex flex-wrap items-center gap-3">
           <UButton

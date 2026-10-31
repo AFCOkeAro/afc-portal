@@ -32,7 +32,7 @@ export const COPY = {
   sessionEndedCta: 'Log in again',
   resumeTitle: 'Resume where you left off',
   sharedDeviceNote: 'On a shared device? Discard draft after use.',
-  slowFallback: "Still trying... Retry or continue offline",
+  slowFallback: 'Still trying... Retry or continue offline',
   conflictKeptServer:
     'Server already has a newer record — kept the server version. Nothing was overwritten.',
 } as const
@@ -61,10 +61,7 @@ export type Sender = (item: OutboxItem) => Promise<SendResult>
 
 export function uuid(): string {
   try {
-    if (
-      typeof crypto !== 'undefined' &&
-      typeof crypto.randomUUID === 'function'
-    ) {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
       return crypto.randomUUID()
     }
   } catch {
@@ -131,10 +128,7 @@ export function defaultStorage(): KeyValueStorage {
 
 export function isOnline(): boolean {
   try {
-    if (
-      typeof navigator !== 'undefined' &&
-      typeof navigator.onLine === 'boolean'
-    ) {
+    if (typeof navigator !== 'undefined' && typeof navigator.onLine === 'boolean') {
       return navigator.onLine
     }
   } catch {
@@ -358,7 +352,11 @@ export function createOutbox(opts?: OutboxOptions): Outbox {
 
   const sendOne = async (
     item: OutboxItem,
-  ): Promise<{ id: string; outcome: 'sent' | 'conflict' | 'error'; retryInMs?: number }> => {
+  ): Promise<{
+    id: string
+    outcome: 'sent' | 'conflict' | 'error'
+    retryInMs?: number
+  }> => {
     if (item.status === 'queued') item.status = 'retrying'
     emit()
     try {
@@ -430,9 +428,7 @@ export function createOutbox(opts?: OutboxOptions): Outbox {
       it.status === 'failed' ? { ...it, lastError: it.lastError } : it,
     )
     items = items.map((it) =>
-      it.status === 'failed'
-        ? { ...it, status: 'queued' as OutboxStatus }
-        : it,
+      it.status === 'failed' ? { ...it, status: 'queued' as OutboxStatus } : it,
     )
     persistLs()
     emit()
@@ -474,7 +470,11 @@ export function createOutbox(opts?: OutboxOptions): Outbox {
  * the user's own submit. On 401/expiry mid-entry, call
  * `handleExpiredSession` BEFORE any redirect so the draft survives logout. */
 export const drafts = {
-  save(formId: string, data: Record<string, unknown>, storage?: KeyValueStorage): boolean {
+  save(
+    formId: string,
+    data: Record<string, unknown>,
+    storage?: KeyValueStorage,
+  ): boolean {
     const st = storage ?? defaultStorage()
     try {
       st.setItem(
