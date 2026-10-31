@@ -37,7 +37,7 @@ describe('public event id shape fails fast, never 503s (malformed-id hardening)'
   })
 
   it('shared guard lives in one util imported by both routes', () => {
-    const util = read('apps/web/utils/event-ids.ts')
+    const util = read('apps/web/server/utils/event-ids.ts')
     assert.match(util, /isEventId/)
   })
 })
