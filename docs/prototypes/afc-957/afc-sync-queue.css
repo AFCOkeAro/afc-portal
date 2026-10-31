@@ -1,0 +1,170 @@
+/* ==========================================================================
+   AFC Church Portal — afc-sync-queue styles (AFC-959)
+   Tokens only. No literals: every colour, space, radius, duration and
+   easing resolves to an --afc-* token. Pills mark interactive controls;
+   containers stay near-square.
+   ========================================================================== */
+
+/* --- Offline banner: persistent, non-blocking, top-of-shell. Never a toast. */
+.afc-offline-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--afc-space-3);
+  min-height: var(--afc-control-min);
+  padding: var(--afc-space-2) var(--afc-space-5);
+  background: var(--afc-status-warn-bg);
+  color: var(--afc-text-primary);
+  border-bottom: 1px solid var(--afc-border-default);
+  font-size: var(--afc-text-sm);
+}
+.afc-offline-banner[hidden] { display: none; }
+.afc-offline-banner__dot {
+  flex: 0 0 auto;
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: var(--afc-radius-full);
+  background: var(--afc-status-warn);
+}
+.afc-offline-banner__text { margin: 0; }
+.afc-offline-banner__text strong { font-weight: var(--afc-weight-semibold); }
+
+/* --- Queue panel -------------------------------------------------------- */
+.afc-sync-queue__head {
+  display: flex;
+  align-items: center;
+  gap: var(--afc-space-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--afc-space-4);
+}
+.afc-sync-queue__head .afc-meta { margin: 0; }
+.afc-sync-queue__head .afc-sync-queue__retry { margin-left: auto; }
+.afc-sync-queue__empty { margin: 0; }
+.afc-sync-queue__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--afc-space-3);
+}
+.afc-sync-queue__row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--afc-space-4);
+}
+.afc-sync-queue__rowmain { flex: 1 1 auto; min-width: 0; }
+.afc-sync-queue__label {
+  margin: 0 0 var(--afc-space-1);
+  font-size: var(--afc-text-sm);
+  font-weight: var(--afc-weight-semibold);
+  color: var(--afc-text-primary);
+}
+.afc-sync-queue__rowmain .afc-meta { margin: 0; }
+.afc-sync-queue__rowmain .afc-field__error { margin-top: var(--afc-space-2); }
+.afc-sync-queue__optimistic { color: var(--afc-text-secondary); }
+.afc-sync-queue__rowside {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--afc-space-2);
+}
+.afc-sync-queue__retry { min-height: var(--afc-control-min); }
+
+/* --- Expired-session card ------------------------------------------------ */
+.afc-session-card {
+  background: var(--afc-status-warn-bg);
+  border: 1px solid var(--afc-border-default);
+  border-left: 3px solid var(--afc-status-warn);
+  border-radius: var(--afc-radius-md);
+  padding: var(--afc-space-5);
+}
+.afc-session-card__title {
+  margin: 0 0 var(--afc-space-2);
+  font-family: var(--afc-font-serif);
+  font-size: var(--afc-text-lg);
+  color: var(--afc-text-primary);
+}
+.afc-session-card__body { margin: 0 0 var(--afc-space-4); font-size: var(--afc-text-sm); }
+.afc-session-card__note { margin: var(--afc-space-3) 0 0; font-size: var(--afc-text-xs); color: var(--afc-text-muted); }
+
+/* --- Resilient loading / slow / success ---------------------------------- */
+.afc-loading-region {
+  border-radius: var(--afc-radius-md);
+  min-height: 6rem;
+}
+.afc-loading-region .afc-skel {
+  background: linear-gradient(
+    90deg,
+    var(--afc-bg-sunken) 25%,
+    var(--afc-paper-200) 37%,
+    var(--afc-bg-sunken) 63%
+  );
+}
+.afc-progress--sync { margin-top: var(--afc-space-3); }
+.afc-progress--sync .afc-progress {
+  background: var(--afc-paper-200);
+}
+.afc-progress--sync .afc-progress__bar { background: var(--afc-bg-action); }
+.afc-progress__text {
+  margin: var(--afc-space-2) 0 0;
+  font-size: var(--afc-text-xs);
+  color: var(--afc-text-secondary);
+}
+.afc-progress__text .afc-num { font-variant-numeric: tabular-nums; }
+.afc-slow-fallback { margin: var(--afc-space-3) 0 0; font-size: var(--afc-text-sm); }
+
+.afc-success {
+  background: var(--afc-status-success-bg);
+  border: 1px solid var(--afc-border-default);
+  border-left: 3px solid var(--afc-status-success);
+  border-radius: var(--afc-radius-md);
+  padding: var(--afc-space-5);
+}
+.afc-success__title {
+  margin: 0 0 var(--afc-space-1);
+  font-family: var(--afc-font-serif);
+  font-size: var(--afc-text-lg);
+  color: var(--afc-text-primary);
+}
+.afc-success__warm { margin: 0 0 var(--afc-space-4); font-size: var(--afc-text-sm); color: var(--afc-text-secondary); }
+.afc-success__actions {
+  display: flex;
+  gap: var(--afc-space-3);
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* Ledger / history row: financial and destructive outcomes always land here.
+   A toast alone is a defect. */
+.afc-ledger {
+  list-style: none;
+  margin: var(--afc-space-4) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--afc-space-2);
+}
+.afc-ledger__row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--afc-space-3);
+  padding: var(--afc-space-3) var(--afc-space-4);
+  background: var(--afc-bg-inset);
+  border: 1px solid var(--afc-border-subtle);
+  border-radius: var(--afc-radius-sm);
+  font-size: var(--afc-text-sm);
+}
+.afc-ledger__row .afc-num { font-variant-numeric: tabular-nums; }
+
+/* Tap feedback inside the Doherty ceiling: controls respond immediately. */
+.afc-sync-queue__retry:active,
+.afc-offline-banner:active {
+  transition-duration: var(--afc-dur-feedback);
+}
+
+/* Reduced motion: static blocks, shimmer off. State changes stay instant. */
+@media (prefers-reduced-motion: reduce) {
+  .afc-loading-region .afc-skel { animation: none; }
+  .afc-progress--sync .afc-progress__bar { transition: none; }
+}

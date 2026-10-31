@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Finance export — AFC Church Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../../../design-system/tokens/afc-tokens.css" />
+<link rel="stylesheet" href="../../../design-system/components/afc-components.css" />
+<link rel="stylesheet" href="./afc-sync-queue.css" />
+</head>
+<body class="afc">
+<a class="afc-skip-link" href="#main">Skip to content</a>
+
+<div class="afc-offline-banner" data-offline-banner hidden>
+  <span class="afc-offline-banner__dot" aria-hidden="true"></span>
+  <p class="afc-offline-banner__text">You are offline — changes save on this device and sync when reconnected.</p>
+</div>
+
+<header class="afc-topbar">
+  <span class="afc-seal" data-seal="jtlw"><span class="afc-seal__text"><span class="afc-seal__name">AFC Church Portal</span><span class="afc-seal__sub">Finance</span></span></span>
+  <span class="afc-topbar__spacer"></span>
+  <a class="afc-btn afc-btn--ghost" href="./sync-settings.html">Sync queue</a>
+</header>
+
+<main id="main" class="afc-container" style="max-width:44rem">
+  <p class="afc-label">Finance export</p>
+  <h1 class="afc-h2">Export offerings</h1>
+  <p class="afc-lede">Exports run with progress you can cancel. Every completed export writes a ledger row — a toast alone is a defect.</p>
+
+  <section class="afc-loading-region" data-loading-region aria-busy="true">
+    <p class="afc-visually-hidden" role="status">Loading finance...</p>
+    <div class="afc-skel afc-skel--title" aria-hidden="true"></div>
+    <div class="afc-skel afc-skel--line" style="width:88%" aria-hidden="true"></div>
+    <div class="afc-skel afc-skel--line" style="width:64%" aria-hidden="true"></div>
+  </section>
+
+  <form data-export-form hidden>
+    <div class="afc-field">
+      <label class="afc-field__label" for="fin-range">Period <span class="afc-field__req" aria-hidden="true">*</span></label>
+      <select class="afc-select" id="fin-range" name="period" required>
+        <option value="week">This week</option>
+        <option value="month">This month</option>
+      </select>
+    </div>
+    <div class="afc-field">
+      <label class="afc-field__label" for="fin-fund">Fund <span class="afc-field__req" aria-hidden="true">*</span></label>
+      <select class="afc-select" id="fin-fund" name="fund" required>
+        <option value="offerings">Sunday offerings</option>
+        <option value="welfare">Welfare support</option>
+      </select>
+    </div>
+    <div class="afc-row" style="margin-top:var(--afc-space-5)">
+      <button class="afc-btn afc-btn--primary" type="submit">Export offerings</button>
+    </div>
+  </form>
+
+  <section class="afc-progress--sync" data-progress hidden>
+    <div class="afc-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Exporting offerings" data-bar-wrap>
+      <div class="afc-progress__bar" style="width:0%" data-bar></div>
+    </div>
+    <p class="afc-progress__text" role="status" data-step>Exporting offerings…</p>
+    <div class="afc-row" style="margin-top:var(--afc-space-3)">
+      <button class="afc-btn afc-btn--secondary" type="button" data-cancel>Cancel</button>
+    </div>
+    <p class="afc-meta afc-slow-fallback" data-slow-fallback hidden>Still trying... Retry or continue offline</p>
+  </section>
+
+  <section class="afc-success" data-success hidden>
+    <h2 class="afc-success__title" data-success-title>Offerings export saved</h2>
+    <p class="afc-success__warm">Thank you — the record below is the durable copy for the office.</p>
+    <div class="afc-success__actions">
+      <a class="afc-btn afc-btn--primary" href="#" data-success-primary>View ledger</a>
+      <a class="afc-btn afc-btn--secondary" href="./attendance-capture.html">Back to attendance</a>
+      <a class="afc-btn afc-btn--ghost" href="./sync-settings.html">Back to dashboard</a>
+    </div>
+  </section>
+
+  <section style="margin-top:var(--afc-space-7)" aria-labelledby="fin-ledger-h">
+    <h2 class="afc-h4" id="fin-ledger-h">Ledger history</h2>
+    <p class="afc-meta">Durable rows. Synthetic demonstration figures only.</p>
+    <ul class="afc-ledger" data-ledger></ul>
+  </section>
+
+  <section style="margin-top:var(--afc-space-7)" aria-labelledby="fin-queue-h">
+    <h2 class="afc-h4" id="fin-queue-h">Waiting to sync</h2>
+    <div data-queue-panel></div>
+  </section>
+</main>
+
+<div class="afc-toast-stack" data-toasts aria-live="polite"></div>
+
+<script src="./afc-sync-queue.js"></script>
+<script>
+(function () {
+  var Q = window.AfcSyncQueue;
+  var form = document.querySelector('[data-export-form]');
+  var loading = document.querySelector('[data-loading-region]');
+  var banner = document.querySelector('[data-offline-banner]');
+  var panel = document.querySelector('[data-queue-panel]');
+  var progress = document.querySelector('[data-progress]');
+  var bar = document.querySelector('[data-bar]');
+  var barWrap = document.querySelector('[data-bar-wrap]');
+  var stepEl = document.querySelector('[data-step]');
+  var cancelBtn = document.querySelector('[data-cancel]');
+  var slowFallback = document.querySelector('[data-slow-fallback]');
+  var success = document.querySelector('[data-success]');
+  var successTitle = document.querySelector('[data-success-title]');
+  var ledger = document.querySelector('[data-ledger]');
+  var toasts = document.querySelector('[data-toasts]');
+
+  Q.bindOfflineBanner(banner);
+
+  var LEDGER_KEY = 'afc:ledger:v1';
+  function readLedger() {
+    try { return JSON.parse(localStorage.getItem(LEDGER_KEY) || '[]'); }
+    catch (_e) { return []; }
+  }
+  function writeLedger(rows) {
+    try { localStorage.setItem(LEDGER_KEY, JSON.stringify(rows)); } catch (_e) {}
+  }
+  function paintLedger() {
+    var rows = readLedger();
+    ledger.innerHTML = rows.length ? '' : '<li class="afc-ledger__row"><span>No exports yet.</span><span class="afc-num">—</span></li>';
+    rows.slice(-6).reverse().forEach(function (r) {
+      var li = document.createElement('li');
+      li.className = 'afc-ledger__row';
+      var left = document.createElement('span');
+      left.textContent = r.label;
+      var right = document.createElement('span');
+      right.className = 'afc-num';
+      right.textContent = r.at;
+      li.appendChild(left); li.appendChild(right);
+      ledger.appendChild(li);
+    });
+  }
+  paintLedger();
+
+  var outbox = Q.createOutbox({
+    sender: function () {
+      return new Promise(function (resolve, reject) {
+        if (!Q.isOnline()) { reject(new Error('Network unavailable — kept on this device.')); return; }
+        setTimeout(function () { resolve({ ok: true }); }, 120);
+      });
+    }
+  });
+  outbox.boot().then(function () { Q.bindQueuePanel(panel, outbox); });
+  function toast(text) {
+    var t = document.createElement('div');
+    t.className = 'afc-toast';
+    t.textContent = text;
+    toasts.appendChild(t);
+    setTimeout(function () { t.remove(); }, 4000);
+  }
+
+  setTimeout(function () {
+    loading.hidden = true;
+    loading.removeAttribute('aria-busy');
+    form.hidden = false;
+  }, 400);
+
+  var cancelled = false;
+  cancelBtn.addEventListener('click', function () { cancelled = true; });
+  form.addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    cancelled = false;
+    success.hidden = true;
+    var fund = form.elements.namedItem('fund').selectedOptions[0].text;
+    var period = form.elements.namedItem('period').selectedOptions[0].text;
+    outbox.enqueue('finance-export', 'Finance export — ' + fund + ' (' + period + ')', Q.collectForm(form));
+    progress.hidden = false;
+    slowFallback.hidden = true;
+    var total = 6, done = 0, started = Date.now();
+    var slowTimer = setTimeout(function () {
+      if (!progress.hidden) slowFallback.hidden = false;
+    }, 6000);
+    function tick() {
+      if (cancelled) {
+        clearTimeout(slowTimer);
+        progress.hidden = true;
+        toast('Export cancelled — request kept in the queue.');
+        return;
+      }
+      done += 1;
+      var pct = Math.round((done / total) * 100);
+      bar.style.width = pct + '%';
+      barWrap.setAttribute('aria-valuenow', String(pct));
+      stepEl.textContent = Q.formatStep('Exporting offerings', done, total);
+      if (Date.now() - started > 2000 || Q.shouldShowProgress(Date.now() - started)) progress.hidden = false;
+      if (done < total) { setTimeout(tick, 350); return; }
+      clearTimeout(slowTimer);
+      progress.hidden = true;
+      outbox.flush().then(function () {
+        var rows = readLedger();
+        var label = 'Offerings export — ' + fund + ' (' + period + ')';
+        rows.push({ label: label, at: new Date().toISOString().slice(0, 10) });
+        writeLedger(rows);
+        paintLedger();
+        successTitle.textContent = label + ' saved';
+        success.hidden = false;
+        success.scrollIntoView({ block: 'nearest' });
+      });
+    }
+    setTimeout(tick, 350);
+  });
+
+  window.addEventListener('online', function () { outbox.retryNow().catch(function () {}); });
+})();
+</script>
+</body>
+</html>
