@@ -105,7 +105,10 @@ export default defineNuxtConfig({
     },
   },
 
-  css: ['~/assets/css/main.css'],
+  // AFC design tokens (AFC-985 kiosk/badge): the token sheet only declares
+  // :root custom properties, so it changes no existing rendering — kiosk
+  // styles consume var(--afc-*) directly instead of copying hex values.
+  css: ['~/assets/css/main.css', '../../design-system/tokens/afc-tokens.css'],
 
   runtimeConfig: {
     /** Base URL of the Directus instance. Server-side only. */
