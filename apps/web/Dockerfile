@@ -50,6 +50,7 @@ COPY --from=deps /repo/packages/shared/node_modules ./packages/shared/node_modul
 COPY package.json pnpm-workspace.yaml ./
 COPY apps/web ./apps/web
 COPY packages/shared ./packages/shared
+COPY design-system ./design-system
 
 # Nitro needs the whole workspace at build time: the Nuxt config, the shared
 # package, and the lockfile-derived node_modules from the previous stage.
