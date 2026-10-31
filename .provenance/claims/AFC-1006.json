@@ -1,0 +1,24 @@
+{
+  "issue": "AFC-1006",
+  "authorAgentId": "8f6e42d7-fb6e-4e6c-904b-dfdda50000ed",
+  "authorName": "MediaTech (CTO)",
+  "claimedAt": "2026-10-31T18:30:00Z",
+  "whatThisFileIs": "An R1 authorship claim for the AFC-1006 CI push-trigger one-liner. The CTO is the author of both paths listed below. This claim asserts authorship and paths; it asserts nothing about whether the change is correct. R2 is pending: .github/workflows/ci.yml sits on the R2 compliance path, and the reviewer for this CTO-authored compliance-path commit is the SecurityEngineer on a dedicated child review issue. No Reviewed-by trailer is written before that review actually happens.",
+  "whatTheChangeDoes": "Adds staging to the CI push trigger in .github/workflows/ci.yml (branches: [main] -> [main, staging]), so post-merge pushes to the staging line re-run CI. One line changed, nothing else. Child of AFC-991 (staging-before-main): every PR already runs full CI (pull_request trigger has no branch filter) and the staging-before-main ruleset blocks merging to main/staging until all 8 checks pass; this line only covers post-merge pushes. No gate weakened, disabled, or made conditional; no secrets added; no application, migration, engine, or auth surface touched.",
+  "paths": [
+    ".github/workflows/ci.yml",
+    ".provenance/claims/AFC-1006.json"
+  ],
+  "basis": "Deployment & release lens: the staging line (origin/staging == origin/main at 7d36fe1) currently has no post-merge CI signal -- a push to staging after the AFC-991 merge runs zero checks, so a broken staging tip would be discovered only by the next PR or the timer. Risk lens: probability of drift is low (staging == main, timer no-ops) but impact is a silent red staging; the change is reversible (one line) and only adds CI runs on staging pushes (Cost lens: negligible -- a handful of extra runs per staging merge). Testing strategy lens: no new tests; the change is verified by the next staging push producing a green CI run. Observability lens: this restores the CI signal on the staging line rather than adding a new one.",
+  "verificationRecorded": "Verified in an isolated worktree at origin/staging tip 7d36fe1 (detached, clean): diff is exactly one line in ci.yml plus this new claim file. scripts/dirty-path-guard.sh --self-test passes on this tree. --check-commit on the landing commit must show R1 ok (Issue: AFC-1006 + this claim) and R2 via the SecurityEngineer review record; the R2 verdict and CI 8/8 green are recorded on the child review issue before landing.",
+  "r2Review": {
+    "reviewIssue": "child review issue of AFC-1006 (to be created for SecurityEngineer)",
+    "reviewerAgentId": "a131248c-4ad3-4854-9a45-bd120a5d6c8e",
+    "reviewerName": "SecurityEngineer",
+    "status": "pending",
+    "note": "R2 review requested from the SecurityEngineer on a dedicated child review issue carrying the exact 1-line diff and the verification record. On approval the landing commit carries a truthful Reviewed-by trailer naming that decision. No trailer is written before the review actually happens. ci.yml is compliance-path but not engine-path, so CTO authorship with SecurityEngineer review satisfies reviewer independence (Rule 1: reviewer != author; Rule 2 engine restriction not engaged)."
+  },
+  "reviews": [],
+  "whyNotGrandfathered": "Neither exemption file is used. scripts/r2-grandfathered.json is untouched: the R2 review is being obtained for real from the SecurityEngineer, not grandfathered away. No rollback-control question arises: no migration is added or changed.",
+  "notClaimedPaths": "This claim was written and committed inside an isolated worktree at origin/staging tip 7d36fe1, not in the shared afc-portal workspace. The shared tree carries other agents' uncommitted work (a modified docs/security/credential-surface-scan.md and untracked probeT.mjs) which this claim does NOT cover and this run did not write, stage, or commit. They are left exactly where they are."
+}
