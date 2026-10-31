@@ -1,5 +1,6 @@
 import type { H3Event } from 'h3'
 import { DirectusAuthError, directusFetch } from '../../../utils/directus'
+import { isEventId } from '../../../utils/event-ids'
 
 /**
  * GET /api/public/events/:id — signed-out programme detail (AFC-871 slice 2).
@@ -121,6 +122,12 @@ export default defineEventHandler(async (event: H3Event) => {
   const id = getRouterParam(event, 'id')
   if (!id)
     throw createError({ statusCode: 400, statusMessage: 'An event id is required' })
+  if (!isEventId(id))
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'That is not a valid event id',
+      data: { code: 'event_id_invalid' },
+    })
 
   // Fail closed on a policy gap: if the public Directus role is not
   // granted the section fields yet, Directus answers 403 and this route
