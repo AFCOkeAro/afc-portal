@@ -264,7 +264,6 @@ export type CheckInResolution =
   | { kind: 'match'; row: unknown }
   | { kind: 'ambiguous'; count: number }
   | { kind: 'not_found' }
-
 /**
  * Resolve a check-in query against the event's rows. Ticket code is exact
  * (case-insensitive, trimmed); name is a case-insensitive substring over
@@ -302,4 +301,60 @@ export function resolveCheckIn(
   if (hits.length === 1) return { kind: 'match', row: hits[0] }
   if (hits.length > 1) return { kind: 'ambiguous', count: hits.length }
   return { kind: 'not_found' }
+}
+
+/**
+ * Kiosk self-check-in gate (AFC-985 Phase 1).
+ *
+ * The staff check-in route stays the authority for staffed desks: an usher
+ * may check in a child or record consent at the desk. The kiosk may not —
+ * wireframe S3 K5/K6: a child is routed to the welcome desk and "this kiosk
+ * ... will not record one", and a missing consent blocks with nothing
+ * recorded. So when the check-in route runs with `mode: 'kiosk'` it evaluates
+ * the single matched row here BEFORE writing anything:
+ *
+ *   - 'child'          age_group is child, or a DOB proving under-13.
+ *                      Never self-check-in, consent or not.
+ *   - 'needs_guardian' under-18 without guardian_consent. Mirrors the
+ *                      registration schema's minor rule (child/teen group, or
+ *                      DOB under 18, or unknown group with no DOB proving
+ *                      adulthood) — but consent, not registration, is the
+ *                      question, so the check is `guardian_consent !== true`.
+ *   - null             an adult, or a minor with consent: kiosk may proceed.
+ *
+ * Pure (takes `now` for testability); the route maps the result to 409s.
+ */
+export type KioskRefusal = 'child' | 'needs_guardian'
+
+export interface KioskGateRow {
+  age_group?: unknown
+  date_of_birth?: unknown
+  guardian_consent?: unknown
+}
+
+function kioskAgeInYears(dateOfBirth: unknown, now: Date): number | null {
+  if (typeof dateOfBirth !== 'string' || dateOfBirth.trim() === '') return null
+  const born = Date.parse(`${dateOfBirth.trim()}T00:00:00Z`)
+  if (Number.isNaN(born)) return null
+  let age = now.getUTCFullYear() - new Date(born).getUTCFullYear()
+  const birthdayThisYear = new Date(born)
+  birthdayThisYear.setUTCFullYear(now.getUTCFullYear())
+  if (birthdayThisYear.getTime() > now.getTime()) age -= 1
+  return age
+}
+
+export function kioskCheckInRefusal(
+  row: KioskGateRow,
+  now: Date = new Date(),
+): KioskRefusal | null {
+  const ageGroup = typeof row.age_group === 'string' ? row.age_group : 'unknown'
+  const age = kioskAgeInYears(row.date_of_birth, now)
+  if (ageGroup === 'child') return 'child'
+  if (age !== null && age < 13) return 'child'
+  const minorByGroup = ageGroup === 'child' || ageGroup === 'teen'
+  const minorByDate = age !== null && age < 18
+  const unknownWithoutAdultProof = ageGroup === 'unknown' && (age === null || age < 18)
+  const needsGuardian = minorByGroup || minorByDate || unknownWithoutAdultProof
+  if (needsGuardian && row.guardian_consent !== true) return 'needs_guardian'
+  return null
 }

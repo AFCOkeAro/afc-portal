@@ -1,4 +1,7 @@
-import { resolveCheckIn } from '../../../utils/event-registration-completion'
+import {
+  kioskCheckInRefusal,
+  resolveCheckIn,
+} from '../../../utils/event-registration-completion'
 import {
   eventScopeFilter,
   findScopedItem,
@@ -16,6 +19,13 @@ const CHECKIN_FIELDS = [
   'registrant_last_name',
   'ticket_code',
   'registration_status',
+  // AFC-985 kiosk gate: the kiosk-mode refusal (child / missing guardian
+  // consent) is decided from these three columns on the single matched row.
+  // They are returned only on that one row — never as a list — so the
+  // no-roster guarantee below is unchanged.
+  'age_group',
+  'date_of_birth',
+  'guardian_consent',
 ]
 
 /**
@@ -109,6 +119,35 @@ export default defineEventHandler(async (event) => {
         'That registration was cancelled — re-register instead of checking in',
       data: { code: 'checkin_cancelled' },
     })
+  }
+  // AFC-985 kiosk mode: the refusal runs BEFORE any write, so a blocked
+  // kiosk check-in records nothing (wireframe S3 K5/K6). Staffed desks send
+  // no mode and are unaffected — an usher may still check in a child or take
+  // consent at the desk. This narrows the kiosk path only; it grants nothing.
+  if (String(body.mode ?? '') === 'kiosk') {
+    const refusal = kioskCheckInRefusal(row)
+    if (refusal === 'child') {
+      throw createError({
+        statusCode: 409,
+        statusMessage:
+          'This code is for a child — please go to the welcome desk for a supervised sign-in',
+        data: { code: 'checkin_child' },
+      })
+    }
+    if (refusal === 'needs_guardian') {
+      const name =
+        `${String(row.registrant_first_name ?? '').trim()} ${String(row.registrant_last_name ?? '').trim()}`.trim()
+      throw createError({
+        statusCode: 409,
+        statusMessage: 'Guardian consent is not recorded — please go to the welcome desk',
+        data: {
+          code: 'checkin_needs_guardian',
+          // The single matched name only: the kiosk already holds the ticket
+          // the attendee typed, so naming that one row leaks no roster.
+          name,
+        },
+      })
+    }
   }
   try {
     const updated = await updateItem<Record<string, unknown>>(
