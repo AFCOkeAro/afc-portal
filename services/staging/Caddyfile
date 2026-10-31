@@ -14,7 +14,14 @@
 http://afc-staging.bluespace.ng {
 	encode gzip
 
-	reverse_proxy web:3000
+	reverse_proxy web:3000 {
+		# Zero-downtime staging deploys: hold requests (including
+		# replays) while the replacement container boots instead of
+		# answering 502. Kiosk check-in is idempotent server-side, so
+		# a replayed POST cannot double-apply (AFC-987).
+		lb_try_duration 60s
+		lb_try_interval 250ms
+	}
 
 	header {
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
