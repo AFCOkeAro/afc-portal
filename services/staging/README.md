@@ -128,13 +128,18 @@ docker compose -f services/staging/compose.yml ps
 
 ## 2.5 Auto-deploy (AFC-820)
 
-`auto-deploy.sh` stages origin/main without an operator: fetch; no-op when
+`auto-deploy.sh` stages origin/staging without an operator: fetch; no-op when
 `NUXT_PUBLIC_BUILD_SHA` already matches; refuse on a dirty tree or a
 non-ancestor SHA; `pg_dump` first; apply only the migration files new since
 the deployed SHA (`ON_ERROR_STOP`, abort before the build on failure, never
 touches `rollback/`); then the standard bump/build/recreate with a SHA-proof
 health check. Migrations stay human-written and CI-gated; the script only
-applies what already passed on main.
+applies what already passed on staging (CI-gated PRs).
+
+Branching model (AFC-991): feature/fix branches open PRs against `staging`,
+staging auto-deploys and is verified there, then a `staging` -> `main` PR
+promotes to `main` (which currently deploys nowhere - no production
+environment exists yet). Never merge feature branches straight to `main`.
 
 On CT105 it runs every 5 minutes under systemd:
 
