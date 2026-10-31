@@ -549,4 +549,16 @@ describe('staff guard: kiosk + badge leaves skip the staff chain (AFC-1008)', ()
   it('badge page still does zero fetch (no roster leak via the exemption)', () => {
     assert.doesNotMatch(codeOf(BADGE), /useAsyncData|\$fetch\(.*registrations/)
   })
+
+  it('parent yields to the child outlet on public leaves (no staff shell)', () => {
+    const parentSrc = read('apps/web/pages/events/[id].vue')
+    const parentFlat = flatOf('apps/web/pages/events/[id].vue')
+    assert.match(parentSrc, /isKioskBadgePublicLeaf/)
+    assert.match(parentSrc, /isPublicLeaf/)
+    assert.match(parentFlat, /<NuxtPage v-if="isPublicLeaf" \/>/)
+    // The staff shell must not render alongside the outlet.
+    const outletAt = parentFlat.indexOf('<NuxtPage v-if="isPublicLeaf" />')
+    const pendingAt = parentFlat.indexOf('v-else-if="pending"')
+    assert.ok(outletAt > -1 && pendingAt > -1 && outletAt < pendingAt)
+  })
 })

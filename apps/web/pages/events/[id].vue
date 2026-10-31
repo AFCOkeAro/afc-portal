@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { COLLECTIONS, EXPENSE_CATEGORIES, expenseFormSchema } from '@afc/shared'
 import { ApiRequestError } from '~/composables/useApi'
+import { isKioskBadgePublicLeaf } from '~/utils/public-routes'
 import type {
   BranchSummary,
   BudgetRow,
@@ -138,6 +139,14 @@ const shownTabs = computed<(typeof TABS)[number][]>(() =>
       (entry.id !== 'speakers' || canSpeakers.value),
   ),
 )
+
+/**
+ * Public-leaf passthrough (AFC-1008): kiosk/badge are children of this
+ * staff-guarded route. When a child leaf matches, yield the layout/shell
+ * and render the child outlet — never the staff detail shell (which has
+ * no outlet and would swallow the public page).
+ */
+const isPublicLeaf = computed(() => isKioskBadgePublicLeaf(route.path))
 
 const tab = computed<TabId>(() => {
   const raw = route.query.tab
@@ -1137,7 +1146,9 @@ watch(
 
 <template>
   <div>
-    <div v-if="pending" class="flex justify-center py-16">
+    <!-- Public leaves render through the child outlet, not the staff shell. -->
+    <NuxtPage v-if="isPublicLeaf" />
+    <div v-else-if="pending" class="flex justify-center py-16">
       <UIcon name="i-lucide-loader-circle" class="size-6 animate-spin text-gray-400" />
     </div>
 
