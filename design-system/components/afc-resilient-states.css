@@ -75,6 +75,24 @@
   align-items: center;
   gap: var(--afc-space-3);
   margin-top: var(--afc-space-4);
+  min-width: 0;
+}
+/* AFC-1004: 320px overflow — flex items default to min-width:auto, so a
+   nowrap .afc-btn (retry) cannot shrink and pushes past the viewport.
+   Let action children shrink; on narrow phones stack them full-width with
+   a smaller gap. 44px target kept via the existing min-height tokens. */
+.afc-error-card__actions > * {
+  min-width: 0;
+  max-width: 100%;
+}
+@media (max-width: 24.99rem) {
+  .afc-error-card__actions { gap: var(--afc-space-2); }
+  .afc-error-card__actions .afc-btn,
+  .afc-error-card__actions .afc-error-card__secondary {
+    flex: 1 1 100%;
+    white-space: normal;
+    text-align: center;
+  }
 }
 /* Secondary path: quiet by design, still a 44px target with a visible ring. */
 .afc-error-card__secondary {
