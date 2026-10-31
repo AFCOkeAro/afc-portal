@@ -30,15 +30,14 @@
  * Anything not listed needs a session. Adding a route to this list is a security
  * decision, not a convenience, so it is a named constant rather than a pattern.
  */
-const PUBLIC_ROUTES = ['/', '/login', '/register', '/p', '/programmes'] as const
+import { isPublicKioskLeaf } from '~/utils/kiosk-public'
 
-/** Narrow public leaves under /events/:id — kiosk + badge only, never bare /events/. */
-const KIOSK_PUBLIC_RE = /^\/events\/[^/]+\/(kiosk|badge)(\/|$)/
+const PUBLIC_ROUTES = ['/', '/login', '/register', '/p', '/programmes'] as const
 
 function isPublic(path: string): boolean {
   return (
     PUBLIC_ROUTES.some((route) => path === route || path.startsWith(`${route}/`)) ||
-    KIOSK_PUBLIC_RE.test(path)
+    isPublicKioskLeaf(path)
   )
 }
 

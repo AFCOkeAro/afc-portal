@@ -457,13 +457,15 @@ describe('auth guard: kiosk + badge public, event detail stays guarded (AFC-999)
 
   it('pins the narrow kiosk/badge prefix check beside the named list', () => {
     assert.match(src, /PUBLIC_ROUTES/)
-    assert.match(bare, /kiosk\|badge/)
-    assert.match(src, /\/events\/[^/]+/)
+    assert.match(src, /isPublicKioskLeaf/)
+    const util = read('apps/web/utils/kiosk-public.ts')
+    assert.match(util, /kiosk\|badge/)
+    assert.match(util, /\/events\/[^/]+/)
   })
 
   it('does NOT blanket-open /events/ — only the two leaves', () => {
     assert.doesNotMatch(bare, /'\/events'/)
-    assert.match(bare, /KIOSK_PUBLIC_RE/)
+    assert.match(read('apps/web/utils/kiosk-public.ts'), /KIOSK_PUBLIC_RE/)
   })
 
   it('unauthenticated kiosk and badge leaves pass isPublic (no /login redirect)', () => {
@@ -477,5 +479,23 @@ describe('auth guard: kiosk + badge public, event detail stays guarded (AFC-999)
     for (const p of ['/events', '/events/', '/events/e9', '/events/e9/']) {
       assert.equal(isPublic(p), false, `${p} must stay guarded`)
     }
+  })
+})
+
+describe('staff parent: public kiosk/badge leaves render without the staff shell (AFC-1003)', () => {
+  it('staff guard yields the public leaves instead of redirecting to /login', () => {
+    const staff = read('apps/web/middleware/staff.ts')
+    assert.match(staff, /isPublicKioskLeaf\(to\.path\)/)
+  })
+
+  it('event detail parent yields layout + shell when a child leaf matches', () => {
+    const page = read('apps/web/pages/events/[id].vue')
+    assert.match(page, /<NuxtPage v-if="isChildRoute" \/>/)
+    assert.match(page, /route\.matched\.length > 1/)
+  })
+
+  it('staff content still renders for the bare route (outlet is conditional)', () => {
+    const page = read('apps/web/pages/events/[id].vue')
+    assert.match(page, /<div v-else>/)
   })
 })
