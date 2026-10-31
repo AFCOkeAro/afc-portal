@@ -108,6 +108,7 @@ const KIOSK = 'apps/web/pages/events/[id]/kiosk.vue'
 const BADGE = 'apps/web/pages/events/[id]/badge.vue'
 const BADGE_CMP = 'apps/web/components/KioskBadge.vue'
 const OPS = 'docs/kiosk-badge-ops.md'
+const GUARD = 'apps/web/middleware/auth.global.ts'
 
 describe('kiosk gate: children and unconsented minors refuse, nothing recorded', () => {
   const src = codeOf(HELPER)
@@ -441,5 +442,60 @@ describe('design tokens: no hard-coded hex in new interface files', () => {
       read('apps/web/nuxt.config.ts'),
       /design-system\/tokens\/afc-tokens\.css/,
     )
+  })
+})
+
+describe('auth guard: kiosk + badge public, event detail stays guarded (AFC-999)', () => {
+  const src = read(GUARD)
+  const bare = codeOf(GUARD)
+  /* Mirror of isPublic() in apps/web/middleware/auth.global.ts. */
+  const PUBLIC_ROUTES = ['/', '/login', '/register', '/p', '/programmes']
+  const KIOSK_PUBLIC_RE = /^\/events\/[^/]+\/(kiosk|badge)(\/|$)/
+  const isPublic = (path) =>
+    PUBLIC_ROUTES.some((route) => path === route || path.startsWith(`${route}/`)) ||
+    KIOSK_PUBLIC_RE.test(path)
+
+  it('pins the narrow kiosk/badge prefix check beside the named list', () => {
+    assert.match(src, /PUBLIC_ROUTES/)
+    assert.match(src, /isPublicKioskLeaf/)
+    const util = read('apps/web/utils/kiosk-public.ts')
+    assert.match(util, /kiosk\|badge/)
+    assert.match(util, /\/events\/[^/]+/)
+  })
+
+  it('does NOT blanket-open /events/ — only the two leaves', () => {
+    assert.doesNotMatch(bare, /'\/events'/)
+    assert.match(read('apps/web/utils/kiosk-public.ts'), /KIOSK_PUBLIC_RE/)
+  })
+
+  it('unauthenticated kiosk and badge leaves pass isPublic (no /login redirect)', () => {
+    for (const p of ['/events/e9/kiosk', '/events/e9/kiosk/', '/events/e9/badge', '/events/e9/badge/']) {
+      assert.equal(isPublic(p), true, `${p} must be public`)
+    }
+    assert.equal(isPublic('/events/e9/kiosk/extra'), true, 'nested kiosk leaf stays public')
+  })
+
+  it('bare /events/<id> and /events still redirect (stay guarded)', () => {
+    for (const p of ['/events', '/events/', '/events/e9', '/events/e9/']) {
+      assert.equal(isPublic(p), false, `${p} must stay guarded`)
+    }
+  })
+})
+
+describe('staff parent: public kiosk/badge leaves render without the staff shell (AFC-1003)', () => {
+  it('staff guard yields the public leaves instead of redirecting to /login', () => {
+    const staff = read('apps/web/middleware/staff.ts')
+    assert.match(staff, /isPublicKioskLeaf\(to\.path\)/)
+  })
+
+  it('event detail parent yields layout + shell when a child leaf matches', () => {
+    const page = read('apps/web/pages/events/[id].vue')
+    assert.match(page, /<NuxtPage v-if="isChildRoute" \/>/)
+    assert.match(page, /route\.matched\.length > 1/)
+  })
+
+  it('staff content still renders for the bare route (outlet is conditional)', () => {
+    const page = read('apps/web/pages/events/[id].vue')
+    assert.match(page, /<div v-else>/)
   })
 })

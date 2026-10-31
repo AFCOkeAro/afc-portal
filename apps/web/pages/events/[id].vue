@@ -50,6 +50,12 @@ const REPORT_SUBTABS = ['Unit reports', 'Feedback', 'Blessings', 'Testimonies'] 
 
 const route = useRoute()
 const router = useRouter()
+
+/* Public kiosk/badge leaves are children of this staff-guarded route
+   (AFC-1003): the child page brings layout 'public' and this parent must
+   contribute neither layout nor staff chrome, so yield both when a child
+   matches. Staff content below renders only for the bare route. */
+const isChildRoute = computed(() => route.matched.length > 1)
 const api = useApi()
 const permissions = usePermissions()
 const id = String(route.params.id)
@@ -1136,7 +1142,8 @@ watch(
 </script>
 
 <template>
-  <div>
+  <NuxtPage v-if="isChildRoute" />
+  <div v-else>
     <div v-if="pending" class="flex justify-center py-16">
       <UIcon name="i-lucide-loader-circle" class="size-6 animate-spin text-gray-400" />
     </div>

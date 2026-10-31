@@ -20,13 +20,25 @@
  * `/events/[id].vue`, which stays guarded — so this widens the anonymous
  * surface by exactly one prefix.
  *
+ * Two kiosk prefixes are public beside the named list: `/events/:id/kiosk`
+ * and `/events/:id/badge`. The kiosk page POSTs through the existing
+ * grant-gated check-in route with `mode: 'kiosk'` (no new endpoint); the
+ * badge page does zero fetch and renders from query params only (no roster).
+ * Staff `pages/events/[id].vue` (`middleware: 'staff'`) stays guarded — only
+ * the two `/kiosk` and `/badge` leaves are open, never bare `/events/`.
+ *
  * Anything not listed needs a session. Adding a route to this list is a security
  * decision, not a convenience, so it is a named constant rather than a pattern.
  */
+import { isPublicKioskLeaf } from '~/utils/kiosk-public'
+
 const PUBLIC_ROUTES = ['/', '/login', '/register', '/p', '/programmes'] as const
 
 function isPublic(path: string): boolean {
-  return PUBLIC_ROUTES.some((route) => path === route || path.startsWith(`${route}/`))
+  return (
+    PUBLIC_ROUTES.some((route) => path === route || path.startsWith(`${route}/`)) ||
+    isPublicKioskLeaf(path)
+  )
 }
 
 export default defineNuxtRouteMiddleware(async (to) => {
