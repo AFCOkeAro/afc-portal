@@ -109,6 +109,8 @@ const BADGE = 'apps/web/pages/events/[id]/badge.vue'
 const BADGE_CMP = 'apps/web/components/KioskBadge.vue'
 const OPS = 'docs/kiosk-badge-ops.md'
 const GUARD = 'apps/web/middleware/auth.global.ts'
+const STAFF_GUARD = 'apps/web/middleware/staff.ts'
+const SHARED_LEAVES = 'apps/web/utils/public-routes.ts'
 
 describe('kiosk gate: children and unconsented minors refuse, nothing recorded', () => {
   const src = codeOf(HELPER)
@@ -448,17 +450,36 @@ describe('design tokens: no hard-coded hex in new interface files', () => {
 describe('auth guard: kiosk + badge public, event detail stays guarded (AFC-999)', () => {
   const src = read(GUARD)
   const bare = codeOf(GUARD)
-  /* Mirror of isPublic() in apps/web/middleware/auth.global.ts. */
-  const PUBLIC_ROUTES = ['/', '/login', '/register', '/p', '/programmes']
-  const KIOSK_PUBLIC_RE = /^\/events\/[^/]+\/(kiosk|badge)(\/|$)/
+  const sharedSrc = read(SHARED_LEAVES)
+  /* Real guard values extracted from the shared allowlist (AFC-1008):
+     behavioural asserts below run against the shipped regex, so guard drift
+     fails the suite instead of passing against a stale local copy. */
+  const reSrc = sharedSrc.match(/const KIOSK_PUBLIC_RE\s*=\s*(\/.*\/[a-z]*)/)?.[1]
+  assert.ok(reSrc, 'shared allowlist must declare KIOSK_PUBLIC_RE')
+  const KIOSK_PUBLIC_RE = eval(reSrc)
+  const routesSrc = src.match(/const PUBLIC_ROUTES\s*=\s*(\[[^\]]*\])/)?.[1]
+  assert.ok(routesSrc, 'guard must declare PUBLIC_ROUTES')
+  const PUBLIC_ROUTES = eval(routesSrc)
   const isPublic = (path) =>
     PUBLIC_ROUTES.some((route) => path === route || path.startsWith(`${route}/`)) ||
     KIOSK_PUBLIC_RE.test(path)
 
   it('pins the narrow kiosk/badge prefix check beside the named list', () => {
     assert.match(src, /PUBLIC_ROUTES/)
-    assert.match(bare, /kiosk\|badge/)
-    assert.match(src, /\/events\/[^/]+/)
+    assert.match(sharedSrc, /kiosk\|badge/)
+    assert.match(sharedSrc, /\/events\/[^/]+/)
+    assert.match(sharedSrc, /KIOSK_PUBLIC_RE = \/\^\\\/events/)
+  })
+
+  it('both guards share one allowlist — no drift (AFC-1008)', () => {
+    assert.match(src, /utils\/public-routes/)
+    assert.match(src, /KIOSK_PUBLIC_RE/)
+    assert.match(read(STAFF_GUARD), /utils\/public-routes/)
+    assert.match(read(STAFF_GUARD), /isKioskBadgePublicLeaf/)
+  })
+
+  it('pins the anchored tail — optional trailing slash only, no nested suffix', () => {
+    assert.ok(sharedSrc.includes('\\/?$'), 'KIOSK_PUBLIC_RE must end anchored as \\/?$')
   })
 
   it('does NOT blanket-open /events/ — only the two leaves', () => {
@@ -470,12 +491,62 @@ describe('auth guard: kiosk + badge public, event detail stays guarded (AFC-999)
     for (const p of ['/events/e9/kiosk', '/events/e9/kiosk/', '/events/e9/badge', '/events/e9/badge/']) {
       assert.equal(isPublic(p), true, `${p} must be public`)
     }
-    assert.equal(isPublic('/events/e9/kiosk/extra'), true, 'nested kiosk leaf stays public')
+  })
+
+  it('nested paths under kiosk/badge stay guarded (anchored tail, AFC-1002 F1)', () => {
+    for (const p of ['/events/e9/kiosk/extra', '/events/e9/badge/extra', '/events/e9/kiosk/extra/deep']) {
+      assert.equal(isPublic(p), false, `${p} must stay guarded`)
+    }
   })
 
   it('bare /events/<id> and /events still redirect (stay guarded)', () => {
     for (const p of ['/events', '/events/', '/events/e9', '/events/e9/']) {
       assert.equal(isPublic(p), false, `${p} must stay guarded`)
     }
+  })
+})
+
+describe('staff guard: kiosk + badge leaves skip the staff chain (AFC-1008)', () => {
+  const staffSrc = read(STAFF_GUARD)
+  const staffFlat = flatOf(STAFF_GUARD)
+  const sharedSrc = read(SHARED_LEAVES)
+
+  it('exempts the two shared public leaves before any session check', () => {
+    assert.match(staffSrc, /isKioskBadgePublicLeaf\(to\.path\)/)
+    // Comment-stripped source: the docblock mentions /login, so ordering
+    // must run against the bare code, not the raw text.
+    const bare = codeOf(STAFF_GUARD).replace(/\s+/g, ' ')
+    const exemptAt = bare.indexOf('isKioskBadgePublicLeaf(to.path)')
+    const sessionAt = bare.indexOf('ensureSession()')
+    const loginAt = bare.indexOf('/login')
+    assert.ok(exemptAt > -1 && sessionAt > -1 && exemptAt < sessionAt)
+    assert.ok(loginAt === -1 || exemptAt < loginAt)
+  })
+
+  it('the shared allowlist still pins the anchored tail only', () => {
+    assert.ok(sharedSrc.includes('\\/?$'), 'shared allowlist must end anchored as \\/?$')
+  })
+
+  it('leaves pass, bare /events/<id> and nested suffixes stay guarded', () => {
+    const reSrc = sharedSrc.match(/const KIOSK_PUBLIC_RE\s*=\s*(\/.*\/[a-z]*)/)?.[1]
+    assert.ok(reSrc, 'shared allowlist must declare KIOSK_PUBLIC_RE')
+    const re = eval(reSrc)
+    for (const p of ['/events/e9/kiosk', '/events/e9/badge/']) {
+      assert.equal(re.test(p), true, `${p} must skip staff`)
+    }
+    for (const p of [
+      '/events',
+      '/events/e9',
+      '/events/e9/',
+      '/events/e9/kiosk/extra',
+      '/events/e9/badge/extra',
+      '/events/e9/invite',
+    ]) {
+      assert.equal(re.test(p), false, `${p} must stay staff-guarded`)
+    }
+  })
+
+  it('badge page still does zero fetch (no roster leak via the exemption)', () => {
+    assert.doesNotMatch(codeOf(BADGE), /useAsyncData|\$fetch\(.*registrations/)
   })
 })

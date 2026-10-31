@@ -1,3 +1,5 @@
+import { KIOSK_PUBLIC_RE } from '~/utils/public-routes'
+
 /**
  * Global auth guard.
  *
@@ -32,8 +34,7 @@
  */
 const PUBLIC_ROUTES = ['/', '/login', '/register', '/p', '/programmes'] as const
 
-/** Narrow public leaves under /events/:id — kiosk + badge only, never bare /events/. */
-const KIOSK_PUBLIC_RE = /^\/events\/[^/]+\/(kiosk|badge)(\/|$)/
+/** Narrow public leaves under /events/:id — shared with staff.ts (AFC-1008). */
 
 function isPublic(path: string): boolean {
   return (
