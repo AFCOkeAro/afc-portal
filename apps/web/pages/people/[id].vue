@@ -215,8 +215,11 @@ const filteredTimeline = computed(() => {
 /**
  * Anchor sections per prd-addendum-v4 §1 + wireframes-v3 screen 1. Gates are
  * capabilities, never role names (data-model §13 rule 7): a section the
- * session cannot read is absent from the nav and the page (US-S1 AC4 — a
+ * session cannot read is absent from the page (US-S1 AC4 — a
  * volunteer sees no welfare section).
+ *
+ * AFC-1015: tab strip removed per user direction — sections render as a
+ * single scrolling right rail, no SectionNav.
  */
 const canAttendance = computed(() =>
   permissions.can(COLLECTIONS.attendanceSessions, 'read'),
@@ -225,16 +228,6 @@ const canRegistrations = computed(() => permissions.can(COLLECTIONS.events, 'rea
 const canFollowUps = computed(() => permissions.can(COLLECTIONS.visitors, 'read'))
 const canWelfare = computed(() => permissions.can(COLLECTIONS.welfareCases, 'read'))
 const canLeadership = computed(() => permissions.can(COLLECTIONS.departments, 'read'))
-
-const sections = computed(() => [
-  { id: 'overview', label: 'Overview' },
-  ...(canAttendance.value ? [{ id: 'attendance', label: 'Attendance' }] : []),
-  ...(canRegistrations.value ? [{ id: 'registrations', label: 'Registrations' }] : []),
-  ...(canFollowUps.value ? [{ id: 'follow-ups', label: 'Follow-ups' }] : []),
-  ...(canWelfare.value ? [{ id: 'welfare-with-scope', label: 'Welfare' }] : []),
-  ...(canLeadership.value ? [{ id: 'leadership', label: 'Leadership' }] : []),
-  { id: 'timeline', label: 'Full timeline' },
-])
 
 async function toggleStatus(): Promise<void> {
   if (!person.value) return
@@ -280,28 +273,10 @@ async function toggleStatus(): Promise<void> {
     />
 
     <template v-else-if="person">
-      <PageHeader
-        :title="displayName"
-        :description="`${person.membership_status.replace(/_/g, ' ')} · ${person.branch_name || 'No branch'}`"
-      >
-        <template #actions>
-          <PermissionGate :collection="COLLECTIONS.people" action="update">
-            <UButton
-              color="neutral"
-              variant="outline"
-              :label="person.status === 'active' ? 'Archive' : 'Restore'"
-              :loading="savingStatus"
-              @click="toggleStatus"
-            />
-            <UButton
-              label="Edit person"
-              icon="i-lucide-pencil"
-              @click="showEdit = true"
-            />
-          </PermissionGate>
-        </template>
-      </PageHeader>
-
+      <!-- AFC-1015: no full-width picture banner, no tab strip.
+        Compact title row lives in the scrolling right rail; the left rail
+        holds the two static panels (summary + household) and never scrolls
+        away (sticky). -->
       <UAlert
         v-if="actionError"
         class="mb-4"
@@ -319,53 +294,16 @@ async function toggleStatus(): Promise<void> {
         :description="restrictedMessage"
       />
 
-      <SectionNav :sections="sections" />
-
-      <UCard class="mb-6">
-        <div class="flex flex-wrap items-center gap-4">
-          <ProfileAvatar :name="displayName" :photo-url="photoUrl" size="lg" />
-          <div class="min-w-0 flex-1">
-            <h2 class="truncate text-xl font-semibold">{{ displayName }}</h2>
-            <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
-              {{ person.membership_status.replace(/_/g, ' ') }} ·
-              {{ person.branch_name || 'No branch' }}
-            </p>
-            <div class="mt-2 space-y-0.5 text-sm text-gray-600 dark:text-gray-300">
-              <p v-if="person.phone">{{ person.phone }}</p>
-              <p v-if="person.email" class="break-all">{{ person.email }}</p>
-            </div>
-          </div>
-          <PermissionGate :collection="COLLECTIONS.people" action="update">
-            <input
-              ref="photoInput"
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              class="hidden"
-              aria-label="Upload profile photo"
-              @change="uploadPhoto"
-            />
-            <UButton
-              label="Upload photo"
-              icon="i-lucide-camera"
-              color="neutral"
-              variant="outline"
-              :loading="photoSaving"
-              @click="photoInput?.click()"
-            />
-          </PermissionGate>
-        </div>
-      </UCard>
-
-      <section id="overview" class="scroll-mt-28">
+      <div id="overview" class="scroll-mt-28">
         <h2 class="sr-only" tabindex="-1">Overview</h2>
-        <!-- AFC-929 (approved mockup AFC-928 v3): sticky left rail — profile
-          hero with icon contact rows + static household panel; the right
-          column starts with the compact attendance chart. Deliberate
-          deviations from the mockup: the status menu (Active / Under
-          Discipline / Left / Deceased) is not built — the data model only
-          carries active/archived, so the Archive/Restore toggle in the page
-          header stands; no address mini-map — there is no geodata on this
-          surface (map pin deferred, as on the household page). -->
+        <!-- AFC-929 (approved mockup AFC-928 v3) + AFC-1015 layout: static
+          left rail — profile hero with icon contact rows + static household
+          panel; the right column scrolls with every other section.
+          Deliberate deviations from the mockup: the status menu (Active /
+          Under Discipline / Left / Deceased) is not built — the data model
+          only carries active/archived, so the Archive/Restore toggle in the
+          compact header stands; no address mini-map — there is no geodata on
+          this surface (map pin deferred, as on the household page). -->
         <div class="grid gap-6 lg:grid-cols-[340px_minmax(0,1fr)]">
           <aside
             class="space-y-6 lg:sticky lg:top-20 lg:self-start"
@@ -376,6 +314,14 @@ async function toggleStatus(): Promise<void> {
                 <div class="relative shrink-0">
                   <PersonAvatar :name="displayName" :photo-url="photoUrl" size="md" />
                   <PermissionGate :collection="COLLECTIONS.people" action="update">
+                    <input
+                      ref="photoInput"
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      class="hidden"
+                      aria-label="Upload profile photo"
+                      @change="uploadPhoto"
+                    />
                     <button
                       type="button"
                       title="Change or upload photo"
@@ -617,6 +563,32 @@ async function toggleStatus(): Promise<void> {
           </aside>
 
           <div class="min-w-0 space-y-6">
+            <!-- AFC-1015 compact header: name + meta + actions, no banner image. -->
+            <div class="flex flex-wrap items-start justify-between gap-3">
+              <div class="min-w-0">
+                <h1 class="text-xl font-semibold leading-tight">{{ displayName }}</h1>
+                <p class="mt-0.5 text-sm text-gray-500 capitalize dark:text-gray-400">
+                  {{ person.membership_status.replace(/_/g, ' ') }} · {{ person.branch_name || 'No branch' }}
+                </p>
+              </div>
+              <PermissionGate :collection="COLLECTIONS.people" action="update">
+                <div class="flex shrink-0 gap-2">
+                  <UButton
+                    color="neutral"
+                    variant="outline"
+                    :label="person.status === 'active' ? 'Archive' : 'Restore'"
+                    :loading="savingStatus"
+                    @click="toggleStatus"
+                  />
+                  <UButton
+                    label="Edit person"
+                    icon="i-lucide-pencil"
+                    @click="showEdit = true"
+                  />
+                </div>
+              </PermissionGate>
+            </div>
+
             <section v-if="canAttendance" id="attendance" class="scroll-mt-28">
               <UCard>
                 <template #header>
@@ -682,134 +654,130 @@ async function toggleStatus(): Promise<void> {
                 <p class="mt-1 whitespace-pre-line">{{ person.notes }}</p>
               </div>
             </UCard>
+
+            <section v-if="canRegistrations" id="registrations" class="scroll-mt-28">
+              <UCard>
+                <template #header>
+                  <div class="flex items-center justify-between">
+                    <h2 class="text-base font-semibold" tabindex="-1">Registrations</h2>
+                    <span class="text-xs text-gray-500 dark:text-gray-400">
+                      {{ eventItems.length }} registrations
+                    </span>
+                  </div>
+                </template>
+                <ActivityList
+                  :items="eventItems"
+                  empty-title="No event registrations"
+                  empty-description="Registrations and attendance for events will appear here."
+                />
+              </UCard>
+            </section>
+
+            <section v-if="canFollowUps" id="follow-ups" class="scroll-mt-28">
+              <UCard>
+                <template #header>
+                  <div class="flex items-center justify-between">
+                    <h2 class="text-base font-semibold" tabindex="-1">Follow-ups</h2>
+                    <span class="text-xs text-gray-500 dark:text-gray-400">
+                      {{ visitorItems.length }} visits
+                    </span>
+                  </div>
+                </template>
+                <ActivityList
+                  :items="visitorItems"
+                  empty-title="No newcomer journey"
+                  empty-description="Visitor intake, follow-up and connection steps will appear here."
+                />
+              </UCard>
+            </section>
+
+            <section v-if="canWelfare" id="welfare-with-scope" class="scroll-mt-28">
+              <UCard>
+                <template #header>
+                  <div class="flex items-center justify-between">
+                    <h2 class="text-base font-semibold" tabindex="-1">Welfare</h2>
+                    <span class="text-xs text-gray-500 dark:text-gray-400">
+                      {{ welfareItems.length }} cases
+                    </span>
+                  </div>
+                </template>
+                <ActivityList
+                  :items="welfareItems"
+                  empty-title="No welfare involvement"
+                  empty-description="Cases linked to this person will appear here for permitted staff."
+                />
+              </UCard>
+            </section>
+
+            <section v-if="canLeadership" id="leadership" class="scroll-mt-28">
+              <UCard>
+                <template #header>
+                  <div class="flex items-center justify-between">
+                    <h2 class="text-base font-semibold" tabindex="-1">Leadership</h2>
+                    <span class="text-xs text-gray-500 dark:text-gray-400">
+                      {{ person.departments.length }} assignment{{
+                        person.departments.length === 1 ? '' : 's'
+                      }}
+                    </span>
+                  </div>
+                </template>
+                <EmptyState
+                  v-if="person.departments.length === 0"
+                  title="No department assignments"
+                  description="Department membership for this person will appear here. Gated on departments:read so volunteers never see it."
+                />
+                <ul v-else class="divide-y divide-gray-100 dark:divide-gray-800">
+                  <li
+                    v-for="membership in person.departments"
+                    :key="membership.id"
+                    class="flex items-center justify-between gap-3 py-2"
+                  >
+                    <NuxtLink
+                      :to="`/departments/${membership.id}`"
+                      class="text-sm font-medium text-gray-900 hover:text-primary-600 dark:text-white"
+                    >
+                      {{ membership.name }}
+                    </NuxtLink>
+                    <span class="text-xs capitalize text-gray-500 dark:text-gray-400">
+                      {{ membership.role }}
+                    </span>
+                  </li>
+                </ul>
+              </UCard>
+            </section>
+
+            <section id="timeline" class="scroll-mt-28">
+              <UCard>
+                <template #header>
+                  <div class="flex flex-wrap items-center justify-between gap-2">
+                    <h2 class="text-base font-semibold" tabindex="-1">Full timeline</h2>
+                    <span class="text-xs text-gray-500 dark:text-gray-400">
+                      {{ filteredTimeline.length }} of {{ person.timeline.length }} events
+                    </span>
+                  </div>
+                  <div class="mt-3 flex flex-wrap gap-1" role="group" aria-label="Filter timeline">
+                    <UButton
+                      v-for="filter in timelineFilters"
+                      :key="filter.id"
+                      size="xs"
+                      :color="timelineFilter === filter.id ? 'primary' : 'neutral'"
+                      :variant="timelineFilter === filter.id ? 'solid' : 'ghost'"
+                      :label="filter.label"
+                      :aria-pressed="timelineFilter === filter.id"
+                      @click="timelineFilter = filter.id"
+                    />
+                  </div>
+                </template>
+                <ActivityList
+                  :items="filteredTimeline"
+                  empty-title="No activity yet"
+                  empty-description="Attendance, event registrations, visitor follow-ups and welfare cases will appear here."
+                />
+              </UCard>
+            </section>
           </div>
         </div>
-      </section>
-
-      <section v-if="canRegistrations" id="registrations" class="mt-8 scroll-mt-28">
-        <UCard>
-          <template #header>
-            <div class="flex items-center justify-between">
-              <h2 class="text-base font-semibold" tabindex="-1">Registrations</h2>
-              <span class="text-xs text-gray-500 dark:text-gray-400">
-                {{ eventItems.length }} registrations
-              </span>
-            </div>
-          </template>
-          <ActivityList
-            :items="eventItems"
-            empty-title="No event registrations"
-            empty-description="Registrations and attendance for events will appear here."
-          />
-        </UCard>
-      </section>
-
-      <section v-if="canFollowUps" id="follow-ups" class="mt-8 scroll-mt-28">
-        <UCard>
-          <template #header>
-            <div class="flex items-center justify-between">
-              <h2 class="text-base font-semibold" tabindex="-1">Follow-ups</h2>
-              <span class="text-xs text-gray-500 dark:text-gray-400">
-                {{ visitorItems.length }} visits
-              </span>
-            </div>
-          </template>
-          <ActivityList
-            :items="visitorItems"
-            empty-title="No newcomer journey"
-            empty-description="Visitor intake, follow-up and connection steps will appear here."
-          />
-        </UCard>
-      </section>
-
-      <section v-if="canWelfare" id="welfare-with-scope" class="mt-8 scroll-mt-28">
-        <UCard>
-          <template #header>
-            <div class="flex items-center justify-between">
-              <h2 class="text-base font-semibold" tabindex="-1">Welfare</h2>
-              <span class="text-xs text-gray-500 dark:text-gray-400">
-                {{ welfareItems.length }} cases
-              </span>
-            </div>
-          </template>
-          <ActivityList
-            :items="welfareItems"
-            empty-title="No welfare involvement"
-            empty-description="Cases linked to this person will appear here for permitted staff."
-          />
-        </UCard>
-      </section>
-
-      <section v-if="canLeadership" id="leadership" class="mt-8 scroll-mt-28">
-        <UCard>
-          <template #header>
-            <div class="flex items-center justify-between">
-              <h2 class="text-base font-semibold" tabindex="-1">Leadership</h2>
-              <span class="text-xs text-gray-500 dark:text-gray-400">
-                {{ person.departments.length }} assignment{{
-                  person.departments.length === 1 ? '' : 's'
-                }}
-              </span>
-            </div>
-          </template>
-          <EmptyState
-            v-if="person.departments.length === 0"
-            title="No department assignments"
-            description="Department membership for this person will appear here. Gated on departments:read so volunteers never see it."
-          />
-          <ul v-else class="divide-y divide-gray-100 dark:divide-gray-800">
-            <li
-              v-for="membership in person.departments"
-              :key="membership.id"
-              class="flex items-center justify-between gap-3 py-2"
-            >
-              <NuxtLink
-                :to="`/departments/${membership.id}`"
-                class="text-sm font-medium text-gray-900 hover:text-primary-600 dark:text-white"
-              >
-                {{ membership.name }}
-              </NuxtLink>
-              <span class="text-xs capitalize text-gray-500 dark:text-gray-400">
-                {{ membership.role }}
-              </span>
-            </li>
-          </ul>
-        </UCard>
-      </section>
-
-      <section id="timeline" class="mt-8 scroll-mt-28">
-        <UCard>
-          <template #header>
-            <div class="flex flex-wrap items-center justify-between gap-2">
-              <h2 class="text-base font-semibold" tabindex="-1">Full timeline</h2>
-              <span class="text-xs text-gray-500 dark:text-gray-400">
-                {{ filteredTimeline.length }} of {{ person.timeline.length }} events
-              </span>
-            </div>
-            <div
-              class="mt-3 flex flex-wrap gap-1"
-              role="group"
-              aria-label="Filter timeline"
-            >
-              <UButton
-                v-for="filter in timelineFilters"
-                :key="filter.id"
-                size="xs"
-                :color="timelineFilter === filter.id ? 'primary' : 'neutral'"
-                :variant="timelineFilter === filter.id ? 'solid' : 'ghost'"
-                :label="filter.label"
-                :aria-pressed="timelineFilter === filter.id"
-                @click="timelineFilter = filter.id"
-              />
-            </div>
-          </template>
-          <ActivityList
-            :items="filteredTimeline"
-            empty-title="No activity yet"
-            empty-description="Attendance, event registrations, visitor follow-ups and welfare cases will appear here."
-          />
-        </UCard>
-      </section>
+      </div>
 
       <PeopleFormModal
         v-model:open="showEdit"
