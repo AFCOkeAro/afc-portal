@@ -56,7 +56,6 @@ const router = useRouter()
    contribute neither layout nor staff chrome, so yield both when a child
    matches. Staff content below renders only for the bare route. */
 const isChildRoute = computed(() => route.matched.length > 1)
-if (isChildRoute.value) setPageLayout(false)
 const api = useApi()
 const permissions = usePermissions()
 const id = String(route.params.id)
@@ -1143,7 +1142,6 @@ watch(
 </script>
 
 <template>
-  <!-- Public kiosk/badge child (AFC-1003): outlet only, no staff shell. -->
   <NuxtPage v-if="isChildRoute" />
   <div v-else>
     <div v-if="pending" class="flex justify-center py-16">

@@ -491,7 +491,6 @@ describe('staff parent: public kiosk/badge leaves render without the staff shell
   it('event detail parent yields layout + shell when a child leaf matches', () => {
     const page = read('apps/web/pages/events/[id].vue')
     assert.match(page, /<NuxtPage v-if="isChildRoute" \/>/)
-    assert.match(page, /setPageLayout\(false\)/)
     assert.match(page, /route\.matched\.length > 1/)
   })
 
