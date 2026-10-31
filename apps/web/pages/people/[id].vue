@@ -568,7 +568,8 @@ async function toggleStatus(): Promise<void> {
               <div class="min-w-0">
                 <h1 class="text-xl font-semibold leading-tight">{{ displayName }}</h1>
                 <p class="mt-0.5 text-sm text-gray-500 capitalize dark:text-gray-400">
-                  {{ person.membership_status.replace(/_/g, ' ') }} · {{ person.branch_name || 'No branch' }}
+                  {{ person.membership_status.replace(/_/g, ' ') }} ·
+                  {{ person.branch_name || 'No branch' }}
                 </p>
               </div>
               <PermissionGate :collection="COLLECTIONS.people" action="update">
@@ -755,7 +756,11 @@ async function toggleStatus(): Promise<void> {
                       {{ filteredTimeline.length }} of {{ person.timeline.length }} events
                     </span>
                   </div>
-                  <div class="mt-3 flex flex-wrap gap-1" role="group" aria-label="Filter timeline">
+                  <div
+                    class="mt-3 flex flex-wrap gap-1"
+                    role="group"
+                    aria-label="Filter timeline"
+                  >
                     <UButton
                       v-for="filter in timelineFilters"
                       :key="filter.id"
