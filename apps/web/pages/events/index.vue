@@ -45,7 +45,11 @@ const baseQuery = computed(() => ({
   ...(status.value !== 'all' ? { status: status.value } : {}),
 }))
 
-const { data: upcoming, pending: upcomingPending } = await useAsyncData(
+const {
+  data: upcoming,
+  pending: upcomingPending,
+  error: upcomingError,
+} = await useAsyncData(
   'programmes-upcoming',
   () =>
     api.get<Paginated<EventRow>>('/api/events', {
@@ -54,7 +58,11 @@ const { data: upcoming, pending: upcomingPending } = await useAsyncData(
   { watch: [baseQuery] },
 )
 
-const { data: past, pending: pastPending } = await useAsyncData(
+const {
+  data: past,
+  pending: pastPending,
+  error: pastError,
+} = await useAsyncData(
   'programmes-past',
   () =>
     api.get<Paginated<EventRow>>('/api/events', {
@@ -212,6 +220,9 @@ async function refreshAll(): Promise<void> {
     refreshNuxtData('programmes-past'),
   ])
 }
+
+/** Either panel failed to load: the card explains, the sections stand down. */
+const loadError = computed(() => upcomingError.value ?? pastError.value ?? null)
 </script>
 
 <template>
@@ -264,7 +275,19 @@ async function refreshAll(): Promise<void> {
       </div>
     </UCard>
 
-    <div v-if="upcomingPending || pastPending" class="mt-8 flex justify-center py-10">
+    <AfcErrorCard
+      v-if="loadError"
+      class="mt-6"
+      title="Could not load programmes"
+      :cause="loadError.message ?? 'The programme list did not load.'"
+      fix="Check your connection, then retry. Your filters are kept."
+      @retry="refreshAll()"
+    />
+
+    <div
+      v-else-if="upcomingPending || pastPending"
+      class="mt-8 flex justify-center py-10"
+    >
       <UIcon name="i-lucide-loader-circle" class="size-6 animate-spin text-gray-400" />
     </div>
 

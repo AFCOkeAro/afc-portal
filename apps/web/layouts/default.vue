@@ -485,6 +485,10 @@ const menuItems = computed(() => [
         while a preview is active, with a one-click exit. -->
       <ImpersonationBanner />
 
+      <!-- Offline / pending-sync banner (AFC-959 P2): hidden while online
+        with an empty outbox. -->
+      <AfcOfflineBanner />
+
       <main class="min-w-0 flex-1 p-5 lg:p-8">
         <slot />
       </main>
