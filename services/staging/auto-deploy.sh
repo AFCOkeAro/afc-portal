@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 # AFC-820: staging auto-deploy. Runs on CT105 under a systemd timer.
 #
-# Pulls origin/main and, when it moved, stages it: pg_dump first, then only
+# Pulls origin/staging and, when it moved, stages it: pg_dump first, then only
 # the migration files new since the deployed SHA (ON_ERROR_STOP, abort
 # before the build on failure), then the standard rebuild (bump
 # NUXT_PUBLIC_BUILD_SHA, build with the arg, force-recreate) with a
 # SHA-proof health check at the end.
 #
 # Migrations stay human-written and CI-gated; this script only applies what
-# already passed on main. It never touches rollback/ files. If the working
-# tree is dirty, or the deployed SHA is not an ancestor of origin/main, it
+# already passed on staging. It never touches rollback/ files. If the working
+# tree is dirty, or the deployed SHA is not an ancestor of origin/staging, it
 # refuses and a human deploys by hand.
 set -uo pipefail
 
@@ -23,8 +23,8 @@ DB_NAME=afc_portal
 log() { printf '%s %s\n' "$(date -u +%FT%TZ)" "$*"; }
 
 cd "$REPO" || { log "FATAL: cannot cd $REPO"; exit 1; }
-git fetch origin main >/dev/null 2>&1 || { log "FATAL: fetch failed"; exit 1; }
-REMOTE="$(git rev-parse origin/main)"
+git fetch origin staging >/dev/null 2>&1 || { log "FATAL: fetch failed"; exit 1; }
+REMOTE="$(git rev-parse origin/staging)"
 CURRENT="$(sed -n 's/^NUXT_PUBLIC_BUILD_SHA=//p' "$ENV_FILE" | head -1)"
 if [ "$REMOTE" = "$CURRENT" ]; then
   log "staging current at ${REMOTE:0:7}; nothing to do"
@@ -39,7 +39,7 @@ if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
   log "FATAL: working tree dirty; refusing to pull over it"
   exit 1
 fi
-git pull --ff-only origin main >/dev/null 2>&1 || { log "FATAL: pull failed"; exit 1; }
+git checkout -q -B staging "$REMOTE" >/dev/null 2>&1 || { log "FATAL: checkout staging failed"; exit 1; }
 
 # The host .env value feeds BOTH the build arg and the container's runtime
 # value (compose interpolates ${NUXT_PUBLIC_BUILD_SHA} for each), so the
