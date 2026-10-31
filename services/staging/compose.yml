@@ -30,6 +30,10 @@ services:
         NUXT_PUBLIC_BUILD_SHA: ${NUXT_PUBLIC_BUILD_SHA:-}
     image: ${WEB_IMAGE:-afc-web:staging}
     restart: unless-stopped
+    # Zero-downtime staging deploys: SIGTERM must drain in-flight
+    # requests (notably the Directus refresh reseal) instead of
+    # cutting them. Caddy retries while the replacement boots.
+    stop_grace_period: 60s
     environment:
       # Staging serves the real auth path stub-OFF. See .env.example.
       NUXT_STUB_AUTH: ${NUXT_STUB_AUTH:-false}
