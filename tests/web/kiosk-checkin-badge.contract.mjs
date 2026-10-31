@@ -108,6 +108,7 @@ const KIOSK = 'apps/web/pages/events/[id]/kiosk.vue'
 const BADGE = 'apps/web/pages/events/[id]/badge.vue'
 const BADGE_CMP = 'apps/web/components/KioskBadge.vue'
 const OPS = 'docs/kiosk-badge-ops.md'
+const GUARD = 'apps/web/middleware/auth.global.ts'
 
 describe('kiosk gate: children and unconsented minors refuse, nothing recorded', () => {
   const src = codeOf(HELPER)
@@ -441,5 +442,40 @@ describe('design tokens: no hard-coded hex in new interface files', () => {
       read('apps/web/nuxt.config.ts'),
       /design-system\/tokens\/afc-tokens\.css/,
     )
+  })
+})
+
+describe('auth guard: kiosk + badge public, event detail stays guarded (AFC-999)', () => {
+  const src = read(GUARD)
+  const bare = codeOf(GUARD)
+  /* Mirror of isPublic() in apps/web/middleware/auth.global.ts. */
+  const PUBLIC_ROUTES = ['/', '/login', '/register', '/p', '/programmes']
+  const KIOSK_PUBLIC_RE = /^\/events\/[^/]+\/(kiosk|badge)(\/|$)/
+  const isPublic = (path) =>
+    PUBLIC_ROUTES.some((route) => path === route || path.startsWith(`${route}/`)) ||
+    KIOSK_PUBLIC_RE.test(path)
+
+  it('pins the narrow kiosk/badge prefix check beside the named list', () => {
+    assert.match(src, /PUBLIC_ROUTES/)
+    assert.match(bare, /kiosk\|badge/)
+    assert.match(src, /\/events\/[^/]+/)
+  })
+
+  it('does NOT blanket-open /events/ — only the two leaves', () => {
+    assert.doesNotMatch(bare, /'\/events'/)
+    assert.match(bare, /KIOSK_PUBLIC_RE/)
+  })
+
+  it('unauthenticated kiosk and badge leaves pass isPublic (no /login redirect)', () => {
+    for (const p of ['/events/e9/kiosk', '/events/e9/kiosk/', '/events/e9/badge', '/events/e9/badge/']) {
+      assert.equal(isPublic(p), true, `${p} must be public`)
+    }
+    assert.equal(isPublic('/events/e9/kiosk/extra'), true, 'nested kiosk leaf stays public')
+  })
+
+  it('bare /events/<id> and /events still redirect (stay guarded)', () => {
+    for (const p of ['/events', '/events/', '/events/e9', '/events/e9/']) {
+      assert.equal(isPublic(p), false, `${p} must stay guarded`)
+    }
   })
 })
