@@ -12,14 +12,21 @@ export default defineEventHandler(async (event) => {
     limit: query.limit ?? 25,
     sort: query.sort ?? '-meeting_date',
   })
-  const paging = parsed.success ? parsed.data : { page: 1, limit: 25 as number, sort: '-meeting_date' }
+  const paging = parsed.success
+    ? parsed.data
+    : { page: 1, limit: 25 as number, sort: '-meeting_date' }
   logScopedQuery(scope, 'minutes.list', {})
 
-  const { data, meta } = await listItems<Record<string, unknown>>(event, scope, 'office_minutes', {
-    filter: { ...officeBranchScope(scope) },
-    page: paging.page,
-    limit: paging.limit,
-    sort: paging.sort,
-  })
+  const { data, meta } = await listItems<Record<string, unknown>>(
+    event,
+    scope,
+    'office_minutes',
+    {
+      filter: { ...officeBranchScope(scope) },
+      page: paging.page,
+      limit: paging.limit,
+      sort: paging.sort,
+    },
+  )
   return { data, meta }
 })

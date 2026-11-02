@@ -1,4 +1,11 @@
-import { assertUuidParam, findScopedItem, getPortalScope, requireCan, scopeFilter, updateItem } from '../../utils/portal'
+import {
+  assertUuidParam,
+  findScopedItem,
+  getPortalScope,
+  requireCan,
+  scopeFilter,
+  updateItem,
+} from '../../utils/portal'
 import { writeOfficeAudit } from '../../utils/office'
 
 const ALLOWED = new Set(['draft', 'review', 'accepted'])
@@ -8,12 +15,22 @@ export default defineEventHandler(async (event) => {
   requireCan(scope, 'office_minutes', 'update')
 
   const id = assertUuidParam(getRouterParam(event, 'id'), 'minutes', 'invalid_minutes_id')
-  await findScopedItem(event, scope, 'office_minutes', id, { fields: ['id', 'status'], scope: scopeFilter(scope) })
+  await findScopedItem(event, scope, 'office_minutes', id, {
+    fields: ['id', 'status'],
+    scope: scopeFilter(scope),
+  })
 
   const body = await readBody(event)
   const status = typeof body?.status === 'string' ? body.status.toLowerCase() : ''
   if (!ALLOWED.has(status)) {
-    throw createError({ statusCode: 400, statusMessage: 'Invalid status', data: { code: 'validation_error', fields: { status: 'Must be draft, review, or accepted' } } })
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'Invalid status',
+      data: {
+        code: 'validation_error',
+        fields: { status: 'Must be draft, review, or accepted' },
+      },
+    })
   }
 
   const now = new Date().toISOString()

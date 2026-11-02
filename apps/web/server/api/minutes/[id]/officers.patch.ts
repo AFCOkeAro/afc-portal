@@ -1,14 +1,35 @@
-import { assertUuidParam, createItem, findScopedItem, getPortalScope, listItems, requireCan, scopeFilter, updateItem } from '../../utils/portal'
+import {
+  assertUuidParam,
+  createItem,
+  findScopedItem,
+  getPortalScope,
+  listItems,
+  requireCan,
+  scopeFilter,
+  updateItem,
+} from '../../utils/portal'
 import { writeOfficeAudit } from '../../utils/office'
 
-const ROLES = ['chairman', 'opening_prayer', 'closing_prayer', 'minutes_read_by', 'minutes_moved_by', 'minutes_seconded_by', 'adjourn_moved_by', 'adjourn_seconded_by']
+const ROLES = [
+  'chairman',
+  'opening_prayer',
+  'closing_prayer',
+  'minutes_read_by',
+  'minutes_moved_by',
+  'minutes_seconded_by',
+  'adjourn_moved_by',
+  'adjourn_seconded_by',
+]
 
 export default defineEventHandler(async (event) => {
   const scope = await getPortalScope(event)
   requireCan(scope, 'office_minutes', 'update')
 
   const id = assertUuidParam(getRouterParam(event, 'id'), 'minutes', 'invalid_minutes_id')
-  await findScopedItem(event, scope, 'office_minutes', id, { fields: ['id'], scope: scopeFilter(scope) })
+  await findScopedItem(event, scope, 'office_minutes', id, {
+    fields: ['id'],
+    scope: scopeFilter(scope),
+  })
 
   const body = await readBody(event)
   const now = new Date().toISOString()
@@ -22,12 +43,19 @@ export default defineEventHandler(async (event) => {
   await updateItem(event, scope, 'office_minutes', id, patch)
 
   // Auto-add officers to attendees (deduplicate)
-  const attendees = await listItems<Record<string, unknown>>(event, scope, 'minutes_attendees', {
-    filter: { minute: { _eq: id } },
-    limit: 500,
-  })
+  const attendees = await listItems<Record<string, unknown>>(
+    event,
+    scope,
+    'minutes_attendees',
+    {
+      filter: { minute: { _eq: id } },
+      limit: 500,
+    },
+  )
   const existing = new Set(
-    attendees.data.map((row) => String(row.person ?? row.attendee_user ?? '')).filter(Boolean),
+    attendees.data
+      .map((row) => String(row.person ?? row.attendee_user ?? ''))
+      .filter(Boolean),
   )
 
   for (const role of ROLES) {
