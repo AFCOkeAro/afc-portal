@@ -10,7 +10,7 @@ export default defineEventHandler(async (event) => {
 
   await findScopedItem(event, scope, 'office_minutes', id, { fields: ['id'], scope: scopeFilter(scope) })
 
-  const parsed = minutesFormSchema.partial().safeParse(await readBody(event))
+  const parsed = minutesFormSchema.partial?.().safeParse(await readBody(event))
   if (!parsed.success) throwValidation(parsed.error)
   const form = parsed.data
 
