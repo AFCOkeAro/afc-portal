@@ -146,7 +146,7 @@ export const roleMatrix: Record<string, RoleRow> = {
     none: [NONE, 'none', 'none'],
     zone_admin: [R, 'own_zone', 'R'],
   },
-} as Record<string, RoleRow>
+} as any
 
 export function capabilitiesForRole(role: string): string[] {
   const r = roleMatrix as any
