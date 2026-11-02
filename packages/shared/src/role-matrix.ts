@@ -146,16 +146,7 @@ export const roleMatrix: Record<string, RoleRow> = {
     none: [NONE, 'none', 'none'],
     zone_admin: [R, 'own_zone', 'R'],
   },
-  [COLLECTIONS.announcements]: {
-    super_admin: [ALL, 'all', 'ALL'],
-    area_admin: [ALL, 'all', 'ALL'],
-    branch_admin: [CRU, 'own_branch', 'CRU (own)'],
-    department_leader: [CRU, 'own_department', 'CRU (dept)'],
-    volunteer: [NONE, 'none', 'none'],
-    none: [NONE, 'none', 'none'],
-    zone_admin: [CRU, 'own_zone', 'CRU (zone)'],
-  } as RoleRow,
-} as any
+} as Record<string, RoleRow>
 
 export function capabilitiesForRole(role: string): string[] {
   const r = roleMatrix as any
