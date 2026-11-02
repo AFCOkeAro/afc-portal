@@ -23,3 +23,10 @@ export const minutesFormSchema = z
   })
 
 export type MinutesForm = z.infer<typeof minutesFormSchema>
+
+
+export const TASK_STATUSES = ['todo', 'in_progress', 'blocked', 'done', 'cancelled'] as const
+export type TaskStatus = (typeof TASK_STATUSES)[number]
+
+export const TASK_PRIORITIES = ['low', 'normal', 'high', 'urgent'] as const
+export type TaskPriority = (typeof TASK_PRIORITIES)[number]
