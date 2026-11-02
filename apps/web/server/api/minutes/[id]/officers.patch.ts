@@ -7,8 +7,8 @@ import {
   requireCan,
   scopeFilter,
   updateItem,
-} from '../../utils/portal'
-import { writeOfficeAudit } from '../../utils/office'
+} from '../../../utils/portal'
+import { writeOfficeAudit } from '../../../utils/office'
 
 const ROLES = [
   'chairman',
@@ -54,7 +54,7 @@ export default defineEventHandler(async (event) => {
   )
   const existing = new Set(
     attendees.data
-      .map((row) => String(row.person ?? row.attendee_user ?? ''))
+      .map((row: any) => String(row.person ?? row.attendee_user ?? ''))
       .filter(Boolean),
   )
 

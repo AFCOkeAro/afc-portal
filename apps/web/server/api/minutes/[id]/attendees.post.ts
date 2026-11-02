@@ -5,8 +5,8 @@ import {
   getPortalScope,
   requireCan,
   scopeFilter,
-} from '../../utils/portal'
-import { writeOfficeAudit } from '../../utils/office'
+} from '../../../utils/portal'
+import { writeOfficeAudit } from '../../../utils/office'
 
 export default defineEventHandler(async (event) => {
   const scope = await getPortalScope(event)

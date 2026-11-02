@@ -5,8 +5,8 @@ import {
   requireCan,
   scopeFilter,
   updateItem,
-} from '../../utils/portal'
-import { writeOfficeAudit } from '../../utils/office'
+} from '../../../utils/portal'
+import { writeOfficeAudit } from '../../../utils/office'
 
 const ALLOWED = new Set(['draft', 'review', 'accepted'])
 
