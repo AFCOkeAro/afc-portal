@@ -1,4 +1,9 @@
-import { listQuerySchema } from '@afc/shared'
+import { z } from 'zod'
+const listQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(25),
+  sort: z.string().optional(),
+})
 import { getPortalScope, listItems, requireCan } from '../../utils/portal'
 import { logScopedQuery, officeBranchScope } from '../../utils/office'
 

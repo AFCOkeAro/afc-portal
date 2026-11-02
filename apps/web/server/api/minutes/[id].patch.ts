@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import { minutesFormSchema } from '@afc/shared'
 import {
   assertUuidParam,
@@ -22,7 +23,14 @@ export default defineEventHandler(async (event) => {
     scope: scopeFilter(scope),
   })
 
-  const parsed = minutesFormSchema.partial?.().safeParse(await readBody(event))
+  const base = (minutesFormSchema as any).innerType
+    ? (minutesFormSchema as any).innerType()
+    : minutesFormSchema
+  const schema =
+    typeof (base as any).partial === 'function'
+      ? (base as any).partial()
+      : z.object({}).passthrough()
+  const parsed = schema.safeParse(await readBody(event))
   if (!parsed.success) throwValidation(parsed.error)
   const form = parsed.data
 
