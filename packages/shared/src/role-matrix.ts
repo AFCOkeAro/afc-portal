@@ -7,7 +7,15 @@ export const R = ['read'] as const
 export const NONE: readonly [] = []
 
 type Action = 'create' | 'read' | 'update' | 'delete'
-type Scope = 'all' | 'own_branch' | 'own_zone' | 'assigned_branches' | 'assigned_departments' | 'own' | 'public_only' | 'none'
+type Scope =
+  | 'all'
+  | 'own_branch'
+  | 'own_zone'
+  | 'assigned_branches'
+  | 'assigned_departments'
+  | 'own'
+  | 'public_only'
+  | 'none'
 
 type RoleRow = {
   super_admin: readonly [readonly Action[], Scope, string]

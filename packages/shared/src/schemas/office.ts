@@ -2,7 +2,8 @@ import { z } from 'zod'
 
 const dateSchema = z.string().min(1)
 const timeSchema = z.string().min(1).optional()
-const optionalText = (max: number) => z.string().trim().max(max).optional().or(z.literal(''))
+const optionalText = (max: number) =>
+  z.string().trim().max(max).optional().or(z.literal(''))
 const optionalNote = () => z.string().max(4000).optional().or(z.literal(''))
 const branchRef = z.string().uuid().optional().or(z.literal(''))
 
@@ -24,8 +25,13 @@ export const minutesFormSchema = z
 
 export type MinutesForm = z.infer<typeof minutesFormSchema>
 
-
-export const TASK_STATUSES = ['todo', 'in_progress', 'blocked', 'done', 'cancelled'] as const
+export const TASK_STATUSES = [
+  'todo',
+  'in_progress',
+  'blocked',
+  'done',
+  'cancelled',
+] as const
 export type TaskStatus = (typeof TASK_STATUSES)[number]
 
 export const TASK_PRIORITIES = ['low', 'normal', 'high', 'urgent'] as const
