@@ -125,4 +125,3 @@ const visibleCards = computed(() =>
     </div>
   </div>
 </template>
-

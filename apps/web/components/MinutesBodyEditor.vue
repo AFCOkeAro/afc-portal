@@ -16,7 +16,9 @@ const mode = ref<'raw' | 'preview'>('raw')
 const previewHtml = computed(() => renderMarkdownSafe(props.modelValue ?? ''))
 
 function surround(before: string, after: string): void {
-  const textarea = document.getElementById(props.textareaId ?? 'minutes-body') as HTMLTextAreaElement | null
+  const textarea = document.getElementById(
+    props.textareaId ?? 'minutes-body',
+  ) as HTMLTextAreaElement | null
   if (!textarea) return
   const start = textarea.selectionStart
   const end = textarea.selectionEnd
@@ -31,7 +33,8 @@ function surround(before: string, after: string): void {
 }
 
 function insertTable(): void {
-  const table = '\n| Column 1 | Column 2 |\n|----------|----------|\n|          |          |\n'
+  const table =
+    '\n| Column 1 | Column 2 |\n|----------|----------|\n|          |          |\n'
   const value = props.modelValue ?? ''
   emit('update:modelValue', value + table)
 }
@@ -46,8 +49,15 @@ function insertLink(): void {
 <template>
   <div>
     <div class="mb-2 flex items-center justify-between">
-      <label :for="textareaId ?? 'minutes-body'" class="text-sm font-medium text-gray-700 dark:text-gray-200">Body</label>
-      <div role="group" class="flex rounded-md border border-gray-200 dark:border-gray-800">
+      <label
+        :for="textareaId ?? 'minutes-body'"
+        class="text-sm font-medium text-gray-700 dark:text-gray-200"
+        >Body</label
+      >
+      <div
+        role="group"
+        class="flex rounded-md border border-gray-200 dark:border-gray-800"
+      >
         <UButton
           size="xs"
           :color="mode === 'raw' ? 'primary' : 'neutral'"
@@ -68,19 +78,101 @@ function insertLink(): void {
     </div>
     <div v-if="mode === 'raw'">
       <div role="toolbar" class="mb-2 flex flex-wrap gap-1">
-        <UButton size="xs" color="neutral" variant="outline" label="B" title="Bold" @click="surround('**', '**')" />
-        <UButton size="xs" color="neutral" variant="outline" label="I" title="Italic" @click="surround('*', '*')" />
-        <UButton size="xs" color="neutral" variant="outline" label="U" title="Underline" @click="surround('++', '++')" />
-        <UButton size="xs" color="neutral" variant="outline" label="S" title="Strikethrough" @click="surround('~~', '~~')" />
-        <UButton size="xs" color="neutral" variant="outline" label="H1" @click="surround('# ', '')" />
-        <UButton size="xs" color="neutral" variant="outline" label="H2" @click="surround('## ', '')" />
-        <UButton size="xs" color="neutral" variant="outline" label="H3" @click="surround('### ', '')" />
-        <UButton size="xs" color="neutral" variant="outline" label="•" @click="surround('- ', '')" />
-        <UButton size="xs" color="neutral" variant="outline" label="1." @click="surround('1. ', '')" />
-        <UButton size="xs" color="neutral" variant="outline" label=">" @click="surround('> ', '')" />
-        <UButton size="xs" color="neutral" variant="outline" label="`</>" @click="surround('`', '`')" />
-        <UButton size="xs" color="neutral" variant="outline" label="Table" @click="insertTable" />
-        <UButton size="xs" color="neutral" variant="outline" label="Link" @click="insertLink" />
+        <UButton
+          size="xs"
+          color="neutral"
+          variant="outline"
+          label="B"
+          title="Bold"
+          @click="surround('**', '**')"
+        />
+        <UButton
+          size="xs"
+          color="neutral"
+          variant="outline"
+          label="I"
+          title="Italic"
+          @click="surround('*', '*')"
+        />
+        <UButton
+          size="xs"
+          color="neutral"
+          variant="outline"
+          label="U"
+          title="Underline"
+          @click="surround('++', '++')"
+        />
+        <UButton
+          size="xs"
+          color="neutral"
+          variant="outline"
+          label="S"
+          title="Strikethrough"
+          @click="surround('~~', '~~')"
+        />
+        <UButton
+          size="xs"
+          color="neutral"
+          variant="outline"
+          label="H1"
+          @click="surround('# ', '')"
+        />
+        <UButton
+          size="xs"
+          color="neutral"
+          variant="outline"
+          label="H2"
+          @click="surround('## ', '')"
+        />
+        <UButton
+          size="xs"
+          color="neutral"
+          variant="outline"
+          label="H3"
+          @click="surround('### ', '')"
+        />
+        <UButton
+          size="xs"
+          color="neutral"
+          variant="outline"
+          label="•"
+          @click="surround('- ', '')"
+        />
+        <UButton
+          size="xs"
+          color="neutral"
+          variant="outline"
+          label="1."
+          @click="surround('1. ', '')"
+        />
+        <UButton
+          size="xs"
+          color="neutral"
+          variant="outline"
+          label=">"
+          @click="surround('> ', '')"
+        />
+        <UButton
+          size="xs"
+          color="neutral"
+          variant="outline"
+          label="`</>"
+          @click="surround('`', '`')"
+        />
+        <UButton
+          size="xs"
+          color="neutral"
+          variant="outline"
+          label="Table"
+          @click="insertTable"
+        />
+        <UButton
+          size="xs"
+          color="neutral"
+          variant="outline"
+          label="Link"
+          @click="insertLink"
+        />
       </div>
       <UTextarea
         :id="textareaId ?? 'minutes-body'"
@@ -91,11 +183,16 @@ function insertLink(): void {
         @update:model-value="emit('update:modelValue', String($event))"
       />
     </div>
-    <div v-else class="min-h-[200px] rounded-md border border-gray-200 p-3 dark:border-gray-800">
+    <div
+      v-else
+      class="min-h-[200px] rounded-md border border-gray-200 p-3 dark:border-gray-800"
+    >
       <!-- eslint-disable-next-line vue/no-v-html -->
       <div v-if="modelValue" class="markdown-body" v-html="previewHtml" />
       <p v-else class="text-sm text-gray-500">Nothing to preview.</p>
     </div>
-    <p v-if="fieldError" class="mt-1 text-sm text-red-600 dark:text-red-400">{{ fieldError }}</p>
+    <p v-if="fieldError" class="mt-1 text-sm text-red-600 dark:text-red-400">
+      {{ fieldError }}
+    </p>
   </div>
 </template>

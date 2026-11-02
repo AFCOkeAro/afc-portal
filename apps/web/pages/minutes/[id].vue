@@ -12,12 +12,24 @@ const id = String(route.params.id)
 const { personOptions, personPending, onPersonSearch } = usePersonSearch()
 const { branchOptions, branchesPending } = useBranchOptions()
 
-const { data, pending, error: loadError, refresh } = await useAsyncData(
+const {
+  data,
+  pending,
+  error: loadError,
+  refresh,
+} = await useAsyncData(
   () => `minutes-${id}`,
-  () => api.get<{ data: Record<string, unknown>; attendees: Record<string, unknown>[]; audit: Record<string, unknown>[] }>(`/api/minutes/${id}`),
+  () =>
+    api.get<{
+      data: Record<string, unknown>
+      attendees: Record<string, unknown>[]
+      audit: Record<string, unknown>[]
+    }>(`/api/minutes/${id}`),
 )
 
-const attendees = computed(() => (data.value?.attendees ?? []) as Record<string, unknown>[])
+const attendees = computed(
+  () => (data.value?.attendees ?? []) as Record<string, unknown>[],
+)
 const person = ref('')
 const error = ref('')
 const addSaving = ref(false)
@@ -45,8 +57,14 @@ function timeRange(row: Record<string, unknown>): string {
   return start || end || '—'
 }
 
-const hasBody = computed(() => typeof data.value?.data?.body === 'string' && String(data.value.data.body).trim().length > 0)
-const bodyHtml = computed(() => (hasBody.value ? renderMarkdownSafe(String(data.value?.data?.body)) : ''))
+const hasBody = computed(
+  () =>
+    typeof data.value?.data?.body === 'string' &&
+    String(data.value.data.body).trim().length > 0,
+)
+const bodyHtml = computed(() =>
+  hasBody.value ? renderMarkdownSafe(String(data.value?.data?.body)) : '',
+)
 
 // Status
 const statusOptions = [
@@ -65,7 +83,8 @@ async function updateStatus() {
     await api.patch(`/api/minutes/${id}/status`, { status: newStatus.value })
     await refresh()
   } catch (cause) {
-    statusError.value = (cause as { message?: string }).message ?? 'Could not update status'
+    statusError.value =
+      (cause as { message?: string }).message ?? 'Could not update status'
   } finally {
     statusSaving.value = false
   }
@@ -109,7 +128,11 @@ function cancelEdit() {
 async function saveEdit() {
   editError.value = ''
   editFieldErrors.value = {}
-  if (editForm.value.start_time && editForm.value.end_time && editForm.value.end_time <= editForm.value.start_time) {
+  if (
+    editForm.value.start_time &&
+    editForm.value.end_time &&
+    editForm.value.end_time <= editForm.value.start_time
+  ) {
     editFieldErrors.value = { end_time: 'The end time must be after the start time' }
     return
   }
@@ -131,7 +154,8 @@ async function saveEdit() {
       editFieldErrors.value = cause.fields
       editError.value = cause.message
     } else {
-      editError.value = (cause as { message?: string }).message ?? 'Could not save changes'
+      editError.value =
+        (cause as { message?: string }).message ?? 'Could not save changes'
     }
   } finally {
     editSaving.value = false
@@ -159,7 +183,8 @@ async function saveOfficers() {
     await api.patch(`/api/minutes/${id}/officers`, officers.value)
     await refresh()
   } catch (cause) {
-    officersError.value = (cause as { message?: string }).message ?? 'Could not save officers'
+    officersError.value =
+      (cause as { message?: string }).message ?? 'Could not save officers'
   } finally {
     officersSaving.value = false
   }
@@ -168,9 +193,19 @@ async function saveOfficers() {
 
 <template>
   <div>
-    <PageHeader title="Minutes detail" description="Read-only view; attendees managed below.">
+    <PageHeader
+      title="Minutes detail"
+      description="Read-only view; attendees managed below."
+    >
       <template #actions>
-        <UButton color="neutral" variant="ghost" size="sm" icon="i-lucide-arrow-left" label="Minutes" to="/minutes" />
+        <UButton
+          color="neutral"
+          variant="ghost"
+          size="sm"
+          icon="i-lucide-arrow-left"
+          label="Minutes"
+          to="/minutes"
+        />
       </template>
     </PageHeader>
 
@@ -184,18 +219,39 @@ async function saveOfficers() {
           <template #header>
             <div class="flex items-center justify-between">
               <h2 class="font-semibold">Edit minutes</h2>
-              <UButton v-if="!editing" size="xs" label="Edit" icon="i-lucide-pencil" @click="startEdit" />
+              <UButton
+                v-if="!editing"
+                size="xs"
+                label="Edit"
+                icon="i-lucide-pencil"
+                @click="startEdit"
+              />
             </div>
           </template>
           <div v-if="editing" class="grid gap-4 sm:grid-cols-2">
-            <UFormField label="Title" required class="sm:col-span-2" :error="editFieldErrors.title">
+            <UFormField
+              label="Title"
+              required
+              class="sm:col-span-2"
+              :error="editFieldErrors.title"
+            >
               <UInput v-model="editForm.title" class="w-full" />
             </UFormField>
-            <UFormField label="Meeting date" required :error="editFieldErrors.meeting_date">
+            <UFormField
+              label="Meeting date"
+              required
+              :error="editFieldErrors.meeting_date"
+            >
               <UInput v-model="editForm.meeting_date" type="date" class="w-full" />
             </UFormField>
             <UFormField label="Branch" :error="editFieldErrors.branch">
-              <EntitySelect v-model="editForm.branch" :items="branchOptions" placeholder="Select branch…" :loading="branchesPending" class="w-full" />
+              <EntitySelect
+                v-model="editForm.branch"
+                :items="branchOptions"
+                placeholder="Select branch…"
+                :loading="branchesPending"
+                class="w-full"
+              />
             </UFormField>
             <UFormField label="Start time" :error="editFieldErrors.start_time">
               <UInput v-model="editForm.start_time" type="time" class="w-full" />
@@ -203,17 +259,44 @@ async function saveOfficers() {
             <UFormField label="End time" :error="editFieldErrors.end_time">
               <UInput v-model="editForm.end_time" type="time" class="w-full" />
             </UFormField>
-            <UFormField label="Location" class="sm:col-span-2" :error="editFieldErrors.location">
+            <UFormField
+              label="Location"
+              class="sm:col-span-2"
+              :error="editFieldErrors.location"
+            >
               <UInput v-model="editForm.location" class="w-full" />
             </UFormField>
             <div class="sm:col-span-2">
-              <MinutesBodyEditor v-model="editForm.body" textarea-id="minutes-edit-body" :field-error="editFieldErrors.body" />
+              <MinutesBodyEditor
+                v-model="editForm.body"
+                textarea-id="minutes-edit-body"
+                :field-error="editFieldErrors.body"
+              />
             </div>
           </div>
-          <UAlert v-if="editError" class="mt-4" color="error" variant="subtle" title="Could not save the minutes" :description="editError" />
+          <UAlert
+            v-if="editError"
+            class="mt-4"
+            color="error"
+            variant="subtle"
+            title="Could not save the minutes"
+            :description="editError"
+          />
           <div v-if="editing" class="mt-4 flex gap-2">
-            <UButton label="Save changes" icon="i-lucide-check" :loading="editSaving" :disabled="editSaving" @click="saveEdit" />
-            <UButton label="Cancel" color="neutral" variant="ghost" :disabled="editSaving" @click="cancelEdit" />
+            <UButton
+              label="Save changes"
+              icon="i-lucide-check"
+              :loading="editSaving"
+              :disabled="editSaving"
+              @click="saveEdit"
+            />
+            <UButton
+              label="Cancel"
+              color="neutral"
+              variant="ghost"
+              :disabled="editSaving"
+              @click="cancelEdit"
+            />
           </div>
         </UCard>
       </PermissionGate>
@@ -225,10 +308,20 @@ async function saveOfficers() {
         <PermissionGate :collection="COLLECTIONS.officeMinutes" action="update">
           <div class="flex items-center gap-2">
             <USelect v-model="newStatus" :items="statusOptions" class="w-48" />
-            <UButton label="Update status" :loading="statusSaving" @click="updateStatus" />
+            <UButton
+              label="Update status"
+              :loading="statusSaving"
+              @click="updateStatus"
+            />
           </div>
         </PermissionGate>
-        <UAlert v-if="statusError" class="mt-3" color="error" variant="subtle" :description="statusError" />
+        <UAlert
+          v-if="statusError"
+          class="mt-3"
+          color="error"
+          variant="subtle"
+          :description="statusError"
+        />
       </UCard>
 
       <UCard>
@@ -238,36 +331,105 @@ async function saveOfficers() {
         <PermissionGate :collection="COLLECTIONS.officeMinutes" action="update">
           <div class="grid gap-3 sm:grid-cols-2">
             <UFormField label="Chairman">
-              <EntitySelect v-model="officers.chairman" :items="personOptions" placeholder="Select person…" server-search :loading="personPending" @update:search-term="onPersonSearch" />
+              <EntitySelect
+                v-model="officers.chairman"
+                :items="personOptions"
+                placeholder="Select person…"
+                server-search
+                :loading="personPending"
+                @update:search-term="onPersonSearch"
+              />
             </UFormField>
             <UFormField label="Opening prayer">
-              <EntitySelect v-model="officers.opening_prayer" :items="personOptions" placeholder="Select person…" server-search :loading="personPending" @update:search-term="onPersonSearch" />
+              <EntitySelect
+                v-model="officers.opening_prayer"
+                :items="personOptions"
+                placeholder="Select person…"
+                server-search
+                :loading="personPending"
+                @update:search-term="onPersonSearch"
+              />
             </UFormField>
             <UFormField label="Closing prayer">
-              <EntitySelect v-model="officers.closing_prayer" :items="personOptions" placeholder="Select person…" server-search :loading="personPending" @update:search-term="onPersonSearch" />
+              <EntitySelect
+                v-model="officers.closing_prayer"
+                :items="personOptions"
+                placeholder="Select person…"
+                server-search
+                :loading="personPending"
+                @update:search-term="onPersonSearch"
+              />
             </UFormField>
             <UFormField label="Reading of minutes">
-              <EntitySelect v-model="officers.minutes_read_by" :items="personOptions" placeholder="Select person…" server-search :loading="personPending" @update:search-term="onPersonSearch" />
+              <EntitySelect
+                v-model="officers.minutes_read_by"
+                :items="personOptions"
+                placeholder="Select person…"
+                server-search
+                :loading="personPending"
+                @update:search-term="onPersonSearch"
+              />
             </UFormField>
             <UFormField label="Minutes acceptance - Moved by">
-              <EntitySelect v-model="officers.minutes_moved_by" :items="personOptions" placeholder="Select person…" server-search :loading="personPending" @update:search-term="onPersonSearch" />
+              <EntitySelect
+                v-model="officers.minutes_moved_by"
+                :items="personOptions"
+                placeholder="Select person…"
+                server-search
+                :loading="personPending"
+                @update:search-term="onPersonSearch"
+              />
             </UFormField>
             <UFormField label="Minutes acceptance - Seconded by">
-              <EntitySelect v-model="officers.minutes_seconded_by" :items="personOptions" placeholder="Select person…" server-search :loading="personPending" @update:search-term="onPersonSearch" />
+              <EntitySelect
+                v-model="officers.minutes_seconded_by"
+                :items="personOptions"
+                placeholder="Select person…"
+                server-search
+                :loading="personPending"
+                @update:search-term="onPersonSearch"
+              />
             </UFormField>
             <UFormField label="Motion to adjourn - Moved by">
-              <EntitySelect v-model="officers.adjourn_moved_by" :items="personOptions" placeholder="Select person…" server-search :loading="personPending" @update:search-term="onPersonSearch" />
+              <EntitySelect
+                v-model="officers.adjourn_moved_by"
+                :items="personOptions"
+                placeholder="Select person…"
+                server-search
+                :loading="personPending"
+                @update:search-term="onPersonSearch"
+              />
             </UFormField>
             <UFormField label="Motion to adjourn - Seconded by">
-              <EntitySelect v-model="officers.adjourn_seconded_by" :items="personOptions" placeholder="Select person…" server-search :loading="personPending" @update:search-term="onPersonSearch" />
+              <EntitySelect
+                v-model="officers.adjourn_seconded_by"
+                :items="personOptions"
+                placeholder="Select person…"
+                server-search
+                :loading="personPending"
+                @update:search-term="onPersonSearch"
+              />
             </UFormField>
           </div>
-          <p class="mt-2 text-xs text-gray-500">Selected officers will be automatically added to the attendees list.</p>
+          <p class="mt-2 text-xs text-gray-500">
+            Selected officers will be automatically added to the attendees list.
+          </p>
           <div class="mt-3">
-            <UButton label="Save officers" icon="i-lucide-check" :loading="officersSaving" @click="saveOfficers" />
+            <UButton
+              label="Save officers"
+              icon="i-lucide-check"
+              :loading="officersSaving"
+              @click="saveOfficers"
+            />
           </div>
         </PermissionGate>
-        <UAlert v-if="officersError" class="mt-3" color="error" variant="subtle" :description="officersError" />
+        <UAlert
+          v-if="officersError"
+          class="mt-3"
+          color="error"
+          variant="subtle"
+          :description="officersError"
+        />
       </UCard>
 
       <UCard>
@@ -310,8 +472,15 @@ async function saveOfficers() {
         <template #header>
           <h2 class="font-semibold">Attendees ({{ attendees.length }})</h2>
         </template>
-        <ul v-if="attendees.length > 0" class="divide-y divide-gray-100 text-sm dark:divide-gray-800">
-          <li v-for="row in attendees" :key="String(row.id)" class="py-1.5 text-gray-600 dark:text-gray-300">
+        <ul
+          v-if="attendees.length > 0"
+          class="divide-y divide-gray-100 text-sm dark:divide-gray-800"
+        >
+          <li
+            v-for="row in attendees"
+            :key="String(row.id)"
+            class="py-1.5 text-gray-600 dark:text-gray-300"
+          >
             {{ row.person ?? row.attendee_user ?? row.id }}
           </li>
         </ul>
@@ -328,10 +497,24 @@ async function saveOfficers() {
               aria-label="Person to add as attendee"
               @update:search-term="onPersonSearch"
             />
-            <UButton label="Add attendee" color="neutral" variant="outline" icon="i-lucide-user-plus" :loading="addSaving" @click="addAttendee" />
+            <UButton
+              label="Add attendee"
+              color="neutral"
+              variant="outline"
+              icon="i-lucide-user-plus"
+              :loading="addSaving"
+              @click="addAttendee"
+            />
           </div>
         </PermissionGate>
-        <UAlert v-if="error" class="mt-3" color="error" variant="subtle" title="Could not add the attendee" :description="error" />
+        <UAlert
+          v-if="error"
+          class="mt-3"
+          color="error"
+          variant="subtle"
+          title="Could not add the attendee"
+          :description="error"
+        />
       </UCard>
 
       <UCard>
@@ -349,21 +532,62 @@ async function saveOfficers() {
       </UCard>
     </div>
 
-    <EmptyState v-else-if="!loadError" title="Minutes not found" description="They do not exist or are outside your scope." />
+    <EmptyState
+      v-else-if="!loadError"
+      title="Minutes not found"
+      description="They do not exist or are outside your scope."
+    />
   </div>
 </template>
 
 <style scoped>
-.markdown-body :deep(h1), .markdown-body :deep(h2), .markdown-body :deep(h3) { font-weight: 700; margin: 0.75rem 0 0.375rem; }
-.markdown-body :deep(h1) { font-size: 1.25rem; }
-.markdown-body :deep(h2) { font-size: 1.125rem; }
-.markdown-body :deep(h3) { font-size: 1rem; }
-.markdown-body :deep(p) { margin: 0.375rem 0; }
-.markdown-body :deep(ul), .markdown-body :deep(ol) { margin: 0.375rem 0 0.375rem 1.25rem; }
-.markdown-body :deep(ul) { list-style: disc; }
-.markdown-body :deep(ol) { list-style: decimal; }
-.markdown-body :deep(blockquote) { border-left: 3px solid var(--ui-border-accented); padding-left: 0.75rem; color: var(--ui-text-muted); margin: 0.5rem 0; }
-.markdown-body :deep(table) { width: 100%; border-collapse: collapse; margin: 0.5rem 0; font-size: 0.875rem; }
-.markdown-body :deep(th), .markdown-body :deep(td) { border: 1px solid var(--ui-border); padding: 0.375rem 0.625rem; text-align: left; }
-.markdown-body :deep(th) { font-weight: 600; }
+.markdown-body :deep(h1),
+.markdown-body :deep(h2),
+.markdown-body :deep(h3) {
+  font-weight: 700;
+  margin: 0.75rem 0 0.375rem;
+}
+.markdown-body :deep(h1) {
+  font-size: 1.25rem;
+}
+.markdown-body :deep(h2) {
+  font-size: 1.125rem;
+}
+.markdown-body :deep(h3) {
+  font-size: 1rem;
+}
+.markdown-body :deep(p) {
+  margin: 0.375rem 0;
+}
+.markdown-body :deep(ul),
+.markdown-body :deep(ol) {
+  margin: 0.375rem 0 0.375rem 1.25rem;
+}
+.markdown-body :deep(ul) {
+  list-style: disc;
+}
+.markdown-body :deep(ol) {
+  list-style: decimal;
+}
+.markdown-body :deep(blockquote) {
+  border-left: 3px solid var(--ui-border-accented);
+  padding-left: 0.75rem;
+  color: var(--ui-text-muted);
+  margin: 0.5rem 0;
+}
+.markdown-body :deep(table) {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.5rem 0;
+  font-size: 0.875rem;
+}
+.markdown-body :deep(th),
+.markdown-body :deep(td) {
+  border: 1px solid var(--ui-border);
+  padding: 0.375rem 0.625rem;
+  text-align: left;
+}
+.markdown-body :deep(th) {
+  font-weight: 600;
+}
 </style>
