@@ -1,5 +1,14 @@
 import { minutesFormSchema } from '@afc/shared'
-import { assertUuidParam, findScopedItem, getPortalScope, requireCan, resolveBranch, scopeFilter, throwValidation, updateItem } from '../../utils/portal'
+import {
+  assertUuidParam,
+  findScopedItem,
+  getPortalScope,
+  requireCan,
+  resolveBranch,
+  scopeFilter,
+  throwValidation,
+  updateItem,
+} from '../../utils/portal'
 import { writeOfficeAudit } from '../../utils/office'
 
 export default defineEventHandler(async (event) => {
@@ -8,7 +17,10 @@ export default defineEventHandler(async (event) => {
 
   const id = assertUuidParam(getRouterParam(event, 'id'), 'minutes', 'invalid_minutes_id')
 
-  await findScopedItem(event, scope, 'office_minutes', id, { fields: ['id'], scope: scopeFilter(scope) })
+  await findScopedItem(event, scope, 'office_minutes', id, {
+    fields: ['id'],
+    scope: scopeFilter(scope),
+  })
 
   const parsed = minutesFormSchema.partial?.().safeParse(await readBody(event))
   if (!parsed.success) throwValidation(parsed.error)
@@ -26,17 +38,31 @@ export default defineEventHandler(async (event) => {
   if (form.branch !== undefined) {
     const branch = resolveBranch(scope, form.branch)
     if (!branch) {
-      throw createError({ statusCode: 400, statusMessage: 'A branch is required', data: { code: 'validation_error', fields: { branch: 'Choose a branch' } } })
+      throw createError({
+        statusCode: 400,
+        statusMessage: 'A branch is required',
+        data: { code: 'validation_error', fields: { branch: 'Choose a branch' } },
+      })
     }
     patch.branch = branch
   }
 
-  const updated = await updateItem<Record<string, unknown>>(event, scope, 'office_minutes', id, patch)
+  const updated = await updateItem<Record<string, unknown>>(
+    event,
+    scope,
+    'office_minutes',
+    id,
+    patch,
+  )
 
   await writeOfficeAudit(event, scope, 'office_minute_events', {
     minute: id,
     event_type: 'updated',
-    detail: `Minutes edited (${Object.keys(patch).filter((k) => k !== 'updated_at').join(', ') || 'no fields'})`,
+    detail: `Minutes edited (${
+      Object.keys(patch)
+        .filter((k) => k !== 'updated_at')
+        .join(', ') || 'no fields'
+    })`,
     actor_user: scope.session.user.id,
     created_at: now,
   })
