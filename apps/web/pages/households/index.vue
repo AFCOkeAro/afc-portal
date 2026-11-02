@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { COLLECTIONS } from '@afc/shared'
 import type { BranchSummary, HouseholdRow, Paginated } from '~/types/portal'
 
 definePageMeta({ middleware: 'staff' })
