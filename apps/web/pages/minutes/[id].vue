@@ -1,51 +1,43 @@
 <script setup lang="ts">
-import { COLLECTIONS, renderMarkdownSafe } from '@afc/shared'
+import { COLLECTIONS } from '@afc/shared'
+import { renderMarkdownSafe } from '@afc/shared'
 import { ApiRequestError } from '~/composables/useApi'
 
 definePageMeta({ middleware: 'staff' })
 
-const api = useApi()
 const route = useRoute()
+const api = useApi()
 const id = String(route.params.id)
-const person = ref('')
+
 const { personOptions, personPending, onPersonSearch } = usePersonSearch()
 const { branchOptions, branchesPending } = useBranchOptions()
-const error = ref('')
 
-const {
-  data,
-  pending,
-  error: loadError,
-  refresh,
-} = await useAsyncData(`minutes-${id}`, () =>
-  api.get<{
-    data: Record<string, unknown>
-    attendees: Record<string, unknown>[]
-    audit: Record<string, unknown>[]
-  }>(`/api/minutes/${id}`),
+const { data, pending, error: loadError, refresh } = await useAsyncData(
+  () => `minutes-${id}`,
+  () => api.get<{ data: Record<string, unknown>; attendees: Record<string, unknown>[]; audit: Record<string, unknown>[] }>(`/api/minutes/${id}`),
 )
+
+const attendees = computed(() => (data.value?.attendees ?? []) as Record<string, unknown>[])
+const person = ref('')
+const error = ref('')
+const addSaving = ref(false)
 
 async function addAttendee() {
   error.value = ''
+  const pid = person.value.trim()
+  if (!pid) return
+  addSaving.value = true
   try {
-    await api.post(`/api/minutes/${id}/attendees`, { person: person.value })
+    await api.post(`/api/minutes/${id}/attendees`, { person: pid })
     person.value = ''
     await refresh()
   } catch (cause) {
     error.value = (cause as { message?: string }).message ?? 'Could not add the attendee'
+  } finally {
+    addSaving.value = false
   }
 }
 
-const title = computed(() => String(data.value?.data?.title ?? 'Minutes'))
-const attendees = computed(() => data.value?.attendees ?? [])
-
-/**
- * The body is stored as Markdown and rendered through the shared XSS-safe
- * renderer: raw HTML in the source is escaped before any Markdown construct
- * is recognised, so this v-html can only emit the allowlisted tags.
- */
-const bodyHtml = computed(() => renderMarkdownSafe(String(data.value?.data?.body ?? '')))
-const hasBody = computed(() => String(data.value?.data?.body ?? '').trim().length > 0)
 function timeRange(row: Record<string, unknown>): string {
   const start = typeof row.start_time === 'string' ? row.start_time.slice(0, 5) : ''
   const end = typeof row.end_time === 'string' ? row.end_time.slice(0, 5) : ''
@@ -53,13 +45,37 @@ function timeRange(row: Record<string, unknown>): string {
   return start || end || '—'
 }
 
-/**
- * Edit form (AFC-912): same fields as minutes/new.vue, validated by the same
- * minutesFormSchema (partial) on PATCH /api/minutes/:id. The body editor is
- * the shared MinutesBodyEditor, so the Raw | Preview toggle and the toolbar
- * cannot drift from the create page.
- */
+const hasBody = computed(() => typeof data.value?.data?.body === 'string' && String(data.value.data.body).trim().length > 0)
+const bodyHtml = computed(() => (hasBody.value ? renderMarkdownSafe(String(data.value?.data?.body)) : ''))
+
+// Status
+const statusOptions = [
+  { label: 'Draft', value: 'draft' },
+  { label: 'Review', value: 'review' },
+  { label: 'Accepted', value: 'accepted' },
+]
+const newStatus = ref(String(data.value?.data?.status ?? 'draft'))
+const statusSaving = ref(false)
+const statusError = ref('')
+
+async function updateStatus() {
+  statusError.value = ''
+  statusSaving.value = true
+  try {
+    await api.patch(`/api/minutes/${id}/status`, { status: newStatus.value })
+    await refresh()
+  } catch (cause) {
+    statusError.value = (cause as { message?: string }).message ?? 'Could not update status'
+  } finally {
+    statusSaving.value = false
+  }
+}
+
+// Edit
 const editing = ref(false)
+const editSaving = ref(false)
+const editError = ref('')
+const editFieldErrors = ref<Record<string, string>>({})
 const editForm = ref({
   title: '',
   meeting_date: '',
@@ -69,41 +85,31 @@ const editForm = ref({
   branch: '',
   body: '',
 })
-const editSaving = ref(false)
-const editError = ref('')
-const editFieldErrors = ref<Record<string, string>>({})
 
 function startEdit() {
-  const row = data.value?.data
-  if (!row) return
-  editError.value = ''
-  editFieldErrors.value = {}
+  const row = data.value?.data ?? {}
   editForm.value = {
     title: String(row.title ?? ''),
-    meeting_date: String(row.meeting_date ?? '').slice(0, 10),
-    start_time: typeof row.start_time === 'string' ? row.start_time.slice(0, 5) : '',
-    end_time: typeof row.end_time === 'string' ? row.end_time.slice(0, 5) : '',
+    meeting_date: String(row.meeting_date ?? ''),
+    start_time: row.start_time ? String(row.start_time).slice(0, 5) : '',
+    end_time: row.end_time ? String(row.end_time).slice(0, 5) : '',
     location: String(row.location ?? ''),
-    branch: typeof row.branch === 'string' ? row.branch : '',
+    branch: String(row.branch ?? ''),
     body: String(row.body ?? ''),
   }
+  editFieldErrors.value = {}
+  editError.value = ''
   editing.value = true
 }
 
 function cancelEdit() {
   editing.value = false
-  editError.value = ''
-  editFieldErrors.value = {}
 }
 
 async function saveEdit() {
   editError.value = ''
   editFieldErrors.value = {}
-  if (
-    editForm.value.start_time &&
-    editForm.value.end_time &&
-    editForm.value.end_time <= editForm.value.start_time
-  ) {
+  if (editForm.value.start_time && editForm.value.end_time && editForm.value.end_time <= editForm.value.start_time) {
     editFieldErrors.value = { end_time: 'The end time must be after the start time' }
     return
   }
@@ -114,9 +120,9 @@ async function saveEdit() {
       meeting_date: editForm.value.meeting_date,
       start_time: editForm.value.start_time || null,
       end_time: editForm.value.end_time || null,
-      location: editForm.value.location.trim() || null,
+      location: editForm.value.location || null,
+      branch: editForm.value.branch || null,
       body: editForm.value.body || null,
-      ...(editForm.value.branch ? { branch: editForm.value.branch } : {}),
     })
     editing.value = false
     await refresh()
@@ -125,85 +131,71 @@ async function saveEdit() {
       editFieldErrors.value = cause.fields
       editError.value = cause.message
     } else {
-      editError.value = 'Could not save the minutes. Try again.'
+      editError.value = (cause as { message?: string }).message ?? 'Could not save changes'
     }
   } finally {
     editSaving.value = false
+  }
+}
+
+// Meeting officers
+const officers = ref({
+  chairman: '',
+  opening_prayer: '',
+  closing_prayer: '',
+  minutes_read_by: '',
+  minutes_moved_by: '',
+  minutes_seconded_by: '',
+  adjourn_moved_by: '',
+  adjourn_seconded_by: '',
+})
+const officersSaving = ref(false)
+const officersError = ref('')
+
+async function saveOfficers() {
+  officersError.value = ''
+  officersSaving.value = true
+  try {
+    await api.patch(`/api/minutes/${id}/officers`, officers.value)
+    await refresh()
+  } catch (cause) {
+    officersError.value = (cause as { message?: string }).message ?? 'Could not save officers'
+  } finally {
+    officersSaving.value = false
   }
 }
 </script>
 
 <template>
   <div>
-    <PageHeader
-      :title="title"
-      description="File, attendees and audit trail. Writes are area-scoped per the matrix."
-    >
+    <PageHeader title="Minutes detail" description="Read-only view; attendees managed below.">
       <template #actions>
-        <PermissionGate :collection="COLLECTIONS.officeMinutes" action="update">
-          <UButton
-            v-if="!editing"
-            color="neutral"
-            variant="outline"
-            size="sm"
-            icon="i-lucide-pencil"
-            label="Edit"
-            @click="startEdit"
-          />
-        </PermissionGate>
-        <UButton
-          color="neutral"
-          variant="ghost"
-          size="sm"
-          icon="i-lucide-arrow-left"
-          label="Minutes"
-          to="/minutes"
-        />
+        <UButton color="neutral" variant="ghost" size="sm" icon="i-lucide-arrow-left" label="Minutes" to="/minutes" />
       </template>
     </PageHeader>
-
-    <UAlert
-      v-if="loadError"
-      color="error"
-      variant="subtle"
-      title="Could not load these minutes"
-      :description="loadError.message"
-    />
 
     <div v-if="pending" class="mt-8 flex justify-center py-10">
       <UIcon name="i-lucide-loader-circle" class="size-6 animate-spin text-gray-400" />
     </div>
 
-    <div v-else-if="data?.data" class="grid gap-4">
+    <div v-else-if="data?.data" class="mt-4 space-y-4">
       <PermissionGate :collection="COLLECTIONS.officeMinutes" action="update">
-        <UCard v-if="editing">
+        <UCard>
           <template #header>
-            <h2 class="font-semibold">Edit minutes</h2>
+            <div class="flex items-center justify-between">
+              <h2 class="font-semibold">Edit minutes</h2>
+              <UButton v-if="!editing" size="xs" label="Edit" icon="i-lucide-pencil" @click="startEdit" />
+            </div>
           </template>
-          <div class="grid gap-4 sm:grid-cols-2">
-            <UFormField
-              label="Title"
-              required
-              class="sm:col-span-2"
-              :error="editFieldErrors.title"
-            >
+          <div v-if="editing" class="grid gap-4 sm:grid-cols-2">
+            <UFormField label="Title" required class="sm:col-span-2" :error="editFieldErrors.title">
               <UInput v-model="editForm.title" class="w-full" />
             </UFormField>
-            <UFormField
-              label="Meeting date"
-              required
-              :error="editFieldErrors.meeting_date"
-            >
+            <UFormField label="Meeting date" required :error="editFieldErrors.meeting_date">
               <UInput v-model="editForm.meeting_date" type="date" class="w-full" />
             </UFormField>
             <UFormField label="Branch" :error="editFieldErrors.branch">
-              <EntitySelect
-                v-model="editForm.branch"
-                :items="branchOptions"
-                placeholder="Select branch…"
-                :loading="branchesPending"
-                class="w-full"
-              />
+              <EntitySelect v-model="editForm.branch" :items="branchOptions" placeholder="Select branch…" :loading="branchesPending" class="w-full" />
             </UFormField>
             <UFormField label="Start time" :error="editFieldErrors.start_time">
               <UInput v-model="editForm.start_time" type="time" class="w-full" />
@@ -211,47 +203,72 @@ async function saveEdit() {
             <UFormField label="End time" :error="editFieldErrors.end_time">
               <UInput v-model="editForm.end_time" type="time" class="w-full" />
             </UFormField>
-            <UFormField
-              label="Location"
-              class="sm:col-span-2"
-              :error="editFieldErrors.location"
-            >
+            <UFormField label="Location" class="sm:col-span-2" :error="editFieldErrors.location">
               <UInput v-model="editForm.location" class="w-full" />
             </UFormField>
             <div class="sm:col-span-2">
-              <MinutesBodyEditor
-                v-model="editForm.body"
-                textarea-id="minutes-edit-body"
-                :field-error="editFieldErrors.body"
-              />
+              <MinutesBodyEditor v-model="editForm.body" textarea-id="minutes-edit-body" :field-error="editFieldErrors.body" />
             </div>
           </div>
-          <UAlert
-            v-if="editError"
-            class="mt-4"
-            color="error"
-            variant="subtle"
-            title="Could not save the minutes"
-            :description="editError"
-          />
-          <div class="mt-4 flex gap-2">
-            <UButton
-              label="Save changes"
-              icon="i-lucide-check"
-              :loading="editSaving"
-              :disabled="editSaving"
-              @click="saveEdit"
-            />
-            <UButton
-              label="Cancel"
-              color="neutral"
-              variant="ghost"
-              :disabled="editSaving"
-              @click="cancelEdit"
-            />
+          <UAlert v-if="editError" class="mt-4" color="error" variant="subtle" title="Could not save the minutes" :description="editError" />
+          <div v-if="editing" class="mt-4 flex gap-2">
+            <UButton label="Save changes" icon="i-lucide-check" :loading="editSaving" :disabled="editSaving" @click="saveEdit" />
+            <UButton label="Cancel" color="neutral" variant="ghost" :disabled="editSaving" @click="cancelEdit" />
           </div>
         </UCard>
       </PermissionGate>
+
+      <UCard>
+        <template #header>
+          <h2 class="font-semibold">Status</h2>
+        </template>
+        <PermissionGate :collection="COLLECTIONS.officeMinutes" action="update">
+          <div class="flex items-center gap-2">
+            <USelect v-model="newStatus" :items="statusOptions" class="w-48" />
+            <UButton label="Update status" :loading="statusSaving" @click="updateStatus" />
+          </div>
+        </PermissionGate>
+        <UAlert v-if="statusError" class="mt-3" color="error" variant="subtle" :description="statusError" />
+      </UCard>
+
+      <UCard>
+        <template #header>
+          <h2 class="font-semibold">Meeting officers & actions</h2>
+        </template>
+        <PermissionGate :collection="COLLECTIONS.officeMinutes" action="update">
+          <div class="grid gap-3 sm:grid-cols-2">
+            <UFormField label="Chairman">
+              <EntitySelect v-model="officers.chairman" :items="personOptions" placeholder="Select person…" server-search :loading="personPending" @update:search-term="onPersonSearch" />
+            </UFormField>
+            <UFormField label="Opening prayer">
+              <EntitySelect v-model="officers.opening_prayer" :items="personOptions" placeholder="Select person…" server-search :loading="personPending" @update:search-term="onPersonSearch" />
+            </UFormField>
+            <UFormField label="Closing prayer">
+              <EntitySelect v-model="officers.closing_prayer" :items="personOptions" placeholder="Select person…" server-search :loading="personPending" @update:search-term="onPersonSearch" />
+            </UFormField>
+            <UFormField label="Reading of minutes">
+              <EntitySelect v-model="officers.minutes_read_by" :items="personOptions" placeholder="Select person…" server-search :loading="personPending" @update:search-term="onPersonSearch" />
+            </UFormField>
+            <UFormField label="Minutes acceptance - Moved by">
+              <EntitySelect v-model="officers.minutes_moved_by" :items="personOptions" placeholder="Select person…" server-search :loading="personPending" @update:search-term="onPersonSearch" />
+            </UFormField>
+            <UFormField label="Minutes acceptance - Seconded by">
+              <EntitySelect v-model="officers.minutes_seconded_by" :items="personOptions" placeholder="Select person…" server-search :loading="personPending" @update:search-term="onPersonSearch" />
+            </UFormField>
+            <UFormField label="Motion to adjourn - Moved by">
+              <EntitySelect v-model="officers.adjourn_moved_by" :items="personOptions" placeholder="Select person…" server-search :loading="personPending" @update:search-term="onPersonSearch" />
+            </UFormField>
+            <UFormField label="Motion to adjourn - Seconded by">
+              <EntitySelect v-model="officers.adjourn_seconded_by" :items="personOptions" placeholder="Select person…" server-search :loading="personPending" @update:search-term="onPersonSearch" />
+            </UFormField>
+          </div>
+          <p class="mt-2 text-xs text-gray-500">Selected officers will be automatically added to the attendees list.</p>
+          <div class="mt-3">
+            <UButton label="Save officers" icon="i-lucide-check" :loading="officersSaving" @click="saveOfficers" />
+          </div>
+        </PermissionGate>
+        <UAlert v-if="officersError" class="mt-3" color="error" variant="subtle" :description="officersError" />
+      </UCard>
 
       <UCard>
         <template #header>
@@ -278,8 +295,6 @@ async function saveEdit() {
           </div>
           <div class="col-span-2">
             <dt class="text-gray-500">Body</dt>
-            <!-- bodyHtml comes from the shared XSS-safe renderer
-              (escape-first, allowlisted tags), never from raw user HTML. -->
             <!-- eslint-disable-next-line vue/no-v-html -->
             <dd v-if="hasBody" class="markdown-body mt-1" v-html="bodyHtml" />
             <dd v-else class="mt-1">—</dd>
@@ -295,16 +310,9 @@ async function saveEdit() {
         <template #header>
           <h2 class="font-semibold">Attendees ({{ attendees.length }})</h2>
         </template>
-        <ul
-          v-if="attendees.length > 0"
-          class="divide-y divide-gray-100 text-sm dark:divide-gray-800"
-        >
-          <li
-            v-for="row in attendees"
-            :key="String(row.id)"
-            class="py-1.5 text-gray-600 dark:text-gray-300"
-          >
-            {{ row.person ?? row.attendee_user }}
+        <ul v-if="attendees.length > 0" class="divide-y divide-gray-100 text-sm dark:divide-gray-800">
+          <li v-for="row in attendees" :key="String(row.id)" class="py-1.5 text-gray-600 dark:text-gray-300">
+            {{ row.person ?? row.attendee_user ?? row.id }}
           </li>
         </ul>
         <p v-else class="text-sm text-gray-500">No attendees recorded.</p>
@@ -320,23 +328,10 @@ async function saveEdit() {
               aria-label="Person to add as attendee"
               @update:search-term="onPersonSearch"
             />
-            <UButton
-              label="Add attendee"
-              color="neutral"
-              variant="outline"
-              icon="i-lucide-user-plus"
-              @click="addAttendee"
-            />
+            <UButton label="Add attendee" color="neutral" variant="outline" icon="i-lucide-user-plus" :loading="addSaving" @click="addAttendee" />
           </div>
         </PermissionGate>
-        <UAlert
-          v-if="error"
-          class="mt-3"
-          color="error"
-          variant="subtle"
-          title="Could not add the attendee"
-          :description="error"
-        />
+        <UAlert v-if="error" class="mt-3" color="error" variant="subtle" title="Could not add the attendee" :description="error" />
       </UCard>
 
       <UCard>
@@ -354,74 +349,21 @@ async function saveEdit() {
       </UCard>
     </div>
 
-    <EmptyState
-      v-else-if="!loadError"
-      title="Minutes not found"
-      description="They do not exist or are outside your scope."
-    />
+    <EmptyState v-else-if="!loadError" title="Minutes not found" description="They do not exist or are outside your scope." />
   </div>
 </template>
 
 <style scoped>
-.markdown-body :deep(h1),
-.markdown-body :deep(h2),
-.markdown-body :deep(h3) {
-  font-weight: 700;
-  margin: 0.75rem 0 0.375rem;
-}
-.markdown-body :deep(h1) {
-  font-size: 1.25rem;
-}
-.markdown-body :deep(h2) {
-  font-size: 1.125rem;
-}
-.markdown-body :deep(h3) {
-  font-size: 1rem;
-}
-.markdown-body :deep(p) {
-  margin: 0.375rem 0;
-}
-.markdown-body :deep(ul),
-.markdown-body :deep(ol) {
-  margin: 0.375rem 0 0.375rem 1.25rem;
-}
-.markdown-body :deep(ul) {
-  list-style: disc;
-}
-.markdown-body :deep(ol) {
-  list-style: decimal;
-}
-.markdown-body :deep(blockquote) {
-  border-left: 3px solid var(--ui-border-accented);
-  padding-left: 0.75rem;
-  color: var(--ui-text-muted);
-  margin: 0.5rem 0;
-}
-.markdown-body :deep(table) {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 0.5rem 0;
-  font-size: 0.875rem;
-}
-.markdown-body :deep(th),
-.markdown-body :deep(td) {
-  border: 1px solid var(--ui-border);
-  padding: 0.375rem 0.625rem;
-  text-align: left;
-}
-.markdown-body :deep(th) {
-  font-weight: 600;
-}
-.markdown-body :deep(code) {
-  font-family: ui-monospace, monospace;
-  font-size: 0.875em;
-}
-.markdown-body :deep(pre) {
-  overflow-x: auto;
-  padding: 0.625rem;
-  border-radius: 0.375rem;
-}
-.markdown-body :deep(a) {
-  text-decoration: underline;
-}
+.markdown-body :deep(h1), .markdown-body :deep(h2), .markdown-body :deep(h3) { font-weight: 700; margin: 0.75rem 0 0.375rem; }
+.markdown-body :deep(h1) { font-size: 1.25rem; }
+.markdown-body :deep(h2) { font-size: 1.125rem; }
+.markdown-body :deep(h3) { font-size: 1rem; }
+.markdown-body :deep(p) { margin: 0.375rem 0; }
+.markdown-body :deep(ul), .markdown-body :deep(ol) { margin: 0.375rem 0 0.375rem 1.25rem; }
+.markdown-body :deep(ul) { list-style: disc; }
+.markdown-body :deep(ol) { list-style: decimal; }
+.markdown-body :deep(blockquote) { border-left: 3px solid var(--ui-border-accented); padding-left: 0.75rem; color: var(--ui-text-muted); margin: 0.5rem 0; }
+.markdown-body :deep(table) { width: 100%; border-collapse: collapse; margin: 0.5rem 0; font-size: 0.875rem; }
+.markdown-body :deep(th), .markdown-body :deep(td) { border: 1px solid var(--ui-border); padding: 0.375rem 0.625rem; text-align: left; }
+.markdown-body :deep(th) { font-weight: 600; }
 </style>

@@ -84,6 +84,12 @@ const CARDS: FormCard[] = [
     to: '/custom-forms',
     requires: [COLLECTIONS.customForms, 'read'],
   },
+  {
+    title: 'Minutes',
+    description: 'Record meeting minutes with attendees and officers.',
+    to: '/minutes?new=1',
+    requires: [COLLECTIONS.officeMinutes, 'create'],
+  },
 ]
 
 const visibleCards = computed(() =>
@@ -119,3 +125,4 @@ const visibleCards = computed(() =>
     </div>
   </div>
 </template>
+
