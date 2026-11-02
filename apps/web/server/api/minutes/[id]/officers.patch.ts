@@ -54,7 +54,9 @@ export default defineEventHandler(async (event) => {
   )
   const existing = new Set(
     attendees.data
-      .map((row: Record<string, unknown>) => String(row.person ?? row.attendee_user ?? ''))
+      .map((row: Record<string, unknown>) =>
+        String(row.person ?? row.attendee_user ?? ''),
+      )
       .filter(Boolean),
   )
 
