@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { COLLECTIONS } from '@afc/shared'
-import { renderMarkdownSafe } from '@afc/shared'
+import { COLLECTIONS, renderMarkdownSafe } from '@afc/shared'
 import { ApiRequestError } from '~/composables/useApi'
 
 definePageMeta({ middleware: 'staff' })
