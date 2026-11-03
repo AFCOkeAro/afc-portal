@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { H3Event } from 'h3'
 import { readSession, writeSession } from './session'
 import type { PortalSessionData } from './session'
@@ -84,7 +85,7 @@ async function performDirectusRequest<T>(
   // `$fetch` is typed against the typed routes, which know nothing about
   // Directus. The cast is confined to this one call; every caller above sees
   // the `T` the function was asked for.
-  return (await $fetch(url, {
+  return (await ($fetch as any)(url, {
     method: options.method ?? 'GET',
     query: options.query,
     body: options.body as Record<string, unknown> | undefined,
@@ -165,14 +166,6 @@ async function attemptRequest<T>(
   }
 }
 
-interface DirectusRefreshResponse {
-  data: {
-    access_token: string
-    refresh_token: string | null
-    expires: number
-  }
-}
-
 /**
  * In-flight refreshes, keyed by the refresh token being exchanged.
  *
@@ -219,13 +212,10 @@ async function doRefreshSessionToken(
   session: PortalSessionData,
 ): Promise<string | null> {
   try {
-    const refreshed = await $fetch<DirectusRefreshResponse>(
-      `${directusBaseUrl(event)}/auth/refresh`,
-      {
-        method: 'POST',
-        body: { refresh_token: session.refreshToken, mode: 'json' },
-      },
-    )
+    const refreshed = await ($fetch as any)(`${directusBaseUrl(event)}/auth/refresh`, {
+      method: 'POST',
+      body: { refresh_token: session.refreshToken, mode: 'json' },
+    })
     const accessToken = refreshed?.data?.access_token
     if (!accessToken) {
       return null

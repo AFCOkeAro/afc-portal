@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import {
   eventScopeFilter,
   findScopedItem,
@@ -68,10 +69,10 @@ export default defineEventHandler(async (event) => {
   const headers = { Authorization: `Bearer ${token}` }
   let meta: { data: { type?: string; filename_download?: string } }
   try {
-    meta = await $fetch<{ data: { type?: string; filename_download?: string } }>(
-      `${directusBaseUrl(event)}/files/${file}`,
-      { query: { fields: 'id,type,filename_download' }, headers },
-    )
+    meta = await ($fetch as any)(`${directusBaseUrl(event)}/files/${file}`, {
+      query: { fields: 'id,type,filename_download' },
+      headers,
+    })
   } catch {
     throw createError({
       statusCode: 404,
@@ -82,7 +83,7 @@ export default defineEventHandler(async (event) => {
   const mime = String(meta.data?.type ?? 'application/octet-stream')
   const name = String(meta.data?.filename_download ?? 'receipt')
   try {
-    const bytes = await $fetch<ArrayBuffer>(`${directusBaseUrl(event)}/assets/${file}`, {
+    const bytes = await ($fetch as any)(`${directusBaseUrl(event)}/assets/${file}`, {
       headers,
       responseType: 'arrayBuffer',
     })

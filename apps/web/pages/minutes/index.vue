@@ -17,9 +17,20 @@ function timeRange(row: Record<string, unknown>): string {
   return start || end || '—'
 }
 
-/** Dashboard strip (AFC-588): no server filters — display-only total, no new backend. */
+const statusCounts = computed(() => {
+  const counts = { draft: 0, review: 0, accepted: 0, total: rows.value.length }
+  for (const row of rows.value) {
+    const s = String(row.status ?? '').toLowerCase()
+    if (s in counts) counts[s as keyof typeof counts]++
+  }
+  return counts
+})
+
 const stripItems = computed(() => [
-  { label: 'Minutes', value: rows.value.length, to: null, hint: 'Total in view' },
+  { label: 'Total', value: statusCounts.value.total },
+  { label: 'Draft', value: statusCounts.value.draft },
+  { label: 'Review', value: statusCounts.value.review },
+  { label: 'Accepted', value: statusCounts.value.accepted },
 ])
 </script>
 
@@ -38,15 +49,7 @@ const stripItems = computed(() => [
 
     <DashboardStrip :items="stripItems" />
 
-    <UCard>
-      <UAlert
-        v-if="error"
-        color="error"
-        variant="subtle"
-        title="Could not load minutes"
-        :description="error.message"
-      />
-
+    <UCard class="mt-4">
       <div v-if="pending" class="mt-8 flex justify-center py-10">
         <UIcon name="i-lucide-loader-circle" class="size-6 animate-spin text-gray-400" />
       </div>
@@ -54,7 +57,7 @@ const stripItems = computed(() => [
       <EmptyState
         v-else-if="rows.length === 0"
         title="No minutes yet"
-        description="Minutes are recorded by area staff with a file and attendees."
+        description="Record the first meeting minutes for this scope."
       >
         <PermissionGate :collection="COLLECTIONS.officeMinutes" action="create">
           <UButton class="mt-4" label="New minutes" to="/minutes/new" />
@@ -67,54 +70,53 @@ const stripItems = computed(() => [
             <tr
               class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400"
             >
-              <th class="px-3 py-2 font-medium">Title</th>
-              <th class="px-3 py-2 font-medium">Meeting date</th>
-              <th class="px-3 py-2 font-medium">Time</th>
-              <th class="px-3 py-2 font-medium">Location</th>
-              <th class="px-3 py-2 font-medium">Status</th>
-              <th class="px-3 py-2"><span class="sr-only">Open</span></th>
+              <th class="px-4 py-2">Title</th>
+              <th class="px-4 py-2">Date</th>
+              <th class="px-4 py-2">Time</th>
+              <th class="px-4 py-2">Location</th>
+              <th class="px-4 py-2">Status</th>
+              <th class="px-4 py-2" />
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-            <tr
-              v-for="row in rows"
-              :key="String(row.id)"
-              class="hover:bg-gray-50 dark:hover:bg-gray-900/60"
-            >
-              <td class="px-3 py-3">
-                <NuxtLink
-                  :to="`/minutes/${String(row.id)}`"
-                  class="font-medium text-gray-900 hover:text-primary-600 dark:text-white"
-                >
-                  {{ row.title }}
-                </NuxtLink>
+            <tr v-for="row in rows" :key="String(row.id)">
+              <td class="px-4 py-2 font-medium text-gray-900 dark:text-white">
+                {{ row.title }}
               </td>
-              <td class="px-3 py-3 text-gray-600 dark:text-gray-300">
+              <td class="px-4 py-2 text-gray-600 dark:text-gray-300">
                 {{ row.meeting_date }}
               </td>
-              <td class="px-3 py-3 text-gray-600 dark:text-gray-300">
+              <td class="px-4 py-2 text-gray-600 dark:text-gray-300">
                 {{ timeRange(row) }}
               </td>
-              <td class="max-w-48 truncate px-3 py-3 text-gray-600 dark:text-gray-300">
+              <td class="px-4 py-2 text-gray-600 dark:text-gray-300">
                 {{ row.location ?? '—' }}
               </td>
-              <td class="px-3 py-3">
+              <td class="px-4 py-2">
                 <UBadge color="neutral" variant="subtle">{{ row.status }}</UBadge>
               </td>
-              <td class="px-3 py-3 text-right">
+              <td class="px-4 py-2 text-right">
                 <UButton
-                  :to="`/minutes/${String(row.id)}`"
+                  size="xs"
                   color="neutral"
                   variant="ghost"
-                  size="xs"
-                  icon="i-lucide-arrow-right"
-                  aria-label="Open minutes"
+                  label="View"
+                  :to="`/minutes/${row.id}`"
                 />
               </td>
             </tr>
           </tbody>
         </table>
       </div>
+
+      <UAlert
+        v-if="error"
+        class="mt-4"
+        color="error"
+        variant="subtle"
+        title="Could not load minutes"
+        :description="error.message"
+      />
     </UCard>
   </div>
 </template>

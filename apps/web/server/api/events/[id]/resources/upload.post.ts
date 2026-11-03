@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { can, getPortalScope, throwStoreUnavailable } from '../../../../utils/portal'
 import { collaboratorHasArea } from '../../../../utils/event-access'
 import { directusBaseUrl } from '../../../../utils/directus'
@@ -92,7 +93,7 @@ export default defineEventHandler(async (event) => {
   )
   let stored: { data: { id: string } }
   try {
-    stored = await $fetch<{ data: { id: string } }>(`${directusBaseUrl(event)}/files`, {
+    stored = await ($fetch as any)(`${directusBaseUrl(event)}/files`, {
       method: 'POST',
       body: form,
       headers: scope.token ? { Authorization: `Bearer ${scope.token}` } : undefined,
