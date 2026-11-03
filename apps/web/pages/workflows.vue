@@ -265,7 +265,11 @@ onMounted(() => {
       <div v-else class="mt-3 space-y-2">
         <UCard v-for="row in rows" :key="String(row.id)">
           <div class="flex flex-wrap items-center gap-2 text-sm">
-            <span class="font-semibold">{{ row.title }}</span>
+            <NuxtLink
+              :to="`/tasks/${row.id}`"
+              class="font-semibold text-primary-600 hover:underline"
+              >{{ row.title }}</NuxtLink
+            >
             <UBadge color="neutral" variant="subtle">{{ row.status }}</UBadge>
             <UBadge color="neutral" variant="subtle">{{ row.priority }}</UBadge>
             <span v-if="row.due_date" class="text-gray-500">{{ row.due_date }}</span>
