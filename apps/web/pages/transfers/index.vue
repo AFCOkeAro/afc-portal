@@ -28,10 +28,33 @@ const form = ref({
   person: '',
   from_branch: '',
   to_branch: '',
+  transfer_type: 'domestic',
+  destination_country: '',
   reason: '',
   effective_date: '',
 })
 const error = ref('')
+
+watch(
+  () => form.value.person,
+  async (personId: string) => {
+    if (!personId) {
+      form.value.from_branch = ''
+      return
+    }
+    try {
+      const res = await api.get<{ data: Record<string, unknown> }>(
+        `/api/people/${personId}`,
+      )
+      const branch = res.data?.branch
+      if (typeof branch === 'string') form.value.from_branch = branch
+      else if (branch && typeof branch === 'object' && 'id' in branch)
+        form.value.from_branch = String((branch as { id: string }).id)
+    } catch {
+      form.value.from_branch = ''
+    }
+  },
+)
 
 const query = computed(() => ({
   ...(status.value !== 'all' ? { status: status.value } : {}),
@@ -52,6 +75,10 @@ async function create() {
       person: form.value.person,
       from_branch: form.value.from_branch,
       to_branch: form.value.to_branch,
+      transfer_type: form.value.transfer_type,
+      ...(form.value.destination_country
+        ? { destination_country: form.value.destination_country }
+        : {}),
       ...(form.value.reason ? { reason: form.value.reason } : {}),
       ...(form.value.effective_date ? { effective_date: form.value.effective_date } : {}),
     })
@@ -60,6 +87,8 @@ async function create() {
       person: '',
       from_branch: '',
       to_branch: '',
+      transfer_type: 'domestic',
+      destination_country: '',
       reason: '',
       effective_date: '',
     }
@@ -172,12 +201,16 @@ const stripItems = computed(() => [
         <UFormField label="Effective date">
           <UInput v-model="form.effective_date" type="date" class="w-full" />
         </UFormField>
-        <UFormField label="From branch">
-          <EntitySelect
-            v-model="form.from_branch"
-            :items="branchOptions"
-            placeholder="Select branch…"
-            :loading="branchesPending"
+        <UFormField label="From branch (auto-filled)">
+          <UInput v-model="form.from_branch" class="w-full" disabled />
+        </UFormField>
+        <UFormField label="Transfer type">
+          <USelect
+            v-model="form.transfer_type"
+            :items="[
+              { label: 'Within Nigeria', value: 'domestic' },
+              { label: 'International', value: 'international' },
+            ]"
             class="w-full"
           />
         </UFormField>
@@ -185,9 +218,19 @@ const stripItems = computed(() => [
           <EntitySelect
             v-model="form.to_branch"
             :items="branchOptions"
-            placeholder="Select branch…"
+            placeholder="Select destination branch…"
             :loading="branchesPending"
             class="w-full"
+          />
+        </UFormField>
+        <UFormField
+          v-if="form.transfer_type === 'international'"
+          label="Destination country"
+        >
+          <UInput
+            v-model="form.destination_country"
+            class="w-full"
+            placeholder="e.g. United Kingdom"
           />
         </UFormField>
         <UFormField label="Reason" class="sm:col-span-2">
