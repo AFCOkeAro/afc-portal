@@ -172,6 +172,7 @@ export interface Department {
     | 'security'
     | 'kitchen'
     | 'sanitation'
+    | 'library'
     | 'elementary'
   /** Null means an area-wide department (data-model §2.2). */
   branch: string | null

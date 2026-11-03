@@ -36,7 +36,6 @@ const { personOptions, personPending, onPersonSearch } = usePersonSearch()
 const TABS = [
   { id: 'balances', label: 'Balances', icon: 'i-lucide-wallet' },
   { id: 'requests', label: 'Requests', icon: 'i-lucide-inbox' },
-  { id: 'approvals', label: 'Approvals', icon: 'i-lucide-check-check' },
 ] as const
 
 type TabId = (typeof TABS)[number]['id']
@@ -357,19 +356,12 @@ const tab = computed<TabId>(() => {
 function goTab(next: TabId): void {
   // The approvals queue is inherently the whole queue — landing on it resets
   // the Requests tab status filter so the pending list is complete.
-  if (next === 'approvals' && statusFilter.value !== 'all') statusFilter.value = 'all'
   void router.replace({ query: { ...route.query, tab: next } })
 }
 
 /* Approvals tab (AFC-896): the pending decision queue plus the decided
  * list, folded client-side from the already-loaded scoped rows. Same rows,
  * same decide()/withdraw() flow — only the focus moves. */
-const pendingRequests = computed(() =>
-  requests.value.filter((row: LeaveRequest) => row.status === 'pending'),
-)
-const decidedRequests = computed(() =>
-  requests.value.filter((row: LeaveRequest) => row.status !== 'pending'),
-)
 
 onMounted(() => {
   void loadBalances()
@@ -389,7 +381,7 @@ watch(statusFilter, () => {
   <div>
     <PageHeader
       title="Time Off"
-      description="Annual leave in one place — balances, requests and approvals. Allowances count in working days."
+      description="Annual leave in one place — balances, requests and approvals. Allowances count in days (church calendar)."
     />
     <!-- Tabs (AFC-896): one section, `?tab=` deep-links (events detail precedent). -->
     <nav aria-label="Time off sections" class="mt-4">
@@ -505,7 +497,7 @@ watch(statusFilter, () => {
           <template #header>
             <h3 class="font-semibold">Working-day calculator</h3>
             <p class="mt-1 text-xs text-gray-500">
-              Weekends skipped. Public holidays not subtracted yet.
+              All days counted (church calendar). Public holidays not subtracted yet.
             </p>
           </template>
           <div class="grid gap-2 sm:grid-cols-2">
@@ -671,113 +663,6 @@ watch(statusFilter, () => {
           {{ requestError }}
         </p>
       </UCard>
-    </section>
-
-    <!-- APPROVALS (AFC-896): pending queue + decided list, same flow -->
-    <section v-else-if="tab === 'approvals'" aria-label="Leave approvals" class="mt-4">
-      <p class="text-sm text-gray-500 dark:text-gray-400">
-        The pending decision queue, plus the decided list. Decisions ride the same row and
-        transition table as the Requests tab — this tab only focuses the queue.
-      </p>
-      <p v-if="requestsPending" class="mt-3 text-sm text-gray-500">Loading requests…</p>
-      <p v-else-if="requestsError !== ''" class="mt-3 text-sm text-red-600">
-        {{ requestsError }}
-      </p>
-      <template v-else>
-        <h3 class="mt-4 font-semibold">
-          Pending decisions ({{ pendingRequests.length }})
-        </h3>
-        <div v-if="pendingRequests.length === 0" class="mt-3">
-          <UCard>
-            <EmptyState
-              title="Nothing waiting"
-              description="No pending leave requests."
-            />
-          </UCard>
-        </div>
-        <div v-else class="mt-3 space-y-2">
-          <UCard v-for="row in pendingRequests" :key="row.id">
-            <div class="flex flex-wrap items-center gap-2 text-sm">
-              <span class="font-semibold">{{ personLabel(row.person) }}</span>
-              <UBadge color="neutral" variant="subtle">{{
-                typeLabel(row.leave_type)
-              }}</UBadge>
-              <span class="text-gray-500"
-                >{{ row.start_date }} → {{ row.end_date }} ({{ row.days }}d)</span
-              >
-              <span class="ml-auto flex gap-1">
-                <UButton
-                  v-if="canDecide"
-                  size="xs"
-                  color="success"
-                  variant="soft"
-                  label="Approve"
-                  @click="decide(row.id, 'approved')"
-                />
-                <UButton
-                  v-if="canDecide"
-                  size="xs"
-                  color="error"
-                  variant="soft"
-                  label="Decline"
-                  @click="decide(row.id, 'declined')"
-                />
-                <UButton
-                  size="xs"
-                  color="neutral"
-                  variant="ghost"
-                  icon="i-lucide-x"
-                  :aria-label="`Withdraw request`"
-                  @click="withdraw(row.id)"
-                />
-              </span>
-            </div>
-            <p v-if="row.reason" class="mt-1 text-sm text-gray-600">{{ row.reason }}</p>
-          </UCard>
-        </div>
-        <h3 class="mt-6 font-semibold">Decided ({{ decidedRequests.length }})</h3>
-        <div v-if="decidedRequests.length === 0" class="mt-3">
-          <UCard>
-            <EmptyState
-              title="No decided requests"
-              description="Approved, declined and cancelled requests land here."
-            />
-          </UCard>
-        </div>
-        <ul v-else class="mt-3 space-y-2">
-          <li
-            v-for="row in decidedRequests"
-            :key="row.id"
-            class="flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-800"
-          >
-            <span class="font-medium">{{ personLabel(row.person) }}</span>
-            <UBadge color="neutral" variant="subtle">{{
-              typeLabel(row.leave_type)
-            }}</UBadge>
-            <UBadge
-              :color="row.status === 'approved' ? 'success' : 'error'"
-              variant="subtle"
-            >
-              {{ row.status }}
-            </UBadge>
-            <span class="text-gray-500"
-              >{{ row.start_date }} → {{ row.end_date }} ({{ row.days }}d)</span
-            >
-            <UButton
-              v-if="canDecide && row.status === 'approved'"
-              size="xs"
-              color="neutral"
-              variant="ghost"
-              label="Cancel"
-              class="ml-auto"
-              @click="decide(row.id, 'cancelled')"
-            />
-          </li>
-        </ul>
-        <p v-if="actionError !== ''" class="mt-3 text-sm text-red-600">
-          {{ actionError }}
-        </p>
-      </template>
     </section>
   </div>
 </template>
