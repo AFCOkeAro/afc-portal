@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { COLLECTIONS, CUSTOM_FORM_MODULES } from '@afc/shared'
+import { COLLECTIONS } from '@afc/shared'
 import type { CollectionName, PermissionAction } from '@afc/shared'
 import type { CustomFormRow } from '~/types/portal'
 
@@ -114,9 +114,8 @@ const visibleCards = computed(() =>
 )
 
 // Existing custom forms
-const { data: customFormsData, pending: customFormsPending } = await useAsyncData(
-  'forms-custom-list',
-  () => api.get<{ data: CustomFormRow[] }>('/api/custom-forms'),
+const { data: customFormsData } = await useAsyncData('forms-custom-list', () =>
+  api.get<{ data: CustomFormRow[] }>('/api/custom-forms'),
 )
 const customForms = computed(() => customFormsData.value?.data ?? [])
 
