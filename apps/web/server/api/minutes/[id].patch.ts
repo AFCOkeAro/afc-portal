@@ -44,7 +44,8 @@ export default defineEventHandler(async (event) => {
       message: 'The end time must be after the start time',
       path: ['end_time'],
     })
-  const parsed = minutesPatchSchema.safeParse(await readBody(event))
+  const rawBody = await readBody(event)
+  const parsed = minutesPatchSchema.safeParse(rawBody)
   if (!parsed.success) throwValidation(parsed.error)
   const form = parsed.data
 
@@ -68,7 +69,23 @@ export default defineEventHandler(async (event) => {
     }
     patch.branch = branch
   }
+  if (rawBody?.status !== undefined) patch.status = rawBody.status
 
+  const ROLES = [
+    'chairman',
+    'opening_prayer',
+    'closing_prayer',
+    'minutes_read_by',
+    'minutes_moved_by',
+    'minutes_seconded_by',
+    'adjourn_moved_by',
+    'adjourn_seconded_by',
+  ]
+  for (const role of ROLES) {
+    if (rawBody && role in rawBody) {
+      patch[role] = rawBody[role] === '' ? null : rawBody[role]
+    }
+  }
   const updated = await updateItem<Record<string, unknown>>(
     event,
     scope,

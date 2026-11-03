@@ -79,7 +79,7 @@ async function updateStatus() {
   statusError.value = ''
   statusSaving.value = true
   try {
-    await api.patch(`/api/minutes/${id}/status`, { status: newStatus.value })
+    await api.patch(`/api/minutes/${id}`, { status: newStatus.value })
     await refresh()
   } catch (cause) {
     statusError.value =
@@ -179,7 +179,7 @@ async function saveOfficers() {
   officersError.value = ''
   officersSaving.value = true
   try {
-    await api.patch(`/api/minutes/${id}/officers`, officers.value)
+    await api.patch(`/api/minutes/${id}`, officers.value)
     await refresh()
   } catch (cause) {
     officersError.value =

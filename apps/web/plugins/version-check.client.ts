@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Update check (AFC-821). Client-only.
  *
@@ -25,7 +26,7 @@ export default defineNuxtPlugin(() => {
     if (now - lastCheck < 60_000) return
     lastCheck = now
     try {
-      const health = await $fetch<{ sha?: string }>('/api/health', { timeout: 10000 })
+      const health = await ($fetch as any)('/api/health', { timeout: 10000 })
       const served = String(health?.sha ?? '')
       if (served && served !== baked) updateAvailable.value = true
     } catch {

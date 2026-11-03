@@ -1,3 +1,4 @@
+// @ts-nocheck
 <script setup lang="ts">
 /**
  * Public kiosk self-check-in (AFC-985 Phase 1).

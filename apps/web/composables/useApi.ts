@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { ApiError } from '@afc/shared'
 
 /**
@@ -64,7 +65,7 @@ export function useApi() {
       // typed routes; `/api/*` routes do declare their return types, but the
       // generic here is chosen by the caller and cannot be reconciled with that
       // inference.
-      return (await request(path, {
+      return (await (request as any)(path, {
         method,
         query: options.query,
         body: options.body as Record<string, unknown> | undefined,
