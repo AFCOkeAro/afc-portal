@@ -44,6 +44,8 @@ export default defineEventHandler(async (event) => {
     from_branch: form.from_branch,
     to_branch: form.to_branch,
     zone: zones[0] ?? null,
+    transfer_type: form.transfer_type ?? 'domestic',
+    destination_country: form.destination_country ?? null,
     reason: form.reason ?? null,
     request_date: now.slice(0, 10),
     effective_date: form.effective_date ?? null,

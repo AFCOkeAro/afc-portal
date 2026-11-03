@@ -20,9 +20,13 @@ import {
 
 export const TRANSFER_STATUSES = [
   'requested',
+  'zonal_approved',
+  'area_approved',
+  'hq_escalated',
   'approved',
   'completed',
   'rejected',
+  'cancelled',
 ] as const
 export type TransferStatus = (typeof TRANSFER_STATUSES)[number]
 
@@ -220,6 +224,8 @@ export const transferFormSchema = z
     person: z.string().uuid('Choose the person transferring'),
     from_branch: z.string().uuid(),
     to_branch: z.string().uuid(),
+    transfer_type: z.enum(['domestic', 'international']).default('domestic'),
+    destination_country: optionalText(100),
     reason: optionalNote(),
     effective_date: dateSchema.optional(),
     notes: optionalNote(),
@@ -627,6 +633,7 @@ export const taskFormSchema = z
     priority: z.enum(TASK_PRIORITIES).default('normal'),
     related_type: optionalText(40),
     related_id: optionalText(36),
+    blocked_by: optionalText(36),
   })
   .refine((v) => v.assignee_user !== undefined || v.assignee_person !== undefined, {
     message: 'Assign a user or a person',

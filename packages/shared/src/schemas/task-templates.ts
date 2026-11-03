@@ -19,6 +19,7 @@ import type { TaskPriority } from './office'
 export interface TaskTemplateStep {
   title: string
   priority: TaskPriority
+  assignee_person?: string | null
   /** Days relative to the base date. Negative = before, positive = after. */
   dueOffsetDays: number | null
 }
