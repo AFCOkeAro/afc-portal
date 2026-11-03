@@ -9,7 +9,6 @@ import {
 } from '../../utils/portal'
 import { writeOfficeAudit } from '../../utils/office'
 
-/** POST /api/minutes — record minutes (US-E3 AC2). Matrix §11 grants create to area roles; requireCan enforces it. */
 export default defineEventHandler(async (event) => {
   const scope = await getPortalScope(event)
   requireCan(scope, 'office_minutes', 'create')
@@ -48,14 +47,12 @@ export default defineEventHandler(async (event) => {
       updated_at: now,
     },
   )
-
   await writeOfficeAudit(event, scope, 'office_minute_events', {
-    minute: String(created.id),
+    minute: created.id,
     event_type: 'created',
-    detail: `Minutes recorded: ${form.title}`,
+    detail: `Minutes "${form.title}" recorded`,
     actor_user: scope.session.user.id,
     created_at: now,
   })
-
   return { data: { ...created, id: String(created.id) } }
 })

@@ -182,9 +182,9 @@ async function save() {
 
         <PermissionGate :collection="COLLECTIONS.officeMinutes" action="update">
           <div class="sm:col-span-2">
-            <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-200">
-              Attendees
-            </span>
+            <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-200"
+              >Attendees</span
+            >
             <ul
               v-if="stagedAttendees.length > 0"
               class="mb-2 divide-y divide-gray-100 rounded-md border border-gray-200 text-sm dark:divide-gray-800 dark:border-gray-800"
@@ -224,11 +224,6 @@ async function save() {
                 @click="stageAttendee"
               />
             </div>
-            <p class="mt-1 text-xs text-gray-500">
-              People are searched from the directory — no manual IDs. Staff-user attendees
-              stay API-supported and are attached from the detail page once a scoped staff
-              directory exists.
-            </p>
           </div>
         </PermissionGate>
       </div>

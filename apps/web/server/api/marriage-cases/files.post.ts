@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { getPortalScope, requireCan, throwStoreUnavailable } from '../../utils/portal'
 import { directusBaseUrl } from '../../utils/directus'
 
@@ -62,7 +63,7 @@ export default defineEventHandler(async (event) => {
   )
   let stored: { data: { id: string } }
   try {
-    stored = await $fetch<{ data: { id: string } }>(`${directusBaseUrl(event)}/files`, {
+    stored = await ($fetch as any)(`${directusBaseUrl(event)}/files`, {
       method: 'POST',
       body: form,
       headers: scope.token ? { Authorization: `Bearer ${scope.token}` } : undefined,

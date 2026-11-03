@@ -6,7 +6,6 @@ import {
   scopeFilter,
 } from '../../utils/portal'
 
-/** GET /api/minutes/:id — scoped detail with attendees + audit trail (US-E3 AC2). */
 export default defineEventHandler(async (event) => {
   const scope = await getPortalScope(event)
   requireCan(scope, 'office_minutes', 'read')

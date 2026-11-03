@@ -2,7 +2,6 @@ import { listQuerySchema } from '@afc/shared'
 import { getPortalScope, listItems, requireCan } from '../../utils/portal'
 import { logScopedQuery, officeBranchScope } from '../../utils/office'
 
-/** GET /api/minutes — scoped minutes list (US-E3 AC2). Matrix §11: reads for zone/branch/dept, writes area-only. */
 export default defineEventHandler(async (event) => {
   const scope = await getPortalScope(event)
   requireCan(scope, 'office_minutes', 'read')
