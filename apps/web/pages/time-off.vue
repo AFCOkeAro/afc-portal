@@ -36,7 +36,6 @@ const { personOptions, personPending, onPersonSearch } = usePersonSearch()
 const TABS = [
   { id: 'balances', label: 'Balances', icon: 'i-lucide-wallet' },
   { id: 'requests', label: 'Requests', icon: 'i-lucide-inbox' },
-  { id: 'approvals', label: 'Approvals', icon: 'i-lucide-check-check' },
 ] as const
 
 type TabId = (typeof TABS)[number]['id']
@@ -389,7 +388,7 @@ watch(statusFilter, () => {
   <div>
     <PageHeader
       title="Time Off"
-      description="Annual leave in one place — balances, requests and approvals. Allowances count in working days."
+      description="Annual leave in one place — balances, requests and approvals. Allowances count in days (church calendar)."
     />
     <!-- Tabs (AFC-896): one section, `?tab=` deep-links (events detail precedent). -->
     <nav aria-label="Time off sections" class="mt-4">
@@ -505,7 +504,7 @@ watch(statusFilter, () => {
           <template #header>
             <h3 class="font-semibold">Working-day calculator</h3>
             <p class="mt-1 text-xs text-gray-500">
-              Weekends skipped. Public holidays not subtracted yet.
+              All days counted (church calendar). Public holidays not subtracted yet.
             </p>
           </template>
           <div class="grid gap-2 sm:grid-cols-2">
