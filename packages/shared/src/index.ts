@@ -26,6 +26,7 @@ export * from './message-tokens'
 export * from './custom-form-definition'
 export * from './minutes-samples'
 export * from './impersonation'
+export * from './transfer-letters'
 
 /**
  * `role-matrix` is deliberately NOT re-exported from here.
