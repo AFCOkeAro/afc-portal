@@ -633,6 +633,7 @@ export const taskFormSchema = z
     priority: z.enum(TASK_PRIORITIES).default('normal'),
     related_type: optionalText(40),
     related_id: optionalText(36),
+    blocked_by: optionalText(36),
   })
   .refine((v) => v.assignee_user !== undefined || v.assignee_person !== undefined, {
     message: 'Assign a user or a person',
