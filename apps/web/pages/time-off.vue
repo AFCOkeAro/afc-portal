@@ -362,12 +362,6 @@ function goTab(next: TabId): void {
 /* Approvals tab (AFC-896): the pending decision queue plus the decided
  * list, folded client-side from the already-loaded scoped rows. Same rows,
  * same decide()/withdraw() flow — only the focus moves. */
-const pendingRequests = computed(() =>
-  requests.value.filter((row: LeaveRequest) => row.status === 'pending'),
-)
-const decidedRequests = computed(() =>
-  requests.value.filter((row: LeaveRequest) => row.status !== 'pending'),
-)
 
 onMounted(() => {
   void loadBalances()
