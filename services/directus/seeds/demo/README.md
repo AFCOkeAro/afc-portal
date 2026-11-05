@@ -85,3 +85,31 @@ and attends the Revival. Emeka leads the youth fellowship and invites to
 the youth night. Anchor events: Youth Celebration Night, Lagos North
 Revival. Anchor geography: Oke-Aro (zone LAG-NORTH-Z1, area LAG-NORTH) --
 reused, never forked.
+
+## Coverage batch (AFC-1083 follow-up): 618 registry rows across 56 tables
+
+Beyond the original 74 rows:
+
+- **Year of Sundays (§6b/6c):** 52 consecutive Sunday sessions (2025-11-02 ..
+  2026-10-25) with headcounts, plus per-person attendance records —
+  Emmanuel 48, Sarah 39, Tunde 34, Chidi 31 (from February). Deterministic
+  skip rules, no randomness; re-runs are identical.
+- **Person + family (§17):** Folake, Segun, Dayo and Adaeze join the existing
+  households; department links, milestones (saved/sanctified/baptism) and one
+  previous branch.
+- **Marriage (§18):** two cases (counselling_prayer, introduction), two
+  matters (wedding, counselling), audit events, forms, matter events.
+- **Funeral (§19):** one scheduled case, one held case.
+- **Sunday School (§20):** children / teens / adults classes with teachers.
+- **Events tabs (§21):** resources, speakers, testimonies, feedback,
+  collaborators, budgets, expenses and tasks for both demo events.
+- **AVS (§22):** two AVS centres + two demo bible study centres.
+- **Finance (§23):** six more monthly branch records (seven total with September), a healing blessing with
+  recipients + events, welfare contributions, campus support.
+- **Visitor funnel (§24):** three more visitors at identify/welcome/pack
+  stages with follow-ups and legal transitions (one step forward only,
+  pack needs all six checklist items).
+
+Suite `tests/db/103_demo_seed.sql` pins 618 rows / 56 tables and the new
+coverage; the clear script covers every new table registry-first in
+child-to-parent order.

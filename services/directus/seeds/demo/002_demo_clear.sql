@@ -116,6 +116,13 @@ BEGIN
   DELETE FROM demo_seed_registry WHERE table_name = 'welfare_cases';
   v_detail := v_detail || jsonb_build_object('welfare_cases', v_n + v_m);
   v_removed := v_removed + v_n + v_m; v_tables := v_tables + 1;
+  -- blessing_events (registry only; AFC-1083 follow-up; child of blessings)
+  DELETE FROM blessing_events WHERE id IN
+    (SELECT row_id FROM demo_seed_registry WHERE table_name = 'blessing_events');
+  GET DIAGNOSTICS v_n = ROW_COUNT;
+  DELETE FROM demo_seed_registry WHERE table_name = 'blessing_events';
+  v_detail := v_detail || jsonb_build_object('blessing_events', v_n);
+  v_removed := v_removed + v_n; v_tables := v_tables + 1;
 
   -- blessing_recipients (registry only)
   DELETE FROM blessing_recipients WHERE id IN
@@ -195,6 +202,69 @@ BEGIN
   GET DIAGNOSTICS v_n = ROW_COUNT;
   DELETE FROM demo_seed_registry WHERE table_name = 'invite_quota_slots';
   v_detail := v_detail || jsonb_build_object('invite_quota_slots', v_n);
+  v_removed := v_removed + v_n; v_tables := v_tables + 1;
+  -- event_resources (registry only; AFC-1083 follow-up)
+  DELETE FROM event_resources WHERE id IN
+    (SELECT row_id FROM demo_seed_registry WHERE table_name = 'event_resources');
+  GET DIAGNOSTICS v_n = ROW_COUNT;
+  DELETE FROM demo_seed_registry WHERE table_name = 'event_resources';
+  v_detail := v_detail || jsonb_build_object('event_resources', v_n);
+  v_removed := v_removed + v_n; v_tables := v_tables + 1;
+
+  -- event_speakers (registry only; AFC-1083 follow-up)
+  DELETE FROM event_speakers WHERE id IN
+    (SELECT row_id FROM demo_seed_registry WHERE table_name = 'event_speakers');
+  GET DIAGNOSTICS v_n = ROW_COUNT;
+  DELETE FROM demo_seed_registry WHERE table_name = 'event_speakers';
+  v_detail := v_detail || jsonb_build_object('event_speakers', v_n);
+  v_removed := v_removed + v_n; v_tables := v_tables + 1;
+
+  -- event_testimonies (registry only; AFC-1083 follow-up)
+  DELETE FROM event_testimonies WHERE id IN
+    (SELECT row_id FROM demo_seed_registry WHERE table_name = 'event_testimonies');
+  GET DIAGNOSTICS v_n = ROW_COUNT;
+  DELETE FROM demo_seed_registry WHERE table_name = 'event_testimonies';
+  v_detail := v_detail || jsonb_build_object('event_testimonies', v_n);
+  v_removed := v_removed + v_n; v_tables := v_tables + 1;
+
+  -- event_feedback (registry only; AFC-1083 follow-up)
+  DELETE FROM event_feedback WHERE id IN
+    (SELECT row_id FROM demo_seed_registry WHERE table_name = 'event_feedback');
+  GET DIAGNOSTICS v_n = ROW_COUNT;
+  DELETE FROM demo_seed_registry WHERE table_name = 'event_feedback';
+  v_detail := v_detail || jsonb_build_object('event_feedback', v_n);
+  v_removed := v_removed + v_n; v_tables := v_tables + 1;
+
+  -- event_collaborators (registry only; AFC-1083 follow-up)
+  DELETE FROM event_collaborators WHERE id IN
+    (SELECT row_id FROM demo_seed_registry WHERE table_name = 'event_collaborators');
+  GET DIAGNOSTICS v_n = ROW_COUNT;
+  DELETE FROM demo_seed_registry WHERE table_name = 'event_collaborators';
+  v_detail := v_detail || jsonb_build_object('event_collaborators', v_n);
+  v_removed := v_removed + v_n; v_tables := v_tables + 1;
+
+  -- event_budgets (registry only; AFC-1083 follow-up)
+  DELETE FROM event_budgets WHERE id IN
+    (SELECT row_id FROM demo_seed_registry WHERE table_name = 'event_budgets');
+  GET DIAGNOSTICS v_n = ROW_COUNT;
+  DELETE FROM demo_seed_registry WHERE table_name = 'event_budgets';
+  v_detail := v_detail || jsonb_build_object('event_budgets', v_n);
+  v_removed := v_removed + v_n; v_tables := v_tables + 1;
+
+  -- event_expenses (registry only; AFC-1083 follow-up)
+  DELETE FROM event_expenses WHERE id IN
+    (SELECT row_id FROM demo_seed_registry WHERE table_name = 'event_expenses');
+  GET DIAGNOSTICS v_n = ROW_COUNT;
+  DELETE FROM demo_seed_registry WHERE table_name = 'event_expenses';
+  v_detail := v_detail || jsonb_build_object('event_expenses', v_n);
+  v_removed := v_removed + v_n; v_tables := v_tables + 1;
+
+  -- tasks (registry only; AFC-1083 follow-up; titles are recognizable, not DEMO-)
+  DELETE FROM tasks WHERE id IN
+    (SELECT row_id FROM demo_seed_registry WHERE table_name = 'tasks');
+  GET DIAGNOSTICS v_n = ROW_COUNT;
+  DELETE FROM demo_seed_registry WHERE table_name = 'tasks';
+  v_detail := v_detail || jsonb_build_object('tasks', v_n);
   v_removed := v_removed + v_n; v_tables := v_tables + 1;
 
   -- events (registry + slug fallback)
@@ -297,6 +367,13 @@ BEGIN
   DELETE FROM demo_seed_registry WHERE table_name = 'person_milestones';
   v_detail := v_detail || jsonb_build_object('person_milestones', v_n);
   v_removed := v_removed + v_n; v_tables := v_tables + 1;
+  -- campus_financial_support (registry only; AFC-1083 follow-up; child of campus_students)
+  DELETE FROM campus_financial_support WHERE id IN
+    (SELECT row_id FROM demo_seed_registry WHERE table_name = 'campus_financial_support');
+  GET DIAGNOSTICS v_n = ROW_COUNT;
+  DELETE FROM demo_seed_registry WHERE table_name = 'campus_financial_support';
+  v_detail := v_detail || jsonb_build_object('campus_financial_support', v_n);
+  v_removed := v_removed + v_n; v_tables := v_tables + 1;
 
   -- campus_students (registry only)
   DELETE FROM campus_students WHERE id IN
@@ -348,6 +425,86 @@ BEGIN
   GET DIAGNOSTICS v_n = ROW_COUNT;
   DELETE FROM demo_seed_registry WHERE table_name = 'branch_financial_records';
   v_detail := v_detail || jsonb_build_object('branch_financial_records', v_n);
+  v_removed := v_removed + v_n; v_tables := v_tables + 1;
+  -- marriage_case_events (registry only; AFC-1083 follow-up; child of marriage_cases)
+  DELETE FROM marriage_case_events WHERE id IN
+    (SELECT row_id FROM demo_seed_registry WHERE table_name = 'marriage_case_events');
+  GET DIAGNOSTICS v_n = ROW_COUNT;
+  DELETE FROM demo_seed_registry WHERE table_name = 'marriage_case_events';
+  v_detail := v_detail || jsonb_build_object('marriage_case_events', v_n);
+  v_removed := v_removed + v_n; v_tables := v_tables + 1;
+
+  -- marriage_case_forms (registry only; AFC-1083 follow-up; child of marriage_cases)
+  DELETE FROM marriage_case_forms WHERE id IN
+    (SELECT row_id FROM demo_seed_registry WHERE table_name = 'marriage_case_forms');
+  GET DIAGNOSTICS v_n = ROW_COUNT;
+  DELETE FROM demo_seed_registry WHERE table_name = 'marriage_case_forms';
+  v_detail := v_detail || jsonb_build_object('marriage_case_forms', v_n);
+  v_removed := v_removed + v_n; v_tables := v_tables + 1;
+
+  -- marriage_cases (registry only; AFC-1083 follow-up)
+  DELETE FROM marriage_cases WHERE id IN
+    (SELECT row_id FROM demo_seed_registry WHERE table_name = 'marriage_cases');
+  GET DIAGNOSTICS v_n = ROW_COUNT;
+  DELETE FROM demo_seed_registry WHERE table_name = 'marriage_cases';
+  v_detail := v_detail || jsonb_build_object('marriage_cases', v_n);
+  v_removed := v_removed + v_n; v_tables := v_tables + 1;
+
+  -- marriage_matter_events (registry only; AFC-1083 follow-up; child of marriage_matters)
+  DELETE FROM marriage_matter_events WHERE id IN
+    (SELECT row_id FROM demo_seed_registry WHERE table_name = 'marriage_matter_events');
+  GET DIAGNOSTICS v_n = ROW_COUNT;
+  DELETE FROM demo_seed_registry WHERE table_name = 'marriage_matter_events';
+  v_detail := v_detail || jsonb_build_object('marriage_matter_events', v_n);
+  v_removed := v_removed + v_n; v_tables := v_tables + 1;
+
+  -- marriage_matters (registry only; AFC-1083 follow-up)
+  DELETE FROM marriage_matters WHERE id IN
+    (SELECT row_id FROM demo_seed_registry WHERE table_name = 'marriage_matters');
+  GET DIAGNOSTICS v_n = ROW_COUNT;
+  DELETE FROM demo_seed_registry WHERE table_name = 'marriage_matters';
+  v_detail := v_detail || jsonb_build_object('marriage_matters', v_n);
+  v_removed := v_removed + v_n; v_tables := v_tables + 1;
+
+  -- funeral_cases (registry only; AFC-1083 follow-up)
+  DELETE FROM funeral_cases WHERE id IN
+    (SELECT row_id FROM demo_seed_registry WHERE table_name = 'funeral_cases');
+  GET DIAGNOSTICS v_n = ROW_COUNT;
+  DELETE FROM demo_seed_registry WHERE table_name = 'funeral_cases';
+  v_detail := v_detail || jsonb_build_object('funeral_cases', v_n);
+  v_removed := v_removed + v_n; v_tables := v_tables + 1;
+
+  -- sunday_school_classes (registry only; AFC-1083 follow-up)
+  DELETE FROM sunday_school_classes WHERE id IN
+    (SELECT row_id FROM demo_seed_registry WHERE table_name = 'sunday_school_classes');
+  GET DIAGNOSTICS v_n = ROW_COUNT;
+  DELETE FROM demo_seed_registry WHERE table_name = 'sunday_school_classes';
+  v_detail := v_detail || jsonb_build_object('sunday_school_classes', v_n);
+  v_removed := v_removed + v_n; v_tables := v_tables + 1;
+
+  -- avs_centres (registry only; AFC-1083 follow-up)
+  DELETE FROM avs_centres WHERE id IN
+    (SELECT row_id FROM demo_seed_registry WHERE table_name = 'avs_centres');
+  GET DIAGNOSTICS v_n = ROW_COUNT;
+  DELETE FROM demo_seed_registry WHERE table_name = 'avs_centres';
+  v_detail := v_detail || jsonb_build_object('avs_centres', v_n);
+  v_removed := v_removed + v_n; v_tables := v_tables + 1;
+
+  -- bible_study_centres (registry only: DEMO-BSC codes stay in the registry;
+  -- the columns carry real data, so no code sweep)
+  DELETE FROM bible_study_centres WHERE id IN
+    (SELECT row_id FROM demo_seed_registry WHERE table_name = 'bible_study_centres');
+  GET DIAGNOSTICS v_n = ROW_COUNT;
+  DELETE FROM demo_seed_registry WHERE table_name = 'bible_study_centres';
+  v_detail := v_detail || jsonb_build_object('bible_study_centres', v_n);
+  v_removed := v_removed + v_n; v_tables := v_tables + 1;
+
+  -- person_previous_branches (registry only; AFC-1083 follow-up; child of people)
+  DELETE FROM person_previous_branches WHERE id IN
+    (SELECT row_id FROM demo_seed_registry WHERE table_name = 'person_previous_branches');
+  GET DIAGNOSTICS v_n = ROW_COUNT;
+  DELETE FROM demo_seed_registry WHERE table_name = 'person_previous_branches';
+  v_detail := v_detail || jsonb_build_object('person_previous_branches', v_n);
   v_removed := v_removed + v_n; v_tables := v_tables + 1;
 
   -- people_departments (registry only: includes the GROUP-1 junction row)
