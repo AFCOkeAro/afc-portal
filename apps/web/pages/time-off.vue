@@ -1,25 +1,29 @@
 <script setup lang="ts">
-import { COLLECTIONS, LEAVE_STATUSES, LEAVE_TYPES, workingDaysBetween } from '@afc/shared'
+import { COLLECTIONS, LEAVE_TYPES, workingDaysBetween } from '@afc/shared'
+import type { LeaveType } from '@afc/shared'
 
 /**
- * Time Off (AFC-896 merged surface): Time Off and Annual Leave are the same
- * subject, so they live in one section with Balances / Requests / Approvals
- * tabs instead of separate menu entries. No new registers — the tabs only
- * move surfaces.
+ * Time Off (AFC-1058 cutover over AFC-896 + AFC-927): Time Off and Annual
+ * Leave are the same subject, so they live in one section with Balances /
+ * Requests / Approvals tabs instead of separate menu entries.
  *
- * Balances tab (AFC-854, moved unchanged): annual allowances per person per
- * year, plus a working-day calculator for planning leave (weekends skipped;
- * public holidays are not subtracted yet — no holiday register). Used and
- * remaining days compute server-side against approved leave_requests.
+ * Balances tab (AFC-854): annual allowances per person per year, plus a
+ * working-day calculator for planning leave (Mon–Fri; public holidays are
+ * not subtracted yet — no holiday register). Used and remaining days
+ * compute server-side against approved leave_requests.
  *
- * Requests tab (AFC-842, moved unchanged): file a request (person, dates,
- * type, reason — days count start..end inclusive, stamped server-side) and
- * correct pending requests. Scoped to the caller's branch/zone server-side.
+ * Requests tab: answers "my leave status", so Mine is the default —
+ * `?mine=0` opts into the wider scoped view. Filing stamps the session
+ * user as the requester server-side (no client user id, no client day
+ * count); an optional person link covers HR filing on behalf. Pending-only
+ * edit modal via the existing PATCH (server enforces pending + requester
+ * + date order and audits the edit). Names resolve route-side; avatars
+ * render initials until person photos land (AFC-864 wire point).
  *
- * Approvals tab (AFC-896, new focus view): the pending decision queue plus
- * the decided list, folded client-side from the already-loaded scoped rows
- * (no new endpoint, no new register). Decisions ride the same row and the
- * same transition table as the Requests tab.
+ * Approvals tab: the deciding-officer queue — the same endpoint with no
+ * `mine` filter — gated on the update grant; everyone else sees a
+ * restricted notice, never the queue. Decisions (approved/rejected) stamp
+ * decided_by/at from the session and write the audit row.
  *
  * Tab is `?tab=` so each tab deep-links (events detail precedent); the old
  * `/annual-leave` route redirects to `?tab=requests` so bookmarks keep
@@ -36,6 +40,7 @@ const { personOptions, personPending, onPersonSearch } = usePersonSearch()
 const TABS = [
   { id: 'balances', label: 'Balances', icon: 'i-lucide-wallet' },
   { id: 'requests', label: 'Requests', icon: 'i-lucide-inbox' },
+  { id: 'approvals', label: 'Approvals', icon: 'i-lucide-check-check' },
 ] as const
 
 type TabId = (typeof TABS)[number]['id']
@@ -43,8 +48,10 @@ type TabId = (typeof TABS)[number]['id']
 const canManage = computed(() => permissions.can(COLLECTIONS.leaveBalances, 'create'))
 const canSeeBalances = computed(() => permissions.can(COLLECTIONS.leaveBalances, 'read'))
 const canCreate = computed(() => permissions.can(COLLECTIONS.leaveRequests, 'create'))
-const canDecide = computed(() => permissions.can(COLLECTIONS.leaveRequests, 'update'))
 const canSeeRequests = computed(() => permissions.can(COLLECTIONS.leaveRequests, 'read'))
+/** Approvals tab is defence in depth: deciding officers hold the update
+ *  grant; everyone else sees a restricted notice, never the queue. */
+const canApprove = computed(() => permissions.can(COLLECTIONS.leaveRequests, 'update'))
 
 interface LeaveBalance {
   id: string
@@ -72,7 +79,7 @@ const calcEnd = ref('')
 
 const yearItems = computed(() => {
   const current = new Date().getFullYear()
-  return [current - 1, current, current + 1].map((year) => ({
+  return [current - 1, current + 1].map((year) => ({
     label: String(year),
     value: String(year),
   }))
@@ -138,31 +145,142 @@ async function removeBalance(id: string): Promise<void> {
   }
 }
 
-interface LeaveRequest {
+interface LeaveRow {
   id: string
-  person: string | null
+  leave_type: string
   start_date: string
   end_date: string
-  days: number
-  leave_type: string
-  reason: string | null
+  reason?: string | null
   status: string
+  requester_name: string | null
+  requester_photo: string | null
+  can_edit: boolean
 }
 
 const TYPE_LABELS: Record<string, string> = {
   annual: 'Annual',
   sick: 'Sick',
-  maternity: 'Maternity',
   compassionate: 'Compassionate',
+  study: 'Study',
   unpaid: 'Unpaid',
   other: 'Other',
 }
 
-const statusFilter = ref('all')
-const requests = ref<LeaveRequest[]>([])
+function typeLabel(type: string): string {
+  return TYPE_LABELS[type] ?? type
+}
+
+function statusColor(status: string): string {
+  if (status === 'approved') return 'success'
+  if (status === 'rejected') return 'error'
+  return 'warning'
+}
+
+function dateRange(row: LeaveRow): string {
+  return row.start_date === row.end_date
+    ? row.start_date
+    : `${row.start_date} → ${row.end_date}`
+}
+
+function rowDays(row: LeaveRow): number | null {
+  return workingDaysBetween(row.start_date, row.end_date)
+}
+
+/** Drill-down contract: Requests answers "my leave status", so Mine is
+ *  the default — `?mine=0` opts into the wider scoped view. */
+function queryParam(name: string): string | null {
+  const value = route.query[name]
+  return typeof value === 'string' && value.length > 0 ? value : null
+}
+const mine = ref(queryParam('mine') !== '0')
+const requestStatus = ref(queryParam('status') ?? 'all')
+const approvalStatus = ref('pending')
+
+/** Same-page query sync (tasks ?mine= pattern, default inverted to Mine). */
+watch(
+  () => route.query,
+  (next: typeof route.query) => {
+    mine.value = next.mine !== '0'
+    requestStatus.value =
+      typeof next.status === 'string' && next.status.length > 0 ? next.status : 'all'
+  },
+)
+
+const requestsQuery = computed(() => ({
+  ...(requestStatus.value !== 'all' ? { status: requestStatus.value } : {}),
+  ...(mine.value ? { mine: '1' } : {}),
+}))
+
+const requests = ref<LeaveRow[]>([])
 const requestsPending = ref(false)
 const requestsError = ref('')
-const personNames = ref<Record<string, string>>({})
+
+const approvalsQuery = computed(() => ({
+  ...(approvalStatus.value !== 'all' ? { status: approvalStatus.value } : {}),
+}))
+
+const approvals = ref<LeaveRow[]>([])
+const approvalsPending = ref(false)
+const approvalsError = ref('')
+const actionError = ref('')
+
+const statusOptions = [
+  { label: 'All statuses', value: 'all' },
+  { label: 'Pending', value: 'pending' },
+  { label: 'Approved', value: 'approved' },
+  { label: 'Rejected', value: 'rejected' },
+]
+
+const leaveTypeOptions = (LEAVE_TYPES as readonly string[]).map((type) => ({
+  label: typeLabel(type),
+  value: type,
+}))
+
+async function loadRequests(): Promise<void> {
+  requestsPending.value = true
+  requestsError.value = ''
+  try {
+    const res = await api.get<{ data: LeaveRow[] }>('/api/leave-requests', {
+      query: requestsQuery.value,
+    })
+    requests.value = res.data ?? []
+  } catch (cause) {
+    requestsError.value =
+      (cause as { message?: string }).message ?? 'Could not load requests'
+  } finally {
+    requestsPending.value = false
+  }
+}
+
+async function loadApprovals(): Promise<void> {
+  if (!canApprove.value) {
+    approvals.value = []
+    return
+  }
+  approvalsPending.value = true
+  approvalsError.value = ''
+  try {
+    const res = await api.get<{ data: LeaveRow[] }>('/api/leave-requests', {
+      query: approvalsQuery.value,
+    })
+    approvals.value = res.data ?? []
+  } catch (cause) {
+    approvalsError.value =
+      (cause as { message?: string }).message ?? 'Could not load the approvals queue'
+  } finally {
+    approvalsPending.value = false
+  }
+}
+
+/* Balance preview (AFC-854 phase 2): allowance, used and the cost of the
+ * draft dates, so a request is filed with eyes open. Unknown until a person
+ * link and both dates are chosen. */
+const previewBalance = ref<{
+  allowance: number
+  used: number | null
+} | null>(null)
+const previewPending = ref(false)
+
 const newRequest = ref({
   person: '',
   start_date: '',
@@ -172,16 +290,6 @@ const newRequest = ref({
 })
 const requestSaving = ref(false)
 const requestError = ref('')
-const actionError = ref('')
-
-/* Balance preview (AFC-854 phase 2): allowance, used and the cost of the
- * draft dates, so a request is filed with eyes open. Unknown until the
- * person and both dates are chosen. */
-const previewBalance = ref<{
-  allowance: number
-  used: number | null
-} | null>(null)
-const previewPending = ref(false)
 
 const previewDays = computed(() => {
   if (newRequest.value.start_date === '' || newRequest.value.end_date === '') return null
@@ -221,72 +329,26 @@ watch(
   },
 )
 
-const statusItems = computed(() => [
-  { label: 'All statuses', value: 'all' },
-  ...LEAVE_STATUSES.map((status: string) => ({ label: status, value: status })),
-])
-
-async function loadRequests(): Promise<void> {
-  requestsPending.value = true
-  requestsError.value = ''
-  try {
-    const res = await api.get<{ data: LeaveRequest[] }>('/api/leave-requests', {
-      query: statusFilter.value === 'all' ? {} : { status: statusFilter.value },
-    })
-    requests.value = res.data ?? []
-    await resolveNames()
-  } catch (cause) {
-    requestsError.value =
-      (cause as { message?: string }).message ?? 'Could not load requests'
-  } finally {
-    requestsPending.value = false
-  }
-}
-
-async function resolveNames(): Promise<void> {
-  const ids = [
-    ...new Set(requests.value.map((row: LeaveRequest) => row.person).filter(Boolean)),
-  ] as string[]
-  const missing = ids.filter((id) => !personNames.value[id])
-  if (missing.length === 0) return
-  const settled = await Promise.all(
-    missing.map((id) =>
-      api
-        .get<{ data: Record<string, unknown> }>(`/api/people/${id}`)
-        .then((res) => ({ id, row: res.data }))
-        .catch(() => ({ id, row: null })),
-    ),
-  )
-  const names: Record<string, string> = {}
-  for (const { id, row } of settled) {
-    if (!row) continue
-    const full =
-      `${String(row.first_name ?? '').trim()} ${String(row.last_name ?? '').trim()}`.trim()
-    names[id] = String(row.preferred_name ?? '').trim() || full || 'Unnamed member'
-  }
-  personNames.value = { ...personNames.value, ...names }
-}
-
 async function createRequest(): Promise<void> {
-  if (newRequest.value.person === '') {
-    requestError.value = 'Choose who the leave is for.'
-    return
-  }
   if (newRequest.value.start_date === '' || newRequest.value.end_date === '') {
     requestError.value = 'Give the leave a start and an end date.'
+    return
+  }
+  if (newRequest.value.reason.trim() === '') {
+    requestError.value = 'Give a reason for the leave.'
     return
   }
   requestSaving.value = true
   requestError.value = ''
   try {
     await api.post('/api/leave-requests', {
-      person: newRequest.value.person,
+      ...(newRequest.value.person === ''
+        ? {}
+        : { requester_person: newRequest.value.person }),
       start_date: newRequest.value.start_date,
       end_date: newRequest.value.end_date,
       leave_type: newRequest.value.leave_type,
-      ...(newRequest.value.reason.trim() === ''
-        ? {}
-        : { reason: newRequest.value.reason.trim() }),
+      reason: newRequest.value.reason.trim(),
     })
     newRequest.value = {
       person: '',
@@ -304,13 +366,11 @@ async function createRequest(): Promise<void> {
   }
 }
 
-async function decide(
-  id: string,
-  status: 'approved' | 'declined' | 'cancelled',
-): Promise<void> {
+async function decide(id: string, status: 'approved' | 'rejected'): Promise<void> {
   actionError.value = ''
   try {
     await api.patch(`/api/leave-requests/${id}`, { status })
+    await loadApprovals()
     await loadRequests()
   } catch (cause) {
     actionError.value =
@@ -318,24 +378,51 @@ async function decide(
   }
 }
 
-async function withdraw(id: string): Promise<void> {
-  actionError.value = ''
-  try {
-    await api.remove(`/api/leave-requests/${id}`)
-    await loadRequests()
-  } catch (cause) {
-    actionError.value =
-      (cause as { message?: string }).message ?? 'Could not withdraw the request'
+/** Edit modal: pending rows only, requester-owned (server is truth). */
+const editing = ref<LeaveRow | null>(null)
+const editForm = ref({
+  leave_type: 'annual' as LeaveType | string,
+  start_date: '',
+  end_date: '',
+  reason: '',
+})
+const editError = ref('')
+const saving = ref(false)
+
+function openEdit(row: LeaveRow) {
+  editing.value = row
+  editError.value = ''
+  editForm.value = {
+    leave_type: row.leave_type,
+    start_date: row.start_date,
+    end_date: row.end_date,
+    reason: row.reason ?? '',
   }
 }
 
-function typeLabel(type: string): string {
-  return TYPE_LABELS[type] ?? type
-}
-
-function personLabel(id: string | null): string {
-  if (!id) return '—'
-  return personNames.value[id] ?? id.slice(0, 8)
+async function saveEdit() {
+  if (!editing.value) return
+  editError.value = ''
+  if (editForm.value.start_date > editForm.value.end_date) {
+    editError.value = 'The end date must be on or after the start date.'
+    return
+  }
+  saving.value = true
+  try {
+    await api.patch(`/api/leave-requests/${editing.value.id}`, {
+      leave_type: editForm.value.leave_type,
+      start_date: editForm.value.start_date,
+      end_date: editForm.value.end_date,
+      reason: editForm.value.reason,
+    })
+    editing.value = null
+    await loadRequests()
+  } catch (cause) {
+    editError.value =
+      (cause as { message?: string }).message ?? 'Could not save the changes'
+  } finally {
+    saving.value = false
+  }
 }
 
 const shownTabs = computed<(typeof TABS)[number][]>(() =>
@@ -354,26 +441,25 @@ const tab = computed<TabId>(() => {
 })
 
 function goTab(next: TabId): void {
-  // The approvals queue is inherently the whole queue — landing on it resets
-  // the Requests tab status filter so the pending list is complete.
   void router.replace({ query: { ...route.query, tab: next } })
 }
-
-/* Approvals tab (AFC-896): the pending decision queue plus the decided
- * list, folded client-side from the already-loaded scoped rows. Same rows,
- * same decide()/withdraw() flow — only the focus moves. */
 
 onMounted(() => {
   void loadBalances()
   void loadRequests()
+  void loadApprovals()
 })
 
 watch(yearFilter, () => {
   void loadBalances()
 })
 
-watch(statusFilter, () => {
+watch([requestsQuery, canSeeRequests], () => {
   void loadRequests()
+})
+
+watch([approvalsQuery, canApprove], () => {
+  void loadApprovals()
 })
 </script>
 
@@ -381,7 +467,7 @@ watch(statusFilter, () => {
   <div>
     <PageHeader
       title="Time Off"
-      description="Annual leave in one place — balances, requests and approvals. Allowances count in days (church calendar)."
+      description="Annual leave in one place — balances, requests and approvals. Allowances count in working days (Mon–Fri)."
     />
     <!-- Tabs (AFC-896): one section, `?tab=` deep-links (events detail precedent). -->
     <nav aria-label="Time off sections" class="mt-4">
@@ -406,7 +492,7 @@ watch(statusFilter, () => {
       </div>
     </nav>
 
-    <!-- BALANCES (AFC-854, moved unchanged under the merged tabs) -->
+    <!-- BALANCES (AFC-854): allowances + calculator + preview math -->
     <section v-if="tab === 'balances'" aria-label="Leave balances" class="mt-4">
       <div class="flex flex-wrap items-end gap-2">
         <UFormField label="Year" class="w-40">
@@ -497,7 +583,7 @@ watch(statusFilter, () => {
           <template #header>
             <h3 class="font-semibold">Working-day calculator</h3>
             <p class="mt-1 text-xs text-gray-500">
-              All days counted (church calendar). Public holidays not subtracted yet.
+              Weekends skipped. Public holidays not subtracted yet.
             </p>
           </template>
           <div class="grid gap-2 sm:grid-cols-2">
@@ -516,97 +602,114 @@ watch(statusFilter, () => {
       </div>
     </section>
 
-    <!-- REQUESTS (AFC-842, moved unchanged under the merged tabs) -->
+    <!-- REQUESTS: Mine-default, avatars + names, pending-row edit -->
     <section v-else-if="tab === 'requests'" aria-label="Leave requests" class="mt-4">
-      <div class="flex flex-wrap items-end gap-2">
-        <UFormField label="Status" class="w-52">
-          <USelect v-model="statusFilter" :items="statusItems" class="w-full" />
-        </UFormField>
-      </div>
-      <p v-if="requestsPending" class="mt-3 text-sm text-gray-500">Loading requests…</p>
-      <p v-else-if="requestsError !== ''" class="mt-3 text-sm text-red-600">
-        {{ requestsError }}
-      </p>
-      <div v-else-if="requests.length === 0" class="mt-3">
-        <UCard>
-          <EmptyState
-            title="No leave requests"
-            description="File the first request below."
+      <UCard>
+        <div class="grid gap-3 sm:grid-cols-[220px_1fr]">
+          <USelect
+            v-model="requestStatus"
+            :items="statusOptions"
+            class="w-full"
+            aria-label="Filter by status"
           />
-        </UCard>
-      </div>
-      <div v-else class="mt-3 space-y-2">
-        <UCard v-for="row in requests" :key="row.id">
-          <div class="flex flex-wrap items-center gap-2 text-sm">
-            <span class="font-semibold">{{ personLabel(row.person) }}</span>
-            <UBadge color="neutral" variant="subtle">{{
-              typeLabel(row.leave_type)
-            }}</UBadge>
-            <UBadge
-              :color="
-                row.status === 'approved'
-                  ? 'success'
-                  : row.status === 'pending'
-                    ? 'neutral'
-                    : 'error'
-              "
-              variant="subtle"
-            >
-              {{ row.status }}
-            </UBadge>
-            <span class="text-gray-500"
-              >{{ row.start_date }} → {{ row.end_date }} ({{ row.days }}d)</span
-            >
-            <span class="ml-auto flex gap-1">
-              <template v-if="canDecide && row.status === 'pending'">
-                <UButton
-                  size="xs"
-                  color="success"
-                  variant="soft"
-                  label="Approve"
-                  @click="decide(row.id, 'approved')"
-                />
-                <UButton
-                  size="xs"
-                  color="error"
-                  variant="soft"
-                  label="Decline"
-                  @click="decide(row.id, 'declined')"
-                />
-              </template>
-              <UButton
-                v-if="canDecide && row.status === 'approved'"
-                size="xs"
-                color="neutral"
-                variant="ghost"
-                label="Cancel"
-                @click="decide(row.id, 'cancelled')"
-              />
-              <UButton
-                v-if="row.status === 'pending'"
-                size="xs"
-                color="neutral"
-                variant="ghost"
-                icon="i-lucide-x"
-                :aria-label="`Withdraw request`"
-                @click="withdraw(row.id)"
-              />
-            </span>
-          </div>
-          <p v-if="row.reason" class="mt-1 text-sm text-gray-600">{{ row.reason }}</p>
-        </UCard>
-      </div>
-      <p v-if="actionError !== ''" class="mt-3 text-sm text-red-600">{{ actionError }}</p>
+          <UCheckbox v-model="mine" label="Mine only" name="mine" />
+        </div>
+
+        <div v-if="requestsPending" class="mt-8 flex justify-center py-10">
+          <UIcon
+            name="i-lucide-loader-circle"
+            class="size-6 animate-spin text-gray-400"
+          />
+        </div>
+
+        <EmptyState
+          v-else-if="requests.length === 0"
+          title="No leave requests match these filters"
+          description="Requests you make will appear here with their current status."
+        />
+
+        <div v-else class="mt-4 overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
+            <thead>
+              <tr
+                class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400"
+              >
+                <th class="px-3 py-2 font-medium">Requester</th>
+                <th class="px-3 py-2 font-medium">Type</th>
+                <th class="px-3 py-2 font-medium">Dates</th>
+                <th class="px-3 py-2 font-medium">Status</th>
+                <th class="px-3 py-2 font-medium">Reason</th>
+                <th class="px-3 py-2"><span class="sr-only">Edit</span></th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+              <tr
+                v-for="row in requests"
+                :key="row.id"
+                class="hover:bg-gray-50 dark:hover:bg-gray-900/60"
+              >
+                <td class="px-3 py-3">
+                  <span class="flex items-center gap-2">
+                    <PersonAvatar
+                      :name="row.requester_name"
+                      :photo="row.requester_photo"
+                    />
+                    <span class="font-medium text-gray-900 dark:text-white">
+                      {{ row.requester_name ?? '—' }}
+                    </span>
+                  </span>
+                </td>
+                <td class="px-3 py-3 capitalize text-gray-600 dark:text-gray-300">
+                  {{ row.leave_type }}
+                </td>
+                <td class="px-3 py-3 text-gray-600 tabular-nums dark:text-gray-300">
+                  {{ dateRange(row) }}
+                  <span v-if="rowDays(row) !== null" class="text-gray-400"
+                    >({{ rowDays(row) }}d)</span
+                  >
+                </td>
+                <td class="px-3 py-3">
+                  <UBadge :color="statusColor(row.status)" variant="subtle">
+                    {{ row.status }}
+                  </UBadge>
+                </td>
+                <td class="max-w-64 truncate px-3 py-3 text-gray-600 dark:text-gray-300">
+                  {{ row.reason ?? '—' }}
+                </td>
+                <td class="px-3 py-3 text-right">
+                  <UButton
+                    v-if="row.can_edit"
+                    color="neutral"
+                    variant="ghost"
+                    size="xs"
+                    icon="i-lucide-pencil"
+                    aria-label="Edit request"
+                    @click="openEdit(row)"
+                  />
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p v-if="requestsError !== ''" class="mt-3 text-sm text-red-600">
+          {{ requestsError }}
+        </p>
+      </UCard>
+
       <UCard v-if="canCreate" class="mt-4">
         <template #header>
           <h3 class="font-semibold">File a request</h3>
+          <p class="mt-1 text-xs text-gray-500">
+            Filed as you — the requester is stamped from your session. Day counts
+            are computed Mon–Fri, never typed.
+          </p>
         </template>
         <div class="grid gap-2 sm:grid-cols-2">
-          <UFormField label="Who is the leave for" class="sm:col-span-2">
+          <UFormField label="Link a person record (optional)" class="sm:col-span-2">
             <EntitySelect
               v-model="newRequest.person"
               :items="personOptions"
-              placeholder="Type a name to search…"
+              placeholder="Self-filed — pick a record when filing on behalf…"
               :loading="personPending"
               server-search
               class="w-full"
@@ -622,17 +725,16 @@ watch(statusFilter, () => {
           <UFormField label="Type">
             <USelect
               v-model="newRequest.leave_type"
-              :items="
-                LEAVE_TYPES.map((type: string) => ({
-                  label: typeLabel(type),
-                  value: type,
-                }))
-              "
+              :items="leaveTypeOptions"
               class="w-full"
             />
           </UFormField>
           <UFormField label="Reason">
-            <UInput v-model="newRequest.reason" placeholder="Optional" class="w-full" />
+            <UInput
+              v-model="newRequest.reason"
+              placeholder="Required"
+              class="w-full"
+            />
           </UFormField>
         </div>
         <p v-if="previewPending" class="mt-3 text-sm text-gray-500">Checking balance…</p>
@@ -664,5 +766,167 @@ watch(statusFilter, () => {
         </p>
       </UCard>
     </section>
+
+    <!-- APPROVALS: update-grant queue, restricted notice otherwise -->
+    <section v-else-if="tab === 'approvals'" aria-label="Leave approvals" class="mt-4">
+      <UCard v-if="canApprove">
+        <div class="grid gap-3 sm:grid-cols-[220px_1fr]">
+          <USelect
+            v-model="approvalStatus"
+            :items="statusOptions"
+            class="w-full"
+            aria-label="Filter by status"
+          />
+        </div>
+
+        <div v-if="approvalsPending" class="mt-8 flex justify-center py-10">
+          <UIcon
+            name="i-lucide-loader-circle"
+            class="size-6 animate-spin text-gray-400"
+          />
+        </div>
+
+        <EmptyState
+          v-else-if="approvals.length === 0"
+          title="The approvals queue is clear"
+          description="Pending requests in your scope will appear here for decision."
+        />
+
+        <div v-else class="mt-4 overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
+            <thead>
+              <tr
+                class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400"
+              >
+                <th class="px-3 py-2 font-medium">Requester</th>
+                <th class="px-3 py-2 font-medium">Type</th>
+                <th class="px-3 py-2 font-medium">Dates</th>
+                <th class="px-3 py-2 font-medium">Status</th>
+                <th class="px-3 py-2 font-medium">Reason</th>
+                <th class="px-3 py-2"><span class="sr-only">Decide</span></th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+              <tr
+                v-for="row in approvals"
+                :key="row.id"
+                class="hover:bg-gray-50 dark:hover:bg-gray-900/60"
+              >
+                <td class="px-3 py-3">
+                  <span class="flex items-center gap-2">
+                    <PersonAvatar
+                      :name="row.requester_name"
+                      :photo="row.requester_photo"
+                    />
+                    <span class="font-medium text-gray-900 dark:text-white">
+                      {{ row.requester_name ?? '—' }}
+                    </span>
+                  </span>
+                </td>
+                <td class="px-3 py-3 capitalize text-gray-600 dark:text-gray-300">
+                  {{ row.leave_type }}
+                </td>
+                <td class="px-3 py-3 text-gray-600 tabular-nums dark:text-gray-300">
+                  {{ dateRange(row) }}
+                  <span v-if="rowDays(row) !== null" class="text-gray-400"
+                    >({{ rowDays(row) }}d)</span
+                  >
+                </td>
+                <td class="px-3 py-3">
+                  <UBadge :color="statusColor(row.status)" variant="subtle">
+                    {{ row.status }}
+                  </UBadge>
+                </td>
+                <td class="max-w-64 truncate px-3 py-3 text-gray-600 dark:text-gray-300">
+                  {{ row.reason ?? '—' }}
+                </td>
+                <td class="px-3 py-3 text-right">
+                  <span v-if="row.status === 'pending'" class="flex justify-end gap-1">
+                    <UButton
+                      size="xs"
+                      color="success"
+                      variant="soft"
+                      label="Approve"
+                      @click="decide(row.id, 'approved')"
+                    />
+                    <UButton
+                      size="xs"
+                      color="error"
+                      variant="soft"
+                      label="Reject"
+                      @click="decide(row.id, 'rejected')"
+                    />
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p v-if="approvalsError !== ''" class="mt-3 text-sm text-red-600">
+          {{ approvalsError }}
+        </p>
+        <p v-if="actionError !== ''" class="mt-3 text-sm text-red-600">
+          {{ actionError }}
+        </p>
+      </UCard>
+
+      <UAlert
+        v-else
+        color="warning"
+        variant="subtle"
+        title="Restricted"
+        description="The approvals queue is visible to deciding officers only. Your own requests are on the Requests tab."
+      />
+    </section>
+
+    <UModal
+      :open="editing !== null"
+      title="Edit leave request"
+      description="Only pending requests can be edited. The end date must be on or after the start date."
+      @update:open="editing = $event ? editing : null"
+    >
+      <template #body>
+        <div class="grid gap-3">
+          <UFormField label="Leave type">
+            <USelect
+              v-model="editForm.leave_type"
+              :items="leaveTypeOptions"
+              class="w-full"
+            />
+          </UFormField>
+          <UFormField label="Start date">
+            <UInput v-model="editForm.start_date" type="date" class="w-full" />
+          </UFormField>
+          <UFormField label="End date">
+            <UInput v-model="editForm.end_date" type="date" class="w-full" />
+          </UFormField>
+          <UFormField label="Reason">
+            <UTextarea v-model="editForm.reason" class="w-full" :rows="3" />
+          </UFormField>
+        </div>
+        <UAlert
+          v-if="editError"
+          class="mt-4"
+          color="error"
+          variant="subtle"
+          title="Could not save the changes"
+          :description="editError"
+        />
+        <div class="mt-4 flex justify-end gap-2">
+          <UButton
+            label="Cancel"
+            color="neutral"
+            variant="ghost"
+            @click="editing = null"
+          />
+          <UButton
+            label="Save changes"
+            icon="i-lucide-check"
+            :loading="saving"
+            @click="saveEdit"
+          />
+        </div>
+      </template>
+    </UModal>
   </div>
 </template>

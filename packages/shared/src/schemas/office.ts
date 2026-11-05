@@ -239,6 +239,79 @@ export type TransferForm = z.infer<typeof transferFormSchema>
 export const transferStatusSchema = z.object({ status: z.enum(TRANSFER_STATUSES) })
 export type TransferStatusChange = z.infer<typeof transferStatusSchema>
 
+/**
+ * Time Off leave register (AFC-1058 cutover 0067, ADR-0012; surfaced by
+ * the leave routes + time-off page).
+ *
+ * A form validates what the person typed, not the row: scope (branch/zone)
+ * resolves server-side from the session, `requester_user` is stamped from
+ * the session (never a client field), no day count is trusted from the
+ * client (used/remaining compute via workingDaysBetween), `decided_by`/
+ * `decided_at` are stamped by the decision path (ADR-0012 Dec.2 — a CHECK
+ * cannot know the actor), and audit rows are written by the route, never
+ * by the client.
+ */
+export const LEAVE_TYPES = [
+  'annual',
+  'sick',
+  'compassionate',
+  'study',
+  'unpaid',
+  'other',
+] as const
+export type LeaveType = (typeof LEAVE_TYPES)[number]
+
+export const LEAVE_STATUSES = ['pending', 'approved', 'rejected'] as const
+export type LeaveStatus = (typeof LEAVE_STATUSES)[number]
+
+/** Decisions a deciding officer may record; `pending` is the initial state, never a transition. */
+export const LEAVE_DECISIONS = ['approved', 'rejected'] as const
+export type LeaveDecision = (typeof LEAVE_DECISIONS)[number]
+
+export const LEAVE_REQUEST_EVENT_TYPES = [
+  'created',
+  'updated',
+  'status_changed',
+  'note',
+] as const
+export type LeaveRequestEventType = (typeof LEAVE_REQUEST_EVENT_TYPES)[number]
+
+/**
+ * File a leave request. The requester is the session user (stamped
+ * server-side); `requester_person` optionally links the person register
+ * row the leave is for (HR filing on behalf, verified route-side, NULL
+ * for self-filed rows); branch is the scope default unless the filer
+ * names an in-scope branch.
+ */
+export const leaveRequestFormSchema = z.object({
+  branch: optionalText(36),
+  requester_person: z.string().uuid('Choose the person').nullish(),
+  start_date: dateSchema,
+  end_date: dateSchema,
+  leave_type: z.enum(LEAVE_TYPES).default('annual'),
+  reason: z.string().trim().min(1, 'Reason is required').max(4000),
+})
+
+export type LeaveRequestForm = z.infer<typeof leaveRequestFormSchema>
+
+/**
+ * Requester edit of a pending row (dates/type/reason). Every field is
+ * optional so one PATCH can touch one field; when both dates resolve the
+ * order is checked (the migration CHECK owns the stored invariant, this
+ * owns the typed-fields error before the write).
+ */
+export const leaveEditSchema = z.object({
+  leave_type: z.enum(LEAVE_TYPES).optional(),
+  start_date: dateSchema.optional(),
+  end_date: dateSchema.optional(),
+  reason: z.string().trim().min(1, 'Reason is required').max(4000).optional(),
+})
+export type LeaveEdit = z.infer<typeof leaveEditSchema>
+
+/** Deciding-officer transition out of `pending`; the route stamps decided_by/at. */
+export const leaveDecisionSchema = z.object({ status: z.enum(LEAVE_DECISIONS) })
+export type LeaveDecisionChange = z.infer<typeof leaveDecisionSchema>
+
 export const marriageFormSchema = z.object({
   person: z.string().uuid('Choose the person'),
   partner_person: z.string().uuid().optional(),
