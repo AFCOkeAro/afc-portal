@@ -26,7 +26,9 @@ const FIELDS = [
 
 /**
  * GET /api/leave-requests — Church Office leave list (AFC-842), scoped to
- * the caller's branch/zone. Branch + status filters feed the page.
+ * the caller's branch/zone. Branch + status filters feed the page; `mine=1`
+ * narrows to rows the caller filed (created_by = session user) for the
+ * Mine-default Requests tab (AFC-1026).
  */
 export default defineEventHandler(async (event) => {
   const scope = await getPortalScope(event)
@@ -36,6 +38,7 @@ export default defineEventHandler(async (event) => {
   const branch = typeof query.branch === 'string' ? query.branch : undefined
   const status = typeof query.status === 'string' ? query.status : undefined
   const person = typeof query.person === 'string' ? query.person : undefined
+  const mine = query.mine === '1'
   try {
     const result = await listItems<Record<string, unknown>>(
       event,
@@ -46,6 +49,7 @@ export default defineEventHandler(async (event) => {
           branch ? { branch: { _eq: branch } } : undefined,
           status ? { status: { _eq: status } } : undefined,
           person ? { person: { _eq: person } } : undefined,
+          mine ? { created_by: { _eq: scope.session.user.id } } : undefined,
           scopeFilter(scope),
         ),
         fields: FIELDS,
