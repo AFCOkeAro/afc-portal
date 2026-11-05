@@ -1,8 +1,4 @@
-import {
-  COLLECTIONS,
-  leaveDecisionSchema,
-  leaveEditSchema,
-} from '@afc/shared'
+import { COLLECTIONS, leaveDecisionSchema, leaveEditSchema } from '@afc/shared'
 import {
   findScopedItem,
   getPortalScope,
@@ -67,7 +63,8 @@ export default defineEventHandler(async (event) => {
     if (row.requester_user === scope.session.user.id) {
       throw createError({
         statusCode: 403,
-        statusMessage: 'A deciding officer cannot decide their own request — direct it to another officer',
+        statusMessage:
+          'A deciding officer cannot decide their own request — direct it to another officer',
         data: { code: 'not_own_decision' },
       })
     }
@@ -118,7 +115,10 @@ export default defineEventHandler(async (event) => {
     throw createError({
       statusCode: 400,
       statusMessage: 'The end date must be on or after the start date',
-      data: { code: 'invalid_dates', fields: { end_date: 'End date is before start date' } },
+      data: {
+        code: 'invalid_dates',
+        fields: { end_date: 'End date is before start date' },
+      },
     })
   }
 

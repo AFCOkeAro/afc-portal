@@ -115,8 +115,7 @@ export default defineEventHandler(async (event) => {
     // AFC-864 wire point: person photos do not exist yet; the UI falls
     // back to name initials while this stays null.
     requester_photo: null,
-    can_edit:
-      row.status === 'pending' && row.requester_user === sessionUserId,
+    can_edit: row.status === 'pending' && row.requester_user === sessionUserId,
   }))
   return { data: rows, meta }
 })

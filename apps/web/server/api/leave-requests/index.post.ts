@@ -43,7 +43,8 @@ export default defineEventHandler(async (event) => {
   if (!branch) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'No branch in scope: area staff name the branch the request belongs to',
+      statusMessage:
+        'No branch in scope: area staff name the branch the request belongs to',
       data: { code: 'branch_out_of_scope', fields: { branch: 'Required' } },
     })
   }

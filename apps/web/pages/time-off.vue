@@ -700,8 +700,8 @@ watch([approvalsQuery, canApprove], () => {
         <template #header>
           <h3 class="font-semibold">File a request</h3>
           <p class="mt-1 text-xs text-gray-500">
-            Filed as you — the requester is stamped from your session. Day counts
-            are computed Mon–Fri, never typed.
+            Filed as you — the requester is stamped from your session. Day counts are
+            computed Mon–Fri, never typed.
           </p>
         </template>
         <div class="grid gap-2 sm:grid-cols-2">
@@ -730,11 +730,7 @@ watch([approvalsQuery, canApprove], () => {
             />
           </UFormField>
           <UFormField label="Reason">
-            <UInput
-              v-model="newRequest.reason"
-              placeholder="Required"
-              class="w-full"
-            />
+            <UInput v-model="newRequest.reason" placeholder="Required" class="w-full" />
           </UFormField>
         </div>
         <p v-if="previewPending" class="mt-3 text-sm text-gray-500">Checking balance…</p>
