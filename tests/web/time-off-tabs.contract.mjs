@@ -1,22 +1,10 @@
 /**
- * AFC-1058 contract tests — Time Off tabs over the cut register (ADR-0012).
+ * AFC-896 contract — Time Off + Annual Leave merged as tabs.
  *
- * Forward-port of the AFC-927 shape (17 pins: shared schemas, list route,
- * PATCH route, page, merged surface) onto the main route/page paths, with
- * the Balances gates re-pointed at COLLECTIONS.leaveBalances (the AFC-1058
- * amendment keeps leave_balances, owned by 0055).
- *
- * Pure node:test, no dependencies. Pins the vertical shape:
- *   1. List route defaults nothing server-side but honours `mine=1`
- *      (requester_user = session), stays branch-scoped, strips hidden
- *      fields, and resolves `requester_name` route-side (never a raw id
- *      in the UI).
- *   2. PATCH enforces pending-only, requester-only edits with ordered
- *      dates, update-grant decisions with session stamps, and audits
- *      both paths.
- *   3. The page defaults to Mine, gates Approvals on the update grant
- *      with a restricted notice (never the queue), renders names +
- *      avatars in both tabs, and edits pending rows only.
+ * Time off and annual leave are the same subject, so they share one section
+ * (balances / requests / approvals tabs) instead of separate menu entries.
+ * No new registers: the tabs only move surfaces. Balances math (AFC-854)
+ * and the approval flow (AFC-842) ride unchanged underneath.
  *
  * Run: node --test tests/web/time-off-tabs.contract.mjs
  */
@@ -33,178 +21,101 @@ const codeOf = (rel) =>
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/\/\/.*/g, '')
 
-const LIST = 'apps/web/server/api/leave-requests/index.get.ts'
-const PATCH = 'apps/web/server/api/leave-requests/[id].patch.ts'
+const NAV = 'apps/web/utils/navigation.ts'
 const PAGE = 'apps/web/pages/time-off.vue'
-const AVATAR = 'apps/web/components/PersonAvatar.vue'
-const SCHEMAS = 'packages/shared/src/schemas/office.ts'
+const REDIRECT = 'apps/web/pages/annual-leave.vue'
 
-describe('time off — shared leave schemas', () => {
-  const schemas = codeOf(SCHEMAS)
+describe('AFC-896 merged nav: one Time Off section, no Annual Leave duplicate', () => {
+  const src = read(NAV)
 
-  it('pins the leave vocabularies', () => {
-    assert.match(schemas, /export const LEAVE_TYPES = \[/)
-    for (const t of ['annual', 'sick', 'compassionate', 'study', 'unpaid', 'other']) {
-      assert.ok(schemas.includes(`'${t}'`), `leave type includes ${t}`)
-    }
-    assert.doesNotMatch(schemas, /'maternity'/)
-    assert.match(
-      schemas,
-      /export const LEAVE_STATUSES = \['pending', 'approved', 'rejected'\]/,
-    )
-    assert.match(schemas, /export const LEAVE_DECISIONS = \['approved', 'rejected'\]/)
+  it('has exactly one Time Off entry pointing at /time-off', () => {
+    const hits = src.match(/label: 'Time Off'/g) ?? []
+    assert.equal(hits.length, 1, `expected 1 Time Off entry, found ${hits.length}`)
+    assert.match(src, /to: '\/time-off'/)
   })
 
-  it('separates requester edits from officer decisions', () => {
-    assert.match(schemas, /export const leaveEditSchema/)
-    assert.match(schemas, /export const leaveDecisionSchema/)
-  })
-})
-
-describe('time off — list route', () => {
-  const route = codeOf(LIST)
-
-  it('requires the read grant and stays branch-scoped', () => {
-    assert.match(route, /requireCan\(scope, COLLECTIONS\.leaveRequests, 'read'\)/)
-    assert.match(route, /officeBranchScope\(scope\)/)
-    assert.match(route, /stripHiddenMany\(scope, COLLECTIONS\.leaveRequests/)
+  it('removes the separate Annual Leave menu entry', () => {
+    assert.doesNotMatch(src, /label: 'Annual Leave'/)
+    assert.doesNotMatch(src, /to: '\/annual-leave'/)
   })
 
-  it('honours mine=1 as requester_user = session', () => {
-    assert.match(route, /query\.mine === '1'/)
-    assert.match(route, /requester_user: \{ _eq: scope\.session\.user\.id \}/)
-  })
-
-  it('resolves the requester name route-side and marks editable rows', () => {
-    assert.match(route, /requester_name/)
-    assert.match(route, /COLLECTIONS\.people/)
-    assert.match(route, /can_edit/)
-    assert.match(route, /requester_photo: null/)
+  it('keeps the merged entry under Church Office', () => {
+    const needle = "to: '/time-off',"
+    const at = src.indexOf(needle)
+    assert.ok(at !== -1, '/time-off is still a nav target')
+    const slice = src.slice(at, at + 400)
+    assert.match(slice, /group: 'office'/)
   })
 })
 
-describe('time off — PATCH route', () => {
-  const route = codeOf(PATCH)
+describe('AFC-896 merged tabs: balances / requests / approvals with ?tab= links', () => {
+  const src = read(PAGE)
 
-  it('is pending-only on both paths', () => {
-    assert.match(route, /row\.status !== 'pending'/)
-    assert.match(route, /not_pending/)
-  })
-
-  it('restricts edits to the requester and validates the date order', () => {
-    assert.match(route, /row\.requester_user !== scope\.session\.user\.id/)
-    assert.match(route, /not_requester/)
-    assert.match(route, /leaveEditSchema\.safeParse/)
-    assert.match(route, /invalid_dates/)
-  })
-
-  it('restricts decisions to the update grant with session stamps', () => {
-    assert.match(route, /requireCan\(scope, COLLECTIONS\.leaveRequests, 'update'\)/)
-    assert.match(route, /leaveDecisionSchema\.safeParse/)
-    assert.match(route, /decided_by: scope\.session\.user\.id/)
-    assert.match(route, /decided_at: now/)
-  })
-
-  it('audits both paths with the explicit trail', () => {
-    assert.match(route, /COLLECTIONS\.leaveRequestEvents/)
-    assert.ok(route.includes(`'updated'`), 'edit path audits updated')
-    assert.ok(route.includes(`'status_changed'`), 'decision path audits status_changed')
-  })
-})
-
-describe('time off — page', () => {
-  const page = read(PAGE)
-  const script = page.split('<template>')[0]
-  const template = page.split('<template>').slice(1).join('<template>')
-
-  it('defaults Requests to Mine with query-param sync', () => {
-    assert.match(script, /queryParam\('mine'\) !== '0'/)
-    assert.match(script, /mine: '1'/)
-  })
-
-  it('gates Approvals on the update grant with a restricted notice', () => {
-    assert.match(script, /permissions\.can\(COLLECTIONS\.leaveRequests, 'update'\)/)
-    assert.ok(
-      template.includes('Restricted'),
-      'restricted notice renders without the grant',
-    )
-    assert.ok(
-      template.includes('deciding officers only'),
-      'notice names the deciding-officer audience',
-    )
-  })
-
-  it('renders names with avatars in both tabs and no raw ids', () => {
-    assert.equal(
-      template.match(/PersonAvatar/g)?.length ?? 0,
-      2,
-      'one PersonAvatar per tab',
-    )
-    assert.doesNotMatch(template, /requester_user/)
-    assert.doesNotMatch(template, /requester_person/)
-  })
-
-  it('edits pending rows only, validates dates client-side, refreshes on save', () => {
-    assert.match(template, /row\.can_edit/)
-    assert.match(script, /start_date > .*end_date/)
-    assert.match(script, /api\.patch\(`\/api\/leave-requests\//)
-    assert.match(script, /loadRequests\(\)/)
-  })
-
-  it('uses the avatar-with-initials component contract', () => {
-    const avatar = read(AVATAR)
-    assert.match(avatar, /:text=.*initials/)
-    assert.match(avatar, /photo \?\? undefined/)
-    assert.doesNotMatch(codeOf(AVATAR), /requester_user/)
-  })
-})
-
-describe('time off — merged surface (Balances + Mine/avatars/edit)', () => {
-  const page = read(PAGE)
-  const script = page.split('<template>')[0]
-  const template = page.split('<template>').slice(1).join('<template>')
-
-  it('is a single surface with Balances/Requests/Approvals tabs on ?tab=', () => {
+  it('declares the three tabs (balances, requests, approvals)', () => {
     for (const id of ["'balances'", "'requests'", "'approvals'"]) {
-      assert.match(script, new RegExp(`id: ${id}`, 'g'), `tab ${id} present`)
+      assert.match(src, new RegExp(`id: ${id}`, 'g'), `tab ${id} present`)
     }
-    assert.match(script, /route\.query\.tab/)
+  })
+
+  it('deep-links each tab through ?tab= like the events detail precedent', () => {
+    assert.match(src, /route\.query\.tab/)
+    assert.match(src, /router\.replace/)
+    assert.match(src, /tab: next/)
+  })
+
+  it('renders one section per tab with its own labelled region', () => {
+    for (const label of ['Leave balances', 'Leave requests', 'Leave approvals']) {
+      assert.match(src, new RegExp(`aria-label="${label}"`), `${label} section present`)
+    }
+  })
+
+  it('gates each tab by its own read grant (scope-aware, fail-closed)', () => {
+    assert.match(src, /canSeeBalances/)
+    assert.match(src, /canSeeRequests/)
+    assert.match(src, /leaveBalances.*read|COLLECTIONS\.leaveBalances/)
+    assert.match(src, /leaveRequests.*read|COLLECTIONS\.leaveRequests/)
+  })
+
+  it('focuses the pending queue and the decided list without a new endpoint', () => {
+    assert.match(src, /pendingRequests/)
+    assert.match(src, /decidedRequests/)
+    assert.match(src, /row\.status === 'pending'/)
+    assert.doesNotMatch(src, /\/api\/leave-approvals/)
+  })
+})
+
+describe('AFC-896 surfaces moved, behaviour kept', () => {
+  const src = codeOf(PAGE)
+
+  it('balances math still rides the page (AFC-854 unchanged)', () => {
+    assert.match(src, /workingDaysBetween/)
+    assert.match(src, /setAllowance/)
+    assert.match(src, /removeBalance/)
+    assert.match(src, /used_days/)
+    assert.match(src, /remaining_days/)
     assert.match(
-      script,
-      /router\.replace\(\{ query: \{ \.\.\.route\.query, tab: next \} \}\)/,
+      src,
+      /previewBalance\.allowance - previewBalance\.used - previewDays/,
+      'remaining-after math shown',
     )
-    assert.ok(template.includes('aria-label="Leave balances"'), 'balances section kept')
-    assert.ok(template.includes('aria-label="Leave requests"'), 'requests section kept')
-    assert.ok(template.includes('aria-label="Leave approvals"'), 'approvals section kept')
   })
 
-  it('keeps the Balances tab content intact (allowances + calculator)', () => {
-    assert.match(script, /workingDaysBetween/)
-    assert.match(script, /loadBalances/)
-    assert.match(script, /setAllowance/)
-    assert.match(script, /removeBalance/)
-    assert.match(script, /\/api\/leave-balances/)
-    assert.ok(template.includes('Set allowance'), 'allowance card kept')
-    assert.ok(template.includes('Working-day calculator'), 'calculator kept')
-    assert.ok(template.includes('Pick both dates.'), 'calculator empty state kept')
+  it('the approval flow still files, decides and withdraws (AFC-842 unchanged)', () => {
+    assert.match(src, /createRequest/)
+    assert.match(src, /decide\(row\.id, 'approved'\)/)
+    assert.match(src, /decide\(row\.id, 'declined'\)/)
+    assert.match(src, /decide\(row\.id, 'cancelled'\)/)
+    assert.match(src, /withdraw\(row\.id\)/)
   })
+})
 
-  it('points the Balances gates at leaveBalances, not the request register', () => {
-    assert.match(script, /permissions\.can\(COLLECTIONS\.leaveBalances, 'read'\)/)
-    assert.match(script, /permissions\.can\(COLLECTIONS\.leaveBalances, 'create'\)/)
-    assert.doesNotMatch(script, /leaveRequests.*read.*[Bb]alance/)
-  })
-
-  it('keeps Mine-default and the update-grant gate on the merged tabs', () => {
-    assert.match(script, /queryParam\('mine'\) !== '0'/)
-    assert.match(script, /permissions\.can\(COLLECTIONS\.leaveRequests, 'update'\)/)
-    assert.ok(template.includes('Restricted'), 'restricted notice kept')
-    assert.equal(
-      template.match(/PersonAvatar/g)?.length ?? 0,
-      2,
-      'one PersonAvatar per Requests/Approvals table; Balances shows names only',
-    )
-    assert.match(template, /row\.can_edit/)
+describe('AFC-896 old route: /annual-leave redirects into the Requests tab', () => {
+  it('/annual-leave lands on /time-off?tab=requests', () => {
+    const src = codeOf(REDIRECT)
+    assert.match(src, /\/time-off/)
+    assert.match(src, /requests/)
+    assert.match(src, /navigateTo/)
+    assert.match(src, /301/)
   })
 })
 
@@ -213,6 +124,24 @@ describe('AFC-1026 deltas: Mine-default, avatars, pending-row correct, Approvals
   const script = src.split('<template>')[0]
   const template = src.split('<template>').slice(1).join('<template>')
 
+  it('defaults Requests to Mine with ?mine=0 opt-out and query sync', () => {
+    assert.match(script, /route\.query\.mine !== '0'/)
+    assert.match(script, /mine: '1'/)
+    assert.match(template, /Mine only/)
+  })
+
+  it('serves mine=1 from the list route as created_by = session user', () => {
+    const route = codeOf('apps/web/server/api/leave-requests/index.get.ts')
+    assert.match(route, /query\.mine === '1'/)
+    assert.match(route, /created_by: \{ _eq: scope\.session\.user\.id \}/)
+  })
+
+  it('renders names with avatars and never raw ids', () => {
+    const hits = template.match(/ProfileAvatar/g) ?? []
+    assert.ok(hits.length >= 2, `avatars in Requests + Approvals, found ${hits.length}`)
+    assert.match(template, /photo-url="personPhoto\(row\.person\)"/)
+    assert.doesNotMatch(script, /id\.slice\(0, 8\)/)
+  })
 
   it('gates Approvals on the update grant with a restricted notice', () => {
     assert.match(script, /leaveRequests.*'update'|COLLECTIONS\.leaveRequests/)
@@ -227,10 +156,10 @@ describe('AFC-1026 deltas: Mine-default, avatars, pending-row correct, Approvals
   })
 
   it('corrects pending rows only through the existing PATCH and refreshes', () => {
-    assert.match(template, /openEdit\(row\)/)
+    assert.match(template, /openCorrect\(row\)/)
     assert.match(script, /api\.patch\(`\/api\/leave-requests\//)
     assert.match(script, /loadRequests\(\)/)
     const patch = codeOf('apps/web/server/api/leave-requests/[id].patch.ts')
-    assert.match(patch, /Only a pending request can be changed/)
+    assert.match(patch, /Only a pending request can be corrected/)
   })
 })

@@ -44,15 +44,8 @@ export const COLLECTIONS = {
   outreachLocations: 'outreach_locations',
   /** Secretary assignments to outreach locations (AFC-841 junction). */
   outreachLocationSecretaries: 'outreach_location_secretaries',
-  /**
-   * Staff leave requests (AFC-1058 cutover 0067 over AFC-842, ADR-0012).
-   * `leaveRequestEvents` is the explicit audit trail (created/updated/
-   * status_changed/note) -- the portal route is the writer, the table is
-   * the trail. `leaveBalances` stays: the AFC-1058 amendment keeps it
-   * (owned by 0055, HR phase 1) instead of dropping it.
-   */
+  /** Staff leave requests (AFC-842, Church Office). */
   leaveRequests: 'leave_requests',
-  leaveRequestEvents: 'leave_request_events',
   /** Speaker bookings per event (AFC-843). */
   eventSpeakers: 'event_speakers',
   /** Programme materials per event, approval-gated (AFC-844). */

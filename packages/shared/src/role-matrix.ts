@@ -241,29 +241,17 @@ const MATRIX: Readonly<Record<CollectionName, Readonly<Record<StaffRole, Cell>>>
     none: [NONE, 'none'],
     zone_admin: [ALL, 'own_zone'],
   },
-  // Time Off leave register (AFC-1058 cutover 0067, ADR-0012 §Dec.4).
-  // Requests tab is an own-row filter (requester reads/creates own via
-  // policy); Approvals tab is gated on the update grant (branch/zone
-  // deciding officers, area). department_leader holds nothing: leave
-  // decisions are not a department call. The audit trail is append-only
-  // in spirit (no D for any role -- corrections are new rows).
+  // Leave requests (AFC-842): Church Office working list, same hands as
+  // the other programme registers. No finance amounts, no
+  // FIELD_RESTRICTIONS entry.
   [COLLECTIONS.leaveRequests]: {
     super_admin: [ALL, 'all'],
     area_admin: [ALL, 'all'],
-    branch_admin: [CRU, 'own_branch', 'CRU (own)'],
-    department_leader: [NONE, 'none'],
-    volunteer: [CR, 'own_branch', 'C own + R own via policy'],
+    branch_admin: [ALL, 'own_branch'],
+    department_leader: [CRU, 'assigned_branches'],
+    volunteer: [CU, 'own_branch'],
     none: [NONE, 'none'],
-    zone_admin: [CRU, 'own_zone'],
-  },
-  [COLLECTIONS.leaveRequestEvents]: {
-    super_admin: [ALL, 'all'],
-    area_admin: [R, 'all'],
-    branch_admin: [R, 'own_branch'],
-    department_leader: [NONE, 'none'],
-    volunteer: [R, 'own_branch', 'own rows'],
-    none: [NONE, 'none'],
-    zone_admin: [R, 'own_zone'],
+    zone_admin: [ALL, 'own_zone'],
   },
   // Event speakers (AFC-843): programme admin content, same hands as the
   // other event registers. No finance amounts, no FIELD_RESTRICTIONS entry.
@@ -1195,17 +1183,6 @@ const FIELD_RESTRICTIONS: Readonly<
     fields: ['description'],
     roles: ['super_admin', 'area_admin', 'branch_admin'],
     note: 'task description: assignee + scoped admin (record-level in policy); hidden here for roles that never qualify',
-  },
-  // Time Off leave reason (AFC-1058 cutover 0067, ADR-0012 §Dec.3).
-  // Free text that may hold health-adjacent detail: deciding officers +
-  // area only. zone_admin is a deciding officer (MATRIX CRU own_zone), so
-  // it reads reason; omitting it would strip the Approvals-queue reader
-  // the matrix empowers. The requester's own-row read is record-level and
-  // lives in the Directus policy, which withholds the field for others.
-  [COLLECTIONS.leaveRequests]: {
-    fields: ['reason'],
-    roles: ['super_admin', 'area_admin', 'branch_admin', 'zone_admin'],
-    note: 'leave reason: deciding officers (own scope, enforced by policy) + area; own-row read is record-level in policy',
   },
 }
 
