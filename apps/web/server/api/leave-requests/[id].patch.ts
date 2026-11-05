@@ -1,102 +1,140 @@
-import { leaveDecisionSchema, leaveRequestPatchSchema } from '@afc/shared'
+import { COLLECTIONS, leaveDecisionSchema, leaveEditSchema } from '@afc/shared'
 import {
   findScopedItem,
   getPortalScope,
   requireCan,
-  throwStoreUnavailable,
   throwValidation,
   updateItem,
 } from '../../utils/portal'
-
-const TERMINAL: Record<string, readonly string[]> = {
-  pending: ['approved', 'declined', 'cancelled'],
-  approved: ['cancelled'],
-  declined: [],
-  cancelled: [],
-}
+import { logScopedQuery, officeBranchScope, writeOfficeAudit } from '../../utils/office'
 
 /**
- * PATCH /api/leave-requests/:id — correct a pending request, or record a
- * decision (AFC-842). Draft fields (type, reason) edit only while pending;
- * decisions follow the pending→approved/declined/cancelled and
- * approved→cancelled transitions, stamped with the deciding session user.
+ * PATCH /api/leave-requests/:id (AFC-1058 cutover over AFC-930, ADR-0012
+ * Dec.2 — edits are route rules, not CHECKs; forward-port of the AFC-927
+ * shape onto the main route path).
+ *
+ * Two mutually exclusive paths, chosen by the body:
+ *
+ * - Requester edit `{ leave_type?, start_date?, end_date?, reason? }`:
+ *   the row must be `pending` and `requester_user` must be the session
+ *   user. Dates are merged with the stored row before the order check so
+ *   a single-date edit still validates end >= start.
+ * - Deciding-officer decision `{ status: approved | rejected }`: requires
+ *   the `update` grant (zonal/area deciding officers), pending-only,
+ *   separation-of-duties (decider != requester, AFC-1067), and stamps
+ *   `decided_by`/`decided_at` from the session. A CHECK cannot know
+ *   the actor, so the stamp lives here.
+ *
+ * Both paths write the explicit audit row (`updated` / `status_changed`).
+ * No status-escalation widening: nothing here moves a decided row.
  */
 export default defineEventHandler(async (event) => {
   const scope = await getPortalScope(event)
-  requireCan(scope, 'leave_requests', 'update')
+  requireCan(scope, COLLECTIONS.leaveRequests, 'read')
 
-  const id = getRouterParam(event, 'id')
-  if (!id)
-    throw createError({ statusCode: 400, statusMessage: 'A request id is required' })
-  try {
-    const existing = await findScopedItem<Record<string, unknown>>(
-      event,
-      scope,
-      'leave_requests',
-      id,
-      { fields: ['id', 'status'] },
-    )
-    const current = String(existing.status ?? 'pending')
-    const body = await readBody<Record<string, unknown>>(event)
+  const body = (await readBody(event)) as Record<string, unknown>
+  const isDecision = body.status !== undefined
 
-    if (body.status !== undefined) {
-      const parsed = leaveDecisionSchema.safeParse(body)
-      if (!parsed.success) throwValidation(parsed.error)
-      const allowed = TERMINAL[current] ?? []
-      if (!allowed.includes(parsed.data.status)) {
-        throw createError({
-          statusCode: 400,
-          statusMessage: `A ${current} request cannot move to ${parsed.data.status}`,
-          data: { code: 'invalid_transition' },
-        })
-      }
-      const updated = await updateItem<Record<string, unknown>>(
-        event,
-        scope,
-        'leave_requests',
-        id,
-        {
-          status: parsed.data.status,
-          decided_by: scope.session.user.id,
-          decided_at: new Date().toISOString(),
-        },
-      )
-      return { data: updated }
-    }
+  const id = String(getRouterParam(event, 'id'))
+  const row = await findScopedItem<Record<string, unknown>>(
+    event,
+    scope,
+    COLLECTIONS.leaveRequests,
+    id,
+    { scope: officeBranchScope(scope) },
+  )
+  logScopedQuery(scope, 'leave-requests.patch', {
+    id,
+    kind: isDecision ? 'decision' : 'edit',
+  })
 
-    if (current !== 'pending') {
+  if (row.status !== 'pending') {
+    throw createError({
+      statusCode: 409,
+      statusMessage: 'Only a pending request can be changed',
+      data: { code: 'not_pending' },
+    })
+  }
+
+  const now = new Date().toISOString()
+
+  if (isDecision) {
+    requireCan(scope, COLLECTIONS.leaveRequests, 'update')
+    if (row.requester_user === scope.session.user.id) {
       throw createError({
-        statusCode: 400,
-        statusMessage: 'Only a pending request can be corrected',
-        data: { code: 'invalid_transition' },
+        statusCode: 403,
+        statusMessage:
+          'A deciding officer cannot decide their own request — direct it to another officer',
+        data: { code: 'not_own_decision' },
       })
     }
-    const parsed = leaveRequestPatchSchema.safeParse(body)
+    const parsed = leaveDecisionSchema.safeParse(body)
     if (!parsed.success) throwValidation(parsed.error)
-    if (Object.keys(parsed.data).length === 0) {
-      throw createError({
-        statusCode: 400,
-        statusMessage: 'Nothing to update',
-        data: { code: 'validation_error' },
-      })
-    }
+
     const updated = await updateItem<Record<string, unknown>>(
       event,
       scope,
-      'leave_requests',
+      COLLECTIONS.leaveRequests,
       id,
       {
-        ...(parsed.data.leave_type !== undefined
-          ? { leave_type: parsed.data.leave_type }
-          : {}),
-        ...(parsed.data.reason !== undefined
-          ? { reason: parsed.data.reason ?? null }
-          : {}),
+        status: parsed.data.status,
+        decided_by: scope.session.user.id,
+        decided_at: now,
       },
     )
+    await writeOfficeAudit(event, scope, COLLECTIONS.leaveRequestEvents, {
+      leave_request: id,
+      event_type: 'status_changed',
+      detail: `Status → ${parsed.data.status}`,
+      actor_user: scope.session.user.id,
+      created_at: now,
+    })
     return { data: updated }
-  } catch (error) {
-    if ((error as { statusCode?: number })?.statusCode) throw error
-    throwStoreUnavailable(error, 'leave_store', '0052')
   }
+
+  if (row.requester_user !== scope.session.user.id) {
+    throw createError({
+      statusCode: 403,
+      statusMessage: 'Only the requester can edit a pending request',
+      data: { code: 'not_requester' },
+    })
+  }
+  const parsed = leaveEditSchema.safeParse(body)
+  if (!parsed.success) throwValidation(parsed.error)
+  if (Object.keys(parsed.data).length === 0) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'Nothing to update',
+      data: { code: 'empty_patch' },
+    })
+  }
+
+  const start = (parsed.data.start_date ?? row.start_date) as string
+  const end = (parsed.data.end_date ?? row.end_date) as string
+  if (start > end) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'The end date must be on or after the start date',
+      data: {
+        code: 'invalid_dates',
+        fields: { end_date: 'End date is before start date' },
+      },
+    })
+  }
+
+  const updated = await updateItem<Record<string, unknown>>(
+    event,
+    scope,
+    COLLECTIONS.leaveRequests,
+    id,
+    { ...parsed.data },
+  )
+  await writeOfficeAudit(event, scope, COLLECTIONS.leaveRequestEvents, {
+    leave_request: id,
+    event_type: 'updated',
+    detail: `Edited ${Object.keys(parsed.data).join(', ')}`,
+    actor_user: scope.session.user.id,
+    created_at: now,
+  })
+  return { data: updated }
 })
