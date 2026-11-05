@@ -207,3 +207,30 @@ describe('time off — merged surface (Balances + Mine/avatars/edit)', () => {
     assert.match(template, /row\.can_edit/)
   })
 })
+
+describe('AFC-1026 deltas: Mine-default, avatars, pending-row correct, Approvals gate', () => {
+  const src = read(PAGE)
+  const script = src.split('<template>')[0]
+  const template = src.split('<template>').slice(1).join('<template>')
+
+
+  it('gates Approvals on the update grant with a restricted notice', () => {
+    assert.match(script, /leaveRequests.*'update'|COLLECTIONS\.leaveRequests/)
+    assert.ok(
+      template.includes('Restricted'),
+      'restricted notice renders without the grant',
+    )
+    assert.ok(
+      template.includes('deciding officers only'),
+      'notice names the deciding-officer audience',
+    )
+  })
+
+  it('corrects pending rows only through the existing PATCH and refreshes', () => {
+    assert.match(template, /openEdit\(row\)/)
+    assert.match(script, /api\.patch\(`\/api\/leave-requests\//)
+    assert.match(script, /loadRequests\(\)/)
+    const patch = codeOf('apps/web/server/api/leave-requests/[id].patch.ts')
+    assert.match(patch, /Only a pending request can be changed/)
+  })
+})
