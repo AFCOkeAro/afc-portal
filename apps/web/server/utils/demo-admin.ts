@@ -113,6 +113,11 @@ export async function runDemoSeed(
   const client = await demoPool(event).connect()
   try {
     await client.query('BEGIN')
+    // Run as the migration owner: the retention guard on people (AFC-295)
+    // refuses DELETE from any other identity, and the demo tables are
+    // migrator-owned. SET LOCAL resets automatically at COMMIT/ROLLBACK,
+    // so the pooled connection is unaffected.
+    await client.query('SET LOCAL ROLE directus_migrator')
     try {
       await client.query(loadScript('001_demo_seed.sql'))
       const counts = await registryCounts(client)
@@ -148,6 +153,9 @@ export async function runDemoClear(
   const client = await demoPool(event).connect()
   try {
     await client.query('BEGIN')
+    // Same migration-owner identity as the seed path (see above): the
+    // clear script deletes from migrator-owned tables guarded by AFC-295.
+    await client.query('SET LOCAL ROLE directus_migrator')
     try {
       // Capture before the clear deletes the registry rows: the pre-counts
       // are the removed counts the audit row reports.

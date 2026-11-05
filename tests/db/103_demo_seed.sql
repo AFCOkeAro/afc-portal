@@ -10,7 +10,7 @@
 --   103.1  registry     -- demo_seed_registry + demo_admin_actions exist;
 --                           the app role reads/appends both and rewrites
 --                           neither (SELECT+INSERT only, no UPDATE/DELETE).
---   103.2  seed         -- first run plants 74 registry rows across 36
+--   103.2  seed         -- first run plants 618 registry rows across 56
 --                           tables; Emmanuel Adeyemi is linked across 6+
 --                           modules; Grace converts visitor -> person.
 --   103.3  idempotent   -- second run plants zero new rows (registry count
@@ -133,10 +133,10 @@ DECLARE
 BEGIN
   SELECT count(*), count(DISTINCT table_name) INTO v_reg, v_tables
     FROM demo_seed_registry WHERE seed_version = 'demo-1';
-  PERFORM test_support.assert_equals(v_reg::text, '74', 'seed',
-    'first run plants 74 registry rows (got ' || v_reg::text || ')');
-  PERFORM test_support.assert_equals(v_tables::text, '36', 'seed',
-    'first run spans 36 tables (got ' || v_tables::text || ')');
+  PERFORM test_support.assert_equals(v_reg::text, '618', 'seed',
+    'first run plants 618 registry rows (got ' || v_reg::text || ')');
+  PERFORM test_support.assert_equals(v_tables::text, '56', 'seed',
+    'first run spans 56 tables (got ' || v_tables::text || ')');
 
   -- Emmanuel Adeyemi linked across 6+ modules.
   SELECT count(*) INTO v_modules FROM (
@@ -170,6 +170,47 @@ BEGIN
   PERFORM test_support.assert_equals((SELECT count(*)::text FROM event_registrations WHERE group_code = 'DEMO-GRP-REV-A'), '2', 'seed',
     'revival group code links two registrants [NULL]');
 
+  -- AFC-1083 follow-up coverage: year of Sundays, new modules.
+  PERFORM test_support.assert_equals(
+    (SELECT count(*)::text FROM attendance_sessions WHERE idempotency_key LIKE 'DEMO-SESS-____-__-__'), '52', 'seed',
+    'year block plants 52 Sunday sessions [NULL]');
+  PERFORM test_support.assert_equals(
+    (SELECT count(*)::text FROM demo_seed_registry WHERE demo_key LIKE 'DEMO-ATTEND-EMMANUEL-%'), '48', 'seed',
+    'Emmanuel attends 48 of 52 Sundays [NULL]');
+  PERFORM test_support.assert_equals(
+    (SELECT count(*)::text FROM demo_seed_registry WHERE demo_key LIKE 'DEMO-ATTEND-CHIDI-%'), '31', 'seed',
+    'Chidi attends 31 Sundays from February [NULL]');
+  PERFORM test_support.assert_equals(
+    (SELECT count(*)::text FROM people WHERE id BETWEEN
+      '11111111-1111-4111-8111-000000000108' AND '11111111-1111-4111-8111-000000000111'), '4', 'seed',
+    'four more family members planted [NULL]');
+  PERFORM test_support.assert_true(EXISTS (
+    SELECT 1 FROM marriage_cases WHERE id IN
+      ('11111111-1111-4111-8111-000000000383', '11111111-1111-4111-8111-000000000384')),
+    'seed', 'two marriage cases planted', NULL);
+  PERFORM test_support.assert_true(EXISTS (
+    SELECT 1 FROM funeral_cases WHERE id IN
+      ('11111111-1111-4111-8111-000000000395', '11111111-1111-4111-8111-000000000396')),
+    'seed', 'two funeral cases planted', NULL);
+  PERFORM test_support.assert_equals(
+    (SELECT count(*)::text FROM sunday_school_classes WHERE id::text LIKE '11111111%'), '3', 'seed',
+    'three Sunday School classes planted [NULL]');
+  PERFORM test_support.assert_equals(
+    (SELECT count(*)::text FROM event_resources WHERE id::text LIKE '11111111%'), '3', 'seed',
+    'event resources planted [NULL]');
+  PERFORM test_support.assert_equals(
+    (SELECT count(*)::text FROM tasks WHERE id::text LIKE '11111111%'), '3', 'seed',
+    'event tasks planted [NULL]');
+  PERFORM test_support.assert_equals(
+    (SELECT count(*)::text FROM avs_centres WHERE id::text LIKE '11111111%'), '2', 'seed',
+    'two AVS centres planted [NULL]');
+  PERFORM test_support.assert_equals(
+    (SELECT count(*)::text FROM branch_financial_records WHERE id::text LIKE '11111111%'), '7', 'seed',
+    'seven monthly branch records planted [NULL]');
+  PERFORM test_support.assert_equals(
+    (SELECT count(*)::text FROM visitors WHERE id::text LIKE '11111111%'), '5', 'seed',
+    'five funnel visitors planted [NULL]');
+
   -- Tunde: youth profile + birthday + youth-night registration + UNILAG row.
   PERFORM test_support.assert_true(EXISTS (
     SELECT 1 FROM youth_profiles WHERE person = '11111111-1111-4111-8111-000000000103'),
@@ -195,7 +236,7 @@ DECLARE
   v_people bigint;
 BEGIN
   SELECT count(*) INTO v_reg FROM demo_seed_registry WHERE seed_version = 'demo-1';
-  PERFORM test_support.assert_equals(v_reg::text, '74', 'seed',
+  PERFORM test_support.assert_equals(v_reg::text, '618', 'seed',
     'second run plants zero new registry rows (got ' || v_reg::text || ')');
 
   SELECT count(*) INTO v_people FROM people
@@ -205,8 +246,12 @@ BEGIN
                  '11111111-1111-4111-8111-000000000104',
                  '11111111-1111-4111-8111-000000000105',
                  '11111111-1111-4111-8111-000000000106',
-                 '11111111-1111-4111-8111-000000000107');
-  PERFORM test_support.assert_equals(v_people::text, '7', 'seed',
+                 '11111111-1111-4111-8111-000000000107',
+                 '11111111-1111-4111-8111-000000000108',
+                 '11111111-1111-4111-8111-000000000109',
+                 '11111111-1111-4111-8111-000000000110',
+                 '11111111-1111-4111-8111-000000000111');
+  PERFORM test_support.assert_equals(v_people::text, '11', 'seed',
     'second run plants zero duplicate people (got ' || v_people::text || ')');
 END
 $$;
@@ -245,8 +290,37 @@ BEGIN
     SELECT 1 FROM departments WHERE code LIKE 'DEMO-%'),
     'seed', 'demo departments are gone', NULL);
   PERFORM test_support.assert_true(NOT EXISTS (
+    SELECT 1 FROM marriage_cases WHERE id::text LIKE '11111111%'),
+    'seed', 'demo marriage cases are gone', NULL);
+  PERFORM test_support.assert_true(NOT EXISTS (
+    SELECT 1 FROM funeral_cases WHERE id::text LIKE '11111111%'),
+    'seed', 'demo funeral cases are gone', NULL);
+  PERFORM test_support.assert_true(NOT EXISTS (
+    SELECT 1 FROM sunday_school_classes WHERE id::text LIKE '11111111%'),
+    'seed', 'demo Sunday School classes are gone', NULL);
+  PERFORM test_support.assert_true(NOT EXISTS (
+    SELECT 1 FROM event_resources WHERE id::text LIKE '11111111%'),
+    'seed', 'demo event resources are gone', NULL);
+  PERFORM test_support.assert_true(NOT EXISTS (
+    SELECT 1 FROM tasks WHERE id::text LIKE '11111111%'),
+    'seed', 'demo tasks are gone', NULL);
+  PERFORM test_support.assert_true(NOT EXISTS (
+    SELECT 1 FROM avs_centres WHERE id::text LIKE '11111111%'),
+    'seed', 'demo AVS centres are gone', NULL);
+  PERFORM test_support.assert_true(NOT EXISTS (
+    SELECT 1 FROM branch_financial_records WHERE id::text LIKE '11111111%'
+      AND month >= DATE '2026-03-01'),
+    'seed', 'new monthly records are gone', NULL);
+  PERFORM test_support.assert_true(NOT EXISTS (
     SELECT 1 FROM visitors WHERE id IN
-      ('11111111-1111-4111-8111-000000000401', '11111111-1111-4111-8111-000000000402')),
+      ('11111111-1111-4111-8111-000000000440', '11111111-1111-4111-8111-000000000441',
+       '11111111-1111-4111-8111-000000000442')),
+    'seed', 'new funnel visitors are gone', NULL);
+  PERFORM test_support.assert_true(NOT EXISTS (
+    SELECT 1 FROM visitors WHERE id IN
+      ('11111111-1111-4111-8111-000000000401', '11111111-1111-4111-8111-000000000402',
+       '11111111-1111-4111-8111-000000000440', '11111111-1111-4111-8111-000000000441',
+       '11111111-1111-4111-8111-000000000442')),
     'seed', 'demo visitors are gone', NULL);
 
   -- Real registers untouched.
@@ -339,7 +413,7 @@ $$;
 
 DO $$
 BEGIN
-  PERFORM test_support.assert_equals((SELECT count(*)::text FROM demo_seed_registry WHERE seed_version = 'demo-1'), '74', 'seed',
+  PERFORM test_support.assert_equals((SELECT count(*)::text FROM demo_seed_registry WHERE seed_version = 'demo-1'), '618', 'seed',
     're-seed after clear re-plants fully [NULL]');
 END
 $$;

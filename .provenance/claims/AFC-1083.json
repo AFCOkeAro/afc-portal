@@ -1,0 +1,13 @@
+{
+  "authorAgentId": "human-operator-board",
+  "authorName": "Board operator (OpenCode session, 2026-11-05)",
+  "claimedAt": "2026-11-05T23:55:00Z",
+  "issue": "AFC-1083",
+  "notClaimedPaths": "Seed SQL (services/directus/seeds/demo/), README and apps/web/server/utils/demo-admin.ts are outside the gate scope; correctness there is asserted by the rollback-tested runs and the CTO review below, not by this file.",
+  "paths": [
+    "tests/db/103_demo_seed.sql"
+  ],
+  "scopeOfTheClaim": "R1 only: authorship of the suite-pin updates and new coverage asserts below. Correctness is for CI (R4) and the CTO review (R2, Reviewed-by trailer on the landing commit).",
+  "whatTheChangeActuallyDoes": "AFC-1083 follow-up coverage batch: suite pins 74->618 rows and 36->56 tables; people list extended 101-107 to 108-111 (expects 11); visitor clear-check extended to 440-442; new asserts for year sessions (52), Emmanuel 48 / Chidi 31 attendance, marriage/funeral cases, Sunday School classes, event resources, tasks, AVS centres, monthly finance records, funnel visitors; matching clear-asserts for the same tables. Mirrors numbers measured by rollback-tested runs on staging (618/56, then clear to zero with real rows intact).",
+  "whatThisFileIs": "An R1 authorship claim, and nothing else. It says who wrote the compliance-path file below and on which issue. It carries no reviews[] entry; R2 is the Reviewed-by trailer on the commit."
+}
