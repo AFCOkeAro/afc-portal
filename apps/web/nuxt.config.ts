@@ -125,6 +125,16 @@ export default defineNuxtConfig({
      */
     legalHoldDatabaseUrl: '',
     /**
+     * Connection string for the demo seed/clear identity (AFC-1086).
+     * Server-side only, never sent to the browser. Staging only: points at
+     * a migrator-capable credential so the super-admin demo routes can run
+     * the versioned seed/clear scripts and write the audit row. Absent
+     * (including every production deployment) means the demo routes answer
+     * 503. Never configure this in production: demo data must never exist
+     * there, so the credential to plant it must not either.
+     */
+    demoDatabaseUrl: '',
+    /**
      * Token whose Directus policy is the *public* role's. Used only by the
      * unauthenticated registration proxy: an anonymous write must be constrained
      * by a public policy, not merely by the field allowlist in application code.
