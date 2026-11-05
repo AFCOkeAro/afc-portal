@@ -105,6 +105,14 @@ BEGIN
     'branch_financial_records', 'weca_returns',
     'prior_year_imports', 'prior_year_import_items',
     'consent_records',
+    'person_previous_branches',
+    'marriage_cases', 'marriage_matters',
+    'marriage_case_events', 'marriage_case_forms', 'marriage_matter_events',
+    'funeral_cases', 'sunday_school_classes',
+    'event_resources', 'event_speakers', 'event_testimonies', 'event_feedback',
+    'event_collaborators', 'event_budgets', 'event_expenses', 'tasks',
+    'avs_centres', 'bible_study_centres',
+    'blessing_events', 'campus_financial_support',
     'demo_seed_registry', 'demo_admin_actions']
   LOOP
     EXECUTE format('ALTER TABLE %I OWNER TO directus_migrator', t);
