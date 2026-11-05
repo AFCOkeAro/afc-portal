@@ -45,9 +45,10 @@ describe('expenses tab: 9th tab, deep-linkable, hidden without the grant', () =>
   it('adds Expenses as the 9th tab with a receipt icon', () => {
     assert.match(src, /id: 'expenses', label: 'Expenses', icon: 'i-lucide-receipt'/)
     const tabs = read('apps/web/pages/events/[id].vue').match(/\{ id: '(\w+)', label:/g)
-    // AFC-806 added the Attendance tab after this pin; nine tabs now.
-    assert.ok(tabs && tabs.length === 9, `nine tabs, found ${tabs ? tabs.length : 0}`)
+    // PR #128 added the Speakers tab after Expenses on the main side; ten tabs now.
+    assert.ok(tabs && tabs.length === 10, `ten tabs, found ${tabs ? tabs.length : 0}`)
     assert.ok(tabs[8].includes('expenses'), 'expenses is the 9th tab')
+    assert.ok(tabs[9].includes('speakers'), 'speakers is the 10th tab')
   })
 
   it('deep-links through ?tab=expenses and falls back to overview', () => {
