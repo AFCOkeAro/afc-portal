@@ -75,7 +75,11 @@ export default defineEventHandler(async (event) => {
     `/items/people/${personId}`,
     {
       query: {
-        fields: 'id,first_name,last_name,phone,branch,zone',
+        // people carries branch only (no zone column — hierarchy 0002 adds
+        // none, so a zone field selection makes Directus 403 with
+        // directus_forbidden). Zone derives from branches below, as in the
+        // leave-balances allowance route (AFC-1078).
+        fields: 'id,first_name,last_name,phone,branch',
       },
     },
   ).catch(() => null)
@@ -88,12 +92,23 @@ export default defineEventHandler(async (event) => {
   }
 
   const row = person.data
+  const branch = typeof row.branch === 'string' && row.branch !== '' ? row.branch : null
+  let zone: string | null = null
+  if (branch) {
+    const branchRow = await directusFetch<{ data: Record<string, unknown> }>(
+      event,
+      `/items/branches/${branch}`,
+      { query: { fields: 'zone' } },
+    ).catch(() => null)
+    const raw = branchRow?.data?.zone
+    zone = typeof raw === 'string' && raw.length > 0 ? raw : null
+  }
   return {
     id: String(row.id),
     first_name: (row.first_name as string | null) ?? null,
     last_name: (row.last_name as string | null) ?? null,
     phone_redacted: redactMemberPhone(row.phone as string | null),
-    branch: (row.branch as string | null) ?? null,
-    zone: (row.zone as string | null) ?? null,
+    branch,
+    zone,
   }
 })

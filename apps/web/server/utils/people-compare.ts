@@ -1,12 +1,5 @@
 import type { H3Event } from 'h3'
-import {
-  branchNames,
-  listItems,
-  mergeFilters,
-  scopeFilter,
-  zoneScopeFilter,
-  type PortalScope,
-} from './portal'
+import { branchNames, listItems, scopeFilter, type PortalScope } from './portal'
 
 /**
  * People compare collectors (AFC-485, US-A4). One grouped read feeds the
@@ -18,7 +11,6 @@ import {
 
 interface PeopleRow {
   branch: string | null
-  zone: string | null
   status: string | null
 }
 
@@ -36,17 +28,42 @@ export async function collectPeopleGroups(
   groupBy: 'branch' | 'zone',
 ): Promise<Map<string, number>> {
   const groups = new Map<string, number>()
+  // people carries branch only (no zone column — hierarchy 0002 adds none,
+  // so a zone field selection makes Directus 403). Zone groups derive via
+  // the branches table, mirroring people-summary.ts.
+  const branchZone = new Map<string, string>()
+  if (groupBy === 'zone') {
+    try {
+      const branches = await listItems<{ id: string | number; zone: string | null }>(
+        event,
+        scope,
+        'branches',
+        { fields: ['id', 'zone'], limit: -1 },
+      )
+      for (const branch of branches.data) {
+        if (branch.zone) branchZone.set(String(branch.id), String(branch.zone))
+      }
+    } catch {
+      // Best-effort: unmapped branches fall back to unassigned below.
+    }
+  }
   let page = 1
   for (;;) {
     const result = await listItems<PeopleRow>(event, scope, 'people', {
-      filter: mergeFilters(scopeFilter(scope), zoneScopeFilter(scope)),
-      fields: ['branch', 'zone', 'status'],
+      // Branch ids already expand zone grants (getPortalScope), so scopeFilter
+      // alone suffices — people has no zone column to filter on.
+      filter: scopeFilter(scope),
+      fields: ['branch', 'status'],
       limit: 200,
       page,
     })
     for (const row of result.data) {
       const key =
-        groupBy === 'zone' ? (row.zone ?? 'unassigned') : (row.branch ?? 'unassigned')
+        groupBy === 'zone'
+          ? row.branch
+            ? (branchZone.get(String(row.branch)) ?? 'unassigned')
+            : 'unassigned'
+          : (row.branch ?? 'unassigned')
       groups.set(String(key), (groups.get(String(key)) ?? 0) + 1)
     }
     if (result.data.length < 200) break

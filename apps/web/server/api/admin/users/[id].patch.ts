@@ -1,10 +1,13 @@
 import { STAFF_ROLES } from '@afc/shared'
-import { requireArea } from '../../../utils/admin-guard'
+import { requireArea, requireSuperAdmin } from '../../../utils/admin-guard'
 import { directusFetch } from '../../../utils/directus'
 import { directusAdminToken } from '../../../utils/directus-admin'
 
 /**
  * PATCH /api/admin/users/:id — assign a role and scope links (AFC-669).
+ * Area admins only, except assigning `super_admin` (AFC-1077): that maps to
+ * the Directus Administrator system role, which bypasses every Directus
+ * policy, so only a super admin may assign it.
  * Sets the portal `staff_role` (what the code matrix and the custom-grant
  * loader enforce) together with the Directus `role` (what the Directus
  * policy layer enforces on data reads) and the branch / zone / area scope
@@ -61,6 +64,13 @@ export default defineEventHandler(async (event) => {
       statusMessage: 'A staff role is required',
       data: { code: 'validation_error', fields: { staff_role: 'Required' } },
     })
+  }
+  // AFC-1077: promoting to super_admin is a one-way door — it maps to the
+  // Directus Administrator system role, which bypasses every Directus
+  // policy. Only a super admin may assign it (either spelling the selects
+  // submit); area admins keep every other assignment.
+  if (staffRole === 'super_admin' || staffRole === 'Administrator') {
+    await requireSuperAdmin(event)
   }
   const builtIn = (STAFF_ROLES as readonly string[]).includes(staffRole)
   const roleName = builtIn ? (BUILT_IN_ROLE_NAMES[staffRole] ?? null) : staffRole

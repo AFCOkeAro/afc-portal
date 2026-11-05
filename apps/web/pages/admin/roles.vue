@@ -135,11 +135,21 @@ const collectionOptions = computed(() => [
   ...collections.value.map((name: string) => ({ label: name, value: name })),
 ])
 
+/* AFC-1077: the super_admin assignment (staff `super_admin`, Directus
+ * `Administrator`) is a one-way door — the server refuses it for non-super
+ * admins, and the selects hide it from them so it cannot be picked by
+ * accident. The server remains the control; this is convenience only. */
 const roleOptions = computed(() =>
-  roles.value.map((role: AdminRole) => ({
-    label: `${role.name}${role.builtIn ? ' (built-in)' : ''}`,
-    value: role.name,
-  })),
+  roles.value
+    .filter(
+      (role: AdminRole) =>
+        isSuperAdmin.value ||
+        (role.name !== 'super_admin' && role.name !== 'Administrator'),
+    )
+    .map((role: AdminRole) => ({
+      label: `${role.name}${role.builtIn ? ' (built-in)' : ''}`,
+      value: role.name,
+    })),
 )
 
 async function reloadAll(): Promise<void> {

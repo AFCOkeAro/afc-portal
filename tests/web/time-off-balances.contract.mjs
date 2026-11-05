@@ -88,4 +88,13 @@ describe('AFC-854 time-off page and nav', () => {
     assert.match(src, /findScopedItem/)
     assert.match(src, /duplicate_allowance/)
   })
+
+  it('the allowance route never selects people.zone (AFC-1078)', () => {
+    // people carries branch only — hierarchy 0002 adds no zone column, so a
+    // zone field selection makes Directus 403 with directus_forbidden. Zone
+    // derives from branches below; see index.post.ts.
+    const src = codeOf('apps/web/server/api/leave-balances/index.post.ts')
+    assert.doesNotMatch(src, /person\.zone/)
+    assert.match(src, /fields: \['id', 'branch'\]/)
+  })
 })
