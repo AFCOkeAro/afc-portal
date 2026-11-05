@@ -131,6 +131,18 @@ function toApiRequestError(cause: unknown, method: string, path: string): Error 
     })
   }
   if (status === 403) {
+    // Surface the server's own code (e.g. directus_forbidden vs forbidden)
+    // so the next trace names the layer that refused. Fall back to the
+    // generic portal code only when the body carries none.
+    if (
+      data &&
+      typeof data === 'object' &&
+      'code' in data &&
+      typeof data.code === 'string' &&
+      data.code.length > 0
+    ) {
+      return new ApiRequestError(status, data)
+    }
     return new ApiRequestError(403, {
       code: 'forbidden',
       message: 'You do not have access to that.',

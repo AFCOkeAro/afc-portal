@@ -1,11 +1,13 @@
 import { STAFF_ROLES } from '@afc/shared'
-import { requireArea } from '../../../utils/admin-guard'
+import { requireArea, requireSuperAdmin } from '../../../utils/admin-guard'
 import { directusFetch } from '../../../utils/directus'
 import { directusAdminToken } from '../../../utils/directus-admin'
 
 /**
  * POST /api/admin/users — add a person with a permission level and coverage
- * (AFC-914). Area admins only, mirroring PATCH /api/admin/users/:id.
+ * (AFC-914). Area admins only, mirroring PATCH /api/admin/users/:id, except
+ * assigning `super_admin` (AFC-1077): that maps to the Directus Administrator
+ * system role and requires a super admin.
  *
  * Body: email + name (identity), staff_role (permission level), and coverage
  * (area / zone / branch / AVS location / BSC). Modules need no coverage
@@ -78,6 +80,13 @@ export default defineEventHandler(async (event) => {
   const staffRole = asText(body?.staff_role, 60)
   if (!staffRole) {
     invalid('A staff role is required', { staff_role: 'Required' })
+  }
+  // AFC-1077: minting a super_admin is a one-way door — it maps to the
+  // Directus Administrator system role, which bypasses every Directus
+  // policy. Only a super admin may assign it (either spelling the selects
+  // submit); area admins keep every other assignment.
+  if (staffRole === 'super_admin' || staffRole === 'Administrator') {
+    await requireSuperAdmin(event)
   }
   const builtIn = (STAFF_ROLES as readonly string[]).includes(staffRole)
   const roleName = builtIn ? (BUILT_IN_ROLE_NAMES[staffRole] ?? null) : staffRole

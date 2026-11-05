@@ -34,7 +34,6 @@ const LEAVE_FIELDS = [
   'branch',
   'zone',
   'created_at',
-  'updated_at',
 ]
 
 interface PersonName {

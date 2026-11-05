@@ -130,13 +130,22 @@ const regAgeGroup = ref('all')
 const regSort = ref('newest')
 const selectedRegs = ref<Set<string>>(new Set())
 
-/* Tab gates live above `tab`: the immediate watcher below evaluates
- * `tab` during setup, and anything it touches must already be
- * initialized (TDZ 500, AFC-925). */
-/* Expenses tab (AFC-801): the 8th tab, hidden without the grant. */
+/* Expenses tab (AFC-801): hidden without the grant. */
+/* AFC-924: gates stay above `tab` — the immediate watcher evaluates `tab`
+ * during setup and `tab` reads `shownTabs`, so a gate declared below would
+ * sit in TDZ and 500 the page (AFC-925). Deps here are top-level only. */
 const canExpenses = computed(() => permissions.can(COLLECTIONS.eventExpenses, 'read'))
 /* Speakers tab (AFC-843): bookings, hidden without the grant. */
 const canSpeakers = computed(() => permissions.can(COLLECTIONS.eventSpeakers, 'read'))
+const canRecordExpenses = computed(
+  () =>
+    canExpenses.value &&
+    (permissions.can(COLLECTIONS.eventExpenses, 'create') ||
+      permissions.can(COLLECTIONS.events, 'update')),
+)
+const expenseAmountVisible = computed(() =>
+  permissions.isFieldVisible(COLLECTIONS.eventExpenses, 'amount'),
+)
 const shownTabs = computed<(typeof TABS)[number][]>(() =>
   TABS.filter(
     (entry) =>
@@ -230,15 +239,6 @@ const canManageResources = computed(
     canResources.value &&
     (permissions.can(COLLECTIONS.eventResources, 'create') ||
       permissions.can(COLLECTIONS.events, 'update')),
-)
-const canRecordExpenses = computed(
-  () =>
-    canExpenses.value &&
-    (permissions.can(COLLECTIONS.eventExpenses, 'create') ||
-      permissions.can(COLLECTIONS.events, 'update')),
-)
-const expenseAmountVisible = computed(() =>
-  permissions.isFieldVisible(COLLECTIONS.eventExpenses, 'amount'),
 )
 const restrictedMessage = computed(() => {
   const hidden = permissions.hiddenFields(COLLECTIONS.eventRegistrations)

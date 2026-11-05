@@ -27,11 +27,13 @@ export default defineEventHandler(async (event) => {
       scope,
       'people',
       form.person,
-      { fields: ['id', 'branch', 'zone'] },
+      { fields: ['id', 'branch'] },
     )
     const branch =
       typeof person.branch === 'string' && person.branch !== '' ? person.branch : null
-    let zone: string | null = typeof person.zone === 'string' ? person.zone : null
+    // people carries branch only (no zone column — hierarchy 0002 adds none,
+    // scope resolves through branch). Zone derives from branches below.
+    let zone: string | null = null
     if (branch && !zone) {
       const rows = await listItems<Record<string, unknown>>(event, scope, 'branches', {
         filter: { id: { _eq: branch } },
