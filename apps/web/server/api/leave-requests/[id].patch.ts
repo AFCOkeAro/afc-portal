@@ -24,8 +24,9 @@ import { logScopedQuery, officeBranchScope, writeOfficeAudit } from '../../utils
  *   user. Dates are merged with the stored row before the order check so
  *   a single-date edit still validates end >= start.
  * - Deciding-officer decision `{ status: approved | rejected }`: requires
- *   the `update` grant (zonal/area deciding officers), pending-only, and
- *   stamps `decided_by`/`decided_at` from the session. A CHECK cannot know
+ *   the `update` grant (zonal/area deciding officers), pending-only,
+ *   separation-of-duties (decider != requester, AFC-1067), and stamps
+ *   `decided_by`/`decided_at` from the session. A CHECK cannot know
  *   the actor, so the stamp lives here.
  *
  * Both paths write the explicit audit row (`updated` / `status_changed`).
@@ -63,6 +64,13 @@ export default defineEventHandler(async (event) => {
 
   if (isDecision) {
     requireCan(scope, COLLECTIONS.leaveRequests, 'update')
+    if (row.requester_user === scope.session.user.id) {
+      throw createError({
+        statusCode: 403,
+        statusMessage: 'A deciding officer cannot decide their own request — direct it to another officer',
+        data: { code: 'not_own_decision' },
+      })
+    }
     const parsed = leaveDecisionSchema.safeParse(body)
     if (!parsed.success) throwValidation(parsed.error)
 

@@ -258,6 +258,12 @@ describe('leave cutover — routes (no DELETE, stamped create, vocab, mine, audi
     assert.ok(patch.includes(`'status_changed'`), 'decision path audits status_changed')
   })
 
+  it('blocks self-decision on the decision path (AFC-1067 separation of duties)', () => {
+    const patch = codeOf('apps/web/server/api/leave-requests/[id].patch.ts')
+    assert.match(patch, /not_own_decision/)
+    assert.match(patch, /row\.requester_user === scope\.session\.user\.id/)
+  })
+
   it('maps maternity→other and blocks cancelled at the migration, not the route', () => {
     const post = codeOf('apps/web/server/api/leave-requests/index.post.ts')
     const edit = codeOf('packages/shared/src/schemas/office.ts')
