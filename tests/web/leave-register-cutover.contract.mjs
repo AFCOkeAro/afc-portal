@@ -206,7 +206,10 @@ describe('leave cutover — shared (collections + matrix)', () => {
 
   it('restricts the reason field to deciding officers + area', () => {
     const fr = matrix.slice(matrix.indexOf('FIELD_RESTRICTIONS'))
-    assert.ok(fr.includes('[COLLECTIONS.leaveRequests]'), 'leaveRequests has a restriction entry')
+    assert.ok(
+      fr.includes('[COLLECTIONS.leaveRequests]'),
+      'leaveRequests has a restriction entry',
+    )
     assert.ok(fr.includes("'reason'"), 'reason is the restricted field')
   })
 
@@ -247,6 +250,46 @@ describe('leave cutover — routes (no DELETE, stamped create, vocab, mine, audi
     assert.doesNotMatch(list, /person: \{ _eq/)
     assert.doesNotMatch(list, /'declined'/)
     assert.doesNotMatch(list, /'cancelled'/)
+  })
+
+  it('requests only migration-defined columns (AFC-1073 phantom updated_at pin)', () => {
+    const listRaw = read('apps/web/server/api/leave-requests/index.get.ts')
+    const fieldsBlock = listRaw.match(/LEAVE_FIELDS = \[([\s\S]*?)\]/)
+    assert.ok(fieldsBlock, 'LEAVE_FIELDS block found')
+    const requested = [...fieldsBlock[1].matchAll(/'([a-z_]+)'/g)].map((m) => m[1])
+    assert.ok(requested.length > 0, 'LEAVE_FIELDS is non-empty')
+    assert.ok(
+      !requested.includes('updated_at'),
+      'no phantom updated_at in the route field list',
+    )
+
+    // Migration-defined column set: 0052 CREATE TABLE, minus 0067 drops,
+    // plus 0067 adds. No migration ever creates updated_at on this table.
+    const base = sqlOf(
+      'services/directus/schema/migrations/20261028_0052_leave_requests.sql',
+    )
+    const createBlock = base.match(
+      /CREATE TABLE IF NOT EXISTS leave_requests \(([\s\S]*?)\n\);/,
+    )
+    assert.ok(createBlock, '0052 CREATE TABLE leave_requests block found')
+    const columns = new Set(
+      [...createBlock[1].matchAll(/^\s*([a-z_]+)\s+[a-z]/gm)]
+        .map((m) => m[1])
+        .filter((name) => !['constraint'].includes(name)),
+    )
+    const cutover = sqlOf(MIGRATION)
+    for (const m of cutover.matchAll(/ADD COLUMN IF NOT EXISTS ([a-z_]+)/g)) {
+      columns.add(m[1])
+    }
+    for (const m of cutover.matchAll(/DROP COLUMN IF EXISTS ([a-z_]+)/g)) {
+      columns.delete(m[1])
+    }
+    for (const field of requested) {
+      assert.ok(
+        columns.has(field),
+        `route field "${field}" exists in the migration-defined column set`,
+      )
+    }
   })
 
   it('audits both PATCH paths and gates them (pending-only, requester-only, update-grant)', () => {
