@@ -139,6 +139,6 @@ describe('AFC-1077 leave matrix unchanged', () => {
   it('the leave create route still enforces its grant (nothing widened)', () => {
     const src = codeOf(LEAVE_POST)
     assert.match(src, /requireCan\(/)
-    assert.match(src, /leave_requests/)
+    assert.match(src, /COLLECTIONS.leaveRequests/)
   })
 })
