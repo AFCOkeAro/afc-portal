@@ -92,8 +92,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const row = person.data
-  const branch =
-    typeof row.branch === 'string' && row.branch !== '' ? row.branch : null
+  const branch = typeof row.branch === 'string' && row.branch !== '' ? row.branch : null
   let zone: string | null = null
   if (branch) {
     const branchRow = await directusFetch<{ data: Record<string, unknown> }>(

@@ -1,10 +1,5 @@
 import type { H3Event } from 'h3'
-import {
-  branchNames,
-  listItems,
-  scopeFilter,
-  type PortalScope,
-} from './portal'
+import { branchNames, listItems, scopeFilter, type PortalScope } from './portal'
 
 /**
  * People compare collectors (AFC-485, US-A4). One grouped read feeds the
@@ -65,7 +60,9 @@ export async function collectPeopleGroups(
     for (const row of result.data) {
       const key =
         groupBy === 'zone'
-          ? (row.branch ? (branchZone.get(String(row.branch)) ?? 'unassigned') : 'unassigned')
+          ? row.branch
+            ? (branchZone.get(String(row.branch)) ?? 'unassigned')
+            : 'unassigned'
           : (row.branch ?? 'unassigned')
       groups.set(String(key), (groups.get(String(key)) ?? 0) + 1)
     }
