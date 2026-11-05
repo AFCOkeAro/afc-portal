@@ -63,10 +63,11 @@ describe('AFC-914 holders list', () => {
 })
 
 describe('AFC-914 add-person endpoint', () => {
-  it('is gated like the assignment PATCH (area), not widened', () => {
+  it('is gated like the assignment PATCH (area), plus the AFC-1077 super_admin gate', () => {
     const src = codeOf(POST)
     assert.match(src, /requireArea\(event\)/)
-    assert.doesNotMatch(src, /requireSuperAdmin/)
+    assert.match(src, /requireSuperAdmin\(event\)/)
+    assert.match(src, /staffRole === 'super_admin'/)
   })
 
   it('requires identity and a permission level', () => {
@@ -162,8 +163,10 @@ describe('AFC-914 stays apps-only', () => {
     assert.doesNotMatch(codeOf(GET), /ALTER TABLE/)
   })
 
-  it('does not widen permission gates beyond the PATCH precedent', () => {
+  it('both user routes gate super_admin assignment behind requireSuperAdmin', () => {
     assert.match(codeOf(PATCH), /requireArea\(event\)/)
     assert.match(codeOf(POST), /requireArea\(event\)/)
+    assert.match(codeOf(PATCH), /requireSuperAdmin\(event\)/)
+    assert.match(codeOf(POST), /requireSuperAdmin\(event\)/)
   })
 })
