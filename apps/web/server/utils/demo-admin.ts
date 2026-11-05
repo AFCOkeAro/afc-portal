@@ -94,8 +94,14 @@ async function registryCounts(client: {
   return { tables, total }
 }
 
-function actorId(scopeUserId: string): string | null {
-  if (!UUID_RE.test(scopeUserId)) return null
+function actorId(scopeUserId: string): string {
+  if (!UUID_RE.test(scopeUserId)) {
+    throw createError({
+      statusCode: 500,
+      statusMessage: 'Demo audit actor is not a valid user id',
+      data: { code: 'demo_actor_invalid' },
+    })
+  }
   return scopeUserId
 }
 
@@ -103,19 +109,24 @@ export async function runDemoSeed(
   event: H3Event,
   scopeUserId: string,
 ): Promise<DemoCounts> {
+  const actor = actorId(scopeUserId)
   const client = await demoPool(event).connect()
   try {
-    await client.query(loadScript('001_demo_seed.sql'))
-    const counts = await registryCounts(client)
-    await client.query(
-      `INSERT INTO demo_admin_actions (action, actor_user, detail)
-       VALUES ('seed', $1::uuid, $2::jsonb)`,
-      [
-        actorId(scopeUserId),
-        JSON.stringify({ tables: counts.tables, total: counts.total }),
-      ],
-    )
-    return counts
+    await client.query('BEGIN')
+    try {
+      await client.query(loadScript('001_demo_seed.sql'))
+      const counts = await registryCounts(client)
+      await client.query(
+        `INSERT INTO demo_admin_actions (action, actor_user, detail)
+         VALUES ('seed', $1::uuid, $2::jsonb)`,
+        [actor, JSON.stringify({ tables: counts.tables, total: counts.total })],
+      )
+      await client.query('COMMIT')
+      return counts
+    } catch (cause) {
+      await client.query('ROLLBACK')
+      throw cause
+    }
   } finally {
     client.release()
   }
@@ -133,21 +144,26 @@ export async function runDemoClear(
       data: { code: 'confirmation_required' },
     })
   }
+  const actor = actorId(scopeUserId)
   const client = await demoPool(event).connect()
   try {
-    // Capture before the clear deletes the registry rows: the pre-counts
-    // are the removed counts the audit row reports.
-    const removed = await registryCounts(client)
-    await client.query(loadScript('002_demo_clear.sql'))
-    await client.query(
-      `INSERT INTO demo_admin_actions (action, actor_user, detail)
-       VALUES ('clear', $1::uuid, $2::jsonb)`,
-      [
-        actorId(scopeUserId),
-        JSON.stringify({ tables: removed.tables, total: removed.total }),
-      ],
-    )
-    return removed
+    await client.query('BEGIN')
+    try {
+      // Capture before the clear deletes the registry rows: the pre-counts
+      // are the removed counts the audit row reports.
+      const removed = await registryCounts(client)
+      await client.query(loadScript('002_demo_clear.sql'))
+      await client.query(
+        `INSERT INTO demo_admin_actions (action, actor_user, detail)
+         VALUES ('clear', $1::uuid, $2::jsonb)`,
+        [actor, JSON.stringify({ tables: removed.tables, total: removed.total })],
+      )
+      await client.query('COMMIT')
+      return removed
+    } catch (cause) {
+      await client.query('ROLLBACK')
+      throw cause
+    }
   } finally {
     client.release()
   }
