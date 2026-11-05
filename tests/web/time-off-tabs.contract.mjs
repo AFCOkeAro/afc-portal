@@ -118,3 +118,48 @@ describe('AFC-896 old route: /annual-leave redirects into the Requests tab', () 
     assert.match(src, /301/)
   })
 })
+
+describe('AFC-1026 deltas: Mine-default, avatars, pending-row correct, Approvals gate', () => {
+  const src = read(PAGE)
+  const script = src.split('<template>')[0]
+  const template = src.split('<template>').slice(1).join('<template>')
+
+  it('defaults Requests to Mine with ?mine=0 opt-out and query sync', () => {
+    assert.match(script, /route\.query\.mine !== '0'/)
+    assert.match(script, /mine: '1'/)
+    assert.match(template, /Mine only/)
+  })
+
+  it('serves mine=1 from the list route as created_by = session user', () => {
+    const route = codeOf('apps/web/server/api/leave-requests/index.get.ts')
+    assert.match(route, /query\.mine === '1'/)
+    assert.match(route, /created_by: \{ _eq: scope\.session\.user\.id \}/)
+  })
+
+  it('renders names with avatars and never raw ids', () => {
+    const hits = template.match(/ProfileAvatar/g) ?? []
+    assert.ok(hits.length >= 2, `avatars in Requests + Approvals, found ${hits.length}`)
+    assert.match(template, /photo-url="personPhoto\(row\.person\)"/)
+    assert.doesNotMatch(script, /id\.slice\(0, 8\)/)
+  })
+
+  it('gates Approvals on the update grant with a restricted notice', () => {
+    assert.match(script, /leaveRequests.*'update'|COLLECTIONS\.leaveRequests/)
+    assert.ok(
+      template.includes('Restricted'),
+      'restricted notice renders without the grant',
+    )
+    assert.ok(
+      template.includes('deciding officers only'),
+      'notice names the deciding-officer audience',
+    )
+  })
+
+  it('corrects pending rows only through the existing PATCH and refreshes', () => {
+    assert.match(template, /openCorrect\(row\)/)
+    assert.match(script, /api\.patch\(`\/api\/leave-requests\//)
+    assert.match(script, /loadRequests\(\)/)
+    const patch = codeOf('apps/web/server/api/leave-requests/[id].patch.ts')
+    assert.match(patch, /Only a pending request can be corrected/)
+  })
+})

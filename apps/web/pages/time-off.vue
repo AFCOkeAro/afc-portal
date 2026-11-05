@@ -2,24 +2,28 @@
 import { COLLECTIONS, LEAVE_STATUSES, LEAVE_TYPES, workingDaysBetween } from '@afc/shared'
 
 /**
- * Time Off (AFC-896 merged surface): Time Off and Annual Leave are the same
- * subject, so they live in one section with Balances / Requests / Approvals
- * tabs instead of separate menu entries. No new registers — the tabs only
- * move surfaces.
+ * Time Off (AFC-896 merged surface + AFC-1026 deltas): Time Off and Annual
+ * Leave are the same subject, so they live in one section with Balances /
+ * Requests / Approvals tabs instead of separate menu entries. No new
+ * registers — the tabs only move surfaces.
  *
  * Balances tab (AFC-854, moved unchanged): annual allowances per person per
  * year, plus a working-day calculator for planning leave (weekends skipped;
  * public holidays are not subtracted yet — no holiday register). Used and
  * remaining days compute server-side against approved leave_requests.
  *
- * Requests tab (AFC-842, moved unchanged): file a request (person, dates,
- * type, reason — days count start..end inclusive, stamped server-side) and
- * correct pending requests. Scoped to the caller's branch/zone server-side.
+ * Requests tab (AFC-842 + AFC-1026): file a request (person, dates, type,
+ * reason — days count start..end inclusive, stamped server-side) and
+ * correct pending rows. Scoped to the caller's branch/zone server-side.
+ * Mine is the default — `?mine=0` opts into the wider scoped view. Rows
+ * show names with avatars, never raw ids.
  *
- * Approvals tab (AFC-896, new focus view): the pending decision queue plus
- * the decided list, folded client-side from the already-loaded scoped rows
- * (no new endpoint, no new register). Decisions ride the same row and the
- * same transition table as the Requests tab.
+ * Approvals tab (AFC-896 focus view, AFC-1026 gate): the pending decision
+ * queue plus the decided list, folded client-side from the already-loaded
+ * scoped rows (no new endpoint, no new register). Gated on the update
+ * grant — everyone else sees a restricted notice, never the queue.
+ * Decisions ride the same row and the same transition table as the
+ * Requests tab.
  *
  * Tab is `?tab=` so each tab deep-links (events detail precedent); the old
  * `/annual-leave` route redirects to `?tab=requests` so bookmarks keep
@@ -36,6 +40,7 @@ const { personOptions, personPending, onPersonSearch } = usePersonSearch()
 const TABS = [
   { id: 'balances', label: 'Balances', icon: 'i-lucide-wallet' },
   { id: 'requests', label: 'Requests', icon: 'i-lucide-inbox' },
+  { id: 'approvals', label: 'Approvals', icon: 'i-lucide-check-check' },
 ] as const
 
 type TabId = (typeof TABS)[number]['id']
@@ -159,10 +164,14 @@ const TYPE_LABELS: Record<string, string> = {
 }
 
 const statusFilter = ref('all')
+/** Requests answers "my leave status", so Mine is the default — `?mine=0`
+ *  opts into the wider scoped view (tasks ?mine= pattern, inverted). */
+const mine = ref(route.query.mine !== '0')
 const requests = ref<LeaveRequest[]>([])
 const requestsPending = ref(false)
 const requestsError = ref('')
 const personNames = ref<Record<string, string>>({})
+const personPhotos = ref<Record<string, string | null>>({})
 const newRequest = ref({
   person: '',
   start_date: '',
@@ -231,7 +240,10 @@ async function loadRequests(): Promise<void> {
   requestsError.value = ''
   try {
     const res = await api.get<{ data: LeaveRequest[] }>('/api/leave-requests', {
-      query: statusFilter.value === 'all' ? {} : { status: statusFilter.value },
+      query: {
+        ...(statusFilter.value === 'all' ? {} : { status: statusFilter.value }),
+        ...(mine.value ? { mine: '1' } : {}),
+      },
     })
     requests.value = res.data ?? []
     await resolveNames()
@@ -242,6 +254,15 @@ async function loadRequests(): Promise<void> {
     requestsPending.value = false
   }
 }
+
+/** Approvals tab folds client-side from the already-loaded scoped rows —
+ *  the pending decision queue plus the decided list (no new endpoint). */
+const pendingRequests = computed(() =>
+  requests.value.filter((row: LeaveRequest) => row.status === 'pending'),
+)
+const decidedRequests = computed(() =>
+  requests.value.filter((row: LeaveRequest) => row.status !== 'pending'),
+)
 
 async function resolveNames(): Promise<void> {
   const ids = [
@@ -258,13 +279,19 @@ async function resolveNames(): Promise<void> {
     ),
   )
   const names: Record<string, string> = {}
+  const photos: Record<string, string | null> = {}
   for (const { id, row } of settled) {
     if (!row) continue
     const full =
       `${String(row.first_name ?? '').trim()} ${String(row.last_name ?? '').trim()}`.trim()
     names[id] = String(row.preferred_name ?? '').trim() || full || 'Unnamed member'
+    photos[id] =
+      typeof row.photo_file === 'string' && row.photo_file !== ''
+        ? `/api/people/${id}/photo`
+        : null
   }
   personNames.value = { ...personNames.value, ...names }
+  personPhotos.value = { ...personPhotos.value, ...photos }
 }
 
 async function createRequest(): Promise<void> {
@@ -329,13 +356,52 @@ async function withdraw(id: string): Promise<void> {
   }
 }
 
+/** Correct a pending row (AFC-1026): type + reason only, matching what the
+ *  PATCH route accepts for corrections. The server re-checks pending-only
+ *  and the update grant — this modal never shows otherwise. */
+const correcting = ref<LeaveRequest | null>(null)
+const correctForm = ref({ leave_type: 'annual', reason: '' })
+const correctError = ref('')
+const correctSaving = ref(false)
+
+function openCorrect(row: LeaveRequest): void {
+  correcting.value = row
+  correctError.value = ''
+  correctForm.value = { leave_type: row.leave_type, reason: row.reason ?? '' }
+}
+
+async function saveCorrect(): Promise<void> {
+  if (!correcting.value) return
+  correctSaving.value = true
+  correctError.value = ''
+  try {
+    await api.patch(`/api/leave-requests/${correcting.value.id}`, {
+      leave_type: correctForm.value.leave_type,
+      reason: correctForm.value.reason,
+    })
+    correcting.value = null
+    await loadRequests()
+  } catch (cause) {
+    correctError.value =
+      (cause as { message?: string }).message ?? 'Could not save the correction'
+  } finally {
+    correctSaving.value = false
+  }
+}
+
 function typeLabel(type: string): string {
   return TYPE_LABELS[type] ?? type
 }
 
 function personLabel(id: string | null): string {
   if (!id) return '—'
-  return personNames.value[id] ?? id.slice(0, 8)
+  return personNames.value[id] ?? 'Unknown'
+}
+
+/** Avatar photo for a request row, if the person has one on file. */
+function personPhoto(id: string | null): string | null {
+  if (!id) return null
+  return personPhotos.value[id] ?? null
 }
 
 const shownTabs = computed<(typeof TABS)[number][]>(() =>
@@ -354,14 +420,19 @@ const tab = computed<TabId>(() => {
 })
 
 function goTab(next: TabId): void {
-  // The approvals queue is inherently the whole queue — landing on it resets
-  // the Requests tab status filter so the pending list is complete.
   void router.replace({ query: { ...route.query, tab: next } })
 }
 
-/* Approvals tab (AFC-896): the pending decision queue plus the decided
- * list, folded client-side from the already-loaded scoped rows. Same rows,
- * same decide()/withdraw() flow — only the focus moves. */
+watch(mine, () => {
+  void loadRequests()
+})
+
+watch(
+  () => route.query.mine,
+  (value: unknown) => {
+    mine.value = value !== '0'
+  },
+)
 
 onMounted(() => {
   void loadBalances()
@@ -516,12 +587,13 @@ watch(statusFilter, () => {
       </div>
     </section>
 
-    <!-- REQUESTS (AFC-842, moved unchanged under the merged tabs) -->
+    <!-- REQUESTS (AFC-842 + AFC-1026: Mine-default, avatars, pending-row correct) -->
     <section v-else-if="tab === 'requests'" aria-label="Leave requests" class="mt-4">
       <div class="flex flex-wrap items-end gap-2">
         <UFormField label="Status" class="w-52">
           <USelect v-model="statusFilter" :items="statusItems" class="w-full" />
         </UFormField>
+        <UCheckbox v-model="mine" label="Mine only" name="mine" class="pb-2" />
       </div>
       <p v-if="requestsPending" class="mt-3 text-sm text-gray-500">Loading requests…</p>
       <p v-else-if="requestsError !== ''" class="mt-3 text-sm text-red-600">
@@ -538,6 +610,11 @@ watch(statusFilter, () => {
       <div v-else class="mt-3 space-y-2">
         <UCard v-for="row in requests" :key="row.id">
           <div class="flex flex-wrap items-center gap-2 text-sm">
+            <ProfileAvatar
+              :name="personLabel(row.person)"
+              :photo-url="personPhoto(row.person)"
+              size="sm"
+            />
             <span class="font-semibold">{{ personLabel(row.person) }}</span>
             <UBadge color="neutral" variant="subtle">{{
               typeLabel(row.leave_type)
@@ -572,6 +649,13 @@ watch(statusFilter, () => {
                   variant="soft"
                   label="Decline"
                   @click="decide(row.id, 'declined')"
+                />
+                <UButton
+                  size="xs"
+                  color="neutral"
+                  variant="soft"
+                  label="Correct"
+                  @click="openCorrect(row)"
                 />
               </template>
               <UButton
@@ -663,6 +747,155 @@ watch(statusFilter, () => {
           {{ requestError }}
         </p>
       </UCard>
+
+      <UModal
+        :open="correcting !== null"
+        title="Correct a pending request"
+        @update:open="correcting = $event ? correcting : null"
+      >
+        <template #body>
+          <div class="space-y-3">
+            <UFormField label="Type">
+              <USelect
+                v-model="correctForm.leave_type"
+                :items="
+                  LEAVE_TYPES.map((type: string) => ({
+                    label: typeLabel(type),
+                    value: type,
+                  }))
+                "
+                class="w-full"
+              />
+            </UFormField>
+            <UFormField label="Reason">
+              <UInput v-model="correctForm.reason" class="w-full" />
+            </UFormField>
+            <p v-if="correctError !== ''" class="text-sm text-red-600">
+              {{ correctError }}
+            </p>
+          </div>
+        </template>
+        <template #footer>
+          <UButton
+            label="Save correction"
+            icon="i-lucide-check"
+            :loading="correctSaving"
+            @click="saveCorrect"
+          />
+        </template>
+      </UModal>
+    </section>
+
+    <!-- APPROVALS (AFC-896 focus view, AFC-1026 update-grant gate): the
+      pending decision queue plus the decided list, folded client-side from
+      the already-loaded scoped rows. No new endpoint, no new register. -->
+    <section v-else-if="tab === 'approvals'" aria-label="Leave approvals" class="mt-4">
+      <UCard v-if="!canDecide">
+        <template #header>
+          <h3 class="font-semibold">Restricted</h3>
+        </template>
+        <p class="text-sm text-gray-500">
+          The approvals queue is for deciding officers only. Requests you file stay under
+          the Requests tab.
+        </p>
+      </UCard>
+      <template v-else>
+        <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">
+          Pending decisions
+        </h3>
+        <p v-if="requestsPending" class="mt-3 text-sm text-gray-500">Loading requests…</p>
+        <p v-else-if="requestsError !== ''" class="mt-3 text-sm text-red-600">
+          {{ requestsError }}
+        </p>
+        <div v-else-if="pendingRequests.length === 0" class="mt-3">
+          <UCard>
+            <EmptyState
+              title="No pending requests"
+              description="The queue is clear. Decided requests stay listed below."
+            />
+          </UCard>
+        </div>
+        <div v-else class="mt-3 space-y-2">
+          <UCard v-for="row in pendingRequests" :key="row.id">
+            <div class="flex flex-wrap items-center gap-2 text-sm">
+              <ProfileAvatar
+                :name="personLabel(row.person)"
+                :photo-url="personPhoto(row.person)"
+                size="sm"
+              />
+              <span class="font-semibold">{{ personLabel(row.person) }}</span>
+              <UBadge color="neutral" variant="subtle">{{
+                typeLabel(row.leave_type)
+              }}</UBadge>
+              <span class="text-gray-500"
+                >{{ row.start_date }} → {{ row.end_date }} ({{ row.days }}d)</span
+              >
+              <span class="ml-auto flex gap-1">
+                <UButton
+                  size="xs"
+                  color="success"
+                  variant="soft"
+                  label="Approve"
+                  @click="decide(row.id, 'approved')"
+                />
+                <UButton
+                  size="xs"
+                  color="error"
+                  variant="soft"
+                  label="Decline"
+                  @click="decide(row.id, 'declined')"
+                />
+              </span>
+            </div>
+            <p v-if="row.reason" class="mt-1 text-sm text-gray-600">{{ row.reason }}</p>
+          </UCard>
+        </div>
+        <h3 class="mt-6 text-sm font-semibold text-gray-700 dark:text-gray-300">
+          Decided
+        </h3>
+        <div v-if="!requestsPending && decidedRequests.length === 0" class="mt-3">
+          <UCard>
+            <EmptyState
+              title="Nothing decided yet"
+              description="Approved, declined and cancelled requests appear here."
+            />
+          </UCard>
+        </div>
+        <div v-else class="mt-3 space-y-2">
+          <UCard v-for="row in decidedRequests" :key="row.id">
+            <div class="flex flex-wrap items-center gap-2 text-sm">
+              <ProfileAvatar
+                :name="personLabel(row.person)"
+                :photo-url="personPhoto(row.person)"
+                size="sm"
+              />
+              <span class="font-semibold">{{ personLabel(row.person) }}</span>
+              <UBadge
+                :color="row.status === 'approved' ? 'success' : 'error'"
+                variant="subtle"
+              >
+                {{ row.status }}
+              </UBadge>
+              <span class="text-gray-500"
+                >{{ row.start_date }} → {{ row.end_date }} ({{ row.days }}d)</span
+              >
+              <span class="ml-auto flex gap-1">
+                <UButton
+                  v-if="row.status === 'approved'"
+                  size="xs"
+                  color="neutral"
+                  variant="ghost"
+                  label="Cancel"
+                  @click="decide(row.id, 'cancelled')"
+                />
+              </span>
+            </div>
+          </UCard>
+        </div>
+        <p v-if="actionError !== ''" class="mt-3 text-sm text-red-600">
+          {{ actionError }}
+        </p>
+      </template>
     </section>
   </div>
 </template>
