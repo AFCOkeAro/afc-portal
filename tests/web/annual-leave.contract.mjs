@@ -82,17 +82,23 @@ describe('AFC-842 leave page and nav (AFC-896 merged tabs)', () => {
     assert.match(src, /navigateTo/)
   })
 
-  it('the page files, corrects and decides with transitions', () => {
+  it('the page files, edits pending rows and decides approve/reject', () => {
     const src = codeOf(PAGE)
     assert.match(src, /createRequest/)
     assert.match(src, /decide\(row\.id, 'approved'\)/)
-    assert.match(src, /withdraw\(row\.id\)/)
+    assert.match(src, /decide\(row\.id, 'rejected'\)/)
+    assert.match(src, /openEdit\(row\)/)
+    assert.doesNotMatch(src, /withdraw\(row\.id\)/)
+    assert.doesNotMatch(src, /'declined'/)
   })
 
-  it('decisions stamp the decider and follow the transition table', () => {
+  it('decisions stamp the decider on pending-only rows (no transition table)', () => {
     const src = codeOf('apps/web/server/api/leave-requests/[id].patch.ts')
-    assert.match(src, /TERMINAL/)
     assert.match(src, /decided_by: scope\.session\.user\.id/)
-    assert.match(src, /invalid_transition/)
+    assert.match(src, /decided_at: now/)
+    assert.match(src, /not_pending/)
+    assert.match(src, /not_requester/)
+    assert.doesNotMatch(src, /TERMINAL/)
+    assert.doesNotMatch(src, /invalid_transition/)
   })
 })
