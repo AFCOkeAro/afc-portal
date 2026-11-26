@@ -1,0 +1,13 @@
+/* AFC Pathway Child — front-end helpers (AFC-1209). Tokens come from theme.json; this file only adds the badge + form primitives the patterns rely on. Kept under 3KB. */
+.afc-badge{display:inline-flex;align-items:center;gap:8px;padding:4px 14px;border-radius:999px;font-size:11px;font-weight:600;letter-spacing:.08em;white-space:nowrap}
+.afc-badge::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.afc-badge--free{background:#E9F4EE;color:#175A35}
+.afc-badge--tba{background:#FDF5E0;color:#7A5C00}
+.afc-register{max-width:56rem}
+.afc-register label{display:block;font-size:14px;font-weight:600;margin-bottom:6px}
+.afc-register input[type="text"],.afc-register input[type="tel"],.afc-register select{width:100%;min-height:44px;border:1px solid #8A94A6;border-radius:8px;padding:10px 14px;font:inherit;background:#fff}
+.afc-register fieldset{border:2px solid #E2E7F1;border-radius:12px;padding:1.5rem;margin:0 0 1rem}
+.afc-register fieldset legend{font-weight:700;padding:0 .5rem}
+.afc-register fieldset label{border:2px solid #E2E7F1;border-radius:12px;padding:14px;margin-bottom:12px;cursor:pointer;font-weight:400}
+.afc-register fieldset label:has(input:checked){border-color:#1A63B4;background:#E8F0FA}
+.afc-register button[type="submit"]{min-height:44px;padding:12px 24px;border-radius:999px;border:1px solid transparent;background:#1A63B4;color:#fff;font-size:11px;font-weight:600;letter-spacing:.19em;text-transform:uppercase;cursor:pointer}
