@@ -14,6 +14,11 @@
 http://afc-staging.bluespace.ng {
 	encode gzip
 
+	# Staging access log to stdout (Docker collects it). The 30-day edge-log
+	# rule (AFC-1222 F6) is enforced by the prod Caddyfile's file stanza with
+	# roll_keep_for 720h; staging inherits the Docker default rotation.
+	log
+
 	reverse_proxy web:3000 {
 		# Zero-downtime staging deploys: hold requests (including
 		# replays) while the replacement container boots instead of
@@ -21,6 +26,11 @@ http://afc-staging.bluespace.ng {
 		# a replayed POST cannot double-apply (AFC-987).
 		lb_try_duration 60s
 		lb_try_interval 250ms
+		# XFF hygiene (AFC-1226 H1): overwrite the chain with the immediate
+		# peer so a spoofed X-Forwarded-For never reaches the app or the
+		# logs. The register limiter keys on CF-Connecting-IP / socket and
+		# never trusts XFF either way.
+		header_up X-Forwarded-For {remote_host}
 	}
 
 	header {
@@ -41,6 +51,9 @@ http://afc-staging.bluespace.ng {
 
 http://afc-staging-api.bluespace.ng {
 	encode gzip
+
+	# Same stdout-logging note as above (AFC-1222 F6).
+	log
 
 	reverse_proxy directus:8055
 

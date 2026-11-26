@@ -135,12 +135,38 @@ export default defineNuxtConfig({
      */
     demoDatabaseUrl: '',
     /**
-     * Token whose Directus policy is the *public* role's. Used only by the
-     * unauthenticated registration proxy: an anonymous write must be constrained
-     * by a public policy, not merely by the field allowlist in application code.
-     * Absent means the public form is closed, and the route answers 503.
+     * Token whose Directus policy is the *public* role's. Used only for
+     * READS on the unauthenticated surface: the public event feed and the
+     * register proxy's event-visibility check. It holds no create on
+     * event_registrations (migration 0072 revoked the 0069 grant) — writes
+     * ride the writer token below, so a leaked public token can read the
+     * public calendar and nothing else. Absent means the public form is
+     * closed, and the route answers 503.
      */
     directusPublicToken: '',
+    /**
+     * Token whose Directus policy is the non-public `registration_writer`
+     * role (AFC-1226 G3). Used only by the unauthenticated registration
+     * proxy for its single POST (plus nothing else): the role is
+     * create-only on event_registrations with the writer allowlist (16
+     * public fields + registration_status + idempotency_key — no source,
+     * no consent_signed_at, no ticket/status/money columns). Server-side
+     * only, never sent to the browser. Absent means the public form is
+     * closed, and the route answers 503.
+     */
+    directusWriterToken: '',
+    /**
+     * Cloudflare Turnstile secret for the public registration bot gate
+     * (AFC-1222 F4, fail-closed AFC-1226 H2/H3). Server-side only, never
+     * sent to the browser. When set, POST /api/register requires a valid
+     * `turnstile_token` before seat allocation; when absent the honeypot +
+     * rate limit + dedupe are the active layers outside production, and IN
+     * PRODUCTION the form closes (503) — honeypot-only in prod needs a
+     * written CEO risk-acceptance, it is not a default. Enabling
+     * enforcement is setting the secret, not a code change — a CTO deploy
+     * decision, per the route header.
+     */
+    turnstileSecretKey: '',
     /** Signs the session cookie. Required in any environment but local dev. */
     sessionSecret: '',
     /**
