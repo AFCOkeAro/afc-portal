@@ -25,7 +25,7 @@ Directus is source-available under the Monospace Sustainable Core Licence. Organ
 
 ```
                     ┌───────────────────────── VPS (Hetzner CX33, 4 vCPU / 8 GB) ─────────────────────────┐
- Internet ──443──▶  │  Caddy (reverse proxy + automatic TLS + HSTS + rate limit)                        │
+ Internet ──443──▶  │  Caddy (reverse proxy + automatic TLS + HSTS; rate limit lives at the Nuxt edge, AFC-1222)                        │
                     │    ├── portal.<domain>      →  web  (Nuxt 3 SSR, Node 22, :3000)                   │
                     │    ├── api.<domain>         →  directus (:8055)                                    │
                     │    └── (optional) admin.<domain> → directus (:8055)  [IP-restricted]              │
@@ -121,6 +121,9 @@ services:
     environment:
       NUXT_PUBLIC_DIRECTUS_URL: ${DIRECTUS_PUBLIC_URL}
       NUXT_DIRECTUS_SERVER_TOKEN: ${NUXT_DIRECTUS_SERVER_TOKEN}
+      NUXT_DIRECTUS_PUBLIC_TOKEN: ${NUXT_DIRECTUS_PUBLIC_TOKEN}
+      NUXT_DIRECTUS_WRITER_TOKEN: ${NUXT_DIRECTUS_WRITER_TOKEN}
+      NUXT_TURNSTILE_SECRET_KEY: ${NUXT_TURNSTILE_SECRET_KEY}
       NUXT_PUBLIC_SITE_URL: ${SITE_URL}
 
   caddy:
@@ -176,7 +179,11 @@ portal.example.org {
 }
 api.example.org {
     encode gzip zstd
-    rate_limit { zone api { match { path /items/event_registrations* } events 20 } }
+    # No rate_limit block: stock caddy:2-alpine ships no such directive, so
+    # the sketch that used to sit here never enforced anything (AFC-1222 F1).
+    # The public-registration limit lives at the Nuxt edge
+    # (apps/web/server/utils/public-rate-limit.ts). See
+    # services/directus/Caddyfile, the production transcription.
     reverse_proxy directus:8055
 }
 ```
@@ -197,6 +204,9 @@ api.example.org {
 | `SITE_URL` | Frontend public URL |
 | `NUXT_PUBLIC_DIRECTUS_URL` | API base for the browser |
 | `NUXT_DIRECTUS_SERVER_TOKEN` | Server-side scoped token (SSR) |
+| `NUXT_DIRECTUS_PUBLIC_TOKEN` | Public-role token (unauthenticated reads: public event feed + register visibility check; no create on registrations since 0072) |
+| `NUXT_DIRECTUS_WRITER_TOKEN` | Server-held writer token (AFC-1226 G3, AFC-1230 F3: `registration_writer`, create-only writer allowlist; absent means POST /api/register answers 503 fail-closed) |
+| `NUXT_TURNSTILE_SECRET_KEY` | Cloudflare Turnstile secret (AFC-1222 F4, AFC-1230 F3; absent closes the public form in production) |
 | `EMAIL_FROM`, `EMAIL_SMTP_HOST`, `EMAIL_SMTP_PORT`, `EMAIL_SMTP_USER`, `EMAIL_SMTP_PASSWORD` | Transactional email |
 | `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY`, `S3_SECRET_KEY` | Backup/media object storage |
 | `SENTRY_DSN` | Error tracking (optional) |
@@ -218,6 +228,8 @@ api.example.org {
 | Targets | **RPO ≤ 24h**, **RTO ≤ 4h** |
 | Protection | Versioning/immutability on the backup bucket; separate credentials from app tokens |
 | Erasure | Append-only hash-chained `erasure_ledger` in object storage under object-lock, **never included in a `pg_dump`**. Promotion of a restored database is refused until the ledger is replayed and every erased identifier is absent. Rationale and arithmetic: [ADR-0005](/AFC/issues/AFC-169#document-adr-0005-erasure-lag-is-the-backup-window) |
+| Edge access logs (AFC-1222 F6) | Caddy `log` to `/var/log/caddy/*-access.log` (volume `caddy_logs`), `roll_size 100mb`, `roll_keep_for 720h` = **30 days**, then age out. Cookie/Authorization headers redacted at write. Staging logs to stdout (Docker collects); the 30-day rule is enforced by the prod file stanza. |
+| Directus history (AFC-1222 F6) | Scheduled prune of `directus_activity` + `directus_revisions` (which can embed child PII from registration edits) via `services/directus/bin/prune-directus-history.sh` — dry-run by default, `--apply` + `PRUNE_CONFIRM=prune` deletes. Default window 30 days (edge-log parity, floor 7). Operator-scheduled (cron), never automatic on deploy. |
 
 ---
 
@@ -276,9 +288,10 @@ api.example.org {
 ## 9. Security posture
 
 - TLS 1.2+ everywhere via Caddy automatic certificates; HSTS.
+- Production TLS terminates at origin (AFC-1222 F7, deploy check, operator-owned). Caddy holds the certificate; the CDN in front of production must run Full (Strict). Cloudflare Flexible (staging, AFC-561) speaks plain HTTP from CDN to origin and must not be carried forward: Flexible in front of live registration traffic would move children's data unencrypted over the last leg while the browser shows a lock.
 - Studio admin surface limited to super/area admins and IP-restricted or behind a proxy.
 - Least-privilege Directus roles; public role is create-only on registrations.
-- Rate limiting on public registration endpoints; bot mitigation (Caddy/Turnstile) if abuse appears.
+- Rate limiting on the public registration endpoint at the Nuxt edge (per-IP token bucket; shared store is a CTO deploy decision); Turnstile bot gate enforced when the deploy sets the secret (AFC-1222).
 - OS patching via unattended-upgrades; Docker images pinned to major tags and updated on a schedule.
 - Secrets only in env/secret store; separate credentials for backups.
 - No production code or secrets in this planning phase.
@@ -290,3 +303,4 @@ api.example.org {
 - Every deploy keeps the previous container image tag; rollback = redeploy previous tag.
 - DB migrations (Directus schema changes) are applied via snapshot/migration and are reversible or forward-fixed; take a pre-deploy backup.
 - Public feature changes ship behind a config flag where practical (e.g. registration open/closed, waitlist).
+- Public registration deploy check (AFC-1230 F3, deploy hygiene, not a behavior change): `NUXT_DIRECTUS_WRITER_TOKEN` and `NUXT_TURNSTILE_SECRET_KEY` are set (empty-allowed in the example, real values only on the host/pipeline). Absent writer token or absent Turnstile secret in production means POST /api/register answers 503 fail-closed; do not widen the public grant to compensate.
