@@ -29,7 +29,7 @@ AFC-1207 HiFi (`/` `029c1d61`, `/ystc26` `3ebad753`, confirmation `e2ed36aa`).
    named page template (`page-register-confirmation.html`) assigned to the
    child page, not slug guessing — one `confirmation` slug can never collide.
 2. **System font stack, no Google Fonts:** the HiFi references Google Fonts;
-   the theme uses system sans/serif so the page stays under the 500KB
+   the theme uses the system UI sans stack only (no Google Fonts, no remote font host) so the page stays under the 500KB
    budget on first load. If the board wants the exact HiFi faces, that is a
    follow-up with a self-hosted-fonts task.
 3. **Generic name placeholder:** the HiFi input example names a person; the
