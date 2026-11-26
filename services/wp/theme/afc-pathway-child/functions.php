@@ -17,13 +17,20 @@
  * This is the config-flag rollback path — not a redeploy.
  */
 
+add_filter( 'body_class', function ( $classes ) {
+	if ( function_exists( 'wp_get_environment_type' ) && 'staging' === wp_get_environment_type() ) {
+		$classes[] = 'afc-staging';
+	}
+	return $classes;
+} );
+
 // Front-end helpers: badge + form primitives used by the shared patterns.
 add_action( 'wp_enqueue_scripts', function () {
 	wp_enqueue_style(
 		'afc-pathway-child',
 		get_stylesheet_directory_uri() . '/assets/afc.css',
 		array(),
-		'1.2.0'
+		'2.1.1'
 	);
 } );
 
