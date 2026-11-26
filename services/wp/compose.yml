@@ -1,0 +1,68 @@
+# AFC Church Portal — WordPress marketing surface (AFC-1209, child of AFC-1208).
+#
+# SCOPE: marketing surface for afcokearo.org only. Same-VPS `wp` + `wpdb`
+# containers behind the existing Caddy pattern (cf. services/directus/compose.yml
+# for the names-only env convention, services/staging/Caddyfile for the
+# http://-prefix + header convention). The portal (Nuxt + Directus
+# `event_registrations`) stays the system of record; WordPress never writes to
+# Directus and never holds the public token.
+#
+# NAMES ONLY. Every environment value is a `${VAR}` reference resolved from
+# services/wp/.env on the host (mode 600, git-ignored). No secret value, no
+# real credential, and no personal data appears in this file or in any other
+# committed file. A real value here would be a secret committed to a
+# repository that will hold children's records.
+#
+# Rollback: WP content = XML export (see README.md); images pinned below with
+# the previous tag kept as a comment on each service; registration open/close
+# is the AFC_YSTC_REGISTRATION_OPEN flag, not a redeploy.
+
+services:
+  wpmariadb:
+    # PINNED. Previous tag kept for rollback: mariadb:11.4 (minor line).
+    image: mariadb:11.4.7
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: ${WP_DB_NAME}
+      MARIADB_USER: ${WP_DB_USER}
+      MARIADB_PASSWORD: ${WP_DB_PASSWORD}
+      MARIADB_ROOT_PASSWORD: ${WP_DB_ROOT_PASSWORD}
+    volumes:
+      - wpdbdata:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mariadb-admin ping -h 127.0.0.1 -u root -p$$MARIADB_ROOT_PASSWORD"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  wp:
+    # PINNED. Previous tag kept for rollback: wordpress:6.8-php8.3-apache.
+    image: wordpress:6.8.3-php8.3-apache
+    restart: unless-stopped
+    depends_on:
+      wpmariadb:
+        condition: service_healthy
+    environment:
+      WORDPRESS_DB_HOST: wpmariadb:3306
+      WORDPRESS_DB_NAME: ${WP_DB_NAME}
+      WORDPRESS_DB_USER: ${WP_DB_USER}
+      WORDPRESS_DB_PASSWORD: ${WP_DB_PASSWORD}
+      WORDPRESS_TABLE_PREFIX: ${WP_TABLE_PREFIX:-wp_}
+      WORDPRESS_DEBUG: "false"
+      # Portal integration (server-side only, AFC-1208 ADR §3). The theme's
+      # registration handler POSTs to this URL; empty closes registration
+      # with a 503-style notice instead of failing open. No token here — the
+      # portal authenticates the public path itself (AFC-1210 owns the token).
+      AFC_PORTAL_REGISTER_URL: ${AFC_PORTAL_REGISTER_URL:-}
+      # Config-flag open/close (rollback path): "closed" renders the form
+      # closed notice; no redeploy needed.
+      AFC_YSTC_REGISTRATION_OPEN: ${AFC_YSTC_REGISTRATION_OPEN:-open}
+    volumes:
+      - wpcontent:/var/www/html/wp-content
+      - ./theme/afc-pathway-child:/var/www/html/wp-content/themes/afc-pathway-child:ro
+    expose:
+      - "80"
+
+volumes:
+  wpdbdata:
+  wpcontent:

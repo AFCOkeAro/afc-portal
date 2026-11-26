@@ -1,0 +1,50 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/theme.json",
+  "version": 3,
+  "title": "AFC Pathway Child",
+  "description": "AFC-1209: AFC design tokens v1.0.0 for the afcokearo.org marketing surface. Token values match design-system/tokens/afc-tokens.css and the AFC-1207 HiFi. System UI font stack only: no Google Fonts, no @import, no remote font host.",
+  "settings": {
+    "color": {
+      "palette": [
+        { "name": "Ink", "slug": "ink", "color": "#090B19" },
+        { "name": "Ink secondary", "slug": "ink-2", "color": "#525968" },
+        { "name": "Paper", "slug": "paper", "color": "#F3F6FC" },
+        { "name": "Surface", "slug": "surface", "color": "#FFFFFF" },
+        { "name": "Sunken", "slug": "sunken", "color": "#EDF2FA" },
+        { "name": "Action", "slug": "action", "color": "#1A63B4" },
+        { "name": "Action hover", "slug": "action-hover", "color": "#12559E" },
+        { "name": "Action soft", "slug": "action-soft", "color": "#E8F0FA" },
+        { "name": "Gold", "slug": "gold", "color": "#F5BE00" },
+        { "name": "Gold soft", "slug": "gold-soft", "color": "#FFE9A3" },
+        { "name": "Deep blue", "slug": "deep-blue", "color": "#29186B" },
+        { "name": "Teal", "slug": "teal", "color": "#0184B1" },
+        { "name": "Success", "slug": "success", "color": "#175A35" },
+        { "name": "Success background", "slug": "success-bg", "color": "#E9F4EE" },
+        { "name": "Warning", "slug": "warn", "color": "#7A5C00" },
+        { "name": "Warning background", "slug": "warn-bg", "color": "#FDF5E0" }
+      ]
+    },
+    "typography": {
+      "fontFamilies": [
+        {
+          "name": "Body",
+          "slug": "sans",
+          "fontFamily": "-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", \"Noto Sans\", Arial, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\""
+        }
+      ]
+    },
+    "layout": { "contentSize": "56rem", "wideSize": "80rem" },
+    "spacing": { "units": ["px", "rem", "%"] }
+  },
+  "styles": {
+    "color": { "background": "var(--wp--preset--color--paper)", "text": "var(--wp--preset--color--ink)" },
+    "typography": { "fontFamily": "var(--wp--preset--font-family--sans)" },
+    "elements": {
+      "h1": { "typography": { "fontFamily": "var(--wp--preset--font-family--sans)", "fontWeight": "600" } },
+      "h2": { "typography": { "fontFamily": "var(--wp--preset--font-family--sans)", "fontWeight": "600" } },
+      "h3": { "typography": { "fontFamily": "var(--wp--preset--font-family--sans)", "fontWeight": "600" } },
+      "button": { "border": { "radius": "999px" } }
+    }
+  },
+  "templateParts": [{ "name": "header", "area": "header" }, { "name": "footer", "area": "footer" }]
+}
