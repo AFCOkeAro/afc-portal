@@ -30,7 +30,7 @@ add_action( 'wp_enqueue_scripts', function () {
 		'afc-pathway-child',
 		get_stylesheet_directory_uri() . '/assets/afc.css',
 		array(),
-		'2.1.3'
+		'2.1.5'
 	);
 } );
 

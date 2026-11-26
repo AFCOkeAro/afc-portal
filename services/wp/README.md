@@ -12,8 +12,8 @@ AFC-1207 HiFi (`/` `029c1d61`, `/ystc26` `3ebad753`, confirmation `e2ed36aa`).
 - `Caddyfile.snippet` — operator appends this block to the VPS Caddyfile.
   Kept separate from `services/staging/Caddyfile` (different host/domain).
 - `.env.example` — names only; real values in host `.env` (mode 600).
-- `theme/afc-pathway-child/` — TT5-child block theme + 8 Gutenberg patterns
-  (hero, event-meta band, programme accordion, TBA-speakers, FREE panel,
+- `theme/afc-pathway-child/` — TT5-child block theme + 7 Gutenberg patterns
+  (hero, event-meta band, programme accordion, TBA-speakers,
   FAQ, registration-embed, final CTA) + 3 page templates + header/footer
   parts. No Elementor/Divi.
 - `content/seed-pages.md` — the 3 pages, slugs, template assignment, XML
