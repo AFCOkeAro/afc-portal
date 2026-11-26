@@ -30,22 +30,25 @@
 --     role was: any non-create writer row refuses (restrict_violation)
 --     instead of proceeding.
 --
--- SEQUENCING (safe order, stated so a half-applied deploy fails loud, not
--- open). The public grant is revoked only AFTER the writer replacement is
--- verified in place. If the `registration_writer` Directus role does not
--- exist yet, this file NOTICEs the operator step and RETURNS with the
--- public grant untouched: revoking first would close the live form with no
--- replacement. The operator provisions the role (no read/update/delete, app
--- access minimal), its create permission row (via the Directus UI/snapshot
--- so version-specific columns are filled), and the static token into
--- NUXT_DIRECTUS_WRITER_TOKEN, then re-runs.
+-- SEQUENCING (fail-closed, AFC-1230 F2). The public grant is revoked only
+-- AFTER the writer replacement is verified in place. If the
+-- `registration_writer` Directus role does not exist yet, this file RAISES
+-- (restrict_violation) instead of exiting 0: a NOTICE+RETURN with the
+-- role-NULL create row untouched is a false-green deploy — the G3 bypass
+-- persists behind a log line. The operator provisions the role (no
+-- read/update/delete, app access minimal), its create permission row (via
+-- the Directus UI/snapshot so version-specific columns are filled), and the
+-- static token into NUXT_DIRECTUS_WRITER_TOKEN, then re-runs. The
+-- tables-absent NOTICE+RETURN below stays: on a database where Directus
+-- never booted there is no surface to close, so skipping is correct.
 --
 -- WHAT THIS FILE DELIBERATELY DOES NOT DO
---   No row creation. If the writer create row is missing, this file NOTICEs
---   and changes nothing about the grant (0069 precedent: a migration never
---   invents an access grant to make itself pass). The operator creates the
+--   No row creation. If the writer create row is missing, this file RAISES
+--   (AFC-1230 F2, fail-closed) and changes nothing — the deploy fails loud
+--   instead of exiting 0 with the G3 bypass intact. The operator creates the
 --   row with exactly the allowlist below; this file converges an existing
---   row to it and refuses ambiguity.
+--   row to it and refuses ambiguity (0069 precedent: a migration never
+--   invents an access grant to make itself pass).
 --   No role lookup by id: Directus role UUIDs differ per environment, so
 --   the role is matched by its stable NAME. More than one role with the
 --   name refuses rather than widening an ambiguous set.
@@ -113,10 +116,10 @@ BEGIN
    WHERE r.name = 'registration_writer';
 
   IF v_writer_name_hits = 0 THEN
-    RAISE NOTICE
-      '20261127_0072 not applied: no Directus role named registration_writer. As the Directus operator, create the role (no read/update/delete on event_registrations, minimal app access), grant it create on event_registrations with exactly these fields: %, mint its static token into NUXT_DIRECTUS_WRITER_TOKEN, then re-run this migration. The public grant is left untouched until the replacement exists.',
-      array_to_string(v_writer_allow, ',');
-    RETURN;
+    RAISE EXCEPTION
+      'refusing 20261127_0072: no Directus role named registration_writer. As the Directus operator, create the role (no read/update/delete on event_registrations, minimal app access), grant it create on event_registrations with exactly these fields: %, mint its static token into NUXT_DIRECTUS_WRITER_TOKEN, then re-run this migration. The public grant is left untouched until the replacement exists, and the deploy fails here instead of exiting 0 with the G3 bypass intact (AFC-1230 F2).',
+      array_to_string(v_writer_allow, ',')
+      USING ERRCODE = 'restrict_violation';
   END IF;
 
   IF v_writer_name_hits > 1 THEN
@@ -165,10 +168,10 @@ BEGIN
   END IF;
 
   IF v_writer_create_hits = 0 THEN
-    RAISE NOTICE
-      '20261127_0072 not applied: the registration_writer role has no event_registrations/create permission. As the Directus operator, grant it create with exactly these fields: %. Then re-run this migration.',
-      array_to_string(v_writer_allow, ',');
-    RETURN;
+    RAISE EXCEPTION
+      'refusing 20261127_0072: the registration_writer role has no event_registrations/create permission. As the Directus operator, grant it create with exactly these fields: %. Then re-run this migration. The public grant is left untouched until the replacement exists, and the deploy fails here instead of exiting 0 with the G3 bypass intact (AFC-1230 F2).',
+      array_to_string(v_writer_allow, ',')
+      USING ERRCODE = 'restrict_violation';
   END IF;
 
   IF v_writer_allow_hits = 0 THEN

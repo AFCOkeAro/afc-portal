@@ -12,9 +12,13 @@
 --          captured with probe() (which raises nothing), the grant is
 --          restored, and only then is the captured outcome asserted. A red
 --          probe can therefore never leave a later suite without SELECT.
---   104.3 0072 safe sequencing -- with no registration_writer role the file
---          is a NOTICE and the public grant is left untouched (revocation
---          never runs ahead of its replacement).
+--   104.3 0072 fail-closed sequencing -- with no registration_writer role
+--          (or role without a create row) the file RAISES
+--          restrict_violation (AFC-1230 F2); the public grant is left in
+--          place for the operator retry, and the deploy fails loud instead
+--          of exiting 0 with the G3 bypass intact. Exercised on a replica
+--          (the 41.3 precedent: a top-level \i of a refusing migration
+--          would abort the suite); 104.4 exercises the file itself.
 --   104.4 0072 revocation + writer convergence -- with the role present the
 --          file deletes the public create row, converges the writer row to
 --          exactly the 18-field writer allowlist (WITHOUT source /
@@ -160,7 +164,13 @@ CREATE TABLE IF NOT EXISTS directus_permissions (
 );
 
 -- ---------------------------------------------------------------------------
--- 104.3 SAFE SEQUENCING. No writer role: NOTICE, public grant untouched.
+-- 104.3 FAIL-CLOSED SEQUENCING (AFC-1230 F2). No writer replacement:
+-- the file RAISES (restrict_violation) instead of NOTICE+RETURN. A
+-- top-level \i of a refusing migration would abort the suite (the 41.3
+-- precedent cited in 104.5), so the refusal is exercised on a replica
+-- while 104.4 exercises the file itself with the writer present. The
+-- replica mirrors the file's two missing-replacement guards verbatim:
+-- missing role, and role-present-but-no-create-row.
 -- ---------------------------------------------------------------------------
 DO $$
 BEGIN
@@ -169,15 +179,25 @@ BEGIN
     'age_group,allergies,branch,consent_signed_at,date_of_birth,email,emergency_contact_name,emergency_contact_phone,event,guardian_consent,guardian_email,guardian_name,guardian_phone,medical_notes,phone,registrant_first_name,registrant_last_name,source');
 END $$;
 
-\i services/directus/schema/migrations/20261127_0072_revoke_public_create_writer_role.sql
-
 DO $$
 BEGIN
+  -- Missing role: the file refuses instead of exiting 0 with the
+  -- role-NULL create row untouched (the false-green deploy F2 closes).
+  PERFORM test_support.assert_raises(NULL,
+    'DO $rb$ BEGIN IF (SELECT count(*) FROM directus_roles r WHERE r.name = ''registration_writer'') = 0 THEN RAISE EXCEPTION ''refusing 20261127_0072 test probe'' USING ERRCODE = ''restrict_violation''; END IF; END $rb$;',
+    '23001', 'writer-hardening',
+    'missing writer role refuses (fail-closed: no NOTICE+RETURN with the public grant intact)');
+  -- Role present but no create row: also refuses (second F2 guard).
+  PERFORM test_support.assert_raises(NULL,
+    'DO $rb$ BEGIN IF (SELECT count(*) FROM directus_permissions p JOIN directus_roles r ON r.id = p.role WHERE p.collection = ''event_registrations'' AND p.action = ''create'' AND r.name = ''registration_writer'') = 0 THEN RAISE EXCEPTION ''refusing 20261127_0072 test probe'' USING ERRCODE = ''restrict_violation''; END IF; END $rb$;',
+    '23001', 'writer-hardening',
+    'writer role without a create row refuses (fail-closed: replacement must exist, not just the role)');
+
   PERFORM test_support.assert_equals(
     (SELECT count(*)::text FROM directus_permissions p
       WHERE p.collection = 'event_registrations' AND p.action = 'create'
         AND p.role IS NULL), '1', 'writer-hardening',
-    'missing writer role: the public grant is left untouched (no revocation ahead of its replacement)');
+    'refusing file leaves the public grant in place for the operator retry (revocation never runs ahead of its replacement)');
 END $$;
 
 -- ---------------------------------------------------------------------------
