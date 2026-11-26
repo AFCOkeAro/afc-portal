@@ -137,25 +137,23 @@ export default defineEventHandler(async (event) => {
   // Capacity: only confirmed and pending registrations occupy a place, so a
   // cancelled or no-show registration does not silently shrink the event.
   if (eventRow.capacity !== null) {
-    const counted = await directusFetch<{ meta: { total: number } }>(
-      event,
-      '/items/event_registrations',
-      {
-        method: 'GET',
-        accessToken: publicToken,
-        query: {
-          aggregate: { count: ['registration_status'] },
-          filter: {
-            event: { _eq: eventRow.id },
-            registration_status: { _in: ['pending', 'confirmed'] },
-          },
+    // Directus aggregate responses are `{ data: [{ count: { <field>: "n" } }] }`.
+    // The previous code read a non-existent `meta.total`, so capacity never
+    // filled and waitlisting never triggered. Parse the actual aggregate shape.
+    const counted = await directusFetch<{
+      data: Array<{ count: { registration_status: string } }>
+    }>(event, '/items/event_registrations', {
+      method: 'GET',
+      accessToken: publicToken,
+      query: {
+        aggregate: { count: ['registration_status'] },
+        filter: {
+          event: { _eq: eventRow.id },
+          registration_status: { _in: ['pending', 'confirmed'] },
         },
       },
-    )
-    const taken = Object.values(counted.meta ?? {}).reduce<number>(
-      (total, value) => total + (typeof value === 'number' ? value : 0),
-      0,
-    )
+    })
+    const taken = Number(counted.data?.[0]?.count?.registration_status ?? 0)
     if (taken >= eventRow.capacity) {
       if (!eventRow.waitlist_enabled) {
         throw createError({

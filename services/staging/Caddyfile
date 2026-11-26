@@ -14,6 +14,39 @@
 http://afc-staging.bluespace.ng {
 	encode gzip
 
+	# AFC-1217: shared-store edge rate limit for the public registration
+	# proxy (ADR adr-wp-build, data-model §9, PRD §7.6). This single Caddy
+	# is the only ingress, so a zone here is shared across all web
+	# replicas/workers — a per-instance in-memory limiter is explicitly
+	# rejected (the limit that appears to exist is not the limit that
+	# applies). Enabled via the custom build in Dockerfile.caddy
+	# (Caddy 2.10.0 + pinned github.com/mholt/caddy-ratelimit — stock
+	# caddy:2-alpine has no `rate_limit` directive and breaks on this
+	# block). Shape follows infra-spec §4.
+	#
+	rate_limit {
+		zone register {
+			match {
+				method POST
+				path /api/register
+			}
+			# Per-client-IP bucket (contract doc §5: 20 events/min/client
+			# IP). The module defaults an empty key to ONE global bucket —
+			# without this line open day is capped at 20 registrations/min
+			# TOTAL. One-line deviation from the AFC-1210 commented shape,
+			# stated, not silent. Cloudflare caveat: TLS terminates at the
+			# edge (AFC-561), so true per-client partitioning needs
+			# trusted_proxies/XFF handling — CTO follow-up, not this zone.
+			key {remote_host}
+			window 1m
+			events 20
+		}
+	}
+	# Abuse expectation (open-day path): 20 POST /api/register per
+	# minute per client IP, excess answered 429 with Retry-After; see
+	# docs/planning/wp-portal-registration-contract.md §abuse-protection
+	# for the k6 script the CTO runs on staging before open.
+
 	reverse_proxy web:3000 {
 		# Zero-downtime staging deploys: hold requests (including
 		# replays) while the replacement container boots instead of

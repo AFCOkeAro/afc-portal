@@ -1,0 +1,54 @@
+# AFC Church Portal — staging Caddy with rate_limit module (AFC-1217).
+#
+# Stock `caddy:2-alpine` has no `rate_limit` directive: uncommenting the
+# `register` zone in services/staging/Caddyfile against stock breaks the
+# ingress. This image adds exactly one module and nothing else.
+#
+# Module choice: github.com/mholt/caddy-ratelimit (512★, canonical).
+# Its Caddyfile shape matches the commented zone verbatim —
+#   rate_limit { zone <name> { match { method … path … }
+#                window <dur> events <n> } }
+# — and excess answers 429 with a Retry-After header (handler.go:
+# rateLimitExceeded). No other candidate was closer; generic forward-auth or
+# stock `request_header` hacks cannot keep per-IP sliding-window state, so
+# they were rejected (see services/staging/README.md §9).
+#
+# Pins (exact — do not float):
+#   CADDY_VERSION=2.10.0  (matches the module's go.mod requirement;
+#     builder and final image stay on the same minor)
+#   MODULE_VERSION=5625512f24f6f59d6f64fb3aafe5eecff0b286db
+#     (upstream master 2026-06-12, "fix(metrics): re-register collectors
+#     on each config reload (#102)"). Only published tag is v0.1.0
+#     (2024-08-28, caddy v2.8.0 era); master is pinned by SHA because the
+#     zone shape plus Retry-After already exist at v0.1.0 but the pinned
+#     revision carries two years of fixes on the exact Caddy minor below.
+#
+# Per-IP key note: the zone sets `key {remote_host}` (README Caddyfile
+# placeholder form of {http.request.remote.host}). Without a key the module
+# keeps ONE global bucket for the whole zone — that would cap open day at
+# 20 registrations/min TOTAL, contradicting the contract doc §5
+# ("20 events/min/client IP"). The key is the one-line deviation from the
+# AFC-1210 commented shape, stated here, not silent.
+#
+# Cloudflare caveat: TLS terminates at Cloudflare Flexible (AFC-561), so
+# RemoteAddr at origin is Cloudflare edge unless trusted_proxies /
+# X-Forwarded-For handling is added later. The key still partitions edge
+# IPs; true per-client partitioning behind the proxy is a CTO follow-up,
+# not this image.
+#
+# Build (VPS): docker compose -f services/staging/compose.yml build caddy
+# Rollback: stock `caddy:2-alpine` line kept commented in compose.yml —
+#   comment the build block, uncomment the stock line, keep the zone
+#   commented, re-run up. No postgres/Directus changes; no new ports.
+
+ARG CADDY_VERSION=2.10.0
+ARG MODULE_VERSION=5625512f24f6f59d6f64fb3aafe5eecff0b286db
+
+FROM caddy:${CADDY_VERSION}-builder-alpine AS builder
+ARG CADDY_VERSION
+ARG MODULE_VERSION
+RUN xcaddy build v2.10.0 \
+  --with github.com/mholt/caddy-ratelimit@${MODULE_VERSION}
+
+FROM caddy:${CADDY_VERSION}-alpine
+COPY --from=builder /usr/bin/caddy /usr/bin/caddy

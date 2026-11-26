@@ -66,6 +66,14 @@ services:
       STORAGE_LOCAL_ROOT: /directus/uploads
       RATE_LIMITER_ENABLED: "true"
       TELEMETRY: "false"
+      EMAIL_TRANSPORT: ${EMAIL_TRANSPORT:-smtp}
+      EMAIL_FROM: ${EMAIL_FROM:-events@afcokearo.org}
+      EMAIL_SMTP_HOST: ${EMAIL_SMTP_HOST:-mail.bluespace.com.ng}
+      EMAIL_SMTP_PORT: ${EMAIL_SMTP_PORT:-587}
+      EMAIL_SMTP_USER: ${EMAIL_SMTP_USER}
+      EMAIL_SMTP_PASSWORD: ${EMAIL_SMTP_PASSWORD}
+      EMAIL_SMTP_SECURE: ${EMAIL_SMTP_SECURE:-false}
+      EMAIL_SMTP_POOL: ${EMAIL_SMTP_POOL:-true}
     volumes:
       - directus_uploads:/directus/uploads
 

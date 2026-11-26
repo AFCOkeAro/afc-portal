@@ -91,7 +91,14 @@ services:
       start_period: 20s
 
   caddy:
-    image: caddy:2-alpine
+    # AFC-1217: custom Caddy build with the rate_limit module.
+    # Rollback: comment the build block + afc-caddy image line, uncomment
+    # the stock image line, and restore the pre-AFC-1217 Caddyfile.
+    build:
+      context: ../..
+      dockerfile: services/staging/Dockerfile.caddy
+    image: afc-caddy:staging
+    # image: caddy:2-alpine
     restart: unless-stopped
     depends_on:
       web:
