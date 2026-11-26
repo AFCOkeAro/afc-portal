@@ -24,6 +24,33 @@
  * `{ code: 'registration_failed' }` only.
  *
  * Run: node --test tests/web/register-upstream-leak.contract.mjs
+ *
+ * AFC-1238 (this file, second half): closes the same leak CLASS on the two
+ * sibling paths the verdict found the delta did not touch —
+ *   1237-F1: loadPublicEvent GET 5xx propagated uncaught (no .catch, no
+ *     top-level try/catch) to anonymous clients with raw upstream text.
+ *     Fixed by catching inside loadPublicEvent and answering 503 with
+ *     data.code registration_store_unreadable (named code only).
+ *   1237-F2: the waitlist retry sat INSIDE the catch, so its own 5xx (or an
+ *     event_full/23505 skipping 409/replay normalization) escaped unmapped.
+ *     Fixed by wrapping the retry in its own try/catch that re-runs
+ *     isEventFullRefusal/isIdempotencyDuplicate, else the sanitized 502.
+ * Call-site audit (all directusFetch sites in register.post.ts):
+ *   readTakenSeats        — caller .catch(() => null), falls through to the
+ *                            write path; the DB trigger decides. No leak.
+ *   createRegistration     — attempt 1 inside the race-guard try (matchers +
+ *     sanitized fall-through); retry inside its own try/catch (F2 fix).
+ *   readDedupeCandidates   — double .catch(() => null), then fail-closed 503
+ *                            registration_store_unreadable. No leak.
+ *   findIdempotencyReplay  — caller .catch(() => null), then fail-closed 503
+ *                            registration_store_unreadable. No leak.
+ *   loadPublicEvent        — internal try/catch → 503 (F1 fix). No leak.
+ * Runtime note: a live probe (fabricated 5xx through each call site of the
+ * running Nuxt route, asserting code-only bodies) is unrunnable in this
+ * harness — the route module needs Nuxt auto-imports (defineEventHandler,
+ * useRuntimeConfig, readBody) and directusFetch is not injectable. The
+ * runtime-style tests below are logic mirrors of the specified mappings
+ * (like the F1a NEGATIVE test above); live execution stays with QA staging.
  */
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
@@ -170,5 +197,178 @@ describe('AFC-1235 F1a: the anonymous register route forwards no upstream text',
     assert.match(src, /statusCode: 409/, 'event_full still maps to 409')
     assert.match(src, /event_full/, 'event_full signal referenced')
     assert.match(src, /23505/, '23505 signal referenced')
+  })
+})
+
+describe('AFC-1238 F1: loadPublicEvent 5xx is caught at the source', () => {
+  const loadPublicEventBody = () => {
+    const src = read(ROUTE)
+    const start = src.indexOf('async function loadPublicEvent')
+    const end = src.indexOf('function fieldErrors')
+    assert.ok(start !== -1 && end !== -1 && end > start, 'loadPublicEvent found')
+    return src.slice(start, end)
+  }
+
+  it('the event read never lets a 5xx escape to h3', () => {
+    const body = loadPublicEventBody()
+    assert.match(body, /try\s*\{/, 'fetch is inside a try block')
+    assert.match(body, /catch\s*\{/, 'try has a catch (no bare rethrow binding)')
+    assert.doesNotMatch(body, /throw error/, 'no bare rethrow of the caught shape')
+    const codeOnly = body.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*/g, '')
+    assert.doesNotMatch(codeOnly, /upstream/, 'no upstream key read or forwarded in code')
+  })
+
+  it('the catch answers 503 with a named code only', () => {
+    const body = loadPublicEventBody()
+    assert.match(body, /statusCode: 503/, 'answers 503')
+    assert.match(body, /registration_store_unreadable/, 'named code only')
+  })
+
+  it('runtime-style: a fabricated event-read 5xx maps to a code-only 503', () => {
+    // Logic mirror of the F1 catch: the mapper preserves upstreamMessage
+    // server-side, the catch discards it and answers the named code.
+    const fabricatedUpstream = {
+      statusCode: 500,
+      statusMessage: 'Directus request to /items/events failed',
+      data: {
+        code: 'unexpected',
+        upstreamMessage: FABRICATED_SQL_TEXT,
+        upstreamCode: 'unexpected',
+        upstreamStatus: 500,
+      },
+    }
+    void fabricatedUpstream
+    const clientBody = {
+      statusCode: 503,
+      statusMessage: 'The registration store could not be read — try again shortly',
+      data: { code: 'registration_store_unreadable' },
+    }
+    const body = JSON.stringify(clientBody)
+    assert.doesNotMatch(body, /invalid input syntax/, 'no SQL error class in client body')
+    assert.ok(!body.includes(FABRICATED_STATEMENT_FRAGMENT), 'no statement fragment')
+    assert.ok(!body.includes('not-a-uuid'), 'no upstream value in client body')
+    assert.deepEqual(
+      Object.keys(clientBody.data),
+      ['code'],
+      'data carries only the named code',
+    )
+  })
+})
+
+describe('AFC-1238 F2: the waitlist retry re-runs the matchers', () => {
+  it('no bare retry escapes the catch — every createRegistration call is awaited inside a try', () => {
+    const src = codeOf(ROUTE)
+    assert.doesNotMatch(
+      src,
+      /return createRegistration\(/,
+      'no un-awaited bare `return createRegistration(` (the F2 vector)',
+    )
+    assert.match(src, /catch \(retryError\)/, 'retry has its own catch')
+  })
+
+  it('the retry catch re-runs both refusal matchers before the sanitized fall-through', () => {
+    const src = codeOf(ROUTE)
+    assert.match(
+      src,
+      /isEventFullRefusal\(retryError\)/,
+      'retry re-runs the event_full matcher',
+    )
+    assert.match(
+      src,
+      /isIdempotencyDuplicate\(retryError\)/,
+      'retry re-runs the 23505 matcher',
+    )
+    assert.match(src, /registration_failed/, 'retry falls through to the sanitized 502')
+  })
+
+  it('runtime-style: a fabricated retry 5xx maps to a code-only 502', () => {
+    // Logic mirror of the F2 retry catch: unmapped SQL text matches neither
+    // matcher, so the retry answers the same sanitized 502 as the outer
+    // fall-through — clients never see upstream text.
+    const retryError = {
+      statusCode: 500,
+      data: { upstreamMessage: FABRICATED_SQL_TEXT, upstreamCode: 'unexpected' },
+    }
+    const isFull =
+      typeof retryError.data.upstreamMessage === 'string' &&
+      retryError.data.upstreamMessage.includes('event_full')
+    const isDupe =
+      typeof retryError.data.upstreamMessage === 'string' &&
+      (retryError.data.upstreamMessage.includes('23505') ||
+        retryError.data.upstreamMessage.includes('duplicate key'))
+    assert.ok(!isFull && !isDupe, 'fabricated SQL 5xx matches no retry path')
+    const clientBody = {
+      statusCode: 502,
+      statusMessage: 'The registration could not be completed — try again shortly',
+      data: { code: 'registration_failed' },
+    }
+    const body = JSON.stringify(clientBody)
+    assert.doesNotMatch(body, /invalid input syntax/, 'no SQL error class in client body')
+    assert.ok(!body.includes(FABRICATED_STATEMENT_FRAGMENT), 'no statement fragment')
+    assert.deepEqual(
+      Object.keys(clientBody.data),
+      ['code'],
+      'data carries only the named code',
+    )
+  })
+
+  it('runtime-style: a fabricated event_full on retry still normalizes to 409', () => {
+    const retryUpstream = 'check constraint violation: event_full (remaining seats 0)'
+    assert.ok(retryUpstream.includes('event_full'), 'retry matcher sees the signal')
+    const clientBody = {
+      statusCode: 409,
+      statusMessage: 'That event is full',
+      data: { code: 'event_full' },
+    }
+    assert.deepEqual(
+      Object.keys(clientBody.data),
+      ['code'],
+      'data carries only the named code',
+    )
+    assert.ok(
+      !JSON.stringify(clientBody).includes('remaining seats'),
+      'no upstream detail',
+    )
+  })
+})
+
+describe('AFC-1238 audit: every directusFetch site in the route is guarded or justified', () => {
+  it('exactly the five known call sites exist — no new unreviewed surface', () => {
+    const src = codeOf(ROUTE)
+    const sites = [...src.matchAll(/directusFetch</g)]
+    assert.equal(
+      sites.length,
+      5,
+      'readTakenSeats, createRegistration, readDedupeCandidates, findIdempotencyReplay, loadPublicEvent',
+    )
+  })
+
+  it('read failures fail closed or fall through without leaking upstream text', () => {
+    const src = read(ROUTE)
+    // readTakenSeats: caller swallows to null, the DB trigger decides.
+    assert.match(
+      src,
+      /readTakenSeats\(event, serverToken, eventRow\.id\)\.catch\(\(\) => null\)/,
+      'capacity pre-check failure falls through to the trigger, never to the client',
+    )
+    // readDedupeCandidates: double .catch, then fail-closed 503.
+    const dedupeCatches = [
+      ...src.matchAll(
+        /readDedupeCandidates\(event, serverToken, filter\)\.catch\(\(\) => null\)/g,
+      ),
+    ]
+    assert.equal(dedupeCatches.length, 2, 'dedupe lookup is attempted twice, both caught')
+    // findIdempotencyReplay: caller .catch, then fail-closed 503.
+    assert.match(
+      src,
+      /\.catch\(\(\) => null\)\s*\n/,
+      'replay lookups swallow to null and fail closed',
+    )
+    // Both fail-closed sites answer the named code, never upstream keys.
+    const unreadable = [...src.matchAll(/registration_store_unreadable/g)]
+    assert.ok(
+      unreadable.length >= 3,
+      `fail-closed 503 covers dedupe, idempotency replay, and the event read (found ${unreadable.length})`,
+    )
   })
 })

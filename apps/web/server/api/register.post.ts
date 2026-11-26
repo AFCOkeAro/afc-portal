@@ -422,13 +422,54 @@ async function createWithRaceGuard(
           data: { code: 'event_full' },
         })
       }
-      return createRegistration(
-        event,
-        tokens.writerToken,
-        form,
-        'waitlisted',
-        options.idempotencyKey,
-      )
+      // AFC-1238 F2: the waitlist retry sits INSIDE the catch, so its own
+      // 5xx would escape unmapped (data.upstreamMessage serialized by h3 to
+      // the anonymous client) — as would an event_full/23505 skipping the
+      // 409/replay normalization. Re-run the matchers on the retry error,
+      // else answer the same sanitized 502 as the outer fall-through.
+      try {
+        return await createRegistration(
+          event,
+          tokens.writerToken,
+          form,
+          'waitlisted',
+          options.idempotencyKey,
+        )
+      } catch (retryError) {
+        if (isEventFullRefusal(retryError)) {
+          throw createError({
+            statusCode: 409,
+            statusMessage: 'That event is full',
+            data: { code: 'event_full' },
+          })
+        }
+        if (isIdempotencyDuplicate(retryError)) {
+          const replay = await findIdempotencyReplay(
+            event,
+            tokens.serverToken,
+            form.event,
+            options.idempotencyKey,
+          ).catch(() => null)
+          if (replay) return { ...replay, replay: true as const }
+          throw createError({
+            statusCode: 503,
+            statusMessage: 'The registration could not be confirmed — submit again',
+            data: { code: 'registration_store_unreadable' },
+          })
+        }
+        if (retryError instanceof DirectusAuthError) {
+          throw createError({
+            statusCode: 503,
+            statusMessage: 'The registration service is not configured correctly',
+            data: { code: 'registration_writer_unavailable' },
+          })
+        }
+        throw createError({
+          statusCode: 502,
+          statusMessage: 'The registration could not be completed — try again shortly',
+          data: { code: 'registration_failed' },
+        })
+      }
     }
     if (isIdempotencyDuplicate(error)) {
       const replay = await findIdempotencyReplay(
@@ -767,7 +808,12 @@ async function loadPublicEvent(
   // existing 404 instead of letting Postgres throw (503). Client-side
   // the picker only offers public events, so this is unreachable anyway.
   if (!isEventId(eventId)) return null
-  const response = await directusFetch<{
+  // AFC-1238 F1: an infra-fault/timeout on GET /items/events used to
+  // propagate uncaught (no .catch, no top-level try/catch at the call site)
+  // and h3 serialized data.upstreamMessage to the anonymous client. Catch
+  // here so the function never leaks the upstream shape; the caller keeps
+  // its 404 for null (event not public) and this 503 for unreadable store.
+  let response: {
     data: Array<
       EventRecord & {
         age_min: number | null
@@ -775,31 +821,48 @@ async function loadPublicEvent(
         collect_medical: boolean
       }
     >
-  }>(event, '/items/events', {
-    method: 'GET',
-    accessToken: publicToken,
-    query: {
-      filter: {
-        id: { _eq: eventId },
-        visibility: { _eq: 'public' },
+  }
+  try {
+    response = await directusFetch<{
+      data: Array<
+        EventRecord & {
+          age_min: number | null
+          age_max: number | null
+          collect_medical: boolean
+        }
+      >
+    }>(event, '/items/events', {
+      method: 'GET',
+      accessToken: publicToken,
+      query: {
+        filter: {
+          id: { _eq: eventId },
+          visibility: { _eq: 'public' },
+        },
+        limit: 1,
+        fields: [
+          'id',
+          'status',
+          'visibility',
+          'registration_visibility',
+          'capacity',
+          'waitlist_enabled',
+          'requires_guardian_consent',
+          'registration_opens_at',
+          'registration_closes_at',
+          'age_min',
+          'age_max',
+          'collect_medical',
+        ].join(','),
       },
-      limit: 1,
-      fields: [
-        'id',
-        'status',
-        'visibility',
-        'registration_visibility',
-        'capacity',
-        'waitlist_enabled',
-        'requires_guardian_consent',
-        'registration_opens_at',
-        'registration_closes_at',
-        'age_min',
-        'age_max',
-        'collect_medical',
-      ].join(','),
-    },
-  })
+    })
+  } catch {
+    throw createError({
+      statusCode: 503,
+      statusMessage: 'The registration store could not be read — try again shortly',
+      data: { code: 'registration_store_unreadable' },
+    })
+  }
   return response.data[0] ?? null
 }
 
