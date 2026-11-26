@@ -121,6 +121,9 @@ services:
     environment:
       NUXT_PUBLIC_DIRECTUS_URL: ${DIRECTUS_PUBLIC_URL}
       NUXT_DIRECTUS_SERVER_TOKEN: ${NUXT_DIRECTUS_SERVER_TOKEN}
+      NUXT_DIRECTUS_PUBLIC_TOKEN: ${NUXT_DIRECTUS_PUBLIC_TOKEN}
+      NUXT_DIRECTUS_WRITER_TOKEN: ${NUXT_DIRECTUS_WRITER_TOKEN}
+      NUXT_TURNSTILE_SECRET_KEY: ${NUXT_TURNSTILE_SECRET_KEY}
       NUXT_PUBLIC_SITE_URL: ${SITE_URL}
 
   caddy:
@@ -201,6 +204,9 @@ api.example.org {
 | `SITE_URL` | Frontend public URL |
 | `NUXT_PUBLIC_DIRECTUS_URL` | API base for the browser |
 | `NUXT_DIRECTUS_SERVER_TOKEN` | Server-side scoped token (SSR) |
+| `NUXT_DIRECTUS_PUBLIC_TOKEN` | Public-role token (unauthenticated reads: public event feed + register visibility check; no create on registrations since 0072) |
+| `NUXT_DIRECTUS_WRITER_TOKEN` | Server-held writer token (AFC-1226 G3, AFC-1230 F3: `registration_writer`, create-only writer allowlist; absent means POST /api/register answers 503 fail-closed) |
+| `NUXT_TURNSTILE_SECRET_KEY` | Cloudflare Turnstile secret (AFC-1222 F4, AFC-1230 F3; absent closes the public form in production) |
 | `EMAIL_FROM`, `EMAIL_SMTP_HOST`, `EMAIL_SMTP_PORT`, `EMAIL_SMTP_USER`, `EMAIL_SMTP_PASSWORD` | Transactional email |
 | `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY`, `S3_SECRET_KEY` | Backup/media object storage |
 | `SENTRY_DSN` | Error tracking (optional) |
@@ -297,3 +303,4 @@ api.example.org {
 - Every deploy keeps the previous container image tag; rollback = redeploy previous tag.
 - DB migrations (Directus schema changes) are applied via snapshot/migration and are reversible or forward-fixed; take a pre-deploy backup.
 - Public feature changes ship behind a config flag where practical (e.g. registration open/closed, waitlist).
+- Public registration deploy check (AFC-1230 F3, deploy hygiene, not a behavior change): `NUXT_DIRECTUS_WRITER_TOKEN` and `NUXT_TURNSTILE_SECRET_KEY` are set (empty-allowed in the example, real values only on the host/pipeline). Absent writer token or absent Turnstile secret in production means POST /api/register answers 503 fail-closed; do not widen the public grant to compensate.

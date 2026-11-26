@@ -440,6 +440,109 @@ describe('F3: capacity gate in the serialized path, data shape fixed', () => {
   })
 })
 
+describe('F1 (AFC-1230): race-path signal survives the 5xx mapper', () => {
+  // Mirror of the fixed 5xx branch in apps/web/server/utils/directus.ts:
+  // statusMessage stays generic (AFC-654), the upstream signal rides in
+  // data (never in the message) so the route matcher can still see it.
+  function mirrorMap(cause, path) {
+    const status = cause?.statusCode ?? cause?.status ?? 500
+    const first = cause?.data?.errors?.[0]
+    if (status >= 500 || status < 400) {
+      return {
+        statusCode: status >= 500 && status < 600 ? status : 502,
+        statusMessage: `Directus request to ${path} failed`,
+        data: {
+          code: first?.extensions?.code ?? 'directus_error',
+          upstreamMessage: first?.message ?? cause?.statusMessage ?? null,
+          upstreamCode: first?.extensions?.code ?? null,
+          upstreamStatus: status,
+        },
+      }
+    }
+    return { statusCode: status, statusMessage: String(first?.message ?? '') }
+  }
+  // Mirror of refusalMessages in the route (reads the preserved signal).
+  function mirrorRefusals(error) {
+    return [
+      error?.message,
+      error?.statusMessage,
+      error?.data?.errors?.[0]?.message,
+      error?.data?.upstreamMessage,
+      error?.data?.upstreamCode,
+      error?.data?.code,
+    ]
+  }
+  const isFull = (e) =>
+    mirrorRefusals(e).some((p) => typeof p === 'string' && p.includes('event_full'))
+  const isDupe = (e) =>
+    mirrorRefusals(e).some(
+      (p) =>
+        typeof p === 'string' &&
+        (p.includes('event_registrations_event_idem_key') ||
+          p.includes('duplicate key') ||
+          p.includes('23505')),
+    )
+
+  it('the mapper preserves the upstream signal outside the generic message', () => {
+    const src = codeOf('apps/web/server/utils/directus.ts')
+    assert.match(src, /upstreamMessage/)
+    assert.match(src, /upstreamCode/)
+    // The generic message stays (AFC-654: no SQL text in statusMessage).
+    assert.match(src, /Directus request to \$\{path\} failed/)
+  })
+
+  it('the route matcher reads the preserved signal', () => {
+    const src = codeOf(ROUTE)
+    assert.match(src, /upstreamMessage/)
+    assert.match(src, /upstreamCode/)
+  })
+
+  it('a fabricated 5xx carrying event_full still maps to the full-event path', () => {
+    const upstream = {
+      statusCode: 500,
+      data: {
+        errors: [
+          { message: 'event_full: capacity reached', extensions: { code: '23001' } },
+        ],
+      },
+    }
+    const mapped = mirrorMap(upstream, '/items/event_registrations')
+    assert.equal(mapped.statusCode, 500)
+    assert.doesNotMatch(mapped.statusMessage, /event_full/)
+    assert.ok(isFull(mapped), 'preserved upstreamMessage must still match event_full')
+    // The pre-fix shape (generic message, no preserved signal) would NOT match.
+    const stripped = {
+      statusCode: 500,
+      statusMessage: 'Directus request to /items/event_registrations failed',
+      data: { code: 'directus_error' },
+    }
+    assert.ok(!isFull(stripped), 'stripped shape must not match (the F1 bug)')
+  })
+
+  it('a fabricated 5xx carrying 23505 still maps to the idempotency-replay path', () => {
+    const upstream = {
+      statusCode: 500,
+      data: {
+        errors: [
+          {
+            message:
+              'duplicate key value violates unique constraint "event_registrations_event_idem_key"',
+            extensions: { code: '23505' },
+          },
+        ],
+      },
+    }
+    const mapped = mirrorMap(upstream, '/items/event_registrations')
+    assert.ok(isDupe(mapped), 'preserved 23505/duplicate-key must still match replay')
+    const stripped = {
+      statusCode: 500,
+      statusMessage: 'Directus request to /items/event_registrations failed',
+      data: { code: 'directus_error' },
+    }
+    assert.ok(!isDupe(stripped), 'stripped shape must not match (the F1 bug)')
+  })
+})
+
 describe('G1/G2: the gate survives a read-less caller; the pre-check rides the server token', () => {
   it('the gate runs as its owner with a fixed search_path', () => {
     const src = codeOf(
@@ -704,5 +807,68 @@ describe('F8: WP evidence (repo side)', () => {
 
   it('no server-side WP proxy exists anywhere in the tree', () => {
     assert.doesNotMatch(codeOf(ROUTE), /wp-|wordpress/i)
+  })
+})
+
+describe('AFC-1230 F2: 0072 fails closed when the writer replacement is missing', () => {
+  const migration =
+    'services/directus/schema/migrations/20261127_0072_revoke_public_create_writer_role.sql'
+
+  it('a missing writer role raises instead of NOTICE+RETURN', () => {
+    const src = codeOf(migration)
+    assert.match(src, /no Directus role named registration_writer/)
+    assert.match(src, /restrict_violation/)
+    assert.doesNotMatch(src, /not applied: no Directus role named registration_writer/)
+  })
+
+  it('a missing writer create row raises instead of NOTICE+RETURN', () => {
+    const src = codeOf(migration)
+    assert.match(src, /has no event_registrations\/create permission/)
+    assert.match(src, /restrict_violation/)
+    assert.doesNotMatch(
+      src,
+      /not applied: the registration_writer role has no event_registrations\/create permission/,
+    )
+  })
+
+  it('the tables-absent NOTICE skip stays (no surface exists yet)', () => {
+    const src = codeOf(migration)
+    assert.match(src, /Directus never booted/)
+  })
+})
+
+describe('AFC-1230 F3: both new secrets are wired (empty) into deploy surfaces', () => {
+  it('compose passes the writer token and Turnstile secret to web', () => {
+    const src = read('services/directus/compose.yml')
+    assert.match(src, /NUXT_DIRECTUS_WRITER_TOKEN/)
+    assert.match(src, /NUXT_TURNSTILE_SECRET_KEY/)
+    assert.match(src, /NUXT_DIRECTUS_PUBLIC_TOKEN/)
+  })
+
+  it('.env.example documents both new names with empty values', () => {
+    const src = read('services/directus/.env.example')
+    assert.match(src, /NUXT_DIRECTUS_WRITER_TOKEN=/)
+    assert.match(src, /NUXT_TURNSTILE_SECRET_KEY=/)
+  })
+
+  it('infra-spec records both plus the fail-closed deploy check', () => {
+    const src = read('docs/planning/infra-spec.md')
+    assert.match(src, /NUXT_DIRECTUS_WRITER_TOKEN/)
+    assert.match(src, /NUXT_TURNSTILE_SECRET_KEY/)
+    assert.match(src, /AFC-1230 F3/)
+  })
+
+  it('the route still fails closed when either is absent (hygiene, not behavior change)', () => {
+    const src = codeOf(ROUTE)
+    assert.match(src, /NUXT_DIRECTUS_WRITER_TOKEN is not configured/)
+    assert.match(src, /bot_verification_unavailable/)
+  })
+})
+
+describe('AFC-1230 F4: register page comment names the writer payload', () => {
+  it('the stale toRegistrationPayload comment is fixed', () => {
+    const src = read('apps/web/pages/register.vue')
+    assert.match(src, /toWriterPayload/)
+    assert.doesNotMatch(src, /`toRegistrationPayload` is what the server route applies/)
   })
 })

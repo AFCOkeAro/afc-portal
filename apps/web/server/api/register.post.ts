@@ -459,9 +459,26 @@ function refusalMessages(error: unknown): Array<unknown> {
   const shaped = error as {
     message?: unknown
     statusMessage?: unknown
-    data?: { errors?: Array<{ message?: unknown }> }
+    data?: {
+      errors?: Array<{ message?: unknown }>
+      upstreamMessage?: unknown
+      upstreamCode?: unknown
+      code?: unknown
+    }
   }
-  return [shaped?.message, shaped?.statusMessage, shaped?.data?.errors?.[0]?.message]
+  // AFC-1230 F1: the 5xx branch of mapDirectusError strips upstream text
+  // from message/statusMessage (AFC-654) and preserves it in
+  // data.upstreamMessage / data.upstreamCode instead. Read the preserved
+  // signal here so a concurrent last-seat loser still maps to 409/waitlist
+  // and a 23505 replay still maps to replay:true instead of 502.
+  return [
+    shaped?.message,
+    shaped?.statusMessage,
+    shaped?.data?.errors?.[0]?.message,
+    shaped?.data?.upstreamMessage,
+    shaped?.data?.upstreamCode,
+    shaped?.data?.code,
+  ]
 }
 
 function isEventFullRefusal(error: unknown): boolean {
@@ -475,7 +492,8 @@ function isIdempotencyDuplicate(error: unknown): boolean {
     (part) =>
       typeof part === 'string' &&
       (part.includes('event_registrations_event_idem_key') ||
-        part.includes('duplicate key')),
+        part.includes('duplicate key') ||
+        part.includes('23505')),
   )
 }
 
