@@ -1,13 +1,383 @@
-/* AFC Pathway Child — front-end helpers (AFC-1209). Tokens come from theme.json; this file only adds the badge + form primitives the patterns rely on. Kept under 3KB. */
-.afc-badge{display:inline-flex;align-items:center;gap:8px;padding:4px 14px;border-radius:999px;font-size:11px;font-weight:600;letter-spacing:.08em;white-space:nowrap}
-.afc-badge::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
-.afc-badge--free{background:#E9F4EE;color:#175A35}
-.afc-badge--tba{background:#FDF5E0;color:#7A5C00}
-.afc-register{max-width:56rem}
-.afc-register label{display:block;font-size:14px;font-weight:600;margin-bottom:6px}
-.afc-register input[type="text"],.afc-register input[type="tel"],.afc-register select{width:100%;min-height:44px;border:1px solid #8A94A6;border-radius:8px;padding:10px 14px;font:inherit;background:#fff}
-.afc-register fieldset{border:2px solid #E2E7F1;border-radius:12px;padding:1.5rem;margin:0 0 1rem}
-.afc-register fieldset legend{font-weight:700;padding:0 .5rem}
-.afc-register fieldset label{border:2px solid #E2E7F1;border-radius:12px;padding:14px;margin-bottom:12px;cursor:pointer;font-weight:400}
-.afc-register fieldset label:has(input:checked){border-color:#1A63B4;background:#E8F0FA}
-.afc-register button[type="submit"]{min-height:44px;padding:12px 24px;border-radius:999px;border:1px solid transparent;background:#1A63B4;color:#fff;font-size:11px;font-weight:600;letter-spacing:.19em;text-transform:uppercase;cursor:pointer}
+/* AFC Pathway Child — brand surface layer (AFC-1212 UI fix)
+   Tokens mirror design-system/tokens/afc-tokens.css. WordPress block styles
+   are intentionally overridden here so the Gutenberg patterns render as the
+   AFC brand surface, not as the parent theme defaults. */
+
+:root {
+  --afc-ink: #090b19;
+  --afc-ink-2: #525968;
+  --afc-paper: #f3f6fc;
+  --afc-surface: #ffffff;
+  --afc-sunken: #edf2fa;
+  --afc-action: #1a63b4;
+  --afc-action-hover: #12559e;
+  --afc-action-soft: #e8f0fa;
+  --afc-gold: #f5be00;
+  --afc-gold-soft: #ffe9a3;
+  --afc-deep: #29186b;
+  --afc-teal: #0184b1;
+  --afc-success: #175a35;
+  --afc-success-bg: #e9f4ee;
+  --afc-warn: #7a5c00;
+  --afc-warn-bg: #fdf5e0;
+  --afc-border: #e2e7f1;
+  --afc-border-strong: #cbd5e6;
+  --afc-radius-sm: 8px;
+  --afc-radius: 16px;
+  --afc-radius-pill: 999px;
+  --afc-shadow: 0 16px 40px rgba(9, 11, 25, 0.08);
+  --afc-shadow-soft: 0 8px 24px rgba(9, 11, 25, 0.06);
+  --afc-font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
+  --afc-font-serif: Georgia, "Times New Roman", serif;
+  --afc-max: 80rem;
+  --afc-gutter: clamp(1.25rem, 4vw, 3rem);
+  --afc-section-y: clamp(2.5rem, 4vw, 4rem);
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  background: var(--afc-paper);
+  color: var(--afc-ink);
+  font-family: var(--afc-font-sans);
+  font-size: 16px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--afc-font-serif);
+  font-weight: 400;
+  letter-spacing: -0.025em;
+  line-height: 1.12;
+  color: var(--afc-ink);
+  text-wrap: balance;
+}
+
+h1 { font-size: clamp(2.5rem, 1.8rem + 3.8vw, 4.75rem); }
+h2 { font-size: clamp(1.65rem, 1.25rem + 1.6vw, 2.5rem); }
+h3 { font-size: clamp(1.3rem, 1.1rem + 0.8vw, 1.75rem); }
+
+p { margin: 0 0 1rem; }
+a { color: var(--afc-action); text-underline-offset: 0.18em; }
+img { max-width: 100%; height: auto; }
+
+.wp-site-blocks { overflow: clip; }
+
+/* Header ---------------------------------------------------------------- */
+header.wp-block-template-part {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgba(255, 255, 255, 0.94);
+  border-bottom: 1px solid var(--afc-border);
+  backdrop-filter: blur(14px);
+}
+
+header.wp-block-template-part > .wp-block-group {
+  max-width: var(--afc-max);
+  margin-inline: auto;
+  padding: 0.9rem var(--afc-gutter);
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.wp-block-site-title {
+  font-family: var(--afc-font-serif);
+  font-size: clamp(1.15rem, 1rem + 0.55vw, 1.5rem);
+  letter-spacing: -0.03em;
+  margin: 0;
+  line-height: 1.1;
+}
+.wp-block-site-title a { color: var(--afc-ink); text-decoration: none; }
+
+.wp-block-navigation { font-size: 0.9rem; font-weight: 500; }
+.wp-block-navigation a {
+  color: var(--afc-ink-2);
+  padding: 0.35rem 0.55rem;
+  border-radius: var(--afc-radius-pill);
+  text-decoration: none;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.wp-block-navigation a:hover { background: var(--afc-action-soft); color: var(--afc-action); }
+
+/* Buttons --------------------------------------------------------------- */
+.wp-block-button__link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0.8rem 1.5rem;
+  border: 1px solid var(--afc-action);
+  border-radius: var(--afc-radius-pill);
+  background: var(--afc-action);
+  color: #fff !important;
+  font-family: var(--afc-font-sans);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-decoration: none;
+  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+.wp-block-button__link:hover {
+  background: var(--afc-action-hover);
+  border-color: var(--afc-action-hover);
+  transform: translateY(-1px);
+}
+.wp-block-button.is-style-outline .wp-block-button__link {
+  background: transparent;
+  color: var(--afc-ink) !important;
+  border-color: var(--afc-border-strong);
+}
+.wp-block-button.is-style-outline .wp-block-button__link:hover {
+  background: var(--afc-sunken);
+  border-color: var(--afc-ink);
+}
+.wp-block-cover .wp-block-button.is-style-outline .wp-block-button__link {
+  color: #fff !important;
+  border-color: rgba(255, 255, 255, 0.55);
+}
+.wp-block-cover .wp-block-button.is-style-outline .wp-block-button__link:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: #fff;
+}
+
+/* Hero and closing CTA covers ------------------------------------------- */
+.wp-site-blocks > .wp-block-cover.alignfull {
+  background: linear-gradient(125deg, #090b19 0%, #1a0f45 42%, #29186b 68%, #1a63b4 100%) !important;
+  color: #fff;
+  display: flex;
+  align-items: center;
+}
+.wp-site-blocks > .wp-block-cover.alignfull::before {
+  background: radial-gradient(circle at 82% 18%, rgba(245, 190, 0, 0.18), transparent 32%),
+              radial-gradient(circle at 12% 88%, rgba(1, 132, 177, 0.28), transparent 36%);
+  opacity: 1;
+}
+.wp-site-blocks > .wp-block-cover.alignfull:first-of-type {
+  min-height: min(720px, 82vh);
+}
+.wp-site-blocks > .wp-block-cover.alignfull:last-of-type {
+  min-height: auto;
+  padding-block: clamp(3.5rem, 7vw, 6rem);
+}
+.wp-block-cover__inner-container {
+  width: min(var(--afc-max), 100%);
+  margin-inline: auto;
+  padding: 0 var(--afc-gutter);
+}
+.wp-block-cover h1,
+.wp-block-cover h2,
+.wp-block-cover h3,
+.wp-block-cover p,
+.wp-block-cover blockquote { color: #fff; }
+.wp-block-cover h1 {
+  font-size: clamp(3.2rem, 2rem + 6vw, 6rem);
+  letter-spacing: -0.055em;
+  line-height: 0.94;
+  margin: 0.35rem 0 1.25rem;
+}
+.wp-block-cover blockquote {
+  border-left: 3px solid var(--afc-gold);
+  margin: 1.5rem 0;
+  padding-left: 1.25rem;
+  font-size: clamp(1.05rem, 0.95rem + 0.5vw, 1.35rem);
+}
+.wp-block-cover .has-small-font-size { text-transform: uppercase; letter-spacing: 0.2em; }
+
+/* Section rhythm -------------------------------------------------------- */
+.wp-site-blocks > .wp-block-group {
+  width: min(var(--afc-max), 100%);
+  margin-inline: auto;
+  padding: var(--afc-section-y) var(--afc-gutter);
+}
+
+/* Meta / fact cards ----------------------------------------------------- */
+.wp-block-group.is-layout-grid {
+  gap: 1rem;
+}
+.wp-block-group.is-layout-grid > .wp-block-group {
+  background: var(--afc-surface);
+  border: 1px solid var(--afc-border);
+  border-radius: var(--afc-radius);
+  padding: 1.25rem;
+  box-shadow: var(--afc-shadow-soft);
+}
+.wp-block-group.is-layout-grid > .wp-block-group p:first-child {
+  color: var(--afc-ink-2);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-bottom: 0.35rem;
+}
+
+/* Details / programme / FAQ --------------------------------------------- */
+details.wp-block-details {
+  background: var(--afc-surface);
+  border: 1px solid var(--afc-border);
+  border-radius: var(--afc-radius);
+  margin: 0 0 0.75rem;
+  overflow: hidden;
+  box-shadow: var(--afc-shadow-soft);
+}
+details.wp-block-details summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  padding: 1.05rem 1.25rem;
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+}
+details.wp-block-details summary::-webkit-details-marker { display: none; }
+details.wp-block-details summary::after {
+  content: "+";
+  margin-left: auto;
+  color: var(--afc-action);
+  font-size: 1.25rem;
+  line-height: 1;
+}
+details.wp-block-details[open] summary::after { content: "–"; }
+details.wp-block-details > *:not(summary) {
+  padding: 0 1.25rem 1.25rem;
+}
+details.wp-block-details > p:first-of-type { margin-top: 0; }
+
+/* TBA speakers / white cards ------------------------------------------- */
+.wp-site-blocks > .wp-block-group[style*="background-color:#FFFFFF"] {
+  border: 1px solid var(--afc-border);
+  border-radius: var(--afc-radius);
+  padding: clamp(1.5rem, 3vw, 2.5rem) !important;
+  box-shadow: var(--afc-shadow-soft);
+}
+
+/* FREE panel ------------------------------------------------------------ */
+.wp-site-blocks > .wp-block-group[style*="background-color:#E9F4EE"] {
+  border: 1px solid #cfe6d8;
+  border-radius: var(--afc-radius);
+  padding: clamp(1.75rem, 4vw, 3rem) !important;
+}
+
+/* Badges ---------------------------------------------------------------- */
+.afc-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 14px;
+  border-radius: var(--afc-radius-pill);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+.afc-badge::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.afc-badge--free { background: var(--afc-success-bg); color: var(--afc-success); }
+.afc-badge--tba { background: var(--afc-warn-bg); color: var(--afc-warn); }
+
+/* Registration form ----------------------------------------------------- */
+.afc-register {
+  max-width: 42rem;
+  background: var(--afc-surface);
+  border: 1px solid var(--afc-border);
+  border-radius: var(--afc-radius);
+  padding: clamp(1.25rem, 3vw, 2rem);
+  box-shadow: var(--afc-shadow-soft);
+}
+.afc-register label { display: block; font-size: 0.95rem; font-weight: 600; margin-bottom: 0.4rem; }
+.afc-register input[type="text"],
+.afc-register input[type="tel"],
+.afc-register input[type="email"],
+.afc-register input[type="date"],
+.afc-register select {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid var(--afc-border-strong);
+  border-radius: var(--afc-radius-sm);
+  padding: 0.7rem 0.9rem;
+  font: inherit;
+  background: #fff;
+  color: var(--afc-ink);
+}
+.afc-register input:focus,
+.afc-register select:focus {
+  outline: none;
+  border-color: var(--afc-action);
+  box-shadow: 0 0 0 3px var(--afc-action-soft);
+}
+.afc-register fieldset {
+  border: 1px solid var(--afc-border);
+  border-radius: var(--afc-radius);
+  padding: 1.25rem;
+  margin: 0 0 1.25rem;
+  background: #fff;
+}
+.afc-register fieldset legend { font-weight: 700; padding: 0 0.5rem; }
+.afc-register fieldset label {
+  border: 2px solid var(--afc-border);
+  border-radius: var(--afc-radius);
+  padding: 0.9rem 1rem;
+  margin-bottom: 0.75rem;
+  cursor: pointer;
+  font-weight: 400;
+}
+.afc-register fieldset label:has(input:checked) {
+  border-color: var(--afc-action);
+  background: var(--afc-action-soft);
+}
+.afc-register button[type="submit"] {
+  min-height: 48px;
+  padding: 0.8rem 1.5rem;
+  border-radius: var(--afc-radius-pill);
+  border: 1px solid var(--afc-action);
+  background: var(--afc-action);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+/* Footer ---------------------------------------------------------------- */
+footer.wp-block-template-part {
+  margin-top: 0;
+  background: var(--afc-ink);
+  color: #a8b0c4;
+}
+footer.wp-block-template-part > .wp-block-group {
+  max-width: var(--afc-max);
+  margin-inline: auto;
+  padding: 2.5rem var(--afc-gutter) 3rem !important;
+}
+footer.wp-block-template-part a { color: #fff; }
+footer.wp-block-template-part p { color: #a8b0c4; }
+
+/* Responsive ------------------------------------------------------------ */
+@media (max-width: 781px) {
+  header.wp-block-template-part > .wp-block-group {
+    flex-wrap: wrap;
+    padding-block: 0.75rem;
+    gap: 0.75rem;
+  }
+  .wp-block-navigation { width: 100%; }
+  .wp-block-navigation__responsive-container-open { color: var(--afc-ink); }
+  .wp-site-blocks > .wp-block-cover.alignfull:first-of-type { min-height: 680px; }
+  .wp-block-cover h1 { font-size: clamp(2.8rem, 13vw, 4rem); }
+  .wp-site-blocks > .wp-block-group {
+    padding-block: 2.75rem;
+  }
+  .wp-block-group.is-layout-grid { grid-template-columns: 1fr !important; }
+  .afc-register { padding: 1.25rem; }
+}
