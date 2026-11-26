@@ -451,7 +451,16 @@ async function createWithRaceGuard(
         data: { code: 'registration_writer_unavailable' },
       })
     }
-    throw error
+    // AFC-1235 F1a (option B): sanitized fall-through. The matchers above
+    // have already read the preserved upstream signal server-side; rethrowing
+    // the mapped shape bare would serialize data.upstreamMessage (raw
+    // Directus 5xx text, incl. SQL fragments) to the anonymous client.
+    // Answer a named-code 502 instead — clients never see upstream text.
+    throw createError({
+      statusCode: 502,
+      statusMessage: 'The registration could not be completed — try again shortly',
+      data: { code: 'registration_failed' },
+    })
   }
 }
 
