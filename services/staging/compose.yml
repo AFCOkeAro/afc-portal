@@ -61,8 +61,22 @@ services:
       # services/staging/.env (mode 600, git-ignored), never in the repo.
       # Absent means POST /api/legal-holds/:id/release answers 503.
       NUXT_LEGAL_HOLD_DATABASE_URL: ${NUXT_LEGAL_HOLD_DATABASE_URL:-}
+      # Demo seed/clear path (AFC-1086): connection string for the demo
+      # seed/clear identity. Staging-only: provisioned out of band in
+      # services/staging/.env (mode 600, git-ignored), never in the repo.
+      # Uses the afc_portal role (superuser on the staging database only),
+      # which is migrator-capable for the seed/clear scripts plus the audit
+      # row. Absent means POST /api/admin/demo/seed|clear answers 503.
+      # Never configure this in production.
+      NUXT_DEMO_DATABASE_URL: ${NUXT_DEMO_DATABASE_URL:-}
       NITRO_HOST: 0.0.0.0
       NITRO_PORT: 3000
+    volumes:
+      # Demo seed scripts beside the server (AFC-1086): the demo routes load
+      # services/directus/seeds/demo/*.sql from beside the server and refuse
+      # with 503 when absent. Mounts the reviewed scripts read-only from the
+      # deploy checkout; the server never writes here.
+      - ../../services/directus/seeds/demo:/app/services/directus/seeds/demo:ro
     expose:
       - '3000'
     healthcheck:
