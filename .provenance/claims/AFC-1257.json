@@ -1,0 +1,14 @@
+{
+  "issue": "AFC-1257",
+  "authorAgentId": "7b4aae3b-0da5-4de2-a1d8-4737943ef561",
+  "authorName": "Coder",
+  "claimedAt": "2026-11-27T02:30:00Z",
+  "paths": [
+    "services/directus/schema/migrations/20261128_0073_remove_public_reader_registrations_read.sql",
+    "tests/db/104_public_reader_registrations_read_removal.sql",
+    ".provenance/claims/AFC-1257.json"
+  ],
+  "status": "R1 filed for the AFC-1258 implementation commit a028eda, cherry-picked onto the staging line under AFC-1257. CTO R2 accepted a028eda on AFC-1257; the landing commit carries Reviewed-by: MediaTech (CTO).",
+  "whatTheChangeActuallyDoes": "Adds a standalone forward migration that resolves the afc-public-reader policy by name, refuses if it is anonymous-linked or the residual read field set is not exactly event,id,registration_status,ticket_code, deletes only the one event_registrations/read row, and no-ops (NOTICE) when the row is already gone. Adds suite 104 public-reader coverage: anonymous-link refusal, exact-row transition with decoys, field-set refusal, rerun no-op, and probe hygiene. Does not touch 0069-0072 or the cutover runbook.",
+  "scopeOfTheClaim": "R1 only. R2 is the CTO acceptance of a028eda recorded on AFC-1257. The live read grant was already removed during the AFC-1256 cutover with operator approval; this migration is the reproducible forward record and will NOTICE already-removed on staging."
+}
