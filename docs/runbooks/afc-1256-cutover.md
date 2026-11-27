@@ -119,6 +119,16 @@ must survive; the writer allowlist excludes `source`.
 7. Run probes 01–05 with `TURNSTILE_TOKEN`; direct anonymous POST must be `403`.
 8. Keep the dump until the probes pass.
 
+## AFC-1257 landing (residual read)
+
+`20261128_0073_remove_public_reader_registrations_read.sql` is the forward
+record for the live removal described above. It was applied on `0e5635e` and
+correctly no-opped (`Already removed`). The reader has 0 anonymous
+`directus_access` links and 0 `event_registrations` reads; signed-out and
+public-token reads of registrations return 403 while public event reads return
+200. Suites 103/104 plus the new reader suite: 85 suites / 2519 assertions
+green; migration-privilege and rollback-control gates exit 0.
+
 ## Residual
 
 `afc-public-reader` still has a **create** row on `event_registrations`
