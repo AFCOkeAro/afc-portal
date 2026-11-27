@@ -17,6 +17,7 @@
     "@afc/shared": "workspace:*",
     "@nuxt/ui": "3.3.7",
     "@paulmillr/qr": "^0.3.0",
+    "ics": "^3.12.1",
     "nuxt": "3.21.11",
     "pg": "8.23.1",
     "zod": "^3.25.76"

@@ -37,6 +37,9 @@ RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
 # --------------------------------------------------------------------------
 FROM node:20-bookworm-slim AS build
 
+# Nitro can exceed Node's default old-space during the server bundle on a
+# small builder; 4 GiB is still below the staging host limit.
+ENV NODE_OPTIONS=--max-old-space-size=4096
 ENV PNPM_HOME=/pnpm
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable

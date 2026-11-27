@@ -891,14 +891,14 @@ async function verifyTurnstileIfConfigured(
   }
   let ok: boolean
   try {
-    const verdict = await $fetch<{ success?: boolean }>(
+    const response = await fetch(
       'https://challenges.cloudflare.com/turnstile/v0/siteverify',
       {
         method: 'POST',
-        body: new URLSearchParams({ secret, response: token }).toString(),
-        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ secret, response: token }),
       },
     )
+    const verdict = (await response.json()) as { success?: boolean }
     ok = verdict?.success === true
   } catch {
     ok = false
