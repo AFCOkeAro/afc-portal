@@ -345,6 +345,7 @@ export default defineEventHandler(async (event) => {
   return createWithRaceGuard(event, { writerToken, serverToken }, form, seatStatus, {
     waitlistEnabled: eventRow.waitlist_enabled,
     idempotencyKey,
+    capacity: eventRow.capacity,
   })
 })
 
@@ -380,6 +381,24 @@ async function readTakenSeats(
 }
 
 /**
+ * Post-failure capacity probe. Directus 11 answers a trigger refusal with a
+ * generic 500, so the `event_full` text never reaches the route. A failed
+ * writer create is re-classified here by reading the committed count with
+ * the server token: at/over capacity means the capacity gate refused, not an
+ * infrastructure fault. A null/unreadable count is NOT treated as full.
+ */
+async function isAtCapacity(
+  event: H3Event,
+  serverToken: string,
+  eventId: string,
+  capacity: number | null,
+): Promise<boolean> {
+  if (capacity === null) return false
+  const taken = await readTakenSeats(event, serverToken, eventId).catch(() => null)
+  return taken !== null && taken >= capacity
+}
+
+/**
  * F3 race guard, extended for idempotency (H2). The trigger (migrations
  * 0070/0071) refuses a seat-occupying insert that loses the concurrent race
  * with `event_full`. A raw refusal would surface as a 502; instead it is
@@ -403,8 +422,73 @@ async function createWithRaceGuard(
   tokens: { writerToken: string; serverToken: string },
   form: RegistrationForm,
   status: 'pending' | 'waitlisted',
-  options: { waitlistEnabled: boolean; idempotencyKey: string | null },
+  options: {
+    waitlistEnabled: boolean
+    idempotencyKey: string | null
+    capacity: number | null
+  },
 ): Promise<RegistrationRow | (RegistrationRow & { replay: true })> {
+  const waitlistOrFull = async (): Promise<
+    RegistrationRow | (RegistrationRow & { replay: true })
+  > => {
+    if (status === 'waitlisted' || !options.waitlistEnabled) {
+      throw createError({
+        statusCode: 409,
+        statusMessage: 'That event is full',
+        data: { code: 'event_full' },
+      })
+    }
+    // AFC-1238 F2: the waitlist retry sits INSIDE the catch, so its own
+    // 5xx would escape unmapped (data.upstreamMessage serialized by h3 to
+    // the anonymous client) — as would an event_full/23505 skipping the
+    // 409/replay normalization. Re-run the matchers on the retry error,
+    // else answer the same sanitized 502 as the outer fall-through.
+    try {
+      return await createRegistration(
+        event,
+        tokens.writerToken,
+        tokens.serverToken,
+        form,
+        'waitlisted',
+        options.idempotencyKey,
+      )
+    } catch (retryError) {
+      if (isEventFullRefusal(retryError)) {
+        throw createError({
+          statusCode: 409,
+          statusMessage: 'That event is full',
+          data: { code: 'event_full' },
+        })
+      }
+      if (isIdempotencyDuplicate(retryError)) {
+        const replay = await findIdempotencyReplay(
+          event,
+          tokens.serverToken,
+          form.event,
+          options.idempotencyKey,
+        ).catch(() => null)
+        if (replay) return { ...replay, replay: true as const }
+        throw createError({
+          statusCode: 503,
+          statusMessage: 'The registration could not be confirmed — submit again',
+          data: { code: 'registration_store_unreadable' },
+        })
+      }
+      if (retryError instanceof DirectusAuthError) {
+        throw createError({
+          statusCode: 503,
+          statusMessage: 'The registration service is not configured correctly',
+          data: { code: 'registration_writer_unavailable' },
+        })
+      }
+      throw createError({
+        statusCode: 502,
+        statusMessage: 'The registration could not be completed — try again shortly',
+        data: { code: 'registration_failed' },
+      })
+    }
+  }
+
   try {
     return await createRegistration(
       event,
@@ -416,62 +500,7 @@ async function createWithRaceGuard(
     )
   } catch (error) {
     if (isEventFullRefusal(error)) {
-      if (status === 'waitlisted' || !options.waitlistEnabled) {
-        throw createError({
-          statusCode: 409,
-          statusMessage: 'That event is full',
-          data: { code: 'event_full' },
-        })
-      }
-      // AFC-1238 F2: the waitlist retry sits INSIDE the catch, so its own
-      // 5xx would escape unmapped (data.upstreamMessage serialized by h3 to
-      // the anonymous client) — as would an event_full/23505 skipping the
-      // 409/replay normalization. Re-run the matchers on the retry error,
-      // else answer the same sanitized 502 as the outer fall-through.
-      try {
-        return await createRegistration(
-          event,
-          tokens.writerToken,
-          tokens.serverToken,
-          form,
-          'waitlisted',
-          options.idempotencyKey,
-        )
-      } catch (retryError) {
-        if (isEventFullRefusal(retryError)) {
-          throw createError({
-            statusCode: 409,
-            statusMessage: 'That event is full',
-            data: { code: 'event_full' },
-          })
-        }
-        if (isIdempotencyDuplicate(retryError)) {
-          const replay = await findIdempotencyReplay(
-            event,
-            tokens.serverToken,
-            form.event,
-            options.idempotencyKey,
-          ).catch(() => null)
-          if (replay) return { ...replay, replay: true as const }
-          throw createError({
-            statusCode: 503,
-            statusMessage: 'The registration could not be confirmed — submit again',
-            data: { code: 'registration_store_unreadable' },
-          })
-        }
-        if (retryError instanceof DirectusAuthError) {
-          throw createError({
-            statusCode: 503,
-            statusMessage: 'The registration service is not configured correctly',
-            data: { code: 'registration_writer_unavailable' },
-          })
-        }
-        throw createError({
-          statusCode: 502,
-          statusMessage: 'The registration could not be completed — try again shortly',
-          data: { code: 'registration_failed' },
-        })
-      }
+      return await waitlistOrFull()
     }
     if (isIdempotencyDuplicate(error)) {
       const replay = await findIdempotencyReplay(
@@ -493,6 +522,13 @@ async function createWithRaceGuard(
         statusMessage: 'The registration service is not configured correctly',
         data: { code: 'registration_writer_unavailable' },
       })
+    }
+    // Directus 11 sanitizes a trigger refusal to a generic 500, so the
+    // event_full signal does not reach this layer. Re-read the committed
+    // seat count with the server token: at/over capacity means the capacity
+    // gate refused, not an infrastructure fault. A null count is not full.
+    if (await isAtCapacity(event, tokens.serverToken, form.event, options.capacity)) {
+      return await waitlistOrFull()
     }
     // AFC-1235 F1a (option B): sanitized fall-through. The matchers above
     // have already read the preserved upstream signal server-side; rethrowing

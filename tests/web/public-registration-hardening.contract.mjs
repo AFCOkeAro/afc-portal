@@ -432,6 +432,13 @@ describe('F3: capacity gate in the serialized path, data shape fixed', () => {
     assert.match(src, /IF NEW\.registration_status NOT IN/)
   })
 
+  it('re-classifies a sanitized trigger 500 by re-reading the seat count', () => {
+    const src = codeOf(ROUTE)
+    assert.match(src, /isAtCapacity/)
+    assert.match(src, /capacity: eventRow\.capacity/)
+    assert.match(src, /isAtCapacity\(event, tokens\.serverToken, form\.event, options\.capacity\)/)
+  })
+
   it('the route maps a trigger refusal to 409/waitlist, never a bare 502', () => {
     const src = codeOf(ROUTE)
     assert.match(src, /createWithRaceGuard/)
