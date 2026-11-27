@@ -13,10 +13,11 @@
     "services/directus/schema/migrations/20261126_0069_public_registration_create_policy.sql",
     "services/directus/schema/migrations/20261126_0070_registration_capacity_gate.sql",
     "services/directus/schema/migrations/20261127_0071_registration_capacity_gate_definer.sql",
-    "tests/db/103_public_registration_hardening.sql"
+    "tests/db/103_public_registration_hardening.sql",
+    "services/directus/schema/migrations/20261127_0073_register_idempotency_field.sql"
   ],
   "status": "R1 filed; R2 APPROVED by the CTO on AFC-1256 (2026-11-27). The deploy commit carries Reviewed-by: MediaTech (CTO). The 0069/0070/0071/103 and the 0276b42 base are carried from AFC-1254 (see AFC-1254.json); this claim covers the integrated deploy tree and retains that history.",
   "whatTheChangeActuallyDoes": "1) The public registration route no longer assumes the create-only writer POST returns a body: it reads the created row back with the server token, by idempotency key or by newest normalized contact, with a bounded retry and a named 503. 2) 0072's false-green guard is scoped to the public policy set instead of rejecting every create grant outside registration_writer; legitimate staff/admin create grants for the staff walk-in route (source='staff') survive, while public create remains zero. 3) Suite 104 adds a staff event_registrations create fixture and asserts it survives. 4) The cutover runbook records the required pre-deploy permission snapshot and the full validated sequence.",
   "scopeOfTheClaim": "R1 only. The author does not claim R2. The 0072/104 changes require CTO re-review because they modify an auth/PII migration. Validation: pnpm test:db 84/2508 green; web contract suite has no new failures versus 930b872; explicit BEGIN/ROLLBACK cutover simulation on staging left the live permission set unchanged.",
-  "approval": "CTO approved the 0072 public-scoped guard on 2026-11-27 after the staged cutover simulation showed the original guard refused legitimate staff create grants. Scope change is validated by suite 104 and pnpm test:db."
+  "approval": "CTO approved the 0072 public-scoped guard on 2026-11-27 after the staged cutover simulation showed the original guard refused legitimate staff create grants. Scope change is validated by suite 104 and pnpm test:db. Hotfix: 0073 registers event_registrations.idempotency_key in directus_fields after the live deploy showed Directus was silently ignoring the column; CTO-approved deploy scope, live field registered and Directus restarted during AFC-1256."
 }
