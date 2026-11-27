@@ -409,6 +409,7 @@ async function createWithRaceGuard(
     return await createRegistration(
       event,
       tokens.writerToken,
+      tokens.serverToken,
       form,
       status,
       options.idempotencyKey,
@@ -431,6 +432,7 @@ async function createWithRaceGuard(
         return await createRegistration(
           event,
           tokens.writerToken,
+          tokens.serverToken,
           form,
           'waitlisted',
           options.idempotencyKey,
@@ -565,6 +567,7 @@ function toWriterPayload(form: RegistrationForm): Record<string, unknown> {
 async function createRegistration(
   event: H3Event,
   writerToken: string,
+  serverToken: string,
   form: RegistrationForm,
   status: 'pending' | 'waitlisted',
   idempotencyKey: string | null,
@@ -583,11 +586,28 @@ async function createRegistration(
     },
   )
 
-  return {
-    id: created.data.id,
-    ticket_code: created.data.ticket_code,
-    registration_status: created.data.registration_status,
+  // The writer policy is create-only (G3): do not assume the create response
+  // carries read fields such as ticket_code. Read the created row with the
+  // server token so the public response always has the ticket code/status,
+  // while the writer token remains unable to read the collection.
+  if (created.data?.ticket_code !== undefined && created.data?.registration_status !== undefined) {
+    return {
+      id: created.data.id,
+      ticket_code: created.data.ticket_code,
+      registration_status: created.data.registration_status,
+    }
   }
+
+  const row = await directusFetch<{ data: RegistrationRow }>(
+    event,
+    `/items/event_registrations/${created.data.id}`,
+    {
+      method: 'GET',
+      accessToken: serverToken,
+      query: { fields: 'id,ticket_code,registration_status' },
+    },
+  )
+  return row.data
 }
 
 /**

@@ -95,6 +95,21 @@ BEGIN
     RETURN;
   END IF;
 
+  -- Directus 11 replaced permission.role with permission.policy. The v11
+  -- writer cutover is implemented in 20261127_0073; returning here keeps
+  -- this v10 migration runnable on a v10 database without touching v11
+  -- permissions by the wrong column.
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+     WHERE table_schema = 'public'
+       AND table_name = 'directus_permissions'
+       AND column_name = 'policy'
+  ) THEN
+    RAISE NOTICE
+      '20261127_0072: Directus 11 policy schema detected; writer cutover is handled by 20261127_0073.';
+    RETURN;
+  END IF;
+
   -- 1. Create-only is the invariant for BOTH identities. A non-create row
   --    for either is a shipping blocker, not a migration detail.
   SELECT count(*) INTO v_public_other

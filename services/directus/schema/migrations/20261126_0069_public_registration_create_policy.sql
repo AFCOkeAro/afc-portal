@@ -74,6 +74,19 @@ BEGIN
     RETURN;
   END IF;
 
+  -- Directus 11 uses policies, not permission.role. The policy cutover is
+  -- implemented in 20261127_0073 instead of guessing a role column here.
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+     WHERE table_schema = 'public'
+       AND table_name = 'directus_permissions'
+       AND column_name = 'policy'
+  ) THEN
+    RAISE NOTICE
+      '20261126_0069: Directus 11 policy schema detected; public registration create grant is handled by 20261127_0073.';
+    RETURN;
+  END IF;
+
   SELECT count(*) INTO v_other_actions
     FROM directus_permissions p
    WHERE p.collection = 'event_registrations'
