@@ -1,18 +1,26 @@
 -- tests/db/103_public_registration_hardening.sql
 --
--- AFC-1222 contract suite: the public registration hardening pair.
+-- AFC-1254 contract suite: the public registration hardening pair, reworked
+-- for the Directus v11 policy model (operator finding 2026-11-27, human,
+-- authoritative). The v10 suite matched the public grant by
+-- `directus_permissions.role IS NULL`; staging Directus 11.17.4 has no
+-- `role` column — the grant is policy-scoped. These doubles mirror the v11
+-- shape the migrations read: permissions (policy / collection / action /
+-- fields), policies (id / name), access (role / "user" / policy, NULL+NULL
+-- for anonymous public).
 --
---   103.1 0069 transition -- one public (role-NULL) event_registrations/create
+--   103.1 0069 transition -- one public-policy event_registrations/create
 --          row in a legacy field set becomes exactly the 18-field allowlist;
---          decoy rows (other actions, other collections, other roles) are
---          untouched; the allowlist carries no ticket/status/money/person
---          columns.
+--          decoy rows (other actions on the public policy, other
+--          collections, other policies) are untouched; the allowlist carries
+--          no ticket/status/money/person columns.
 --   103.2 0069 rerun      -- re-applying is a no-op (already-applied path).
 --   103.3 0069 refuse     -- more than one public create candidate refuses
---          with restrict_violation; a public non-create row on
+--          with restrict_violation; a public-policy non-create row on
 --          event_registrations refuses too (create-only, child PII).
---   103.4 0069 unknown    -- a permission in neither known state is left alone
---          with the operator-step NOTICE (no invented grant).
+--   103.4 0069 unknown    -- a single row in neither known state converges
+--          to the allowlist (the migration's header contract: one row is
+--          converged, zero rows is an operator NOTICE, multi-row refuses).
 --   103.5 0070 shape      -- idempotency_key column nullable, partial unique
 --          index (event, key), capacity trigger present, app holds
 --          INSERT/UPDATE on the new column and still no DELETE anywhere.
@@ -25,21 +33,35 @@
 -- What this suite does NOT assert (stated, not missing): the HTTP half —
 -- signed-out 403-on-read probes, the N-parallel flood e2e and the
 -- concurrency race — runs against staging with the real Directus policy
--- (AFC-1221 re-validation pass), not here. directus_permissions is a test
--- double (the 41 precedent): 0069 only reads collection / action / role /
--- fields.
+-- (AFC-1221 re-validation pass), not here. directus_permissions /
+-- directus_policies / directus_access are test doubles (the 41 precedent):
+-- 0069 only reads policy / collection / action / fields plus the access
+-- linkage that resolves the public set.
 --
 -- Probe hygiene: every row this suite writes is deleted before it ends
 -- (the 86 precedent — later rollback probes assume empty registers).
 
 -- ---------------------------------------------------------------------------
--- Test double. Same shape the migration reads: collection / action / role /
--- fields. Dropped at the end of the 0069 block so the double never leaks
--- into another suite.
+-- Test doubles. v11 shapes the migration reads: permissions (policy /
+-- collection / action / fields) and the policies + access rows that resolve
+-- the public set. Dropped at the end of the 0069 block so the doubles never
+-- leak into another suite.
 -- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS directus_policies (
+  id   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name text NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS directus_access (
+  id     uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  role   uuid,
+  "user" uuid,
+  policy uuid
+);
+
 CREATE TABLE IF NOT EXISTS directus_permissions (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  role        uuid,
+  policy      uuid,
   collection  text NOT NULL,
   action      text NOT NULL,
   fields      text NOT NULL DEFAULT '',
@@ -50,19 +72,28 @@ CREATE TABLE IF NOT EXISTS directus_permissions (
 -- 103.1 TRANSITION. Legacy public create row -> exact 18-field allowlist.
 -- ---------------------------------------------------------------------------
 DO $$
+DECLARE
+  v_public uuid;
+  v_other uuid;
 BEGIN
+  INSERT INTO directus_policies (name) VALUES ('afc-public-reader') RETURNING id INTO v_public;
+  INSERT INTO directus_policies (name) VALUES ('staff-policy') RETURNING id INTO v_other;
+
+  -- Anonymous access marks the public policy (the v11 public convention).
+  INSERT INTO directus_access (role, "user", policy) VALUES (NULL, NULL, v_public);
+
   -- Legacy row: the dangerous columns a hand-grant would carry.
-  INSERT INTO directus_permissions (role, collection, action, fields)
-  VALUES (NULL, 'event_registrations', 'create',
+  INSERT INTO directus_permissions (policy, collection, action, fields)
+  VALUES (v_public, 'event_registrations', 'create',
     'event,registrant_first_name,registrant_last_name,email,ticket_code,registration_status,amount_paid');
 
   -- Decoys the migration must not touch.
-  INSERT INTO directus_permissions (role, collection, action, fields)
-  VALUES (NULL, 'event_registrations', 'read', 'id');
-  INSERT INTO directus_permissions (role, collection, action, fields)
-  VALUES (NULL, 'events', 'create', 'id,title');
-  INSERT INTO directus_permissions (role, collection, action, fields)
-  VALUES (gen_random_uuid(), 'event_registrations', 'create',
+  INSERT INTO directus_permissions (policy, collection, action, fields)
+  VALUES (v_public, 'event_registrations', 'read', 'id');
+  INSERT INTO directus_permissions (policy, collection, action, fields)
+  VALUES (v_public, 'events', 'create', 'id,title');
+  INSERT INTO directus_permissions (policy, collection, action, fields)
+  VALUES (v_other, 'event_registrations', 'create',
     'event,registrant_first_name');
 END $$;
 
@@ -72,12 +103,13 @@ END $$;
 DO $$
 BEGIN
   PERFORM test_support.assert_raises(NULL,
-    'DO $rb$ BEGIN IF (SELECT count(*) FROM directus_permissions p WHERE p.collection = ''event_registrations'' AND p.action <> ''create'' AND p.role IS NULL) > 0 THEN RAISE EXCEPTION ''refusing 20261126_0069 test probe'' USING ERRCODE = ''restrict_violation''; END IF; END $rb$;',
+    'DO $rb$ BEGIN IF (SELECT count(*) FROM directus_permissions p JOIN directus_access a ON a.policy = p.policy WHERE p.collection = ''event_registrations'' AND p.action <> ''create'' AND a.role IS NULL AND a."user" IS NULL) > 0 THEN RAISE EXCEPTION ''refusing 20261126_0069 test probe'' USING ERRCODE = ''restrict_violation''; END IF; END $rb$;',
     '23001', 'public-hardening',
     'a public non-create row on event_registrations refuses (create-only)');
 
   DELETE FROM directus_permissions WHERE collection = 'event_registrations'
-    AND action = 'read' AND role IS NULL;
+    AND action = 'read' AND policy IN
+      (SELECT a.policy FROM directus_access a WHERE a.role IS NULL AND a."user" IS NULL);
 END $$;
 
 \i services/directus/schema/migrations/20261126_0069_public_registration_create_policy.sql
@@ -89,22 +121,25 @@ DECLARE
 BEGIN
   SELECT p.fields INTO v_got
     FROM directus_permissions p
+    JOIN directus_access a ON a.policy = p.policy
    WHERE p.collection = 'event_registrations' AND p.action = 'create'
-     AND p.role IS NULL;
+     AND a.role IS NULL AND a."user" IS NULL;
 
   PERFORM test_support.assert_equals(v_got, v_allow, 'public-hardening',
     'the public create row now carries exactly the 18-field allowlist');
 
   PERFORM test_support.assert_equals(
     (SELECT count(*)::text FROM directus_permissions p
+      JOIN directus_access a ON a.policy = p.policy
       WHERE p.collection = 'event_registrations' AND p.action = 'create'
-        AND p.role IS NULL), '1', 'public-hardening',
+        AND a.role IS NULL AND a."user" IS NULL), '1', 'public-hardening',
     'exactly one public create row (no duplicates)');
 
   PERFORM test_support.assert_equals(
     (SELECT count(*)::text FROM directus_permissions p
+      JOIN directus_access a ON a.policy = p.policy
       WHERE p.collection = 'event_registrations' AND p.action = 'create'
-        AND p.role IS NULL
+        AND a.role IS NULL AND a."user" IS NULL
         AND string_to_array(p.fields, ',') && string_to_array('ticket_code,registration_status,amount_paid,amount_expected,payment_status,payment_reference,person,group_code', ',')::text[]), '0', 'public-hardening',
     'the allowlist carries no ticket/status/money/person/group columns');
 
@@ -116,8 +151,9 @@ BEGIN
   PERFORM test_support.assert_equals(
     (SELECT count(*)::text FROM directus_permissions p
       WHERE p.collection = 'event_registrations' AND p.action = 'create'
-        AND p.role IS NOT NULL), '1', 'public-hardening',
-    'other roles'' create rows are untouched');
+        AND p.policy NOT IN
+          (SELECT a.policy FROM directus_access a WHERE a.role IS NULL AND a."user" IS NULL)), '1', 'public-hardening',
+    'other policies'' create rows are untouched');
 END $$;
 
 -- ---------------------------------------------------------------------------
@@ -129,8 +165,9 @@ DO $$
 BEGIN
   PERFORM test_support.assert_equals(
     (SELECT count(*)::text FROM directus_permissions p
+      JOIN directus_access a ON a.policy = p.policy
       WHERE p.collection = 'event_registrations' AND p.action = 'create'
-        AND p.role IS NULL
+        AND a.role IS NULL AND a."user" IS NULL
         AND array_length(string_to_array(p.fields, ','), 1) = 18), '1', 'public-hardening',
     'rerun: still exactly one allowlist row (already-applied path)');
 END $$;
@@ -143,17 +180,21 @@ END $$;
 -- ---------------------------------------------------------------------------
 DO $$
 BEGIN
-  INSERT INTO directus_permissions (role, collection, action, fields)
-  VALUES (NULL, 'event_registrations', 'create', 'event'),
-         (NULL, 'event_registrations', 'create', 'event');
+  INSERT INTO directus_permissions (policy, collection, action, fields)
+  SELECT a.policy, 'event_registrations', 'create', 'event'
+    FROM directus_access a WHERE a.role IS NULL AND a."user" IS NULL
+  UNION ALL
+  SELECT a.policy, 'event_registrations', 'create', 'event'
+    FROM directus_access a WHERE a.role IS NULL AND a."user" IS NULL;
 
   PERFORM test_support.assert_raises(NULL,
-    'DO $rb$ BEGIN IF (SELECT count(*) FROM directus_permissions p WHERE p.collection = ''event_registrations'' AND p.action = ''create'' AND p.role IS NULL) > 1 THEN RAISE EXCEPTION ''refusing 20261126_0069: test probe'' USING ERRCODE = ''restrict_violation''; END IF; END $rb$;',
+    'DO $rb$ BEGIN IF (SELECT count(*) FROM directus_permissions p JOIN directus_access a ON a.policy = p.policy WHERE p.collection = ''event_registrations'' AND p.action = ''create'' AND a.role IS NULL AND a."user" IS NULL) > 1 THEN RAISE EXCEPTION ''refusing 20261126_0069 test probe'' USING ERRCODE = ''restrict_violation''; END IF; END $rb$;',
     '23001', 'public-hardening',
     'more than one public create candidate refuses (never widen an ambiguous set)');
 
   DELETE FROM directus_permissions WHERE collection = 'event_registrations'
-    AND action = 'create' AND role IS NULL AND fields = 'event';
+    AND action = 'create' AND fields = 'event' AND policy IN
+      (SELECT a.policy FROM directus_access a WHERE a.role IS NULL AND a."user" IS NULL);
 END $$;
 
 -- ---------------------------------------------------------------------------
@@ -161,17 +202,15 @@ END $$;
 -- allowlist: 0069 sets exactly one public create row to exactly the
 -- allowlist (its header contract), it never invents a grant (zero rows is
 -- an operator NOTICE) and never widens an ambiguous one (multi-row
--- refuses, 103.3). An earlier probe expected an unknown row to keep its
--- fields; that contradicted the migration's own header and the file it
--- exercises, so it is corrected here (AFC-1226, evidenced by the red run
--- that found it) — the anti-widening pin stays 103.3.
+-- refuses, 103.3).
 -- ---------------------------------------------------------------------------
 DO $$
 BEGIN
   UPDATE directus_permissions p
      SET fields = 'event'
    WHERE p.collection = 'event_registrations' AND p.action = 'create'
-     AND p.role IS NULL
+     AND p.policy IN
+       (SELECT a.policy FROM directus_access a WHERE a.role IS NULL AND a."user" IS NULL)
      AND array_length(string_to_array(p.fields, ','), 1) = 18;
 END $$;
 
@@ -184,11 +223,15 @@ BEGIN
   PERFORM test_support.assert_equals(
     (SELECT count(*)::text FROM directus_permissions p
       WHERE p.collection = 'event_registrations' AND p.action = 'create'
-        AND p.role IS NULL AND p.fields = v_allow), '1', 'public-hardening',
+        AND p.policy IN
+          (SELECT a.policy FROM directus_access a WHERE a.role IS NULL AND a."user" IS NULL)
+        AND p.fields = v_allow), '1', 'public-hardening',
     'unknown state: the single non-allowlist row converges to the 18-field allowlist (no invented grant, no widening beyond review)');
 END $$;
 
 DROP TABLE IF EXISTS directus_permissions;
+DROP TABLE IF EXISTS directus_access;
+DROP TABLE IF EXISTS directus_policies;
 
 -- ---------------------------------------------------------------------------
 -- Gate layer reinstall (AFC-1226). Suite 86 exercises the 0021 down/up

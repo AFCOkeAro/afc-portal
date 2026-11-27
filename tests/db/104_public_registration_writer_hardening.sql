@@ -1,7 +1,13 @@
 -- tests/db/104_public_registration_writer_hardening.sql
 --
--- AFC-1226 contract: the second hardening pass on the public registration
--- surface (G1-G3, M3).
+-- AFC-1254 contract: the second hardening pass on the public registration
+-- surface (G1-G3, M3), reworked for the Directus v11 policy model
+-- (operator finding 2026-11-27, human, authoritative). The v10 suite
+-- matched grants by `directus_permissions.role` and the writer by a row in
+-- `directus_roles`; staging Directus 11.17.4 has no `role` column — grants
+-- hang off `directus_policies` (matched BY NAME: `registration_writer`)
+-- via `directus_access`, and the public set is the policies reachable from
+-- anonymous access. These doubles mirror the v11 shape.
 --
 --   104.1 0071 shape  -- the capacity gate is SECURITY DEFINER, owned by
 --          directus_migrator, with a fixed search_path (public, pg_temp).
@@ -12,16 +18,16 @@
 --          captured with probe() (which raises nothing), the grant is
 --          restored, and only then is the captured outcome asserted. A red
 --          probe can therefore never leave a later suite without SELECT.
---   104.3 0072 fail-closed sequencing -- with no registration_writer role
---          (or role without a create row) the file RAISES
+--   104.3 0072 fail-closed sequencing -- with no registration_writer policy
+--          (or policy without a create row) the file RAISES
 --          restrict_violation (AFC-1230 F2); the public grant is left in
 --          place for the operator retry, and the deploy fails loud instead
 --          of exiting 0 with the G3 bypass intact. Exercised on a replica
 --          (the 41.3 precedent: a top-level \i of a refusing migration
 --          would abort the suite); 104.4 exercises the file itself.
---   104.4 0072 revocation + writer convergence -- with the role present the
---          file deletes the public create row, converges the writer row to
---          exactly the 18-field writer allowlist (WITHOUT source /
+--   104.4 0072 revocation + writer convergence -- with the policy present
+--          the file deletes the public create row, converges the writer row
+--          to exactly the 18-field writer allowlist (WITHOUT source /
 --          consent_signed_at), touches nothing else, and installs the
 --          server-side consent stamp.
 --   104.5 0072 refusals -- multi-row public, public non-create, multi-row
@@ -39,9 +45,10 @@
 -- What this suite does NOT assert (stated, not missing): the HTTP half —
 -- signed-out direct-POST 403s, the rotating-XFF flood and the concurrency
 -- race — runs against staging with the real Directus policy (QA-owned
--- re-validation), not here. directus_permissions / directus_roles are test
--- doubles (the 41 precedent): the migrations only read collection / action /
--- role / fields and the role name.
+-- re-validation), not here. directus_permissions / directus_policies /
+-- directus_access are test doubles (the 41 precedent): the migrations only
+-- read policy / collection / action / fields, the policy name, and the
+-- access linkage that resolves the public set.
 --
 -- Probe hygiene: every row this suite writes is deleted before it ends
 -- (the 86 precedent — later rollback probes assume empty registers).
@@ -144,19 +151,27 @@ BEGIN
 END $$;
 
 -- ---------------------------------------------------------------------------
--- Test doubles for the 0072 grant logic. Same shapes the migration reads:
--- permissions (collection / action / role / fields) and roles (id / name).
+-- Test doubles for the 0072 grant logic. v11 shapes the migration reads:
+-- permissions (policy / collection / action / fields), policies (id /
+-- name), and the access rows that resolve the public set.
 -- Dropped at the end of the 0072 block so the doubles never leak into
 -- another suite.
 -- ---------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS directus_roles (
+CREATE TABLE IF NOT EXISTS directus_policies (
   id   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name text NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS directus_access (
+  id     uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  role   uuid,
+  "user" uuid,
+  policy uuid
+);
+
 CREATE TABLE IF NOT EXISTS directus_permissions (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  role        uuid,
+  policy      uuid,
   collection  text NOT NULL,
   action      text NOT NULL,
   fields      text NOT NULL DEFAULT '',
@@ -170,55 +185,71 @@ CREATE TABLE IF NOT EXISTS directus_permissions (
 -- precedent cited in 104.5), so the refusal is exercised on a replica
 -- while 104.4 exercises the file itself with the writer present. The
 -- replica mirrors the file's two missing-replacement guards verbatim:
--- missing role, and role-present-but-no-create-row.
+-- missing policy, and policy-present-but-no-create-row.
 -- ---------------------------------------------------------------------------
 DO $$
+DECLARE
+  v_public uuid;
 BEGIN
-  INSERT INTO directus_permissions (role, collection, action, fields)
-  VALUES (NULL, 'event_registrations', 'create',
+  INSERT INTO directus_policies (name) VALUES ('afc-public-reader') RETURNING id INTO v_public;
+  INSERT INTO directus_access (role, "user", policy) VALUES (NULL, NULL, v_public);
+
+  INSERT INTO directus_permissions (policy, collection, action, fields)
+  VALUES (v_public, 'event_registrations', 'create',
     'age_group,allergies,branch,consent_signed_at,date_of_birth,email,emergency_contact_name,emergency_contact_phone,event,guardian_consent,guardian_email,guardian_name,guardian_phone,medical_notes,phone,registrant_first_name,registrant_last_name,source');
 END $$;
 
 DO $$
 BEGIN
-  -- Missing role: the file refuses instead of exiting 0 with the
-  -- role-NULL create row untouched (the false-green deploy F2 closes).
+  -- Missing policy: the file refuses instead of exiting 0 with the
+  -- public create row untouched (the false-green deploy F2 closes).
   PERFORM test_support.assert_raises(NULL,
-    'DO $rb$ BEGIN IF (SELECT count(*) FROM directus_roles r WHERE r.name = ''registration_writer'') = 0 THEN RAISE EXCEPTION ''refusing 20261127_0072 test probe'' USING ERRCODE = ''restrict_violation''; END IF; END $rb$;',
+    'DO $rb$ BEGIN IF (SELECT count(*) FROM directus_policies pl WHERE pl.name = ''registration_writer'') = 0 THEN RAISE EXCEPTION ''refusing 20261127_0072 test probe'' USING ERRCODE = ''restrict_violation''; END IF; END $rb$;',
     '23001', 'writer-hardening',
-    'missing writer role refuses (fail-closed: no NOTICE+RETURN with the public grant intact)');
-  -- Role present but no create row: also refuses (second F2 guard).
+    'missing writer policy refuses (fail-closed: no NOTICE+RETURN with the public grant intact)');
+  -- Policy present but no create row: also refuses (second F2 guard).
   PERFORM test_support.assert_raises(NULL,
-    'DO $rb$ BEGIN IF (SELECT count(*) FROM directus_permissions p JOIN directus_roles r ON r.id = p.role WHERE p.collection = ''event_registrations'' AND p.action = ''create'' AND r.name = ''registration_writer'') = 0 THEN RAISE EXCEPTION ''refusing 20261127_0072 test probe'' USING ERRCODE = ''restrict_violation''; END IF; END $rb$;',
+    'DO $rb$ BEGIN IF (SELECT count(*) FROM directus_permissions p JOIN directus_policies pl ON pl.id = p.policy WHERE p.collection = ''event_registrations'' AND p.action = ''create'' AND pl.name = ''registration_writer'') = 0 THEN RAISE EXCEPTION ''refusing 20261127_0072 test probe'' USING ERRCODE = ''restrict_violation''; END IF; END $rb$;',
     '23001', 'writer-hardening',
-    'writer role without a create row refuses (fail-closed: replacement must exist, not just the role)');
+    'writer policy without a create row refuses (fail-closed: replacement must exist, not just the policy)');
 
   PERFORM test_support.assert_equals(
     (SELECT count(*)::text FROM directus_permissions p
+      JOIN directus_access a ON a.policy = p.policy
       WHERE p.collection = 'event_registrations' AND p.action = 'create'
-        AND p.role IS NULL), '1', 'writer-hardening',
+        AND a.role IS NULL AND a."user" IS NULL), '1', 'writer-hardening',
     'refusing file leaves the public grant in place for the operator retry (revocation never runs ahead of its replacement)');
 END $$;
 
 -- ---------------------------------------------------------------------------
--- 104.4 REVOCATION + WRITER CONVERGENCE. The file, with the role present.
+-- 104.4 REVOCATION + WRITER CONVERGENCE. The file, with the policy present.
 -- ---------------------------------------------------------------------------
 DO $$
 DECLARE
   v_writer uuid;
+  v_public uuid;
 BEGIN
-  INSERT INTO directus_roles (name) VALUES ('registration_writer') RETURNING id INTO v_writer;
+  INSERT INTO directus_policies (name) VALUES ('registration_writer') RETURNING id INTO v_writer;
+  SELECT a.policy INTO v_public FROM directus_access a WHERE a.role IS NULL AND a."user" IS NULL;
 
   -- Writer create row in a legacy (public-shaped) field set, to be converged.
-  INSERT INTO directus_permissions (role, collection, action, fields)
+  INSERT INTO directus_permissions (policy, collection, action, fields)
   VALUES (v_writer, 'event_registrations', 'create',
     'event,registrant_first_name,registrant_last_name,email');
 
   -- Decoys the migration must not touch.
-  INSERT INTO directus_permissions (role, collection, action, fields)
-  VALUES (NULL, 'events', 'create', 'id,title');
-  INSERT INTO directus_permissions (role, collection, action, fields)
-  VALUES (gen_random_uuid(), 'events', 'create', 'id,title');
+  INSERT INTO directus_permissions (policy, collection, action, fields)
+  VALUES (v_public, 'events', 'create', 'id,title');
+END $$;
+
+-- A staff policy with an events read decoy (untouched: unrelated policy).
+DO $$
+DECLARE
+  v_staff uuid;
+BEGIN
+  INSERT INTO directus_policies (name) VALUES ('staff-policy') RETURNING id INTO v_staff;
+  INSERT INTO directus_permissions (policy, collection, action, fields)
+  VALUES (v_staff, 'events', 'create', 'id,title');
 END $$;
 
 \i services/directus/schema/migrations/20261127_0072_revoke_public_create_writer_role.sql
@@ -230,92 +261,115 @@ DECLARE
 BEGIN
   PERFORM test_support.assert_equals(
     (SELECT count(*)::text FROM directus_permissions p
-      WHERE p.collection = 'event_registrations' AND p.role IS NULL),
+      JOIN directus_access a ON a.policy = p.policy
+      WHERE p.collection = 'event_registrations'
+        AND a.role IS NULL AND a."user" IS NULL),
     '0', 'writer-hardening',
-    'the public grant is revoked: zero public rows on event_registrations (direct anonymous POST 403s)');
+    'the public grant is revoked: zero public-policy rows on event_registrations (direct anonymous POST 403s)');
 
   SELECT p.fields INTO v_got
-    FROM directus_permissions p JOIN directus_roles r ON r.id = p.role
+    FROM directus_permissions p JOIN directus_policies pl ON pl.id = p.policy
    WHERE p.collection = 'event_registrations' AND p.action = 'create'
-     AND r.name = 'registration_writer';
+     AND pl.name = 'registration_writer';
   PERFORM test_support.assert_equals(v_got, v_writer_allow, 'writer-hardening',
     'the writer row now carries exactly the 18-field writer allowlist');
 
   PERFORM test_support.assert_equals(
     (SELECT count(*)::text FROM directus_permissions p
+      JOIN directus_policies pl ON pl.id = p.policy
       WHERE p.collection = 'event_registrations' AND p.action = 'create'
-        AND p.role IS NOT NULL), '1', 'writer-hardening',
+        AND pl.name = 'registration_writer'), '1', 'writer-hardening',
     'exactly one writer create row (no duplicates)');
 
   PERFORM test_support.assert_equals(
     (SELECT count(*)::text FROM directus_permissions p
+      JOIN directus_policies pl ON pl.id = p.policy
       WHERE p.collection = 'event_registrations' AND p.action = 'create'
-        AND p.role IS NOT NULL
+        AND pl.name = 'registration_writer'
         AND string_to_array(p.fields, ',') && string_to_array('registration_status', ',')::text[]), '1', 'writer-hardening',
     'the writer row carries registration_status (proxy-assigned pending/waitlisted)');
 
   PERFORM test_support.assert_equals(
     (SELECT count(*)::text FROM directus_permissions p
+      JOIN directus_policies pl ON pl.id = p.policy
       WHERE p.collection = 'event_registrations' AND p.action = 'create'
-        AND p.role IS NOT NULL
+        AND pl.name = 'registration_writer'
         AND string_to_array(p.fields, ',') && string_to_array('source,consent_signed_at,ticket_code,amount_paid,amount_expected,payment_status,payment_reference,person,group_code', ',')::text[]), '0', 'writer-hardening',
     'the writer row carries no source/consent/ticket/money/person/group columns');
+
+  PERFORM test_support.assert_equals(
+    (SELECT count(*)::text FROM directus_permissions p
+      WHERE p.collection = 'events' AND p.action = 'create'), '2', 'writer-hardening',
+    'other collections are untouched (public events/create + staff events/create)');
+
+  PERFORM test_support.assert_equals(
+    (SELECT count(*)::text FROM directus_permissions p
+      WHERE p.collection = 'event_registrations' AND p.action = 'create'
+        AND p.policy NOT IN (SELECT pl.id FROM directus_policies pl WHERE pl.name = 'registration_writer')), '0', 'writer-hardening',
+    'no create row survives on event_registrations outside the writer policy (false-green guard)');
 END $$;
 
 -- ---------------------------------------------------------------------------
 -- 104.5 REFUSALS. Replica guards (the 41.3 precedent): the refusal shapes of
 -- 0072 — multi-row public, public non-create, multi-row writer, writer
--- non-create — plus the 0069 non-create shape the migration still refuses.
+-- non-create — plus the writer-in-public-access misconfiguration the file
+-- refuses. A top-level \i of a refusing migration would abort the suite, so
+-- the guard is exercised on a replica while 104.3/104.4 exercise the file
+-- itself.
 -- ---------------------------------------------------------------------------
 DO $$
 DECLARE
   v_writer uuid;
+  v_public uuid;
 BEGIN
-  SELECT r.id INTO v_writer FROM directus_roles r WHERE r.name = 'registration_writer';
+  SELECT pl.id INTO v_writer FROM directus_policies pl WHERE pl.name = 'registration_writer';
+  SELECT a.policy INTO v_public FROM directus_access a WHERE a.role IS NULL AND a."user" IS NULL;
 
   -- Multi-row public create candidates refuse.
-  INSERT INTO directus_permissions (role, collection, action, fields)
-  VALUES (NULL, 'event_registrations', 'create', 'event'),
-         (NULL, 'event_registrations', 'create', 'event');
+  INSERT INTO directus_permissions (policy, collection, action, fields)
+  VALUES (v_public, 'event_registrations', 'create', 'event'),
+         (v_public, 'event_registrations', 'create', 'event');
   PERFORM test_support.assert_raises(NULL,
-    'DO $rb$ BEGIN IF (SELECT count(*) FROM directus_permissions p WHERE p.collection = ''event_registrations'' AND p.action = ''create'' AND p.role IS NULL) > 1 THEN RAISE EXCEPTION ''refusing 20261127_0072 test probe'' USING ERRCODE = ''restrict_violation''; END IF; END $rb$;',
+    'DO $rb$ BEGIN IF (SELECT count(*) FROM directus_permissions p WHERE p.collection = ''event_registrations'' AND p.action = ''create'' AND p.policy = '''
+    || v_public::text || ''') > 1 THEN RAISE EXCEPTION ''refusing 20261127_0072 test probe'' USING ERRCODE = ''restrict_violation''; END IF; END $rb$;',
     '23001', 'writer-hardening',
     'more than one public create candidate refuses (never revoke an ambiguous set blindly)');
   DELETE FROM directus_permissions WHERE collection = 'event_registrations'
-    AND action = 'create' AND role IS NULL AND fields = 'event';
+    AND action = 'create' AND policy = v_public AND fields = 'event';
 
   -- A public non-create row refuses (the migration checks before touching).
-  INSERT INTO directus_permissions (role, collection, action, fields)
-  VALUES (NULL, 'event_registrations', 'read', 'id');
+  INSERT INTO directus_permissions (policy, collection, action, fields)
+  VALUES (v_public, 'event_registrations', 'read', 'id');
   PERFORM test_support.assert_raises(NULL,
-    'DO $rb$ BEGIN IF (SELECT count(*) FROM directus_permissions p WHERE p.collection = ''event_registrations'' AND p.action <> ''create'' AND p.role IS NULL) > 0 THEN RAISE EXCEPTION ''refusing 20261127_0072 test probe'' USING ERRCODE = ''restrict_violation''; END IF; END $rb$;',
+    'DO $rb$ BEGIN IF (SELECT count(*) FROM directus_permissions p WHERE p.collection = ''event_registrations'' AND p.action <> ''create'' AND p.policy = '''
+    || v_public::text || ''') > 0 THEN RAISE EXCEPTION ''refusing 20261127_0072 test probe'' USING ERRCODE = ''restrict_violation''; END IF; END $rb$;',
     '23001', 'writer-hardening',
     'a public non-create row on event_registrations refuses (create-only-or-absent)');
   DELETE FROM directus_permissions WHERE collection = 'event_registrations'
-    AND action = 'read' AND role IS NULL;
+    AND action = 'read' AND policy = v_public;
 
   -- Multi-row writer create candidates refuse.
-  INSERT INTO directus_permissions (role, collection, action, fields)
+  INSERT INTO directus_permissions (policy, collection, action, fields)
   VALUES (v_writer, 'event_registrations', 'create', 'event'),
          (v_writer, 'event_registrations', 'create', 'event');
   PERFORM test_support.assert_raises(NULL,
-    'DO $rb$ BEGIN IF (SELECT count(*) FROM directus_permissions p WHERE p.collection = ''event_registrations'' AND p.action = ''create'' AND p.role = '''
+    'DO $rb$ BEGIN IF (SELECT count(*) FROM directus_permissions p WHERE p.collection = ''event_registrations'' AND p.action = ''create'' AND p.policy = '''
     || v_writer::text || ''') > 1 THEN RAISE EXCEPTION ''refusing 20261127_0072 test probe'' USING ERRCODE = ''restrict_violation''; END IF; END $rb$;',
     '23001', 'writer-hardening',
     'more than one writer create candidate refuses (never widen an ambiguous set)');
   DELETE FROM directus_permissions WHERE collection = 'event_registrations'
-    AND action = 'create' AND role = v_writer AND fields = 'event';
+    AND action = 'create' AND policy = v_writer AND fields = 'event';
 
   -- A writer non-create row refuses (create-only).
-  INSERT INTO directus_permissions (role, collection, action, fields)
+  INSERT INTO directus_permissions (policy, collection, action, fields)
   VALUES (v_writer, 'event_registrations', 'read', 'id');
   PERFORM test_support.assert_raises(NULL,
-    'DO $rb$ BEGIN IF (SELECT count(*) FROM directus_permissions p WHERE p.collection = ''event_registrations'' AND p.action <> ''create'' AND p.role = '''
+    'DO $rb$ BEGIN IF (SELECT count(*) FROM directus_permissions p WHERE p.collection = ''event_registrations'' AND p.action <> ''create'' AND p.policy = '''
     || v_writer::text || ''') > 0 THEN RAISE EXCEPTION ''refusing 20261127_0072 test probe'' USING ERRCODE = ''restrict_violation''; END IF; END $rb$;',
     '23001', 'writer-hardening',
     'a writer non-create row on event_registrations refuses (writer is create-only)');
   DELETE FROM directus_permissions WHERE collection = 'event_registrations'
-    AND action = 'read' AND role = v_writer;
+    AND action = 'read' AND policy = v_writer;
 END $$;
 
 -- ---------------------------------------------------------------------------
@@ -373,4 +427,5 @@ BEGIN
 END $$;
 
 DROP TABLE IF EXISTS directus_permissions;
-DROP TABLE IF EXISTS directus_roles;
+DROP TABLE IF EXISTS directus_access;
+DROP TABLE IF EXISTS directus_policies;

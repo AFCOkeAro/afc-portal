@@ -290,7 +290,7 @@ api.example.org {
 - TLS 1.2+ everywhere via Caddy automatic certificates; HSTS.
 - Production TLS terminates at origin (AFC-1222 F7, deploy check, operator-owned). Caddy holds the certificate; the CDN in front of production must run Full (Strict). Cloudflare Flexible (staging, AFC-561) speaks plain HTTP from CDN to origin and must not be carried forward: Flexible in front of live registration traffic would move children's data unencrypted over the last leg while the browser shows a lock.
 - Studio admin surface limited to super/area admins and IP-restricted or behind a proxy.
-- Least-privilege Directus roles; public role is create-only on registrations.
+- Least-privilege Directus policies; the public policy holds no grant on registrations — writes go through the portal proxy under the server-held `registration_writer` policy (create-only, allowlisted fields).
 - Rate limiting on the public registration endpoint at the Nuxt edge (per-IP token bucket; shared store is a CTO deploy decision); Turnstile bot gate enforced when the deploy sets the secret (AFC-1222).
 - OS patching via unattended-upgrades; Docker images pinned to major tags and updated on a schedule.
 - Secrets only in env/secret store; separate credentials for backups.
