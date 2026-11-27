@@ -46,6 +46,12 @@ services:
       NUXT_PUBLIC_DIRECTUS_URL: ${NUXT_PUBLIC_DIRECTUS_URL:-}
       NUXT_DIRECTUS_SERVER_TOKEN: ${NUXT_DIRECTUS_SERVER_TOKEN:-}
       NUXT_DIRECTUS_PUBLIC_TOKEN: ${NUXT_DIRECTUS_PUBLIC_TOKEN:-}
+      # AFC-1256: server-only create-only writer token. Without it the new
+      # registration route fails closed with 503 registration_writer_unavailable.
+      NUXT_DIRECTUS_WRITER_TOKEN: ${NUXT_DIRECTUS_WRITER_TOKEN:-}
+      # AFC-1256: Turnstile secret. Without it NODE_ENV=production fails
+      # closed with 503 bot_verification_unavailable before any seat work.
+      NUXT_TURNSTILE_SECRET_KEY: ${NUXT_TURNSTILE_SECRET_KEY:-}
       # Staging SHA-proof (AFC-718): runtime fallback for the build SHA the
       # image baked in above. Resolves from the host .env, same as every
       # other entry in this block; empty means the probe reports 'unknown'.
