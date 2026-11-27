@@ -338,7 +338,7 @@ Permission rules are enforced **server-side by Directus policies**; the frontend
 - Person/attendance data retention policy defined with the board (default: retain while active + 7 years for financial welfare records; soft-archive people).
 
 ### 7.6 Security
-- Least-privilege Directus roles/policies; public role is create-only on registration.
+- Least-privilege Directus roles/policies; the public policy holds no grant on registration — writes go through the portal proxy under `registration_writer` (create-only, allowlisted fields).
 - TLS everywhere (Caddy automatic HTTPS); HSTS.
 - Secrets only in environment/secret manager; never in the repo (see `repo-plan`).
 - Rate limiting on public endpoints; bot protection on public forms.

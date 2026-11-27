@@ -277,7 +277,7 @@ api.example.org {
 
 - TLS 1.2+ everywhere via Caddy automatic certificates; HSTS.
 - Studio admin surface limited to super/area admins and IP-restricted or behind a proxy.
-- Least-privilege Directus roles; public role is create-only on registrations.
+- Least-privilege Directus policies; the public policy holds no grant on registrations — writes go through the portal proxy under the server-held `registration_writer` policy (create-only, allowlisted fields).
 - Rate limiting on public registration endpoints; bot mitigation (Caddy/Turnstile) if abuse appears.
 - OS patching via unattended-upgrades; Docker images pinned to major tags and updated on a schedule.
 - Secrets only in env/secret store; separate credentials for backups.
