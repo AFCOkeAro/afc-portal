@@ -176,9 +176,11 @@ async function submit() {
   }
 
   try {
-    // `toRegistrationPayload` is what the server route applies to its own copy.
-    // Running it here means the payload shape a registrant produces is visible in
-    // the browser for anyone auditing the allowlist.
+    // `toRegistrationPayload` shapes the browser copy for audit; the server
+    // route projects its own copy through `toWriterPayload` onto the writer
+    // allowlist. Running the shared projector here means the payload shape a
+    // registrant produces is visible in the browser for anyone auditing the
+    // allowlist.
     const payload = toRegistrationPayload(parsed.data as RegistrationForm)
     const result = await $fetch<{
       id: string

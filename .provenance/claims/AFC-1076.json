@@ -1,0 +1,38 @@
+{
+  "whatThisFileIs": "R1 authorship claim + R2 independent review for the AFC-1076 re-land of the leave cutover onto main (revert of the AFC-1072 containment revert).",
+  "issue": "AFC-1076",
+  "authorAgentId": "8f6e42d7-fb6e-4e6c-904b-dfdda50000ed",
+  "authorName": "MediaTech (CTO)",
+  "whatTheChangeDoes": "Single revert-of-revert commit restoring the pre-revert main tree (cutover 0067 + cutover contracts + PersonAvatar + ADR-0013 + matrix/route/page deltas) so PR #156 staging->main merges cleanly. The migration itself is already applied on staging; this only restores the code on main.",
+  "paths": [
+    "services/directus/schema/migrations/20261105_0067_leave_register_cutover.sql",
+    "services/directus/schema/migrations/rollback/20261105_0067_leave_register_cutover.down.sql",
+    "tests/db/52_leave_requests.sql",
+    "tests/db/67_leave_register_cutover.sql",
+    "tests/web/annual-leave.contract.mjs",
+    "tests/web/leave-decision-self-approval.hooks.mjs",
+    "tests/web/leave-decision-self-approval.regression.mjs",
+    "tests/web/leave-decision-self-approval.stubs.mjs",
+    "tests/web/leave-register-cutover.contract.mjs",
+    "tests/web/time-off-tabs.contract.mjs"
+  ],
+  "notClaimedPaths": "Non-guarded files restored by the same revert (apps/, packages/, docs/) are covered by the staging verification of c68d970 and the CTO review on AFC-1076; they are outside the provenance gate scope.",
+  "r2Review": {
+    "reviewerAgentId": "a131248c-4ad3-4854-9a45-bd120a5d6c8e",
+    "reviewerName": "SecurityEngineer",
+    "reviewIssue": "AFC-1082",
+    "verdict": "approve-with-conditions",
+    "status": "approved-with-conditions",
+    "note": "Independent review of the revert-of-revert: byte-identical restore of f42599b, no new grant/credential/migration delta vs the staging-verified tree. Conditions: C1 merge PR #156 immediately so the known-bad tree is not tip; C2 confirm the out-of-band Directus policy rows (24 leave + 21 balances) exist wherever main is deployed; C3 repeat staging preconditions if 0067 has not applied on that DB."
+  },
+  "reviews": [
+    {
+      "sha": "525ed37757466c16392ca8d34d979a98d3b2323b",
+      "reviewIssue": "AFC-1082",
+      "reviewerAgentId": "a131248c-4ad3-4854-9a45-bd120a5d6c8e",
+      "verdict": "approve-with-conditions"
+    }
+  ],
+  "verificationRecorded": "SecurityEngineer AFC-1082 (read-only): git diff f42599b 9305963 empty; git diff 9305963 c68d970 = 15 files, all post-cutover fixes, zero services/directus files; credential scan clean; grants/authz/personal-data/irreversible lenses clean. Staging c68d970 verified live: POST /api/leave-balances 200, 133 contract tests pass.",
+  "amendNote": "The reviewed commit was 9305963. This amend changes only the commit message (adds Issue/Reviewed-by trailers); the tree is byte-identical."
+}

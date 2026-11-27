@@ -266,11 +266,22 @@ function mapDirectusError(cause: unknown, path: string): Error {
   // detail into a 5xx statusMessage; the named store error downstream names
   // the migration instead. Client-error (4xx) detail passes through so
   // scope 404s keep their explanation.
+  // AFC-1230 F1: the race path (register.post.ts createWithRaceGuard) must
+  // still observe event_full / duplicate-key signals. The generic
+  // statusMessage stays (observability: misconfig pages, never masquerades
+  // as capacity), but the upstream signal is preserved in data — never in
+  // the message — so the route matcher reads it without leaking SQL text
+  // into logs/status.
   if (status >= 500 || status < 400) {
     return createError({
       statusCode: status >= 500 && status < 600 ? status : 502,
       statusMessage: `Directus request to ${path} failed`,
-      data: { code: first?.extensions?.code ?? 'directus_error' },
+      data: {
+        code: first?.extensions?.code ?? 'directus_error',
+        upstreamMessage: first?.message ?? error?.statusMessage ?? null,
+        upstreamCode: first?.extensions?.code ?? null,
+        upstreamStatus: status,
+      },
     })
   }
   return createError({

@@ -393,7 +393,7 @@ Directus allows custom fields on `directus_users`. Add:
   ```
   For collections without a `department` field (e.g. `attendance_sessions`), scope by branch only, or add a denormalised `department` field where department-level isolation is required.
 - Area admin — no item filter; create/update allowed across branches, but **no** `settings`/schema access.
-- Public role — create-only on `event_registrations` via an allowlisted field set; **no read** permission on any collection. Writes go through a Directus Flow (or a rate-limited public endpoint) that validates fields, checks capacity, and generates `ticket_code`.
+- Public policy — **no access** to `event_registrations` (migration 0072 revokes the interim public create grant; a direct anonymous POST 403s). Public writes go only through the portal proxy under the server-held `registration_writer` policy (create-only, allowlisted fields), which validates consent/age/window/dedupe/Turnstile/rate-limit, checks capacity, stamps `source`/`consent_signed_at` server-side, and generates `ticket_code`.
 
 **Area admin sees all branches:** because its policy has no branch item filter. It is a distinct Directus policy/role from branch admin, not a filter value.
 
@@ -405,7 +405,7 @@ Directus allows custom fields on `directus_users`. Add:
 1. A branch admin requesting a record from another branch receives `403`/empty set, on both list and detail.
 2. A department leader sees only records for assigned branches and departments.
 3. A volunteer can create/update attendance for their branch and cannot read welfare or other branches.
-4. The public role cannot read any collection and can create only valid registrations.
+4. The public policy cannot read any collection and holds no create grant on registrations (direct writes fail closed); valid registrations are created only through the portal proxy under `registration_writer`.
 5. A user with `branch = null` and `staff_role != area_admin` sees nothing (fail-closed).
 
 ---

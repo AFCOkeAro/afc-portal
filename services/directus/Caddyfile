@@ -1,0 +1,103 @@
+# AFC Church Portal — production Caddyfile.
+#
+# SPECIFICATION: docs/planning/infra-spec.md §4. This file is a transcription
+# of the outline in that section. If the two disagree, §4 is wrong and the
+# spec is what changes. The operator replaces the example.org site addresses
+# with the real domains at deploy (the staging Caddyfile shows the pattern).
+#
+# RATE LIMITING (AFC-1222 F1, keyed AFC-1226 H1). The §4 outline sketches a
+# `rate_limit` directive. Stock `caddy:2-alpine` ships no such directive:
+# carrying the sketch here would fail the deploy at config-load time. The
+# public-registration limit is enforced at the Nuxt edge instead
+# (apps/web/server/utils/public-rate-limit.ts, per-IP token bucket keyed on
+# the CDN-attested CF-Connecting-IP or the socket peer — XFF is never
+# trusted for keying), which is also where the 429 + Retry-After answer is
+# shaped. A shared store (Redis) for multi-worker deploys is a CTO
+# deploy-topology decision; when it lands, this file still needs no
+# rate-limit block.
+#
+# XFF HYGIENE (AFC-1226 H1). The portal proxy overwrites X-Forwarded-For with
+# the immediate peer, so a rotating-XFF flood cannot smuggle a spoofed chain
+# past the edge into logs or any XFF reader. The register route does not
+# trust XFF either way; this stanza is log integrity, not a second control.
+# Residual, stated: CF-Connecting-IP passes through untouched (the route's
+# key needs it), so a client that bypasses the CDN and talks to this edge
+# directly can assert any CF-Connecting-IP it likes. Direct-to-origin
+# traffic is an operator firewall question (security groups / Cloudflare
+# Tunnel / allowlist), not something this stanza can attest.
+#
+# TLS (AFC-1222 F7). Caddy terminates TLS at origin with automatic
+# certificates. The CDN in front of production MUST be in Full (Strict) mode
+# so the edge-to-origin leg is authenticated TLS. Cloudflare Flexible
+# (staging, AFC-561) terminates at the CDN and speaks plain HTTP to origin;
+# it must not be carried forward to production. Deploy check, operator-owned.
+#
+# EDGE LOG RETENTION (AFC-1222 F6). Access logs roll at 100 MB and are kept
+# 720h (30 days), then age out. No edge log holds registration PII beyond
+# the request line; the scheduled history prune for Directus system tables
+# is services/directus/bin/prune-directus-history.sh.
+
+{
+	admin off
+}
+
+portal.example.org {
+	encode gzip zstd
+
+	log {
+		output file /var/log/caddy/portal-access.log {
+			roll_size 100mb
+			roll_keep 10
+			roll_keep_for 720h
+		}
+		format filter {
+			wrap json
+			fields {
+				request>headers>Cookie redact
+				request>headers>Authorization redact
+			}
+		}
+	}
+
+	reverse_proxy web:3000 {
+		# XFF hygiene (AFC-1226 H1): overwrite the chain with the immediate
+		# peer so a spoofed X-Forwarded-For never reaches the app or the
+		# logs. The register limiter keys on CF-Connecting-IP / socket and
+		# never trusts XFF either way.
+		header_up X-Forwarded-For {remote_host}
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+}
+
+api.example.org {
+	encode gzip zstd
+
+	log {
+		output file /var/log/caddy/api-access.log {
+			roll_size 100mb
+			roll_keep 10
+			roll_keep_for 720h
+		}
+		format filter {
+			wrap json
+			fields {
+				request>headers>Cookie redact
+				request>headers>Authorization redact
+			}
+		}
+	}
+
+	reverse_proxy directus:8055
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+}

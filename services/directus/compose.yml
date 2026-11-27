@@ -128,6 +128,9 @@ services:
     environment:
       NUXT_PUBLIC_DIRECTUS_URL: ${DIRECTUS_PUBLIC_URL}
       NUXT_DIRECTUS_SERVER_TOKEN: ${NUXT_DIRECTUS_SERVER_TOKEN}
+      NUXT_DIRECTUS_PUBLIC_TOKEN: ${NUXT_DIRECTUS_PUBLIC_TOKEN}
+      NUXT_DIRECTUS_WRITER_TOKEN: ${NUXT_DIRECTUS_WRITER_TOKEN}
+      NUXT_TURNSTILE_SECRET_KEY: ${NUXT_TURNSTILE_SECRET_KEY}
       NUXT_PUBLIC_SITE_URL: ${SITE_URL}
 
   caddy:
@@ -147,6 +150,9 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
+      # F6: edge access logs live past container restarts so the 720h
+      # roll_keep_for in the Caddyfile is real retention, not container life.
+      - caddy_logs:/var/log/caddy
 
   db-backup:
     image: postgres:16-alpine
@@ -172,4 +178,5 @@ volumes:
   uploads:
   caddy_data:
   caddy_config:
+  caddy_logs:
   backupdata:
