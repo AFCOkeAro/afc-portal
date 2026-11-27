@@ -78,11 +78,14 @@
 --   No policy lookup by id: Directus policy UUIDs differ per environment, so
 --   the policy is matched by its stable NAME. More than one policy with the
 --   name refuses rather than widening an ambiguous set.
---   No non-create narrowing: a public or writer read/update/delete row on
+--   No public non-create narrowing: a public read/update/delete row on
 --   event_registrations is a shipping blocker (child PII), not a migration
 --   detail — this file RAISEs instead of proceeding. Non-create rows on
---   unrelated (staff/admin) policies are untouched: least privilege for
---   staff reads is a reviewed snapshot, not this file's business.
+--   unrelated (staff/admin) policies, and staff/admin create grants for the
+--   staff walk-in route (which must stamp source='staff'), are untouched:
+--   least privilege for staff is a reviewed snapshot, not this file's
+--   business. The writer allowlist deliberately excludes source, so folding
+--   staff create into registration_writer would break staff attribution.
 --   No down script (0064 precedent): permission state is environment state;
 --   reversal is a new forward migration, not a silent narrowing that could
 --   close or reopen the live public surface on rollback.
@@ -296,18 +299,22 @@ BEGIN
       '20261127_0072: no public event_registrations/create permission remains. Already revoked.';
   END IF;
 
-  -- 5. False-green guard (AFC-1254): after revocation, no create row may
-  --    remain on event_registrations outside the writer policy. An unscoped
-  --    grant the public-set resolution missed is a bypass, not a decoy.
+  -- 5. False-green guard (AFC-1254, scoped for AFC-1256): after revocation,
+  --    no create row may remain on event_registrations for the PUBLIC policy
+  --    set. Staff/admin policies legitimately hold create for the staff
+  --    walk-in route (source='staff'); the writer allowlist excludes source,
+  --    so those rows are not public bypasses and must survive. An unscoped
+  --    public-set grant the resolution missed is the bypass this catches.
   SELECT count(*) INTO v_unknown_create
     FROM directus_permissions p
    WHERE p.collection = 'event_registrations'
      AND p.action = 'create'
+     AND p.policy = ANY(v_public_policies)
      AND p.policy <> v_writer_id;
 
   IF v_unknown_create > 0 THEN
     RAISE EXCEPTION
-      'refusing 20261127_0072: % event_registrations/create row(s) remain outside the registration_writer policy after revocation. Every surviving create grant is a direct-write path around the portal proxy (child PII); scope it to a reviewed policy or remove it in a reviewed snapshot, then re-run.',
+      'refusing 20261127_0072: % public event_registrations/create row(s) remain outside the registration_writer policy after revocation. A public create grant is a direct-write path around the portal proxy (child PII); remove it in a reviewed snapshot, then re-run.',
       v_unknown_create
       USING ERRCODE = 'restrict_violation';
   END IF;

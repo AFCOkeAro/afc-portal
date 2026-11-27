@@ -233,11 +233,14 @@ describe('F2: public create-only policy artifact (0069, revoked by G3)', () => {
   const migration =
     'services/directus/schema/migrations/20261126_0069_public_registration_create_policy.sql'
 
-  it('targets exactly the public (role-NULL) create row, never by perm id', () => {
+  it('targets the public policy set, never a role column or perm id', () => {
     const src = codeOf(migration)
-    assert.match(src, /p\.role IS NULL/)
+    assert.match(src, /directus_access/)
+    assert.match(src, /a\.role IS NULL AND a\."user" IS NULL/)
     assert.match(src, /p\.collection = 'event_registrations'/)
     assert.match(src, /p\.action = 'create'/)
+    assert.match(src, /p\.policy = ANY\(v_public_policies\)/)
+    assert.doesNotMatch(src, /p\.role IS NULL/)
   })
 
   it('sets exactly the 18-field allowlist: 16 public + source + consent_signed_at', () => {
@@ -283,21 +286,22 @@ describe('F2: public create-only policy artifact (0069, revoked by G3)', () => {
   })
 })
 
-describe('G3: the writer role replaces the public grant', () => {
+describe('G3: the writer policy replaces the public grant', () => {
   const migration =
     'services/directus/schema/migrations/20261127_0072_revoke_public_create_writer_role.sql'
 
   it('revokes the legacy public create row instead of narrowing it', () => {
     const src = codeOf(migration)
     assert.match(src, /DELETE FROM directus_permissions/)
-    assert.match(src, /p\.role IS NULL/)
+    assert.match(src, /p\.policy = ANY\(v_public_policies\)/)
+    assert.match(src, /p\.policy <> v_writer_id/)
     assert.match(src, /Direct anonymous writes to the collection now fail closed/)
   })
 
-  it('matches the writer role by stable name, never by environment id', () => {
+  it('matches the writer policy by stable name, never by environment id', () => {
     const src = codeOf(migration)
-    assert.match(src, /directus_roles/)
-    assert.match(src, /r\.name = 'registration_writer'/)
+    assert.match(src, /directus_policies/)
+    assert.match(src, /pl\.name = 'registration_writer'/)
   })
 
   it('leaves the public grant untouched until the writer replacement exists', () => {
@@ -344,7 +348,7 @@ describe('G3: the writer role replaces the public grant', () => {
   it('refuses writer non-create rows and ambiguous sets (create-only)', () => {
     const src = codeOf(migration)
     assert.match(src, /p\.action <> 'create'/)
-    assert.match(src, /AND p\.role = v_writer_id/)
+    assert.match(src, /AND p\.policy = v_writer_id/)
     assert.match(src, /restrict_violation/)
   })
 
@@ -810,15 +814,51 @@ describe('F8: WP evidence (repo side)', () => {
   })
 })
 
+describe('AFC-1256: create-only writer read-after-write (option 2)', () => {
+  const src = codeOf(ROUTE)
+
+  it('does not assume the create response carries the row', () => {
+    assert.match(src, /RegistrationResponse \| null/)
+    assert.match(src, /created && typeof created === 'object' \? created\.data : null/)
+  })
+
+  it('resolves the created row with the server token, never the writer token', () => {
+    assert.match(src, /resolveCreatedRegistration/)
+    assert.match(src, /findIdempotencyReplay/)
+    assert.match(src, /findNewestContactRegistration/)
+    const readback = src.slice(src.indexOf('async function resolveCreatedRegistration'))
+    assert.match(readback, /findIdempotencyReplay\(event, serverToken/)
+    assert.match(readback, /findNewestContactRegistration\(event, serverToken/)
+  })
+
+  it('orders the no-key fallback newest-first so an older sibling cannot win', () => {
+    assert.match(src, /\['-date_created'\]/)
+    assert.match(src, /buildDedupeFilter\(form\)/)
+  })
+
+  it('retries a bounded number of times, then fails closed with a named 503', () => {
+    assert.match(src, /READBACK_ATTEMPTS = 3/)
+    assert.match(src, /registration_readback_failed/)
+    assert.match(src, /retry with the same Idempotency-Key/)
+  })
+
+  it('keeps the writer grant create-only (no read added to satisfy the echo)', () => {
+    assert.doesNotMatch(
+      src,
+      /accessToken: writerToken[\s\S]{0,240}method: 'GET'/,
+    )
+  })
+})
+
 describe('AFC-1230 F2: 0072 fails closed when the writer replacement is missing', () => {
   const migration =
     'services/directus/schema/migrations/20261127_0072_revoke_public_create_writer_role.sql'
 
-  it('a missing writer role raises instead of NOTICE+RETURN', () => {
+  it('a missing writer policy raises instead of NOTICE+RETURN', () => {
     const src = codeOf(migration)
-    assert.match(src, /no Directus role named registration_writer/)
+    assert.match(src, /no Directus policy named registration_writer/)
     assert.match(src, /restrict_violation/)
-    assert.doesNotMatch(src, /not applied: no Directus role named registration_writer/)
+    assert.doesNotMatch(src, /not applied: no Directus policy named registration_writer/)
   })
 
   it('a missing writer create row raises instead of NOTICE+RETURN', () => {

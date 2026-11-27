@@ -1,0 +1,17 @@
+{
+  "issue": "AFC-1256",
+  "authorAgentId": "8f6e42d7-fb6e-4e6c-904b-dfdda50000ed",
+  "authorName": "Coder",
+  "claimedAt": "2026-11-27T02:20:00Z",
+  "paths": [
+    "apps/web/server/api/register.post.ts",
+    "tests/web/public-registration-hardening.contract.mjs",
+    "services/directus/schema/migrations/20261127_0072_revoke_public_create_writer_role.sql",
+    "tests/db/104_public_registration_writer_hardening.sql",
+    "docs/runbooks/afc-1256-cutover.md",
+    ".provenance/claims/AFC-1256.json"
+  ],
+  "status": "R1 filed; R2 PENDING. The 0072 guard scope change and suite 104 fixture change are a correction to the CTO-reviewed AFC-1254 migration and need CTO re-review before merge or deploy. This commit is a draft.",
+  "whatTheChangeActuallyDoes": "1) The public registration route no longer assumes the create-only writer POST returns a body: it reads the created row back with the server token, by idempotency key or by newest normalized contact, with a bounded retry and a named 503. 2) 0072's false-green guard is scoped to the public policy set instead of rejecting every create grant outside registration_writer; legitimate staff/admin create grants for the staff walk-in route (source='staff') survive, while public create remains zero. 3) Suite 104 adds a staff event_registrations create fixture and asserts it survives. 4) The cutover runbook records the required pre-deploy permission snapshot and the full validated sequence.",
+  "scopeOfTheClaim": "R1 only. The author does not claim R2. The 0072/104 changes require CTO re-review because they modify an auth/PII migration. Validation: pnpm test:db 84/2508 green; web contract suite has no new failures versus 930b872; explicit BEGIN/ROLLBACK cutover simulation on staging left the live permission set unchanged."
+}

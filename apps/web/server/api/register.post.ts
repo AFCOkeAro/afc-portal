@@ -409,6 +409,7 @@ async function createWithRaceGuard(
     return await createRegistration(
       event,
       tokens.writerToken,
+      tokens.serverToken,
       form,
       status,
       options.idempotencyKey,
@@ -431,6 +432,7 @@ async function createWithRaceGuard(
         return await createRegistration(
           event,
           tokens.writerToken,
+          tokens.serverToken,
           form,
           'waitlisted',
           options.idempotencyKey,
@@ -565,11 +567,12 @@ function toWriterPayload(form: RegistrationForm): Record<string, unknown> {
 async function createRegistration(
   event: H3Event,
   writerToken: string,
+  serverToken: string,
   form: RegistrationForm,
   status: 'pending' | 'waitlisted',
   idempotencyKey: string | null,
 ): Promise<RegistrationRow> {
-  const created = await directusFetch<RegistrationResponse>(
+  const created = await directusFetch<RegistrationResponse | null>(
     event,
     '/items/event_registrations',
     {
@@ -583,11 +586,70 @@ async function createRegistration(
     },
   )
 
-  return {
-    id: created.data.id,
-    ticket_code: created.data.ticket_code,
-    registration_status: created.data.registration_status,
+  // The G3 writer policy is create-only, so Directus answers the POST with
+  // 204 No Content: there is no body to read ticket_code from. A body is
+  // still used when the deploy grants a read-capable writer (compatibility
+  // and tests); otherwise the row is read back with the server token, which
+  // the public path already uses for dedupe. The writer token never gains a
+  // read grant just to echo the ticket.
+  const createdRow = created && typeof created === 'object' ? created.data : null
+  if (
+    createdRow?.id &&
+    createdRow.ticket_code !== undefined &&
+    createdRow.registration_status !== undefined
+  ) {
+    return {
+      id: createdRow.id,
+      ticket_code: createdRow.ticket_code,
+      registration_status: createdRow.registration_status,
+    }
   }
+
+  return resolveCreatedRegistration(event, serverToken, form, idempotencyKey)
+}
+
+const READBACK_ATTEMPTS = 3
+const READBACK_DELAY_MS = 60
+
+/**
+ * Read the just-created registration back with the server token. The write
+ * itself succeeded, so this is a read-after-write, not a capacity or
+ * validation decision. Directus is synchronous, but a short bounded retry
+ * absorbs a transient read error or replication lag instead of returning a
+ * false 503.
+ *
+ * Idempotency-Key is preferred: the (event, key) partial unique index makes
+ * the lookup exact. Without a key, the newest row matching the same
+ * normalized contact/name key is the one this request just created; it is
+ * ordered by `date_created` so an older sibling registration cannot win.
+ * If the row still cannot be read the route fails closed with 503: the
+ * caller retries with the same Idempotency-Key and the retry replays.
+ */
+async function resolveCreatedRegistration(
+  event: H3Event,
+  serverToken: string,
+  form: RegistrationForm,
+  idempotencyKey: string | null,
+): Promise<RegistrationRow> {
+  for (let attempt = 0; attempt < READBACK_ATTEMPTS; attempt++) {
+    try {
+      const row = idempotencyKey
+        ? await findIdempotencyReplay(event, serverToken, form.event, idempotencyKey)
+        : await findNewestContactRegistration(event, serverToken, form)
+      if (row) return row
+    } catch {
+      // Retry; the final failure is the named 503 below, never a raw 500.
+    }
+    if (attempt < READBACK_ATTEMPTS - 1) {
+      await new Promise((resolve) => setTimeout(resolve, READBACK_DELAY_MS * (attempt + 1)))
+    }
+  }
+  throw createError({
+    statusCode: 503,
+    statusMessage:
+      'The registration was saved but could not be read back — retry with the same Idempotency-Key',
+    data: { code: 'registration_readback_failed' },
+  })
 }
 
 /**
@@ -640,6 +702,7 @@ async function readDedupeCandidates(
   event: H3Event,
   serverToken: string,
   filter: Record<string, unknown>,
+  sort?: string[],
 ): Promise<Array<Record<string, unknown>>> {
   const response = await directusFetch<{ data: Array<Record<string, unknown>> }>(
     event,
@@ -650,12 +713,41 @@ async function readDedupeCandidates(
       query: {
         filter,
         limit: 25,
+        ...(sort ? { sort } : {}),
         fields:
           'id,ticket_code,registration_status,registrant_first_name,registrant_last_name,email,phone',
       },
     },
   )
   return response.data ?? []
+}
+
+/**
+ * Read-after-write without an Idempotency-Key: the newest row matching the
+ * same normalized contact (or name fallback) key. `date_created` descending
+ * puts this request's row first so an older sibling cannot be returned.
+ */
+async function findNewestContactRegistration(
+  event: H3Event,
+  serverToken: string,
+  form: RegistrationForm,
+): Promise<RegistrationRow | null> {
+  const wanted = publicDedupeKey(form.event, form)
+  const rows = await readDedupeCandidates(
+    event,
+    serverToken,
+    buildDedupeFilter(form),
+    ['-date_created'],
+  )
+  for (const row of rows) {
+    if (publicDedupeKey(form.event, row) !== wanted) continue
+    return {
+      id: String(row.id),
+      ticket_code: (row.ticket_code as string | null) ?? null,
+      registration_status: String(row.registration_status ?? 'pending'),
+    }
+  }
+  return null
 }
 
 /**

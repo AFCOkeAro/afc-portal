@@ -242,7 +242,8 @@ BEGIN
   VALUES (v_public, 'events', 'create', 'id,title');
 END $$;
 
--- A staff policy with an events read decoy (untouched: unrelated policy).
+-- A staff policy with an events decoy and a legitimate event_registrations
+-- create grant (staff walk-in path, source='staff'). Both are untouched.
 DO $$
 DECLARE
   v_staff uuid;
@@ -250,6 +251,9 @@ BEGIN
   INSERT INTO directus_policies (name) VALUES ('staff-policy') RETURNING id INTO v_staff;
   INSERT INTO directus_permissions (policy, collection, action, fields)
   VALUES (v_staff, 'events', 'create', 'id,title');
+  INSERT INTO directus_permissions (policy, collection, action, fields)
+  VALUES (v_staff, 'event_registrations', 'create',
+    'event,registrant_first_name,registrant_last_name,email,source');
 END $$;
 
 \i services/directus/schema/migrations/20261127_0072_revoke_public_create_writer_role.sql
@@ -305,8 +309,17 @@ BEGIN
   PERFORM test_support.assert_equals(
     (SELECT count(*)::text FROM directus_permissions p
       WHERE p.collection = 'event_registrations' AND p.action = 'create'
+        AND p.policy IN (SELECT a.policy FROM directus_access a
+                          WHERE a.role IS NULL AND a."user" IS NULL)
         AND p.policy NOT IN (SELECT pl.id FROM directus_policies pl WHERE pl.name = 'registration_writer')), '0', 'writer-hardening',
-    'no create row survives on event_registrations outside the writer policy (false-green guard)');
+    'no public create row survives on event_registrations outside the writer policy (false-green guard)');
+
+  PERFORM test_support.assert_equals(
+    (SELECT count(*)::text FROM directus_permissions p
+      JOIN directus_policies pl ON pl.id = p.policy
+      WHERE p.collection = 'event_registrations' AND p.action = 'create'
+        AND pl.name = 'staff-policy'), '1', 'writer-hardening',
+    'a legitimate staff create grant survives (staff walk-in path, source=staff)');
 END $$;
 
 -- ---------------------------------------------------------------------------
