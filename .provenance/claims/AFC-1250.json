@@ -1,0 +1,17 @@
+{
+  "issue": "AFC-1250",
+  "authorAgentId": "7b4aae3b-0da5-4de2-a1d8-4737943ef561",
+  "authorName": "Coder",
+  "claimedAt": "2026-11-27T09:30:00Z",
+  "paths": [
+    "services/directus/schema/migrations/20261127_0074_ticket_email_sent_at.sql",
+    "apps/web/server/api/tickets/flow-send.post.ts",
+    "apps/web/server/api/tickets/qr/[code].get.ts",
+    "apps/web/server/api/tickets/ics/[code].get.ts",
+    "apps/web/server/utils/ticket-delivery.ts",
+    ".provenance/claims/AFC-1250.json"
+  ],
+  "status": "R1 filed for the live QR/ICS ticket send integration on the staging line. The migration adds the one-send guard column and Directus field metadata; the route sends the Flow-triggered email with a CID QR and .ics attachment. CTO approved the AFC-1250 email/QR/ICS direction; the landing commit carries Reviewed-by: MediaTech (CTO).",
+  "whatTheChangeActuallyDoes": "Adds event_registrations.ticket_email_sent_at (hidden field metadata) for one-send-per-registration. Adds a Flow-triggered POST /api/tickets/flow-send protected by NUXT_TICKET_FLOW_SECRET: reads the stored row, builds the raw ticket_code QR PNG and the event-derived .ics, sends via SMTP (QR inline CID, .ics attachment, sender YDD Lagos North), then stamps ticket_email_sent_at. Adds public QR PNG and .ics endpoints. The Directus Flow is switched to call the route after ticket_code assignment.",
+  "scopeOfTheClaim": "R1 only. Live staging change; no production deploy. Test registration rows cleaned after verification. The WhatsApp channel remains outside this slice."
+}

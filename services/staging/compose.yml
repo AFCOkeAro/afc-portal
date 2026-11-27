@@ -52,6 +52,15 @@ services:
       # AFC-1256: Turnstile secret. Without it NODE_ENV=production fails
       # closed with 503 bot_verification_unavailable before any seat work.
       NUXT_TURNSTILE_SECRET_KEY: ${NUXT_TURNSTILE_SECRET_KEY:-}
+      # AFC-1250: Flow-triggered ticket email transport. The SMTP values are
+      # the same mailbox Directus uses; the flow secret is server-only.
+      NUXT_SMTP_HOST: ${EMAIL_SMTP_HOST:-}
+      NUXT_SMTP_PORT: ${EMAIL_SMTP_PORT:-}
+      NUXT_SMTP_USER: ${EMAIL_SMTP_USER:-}
+      NUXT_SMTP_PASSWORD: ${EMAIL_SMTP_PASSWORD:-}
+      NUXT_SMTP_SECURE: ${EMAIL_SMTP_SECURE:-}
+      NUXT_TICKET_FLOW_SECRET: ${NUXT_TICKET_FLOW_SECRET:-}
+      NUXT_TICKET_FROM: ${NUXT_TICKET_FROM:-}
       # Staging SHA-proof (AFC-718): runtime fallback for the build SHA the
       # image baked in above. Resolves from the host .env, same as every
       # other entry in this block; empty means the probe reports 'unknown'.
