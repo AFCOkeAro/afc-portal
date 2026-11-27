@@ -126,10 +126,20 @@ must not merge or deploy without CTO R2.
 5. Direct anonymous `POST /items/event_registrations` must be `403`.
 6. Keep the `pg_dump` until the probes pass.
 
-## Residual read grant to record
+## Residual read grant — REMOVED 2026-11-27
 
-`afc-public-reader` (`d5cd171c…`) still holds a public-shaped read on
-`event_registrations` (`id,event,registration_status,ticket_code`) through the
-`Public Reader` role, which the migration's public set does not resolve. It is
-not anonymous and the portal does not use it. Flag it to the CTO: remove it in a
-reviewed snapshot if no consumer is confirmed.
+With operator approval, the live `afc-public-reader` read row on
+`event_registrations` was removed from staging:
+
+- permission id `8140`, action `read`,
+  fields `id,event,registration_status,ticket_code`,
+  policy `afc-public-reader` (`d5cd171c-19cc-454b-8045-7d320f69b52d`);
+- before: `total=20`; after: `total=19`; public create remains `2` and public
+  non-create remains `1` (the `portal-public-feed` read);
+- live public registration re-tested after the removal: `200` with a ticket
+  code; the probe row was deleted.
+
+The `afc-public-reader` **create** row (permission id `8139`, fields `*`) still
+exists so the policy is not left half-migrated; no user currently holds the
+`Public Reader` role. If the role is retired, remove that create row in the same
+reviewed snapshot as the rest of the 0072 cutover.
