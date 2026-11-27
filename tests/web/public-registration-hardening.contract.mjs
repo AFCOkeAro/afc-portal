@@ -832,7 +832,7 @@ describe('AFC-1256: create-only writer read-after-write (option 2)', () => {
   })
 
   it('orders the no-key fallback newest-first so an older sibling cannot win', () => {
-    assert.match(src, /\['-date_created'\]/)
+    assert.match(src, /\['-created_at'\]/)
     assert.match(src, /buildDedupeFilter\(form\)/)
   })
 

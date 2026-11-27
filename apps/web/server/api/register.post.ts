@@ -621,7 +621,7 @@ const READBACK_DELAY_MS = 60
  * Idempotency-Key is preferred: the (event, key) partial unique index makes
  * the lookup exact. Without a key, the newest row matching the same
  * normalized contact/name key is the one this request just created; it is
- * ordered by `date_created` so an older sibling registration cannot win.
+ * ordered by `created_at` so an older sibling registration cannot win.
  * If the row still cannot be read the route fails closed with 503: the
  * caller retries with the same Idempotency-Key and the retry replays.
  */
@@ -724,7 +724,7 @@ async function readDedupeCandidates(
 
 /**
  * Read-after-write without an Idempotency-Key: the newest row matching the
- * same normalized contact (or name fallback) key. `date_created` descending
+ * same normalized contact (or name fallback) key. `created_at` descending
  * puts this request's row first so an older sibling cannot be returned.
  */
 async function findNewestContactRegistration(
@@ -737,7 +737,7 @@ async function findNewestContactRegistration(
     event,
     serverToken,
     buildDedupeFilter(form),
-    ['-date_created'],
+    ['-created_at'],
   )
   for (const row of rows) {
     if (publicDedupeKey(form.event, row) !== wanted) continue
